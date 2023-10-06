@@ -176,8 +176,11 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   Http::ResponseMessagePtr message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  message->body().add(api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
-      "contrib/client_ssl_auth/filters/network/test/test_data/vpn_response_1.json")));
+  message->body().add(
+      api_->fileSystem()
+          .fileReadToEnd(TestEnvironment::runfilesPath(
+              "contrib/client_ssl_auth/filters/network/test/test_data/vpn_response_1.json"))
+          .value());
   callbacks_->onSuccess(request_, std::move(message));
   EXPECT_EQ(1U,
             stats_store_

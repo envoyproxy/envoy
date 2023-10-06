@@ -1,7 +1,6 @@
 package test.kotlin.integration
 
 import io.envoyproxy.envoymobile.Element
-import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.engine.JniLibrary
@@ -18,11 +17,12 @@ class EngineApiTest {
   @Test
   fun `verify engine APIs`() {
     val countDownLatch = CountDownLatch(1)
-    val engine = EngineBuilder()
-      .addLogLevel(LogLevel.INFO)
-      .addStatsFlushSeconds(1)
-      .setOnEngineRunning { countDownLatch.countDown() }
-      .build()
+    val engine =
+      EngineBuilder()
+        .addLogLevel(LogLevel.INFO)
+        .addStatsFlushSeconds(1)
+        .setOnEngineRunning { countDownLatch.countDown() }
+        .build()
 
     assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
 

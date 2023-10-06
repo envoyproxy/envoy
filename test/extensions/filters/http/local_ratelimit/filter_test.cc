@@ -311,6 +311,49 @@ descriptors:
 stage: {}
   )";
 
+static const std::string consume_default_token_config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: {}
+  tokens_per_fill: 1
+  fill_interval: 60s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+response_headers_to_add:
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    header:
+      key: x-test-rate-limit
+      value: 'true'
+local_rate_limit_per_downstream_connection: true
+always_consume_default_token_bucket: {}
+descriptors:
+- entries:
+   - key: hello
+     value: world
+   - key: foo
+     value: bar
+  token_bucket:
+    max_tokens: 10
+    tokens_per_fill: 10
+    fill_interval: 60s
+- entries:
+   - key: foo2
+     value: bar2
+  token_bucket:
+    max_tokens: {}
+    tokens_per_fill: 1
+    fill_interval: 60s
+stage: {}
+  )";
+
 static const std::string descriptor_vh_config_yaml = R"(
 stat_prefix: test
 token_bucket:
@@ -467,6 +510,70 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFound) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(DescriptorFilterTest, RouteDescriptorNotFoundWithConsumeDefaultTokenTrue) {
+  setUpTest(fmt::format(fmt::runtime(consume_default_token_config_yaml), "0", "true", "1", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_not_found_));
+
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(DescriptorFilterTest, RouteDescriptorWithConsumeDefaultTokenTrue) {
+  setUpTest(fmt::format(fmt::runtime(consume_default_token_config_yaml), "0", "true", "1", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(DescriptorFilterTest, RouteDescriptorWithConsumeDefaultTokenFalse) {
+  setUpTest(fmt::format(fmt::runtime(consume_default_token_config_yaml), "0", "false", "1", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(DescriptorFilterTest, RouteDescriptorNotFoundWithConsumeDefaultTokenFalse) {
+  setUpTest(fmt::format(fmt::runtime(consume_default_token_config_yaml), "0", "false", "1", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_not_found_));
+
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorBothMatch) {

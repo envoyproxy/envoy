@@ -1251,7 +1251,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   // Rewrites the host of CONNECT-UDP requests.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      HeaderUtility::isConnectUdp(*request_headers_) &&
+      HeaderUtility::isConnectUdpRequest(*request_headers_) &&
       !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
     sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().InvalidPath);
@@ -1633,8 +1633,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
   if (connection_manager_.config_.routeConfigProvider() != nullptr) {
-    return absl::optional<Router::ConfigConstSharedPtr>(
-        connection_manager_.config_.routeConfigProvider()->configCast());
+    return {connection_manager_.config_.routeConfigProvider()->configCast()};
   }
   return {};
 }
@@ -1941,6 +1940,11 @@ bool ConnectionManagerImpl::ActiveStream::verbose() const {
 uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
   ASSERT(connection_manager_tracing_config_.has_value());
   return connection_manager_tracing_config_->max_path_tag_length_;
+}
+
+bool ConnectionManagerImpl::ActiveStream::spawnUpstreamSpan() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->spawn_upstream_span_;
 }
 
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {

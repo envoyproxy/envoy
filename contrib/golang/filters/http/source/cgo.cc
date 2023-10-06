@@ -158,6 +158,15 @@ CAPIStatus envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer_ptr
       });
 }
 
+CAPIStatus envoyGoFilterHttpDrainBuffer(void* r, unsigned long long int buffer_ptr,
+                                        uint64_t length) {
+  return envoyGoFilterHandlerWrapper(
+      r, [buffer_ptr, length](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
+        return filter->drainBuffer(buffer, length);
+      });
+}
+
 CAPIStatus envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buffer_ptr, void* data,
                                             int length, bufferAction action) {
   return envoyGoFilterHandlerWrapper(

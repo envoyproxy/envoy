@@ -153,8 +153,8 @@ tap_config:
 using Extensions::Common::Tap::TapSinkFactory;
 class MockTapSinkFactory : public TapSinkFactory {
 public:
-  MockTapSinkFactory() {}
-  ~MockTapSinkFactory() override{};
+  MockTapSinkFactory() = default;
+  ~MockTapSinkFactory() override = default;
 
   MOCK_METHOD(SinkPtr, createSinkPtr, (const Protobuf::Message& config, SinkContext), (override));
 
@@ -200,7 +200,7 @@ TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  TestConfigImpl(tap_config, NULL, factory_context);
+  TestConfigImpl(tap_config, nullptr, factory_context);
 }
 
 TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
@@ -234,7 +234,7 @@ TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  TestConfigImpl(tap_config, NULL, factory_context);
+  TestConfigImpl(tap_config, nullptr, factory_context);
 }
 
 // Make sure warn if using a pipe address for the admin handler.

@@ -84,7 +84,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           std::make_unique<ActiveTcpListener>(
               *this, config, runtime,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
-              address, config.connectionBalancer(*address)),
+              address, config.connectionBalancer(*address),
+              overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
+                                : absl::nullopt),
           overload_manager_);
     }
   } else {
@@ -357,8 +359,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
       listener_it != tcp_listener_map_by_address_.end() &&
       listener_it->second->listener_->listener() != nullptr) {
-    return Network::BalancedConnectionHandlerOptRef(
-        listener_it->second->tcpListener().value().get());
+    return {listener_it->second->tcpListener().value().get()};
   }
 
   OptRef<ConnectionHandlerImpl::PerAddressActiveListenerDetails> details;

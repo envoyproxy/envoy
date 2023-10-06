@@ -54,7 +54,7 @@ _test () {
     fi
 
     export ENVOY_VERSION="${version}"
-    export AZP_BRANCH="$branch"
+    export CI_BRANCH="$branch"
     # this should be ignored if the non-push
     export DOCKERHUB_USERNAME=DHUSER
     export DOCKERHUB_PASSWORD=DHPASSWORD
@@ -68,13 +68,13 @@ _test () {
 
     if [[ "$DOCKER_CI_TEST_COMMIT" ]]; then
         echo "COMMIT(${name}): > ${testdata}"
-        echo "  DOCKER_FAKE_WIN=${DOCKER_FAKE_WIN} ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path AZP_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
+        echo "  DOCKER_FAKE_WIN=${DOCKER_FAKE_WIN} ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
         ./ci/docker_ci.sh | grep -E "^>" > "$testdata"
         return
     fi
 
     echo "TEST(${name}): <> ${testdata}"
-    echo "  DOCKER_FAKE_WIN=${DOCKER_FAKE_WIN} ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path AZP_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
+    echo "  DOCKER_FAKE_WIN=${DOCKER_FAKE_WIN} ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
     generated="$(mktemp)"
 
     ./ci/docker_ci.sh | grep -E "^>" > "$generated"

@@ -30,7 +30,7 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "drainer_filter_config_lib",
-    srcs = ["drainer_filter.h"],
+    hdrs = ["drainer_filter.h"],
     deps = [
         ":drainer_filter_proto_cc_proto",
         "//envoy/registry",
@@ -48,10 +48,11 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "buffer_filter_config_lib",
-    srcs = ["buffer_filter.h"],
+    hdrs = ["buffer_filter.h"],
     deps = [
         ":buffer_filter_proto_cc_proto",
         "//envoy/registry",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:factory_base_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "//test/test_common:utility_lib",

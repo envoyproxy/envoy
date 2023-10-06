@@ -413,7 +413,7 @@ private:
     // HTTP connection manager configuration, then the entire connection is closed.
     bool validateTrailers();
 
-    std::weak_ptr<bool> stillAlive() { return std::weak_ptr<bool>(still_alive_); }
+    std::weak_ptr<bool> stillAlive() { return {still_alive_}; }
 
     ConnectionManagerImpl& connection_manager_;
     OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
@@ -501,6 +501,7 @@ private:
     const Tracing::CustomTagMap* customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
+    bool spawnUpstreamSpan() const override;
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
   };

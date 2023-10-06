@@ -194,15 +194,18 @@ public:
     if (!waitForData(client_dispatcher, 5, timeout)) {
       return testing::AssertionFailure() << "Timed out waiting for start of gRPC message.";
     }
+    int last_body_size = 0;
     {
       absl::MutexLock lock(&lock_);
+      last_body_size = body_.length();
       if (!grpc_decoder_.decode(body_, decoded_grpc_frames_)) {
         return testing::AssertionFailure()
                << "Couldn't decode gRPC data frame: " << body_.toString();
       }
     }
     if (decoded_grpc_frames_.empty()) {
-      if (!waitForData(client_dispatcher, grpc_decoder_.length(), bound.timeLeft())) {
+      if (!waitForData(client_dispatcher, grpc_decoder_.length() - last_body_size,
+                       bound.timeLeft())) {
         return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
       }
       {
@@ -750,6 +753,7 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager& listener) override;
 
   void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
   void setDisableAllAndDoNotEnable(bool value) { disable_and_do_not_enable_ = value; }

@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
+#include <stdint.h> // NOLINT(modernize-deprecated-headers)
 
 typedef struct { // NOLINT(modernize-use-using)
   const char* data;
@@ -62,6 +62,7 @@ CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* r, void* key, void* value, hea
 CAPIStatus envoyGoFilterHttpRemoveHeader(void* r, void* key);
 
 CAPIStatus envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer, void* value);
+CAPIStatus envoyGoFilterHttpDrainBuffer(void* r, unsigned long long int buffer, uint64_t length);
 CAPIStatus envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buffer, void* data,
                                             int length, bufferAction action);
 
@@ -93,16 +94,14 @@ CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value);
 CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value);
 
 // downstream
-CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int closeType);
-CAPIStatus envoyGoFilterDownstreamWrite(void* wrapper, void* buffers, int buffersNum,
-                                        int endStream);
+CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int close_type);
+CAPIStatus envoyGoFilterDownstreamWrite(void* f, void* buffer_ptr, int buffer_len, int end_stream);
 void envoyGoFilterDownstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterDownstreamInfo(void* wrapper, int t, void* ret);
 
-// upstream
-void* envoyGoFilterUpstreamConnect(void* libraryID, void* addr, unsigned long long int connID);
-CAPIStatus envoyGoFilterUpstreamWrite(void* wrapper, void* buffers, int buffersNum, int endStream);
-CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int closeType);
+void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, unsigned long long int conn_id);
+CAPIStatus envoyGoFilterUpstreamWrite(void* u, void* buffer_ptr, int buffer_len, int end_stream);
+CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int close_type);
 void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterUpstreamInfo(void* wrapper, int t, void* ret);
 

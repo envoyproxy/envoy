@@ -123,9 +123,9 @@ public:
   virtual GoUint64 envoyGoFilterOnDownstreamWrite(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                                   GoInt slice_num, GoInt end_of_stream) PURE;
 
-  virtual void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 connID) PURE;
+  virtual void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 conn_id) PURE;
   virtual void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason,
-                                                        GoUint64 connID) PURE;
+                                                        GoUint64 conn_id) PURE;
   virtual void envoyGoFilterOnUpstreamData(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                            GoInt slice_num, GoInt end_of_stream) PURE;
   virtual void envoyGoFilterOnUpstreamEvent(void* w, GoInt event) PURE;
@@ -149,8 +149,8 @@ public:
   GoUint64 envoyGoFilterOnDownstreamWrite(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                           GoInt slice_num, GoInt end_of_stream) override;
 
-  void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 connID) override;
-  void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason, GoUint64 connID) override;
+  void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 conn_id) override;
+  void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason, GoUint64 conn_id) override;
   void envoyGoFilterOnUpstreamData(void* w, GoUint64 data_size, GoUint64 data_ptr, GoInt slice_num,
                                    GoInt end_of_stream) override;
   void envoyGoFilterOnUpstreamEvent(void* w, GoInt event) override;
@@ -172,9 +172,9 @@ private:
                                                    GoInt slice_num,
                                                    GoInt end_of_stream) = {nullptr};
 
-  void (*envoy_go_filter_on_upstream_connection_ready_)(void* w, GoUint64 connID) = {nullptr};
+  void (*envoy_go_filter_on_upstream_connection_ready_)(void* w, GoUint64 conn_id) = {nullptr};
   void (*envoy_go_filter_on_upstream_connection_failure_)(void* w, GoInt reason,
-                                                          GoUint64 connID) = {nullptr};
+                                                          GoUint64 conn_id) = {nullptr};
   void (*envoy_go_filter_on_upstream_data_)(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                             GoInt slice_num, GoInt end_of_stream) = {nullptr};
   void (*envoy_go_filter_on_upstream_event_)(void* w, GoInt event) = {nullptr};

@@ -121,7 +121,8 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, 200ms, 10000, *stats_store_.rootScope(), ""));
+    config_ =
+        std::make_shared<FilterConfig>(proto_config, 200ms, 10000, *stats_store_.rootScope(), "");
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -451,6 +452,79 @@ protected:
         processResponseBody(absl::nullopt, false);
       }
     }
+  }
+
+  void StreamingSmallChunksWithBodyMutation(bool empty_last_chunk, bool mutate_last_chunk) {
+    initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SKIP"
+    request_body_mode: "NONE"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+    Buffer::OwnedImpl first_chunk("foo");
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, false));
+    EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+    response_headers_.addCopy(LowerCaseString(":status"), "200");
+    response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+    Buffer::OwnedImpl want_response_body;
+    Buffer::OwnedImpl got_response_body;
+    EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+        .WillRepeatedly(Invoke([&got_response_body](Buffer::Instance& data, Unused) {
+          got_response_body.move(data);
+        }));
+    uint32_t chunk_number = 3;
+    for (uint32_t i = 0; i < chunk_number; i++) {
+      Buffer::OwnedImpl resp_data(std::to_string(i));
+      EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+      processResponseBody(
+          [i, &want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(body.body() + " " + std::to_string(i) + " ");
+            want_response_body.add(body.body() + " " + std::to_string(i) + " ");
+          },
+          false);
+    }
+
+    std::string last_chunk_str = "";
+    Buffer::OwnedImpl resp_data;
+    if (!empty_last_chunk) {
+      last_chunk_str = std::to_string(chunk_number);
+    }
+    resp_data.add(last_chunk_str);
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+    if (mutate_last_chunk) {
+      processResponseBody(
+          [&chunk_number, &want_response_body](const HttpBody& body, ProcessingResponse&,
+                                               BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(body.body() + " " + std::to_string(chunk_number) + " ");
+            want_response_body.add(body.body() + " " + std::to_string(chunk_number) + " ");
+          },
+          true);
+    } else {
+      processResponseBody(absl::nullopt, true);
+      want_response_body.add(last_chunk_str);
+    }
+
+    EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+    filter_->onDestroy();
+
+    EXPECT_EQ(1, config_->stats().streams_started_.value());
+    EXPECT_EQ(4, config_->stats().stream_msgs_sent_.value());
+    EXPECT_EQ(4, config_->stats().stream_msgs_received_.value());
+    EXPECT_EQ(1, config_->stats().streams_closed_.value());
   }
 
   // The metadata configured as part of ext_proc filter should be in the filter state.
@@ -1404,6 +1478,22 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
   checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, 2 * chunk_number);
 }
 
+TEST_F(HttpFilterTest, StreamingBodyMutateLastEmptyChunk) {
+  StreamingSmallChunksWithBodyMutation(true, true);
+}
+
+TEST_F(HttpFilterTest, StreamingBodyNotMutateLastEmptyChunk) {
+  StreamingSmallChunksWithBodyMutation(true, false);
+}
+
+TEST_F(HttpFilterTest, StreamingBodyMutateLastChunk) {
+  StreamingSmallChunksWithBodyMutation(false, true);
+}
+
+TEST_F(HttpFilterTest, StreamingBodyNotMutateLastChunk) {
+  StreamingSmallChunksWithBodyMutation(false, false);
+}
+
 // gRPC call fails when streaming sends small chunk request data.
 TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   initializeTestSendAll();
@@ -1879,14 +1969,18 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeMode) {
 
   // There should be two more messages outstanding, but not three, so respond
   // just to them.
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 3; i++) {
     processResponseBody(absl::nullopt, false);
   }
 
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
   // Close the stream
   Buffer::OwnedImpl last_resp_chunk;
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(last_resp_chunk, true));
-  processResponseBody(absl::nullopt, false);
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, true);
 
   // At this point, the whole body should have been processed including things
   // that were rejected.
@@ -1896,8 +1990,8 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeMode) {
   filter_->onDestroy();
 
   EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(5, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(5, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(7, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(7, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
@@ -1970,8 +2064,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, true));
   got_response_body.move(resp_chunk);
 
-  // There should be two more messages outstanding, but not three, so respond
-  // just to them.
+  processResponseBody(absl::nullopt, false);
   processResponseBody(absl::nullopt, false);
   processResponseBody(absl::nullopt, true);
 
@@ -1983,8 +2076,8 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
   filter_->onDestroy();
 
   EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(5, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(5, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(6, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(6, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
@@ -2309,23 +2402,32 @@ TEST_F(HttpFilterTest, ProcessingModeRequestHeadersOnly) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-// Use the default configuration, but then override the processing mode
-// to disable processing of the response headers.
+// Initial configuration is send everything, but after request header processing,
+// override the processing mode to disable the rest.
 TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeaders) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   allow_mode_override: true
+  processing_mode:
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
   )EOF");
   EXPECT_EQ(filter_->config().allowModeOverride(), true);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
-  processRequestHeaders(
-      false, [](const HttpHeaders&, ProcessingResponse& response, HeadersResponse&) {
-        response.mutable_mode_override()->set_response_header_mode(ProcessingMode::SKIP);
-      });
-
+  processRequestHeaders(false,
+                        [](const HttpHeaders&, ProcessingResponse& response, HeadersResponse&) {
+                          auto mode = response.mutable_mode_override();
+                          mode->set_request_body_mode(ProcessingMode::NONE);
+                          mode->set_request_trailer_mode(ProcessingMode::SKIP);
+                          mode->set_response_header_mode(ProcessingMode::SKIP);
+                          mode->set_response_body_mode(ProcessingMode::NONE);
+                          mode->set_response_trailer_mode(ProcessingMode::SKIP);
+                        });
   Buffer::OwnedImpl first_chunk("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));

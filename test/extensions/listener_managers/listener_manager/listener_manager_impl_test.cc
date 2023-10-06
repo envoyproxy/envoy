@@ -45,7 +45,6 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-using testing::AtLeast;
 using testing::ByMove;
 using testing::InSequence;
 using testing::Return;
@@ -2046,94 +2045,6 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsDeprecatedBehavior) {
-  const std::string listener_origin = R"EOF(
-name: foo
-address:
-  socket_address:
-      address: 127.0.0.1
-      port_value: 1234
-enable_reuse_port: true
-socket_options:
-    - level: 1
-      name: 9
-      int_value: 1
-filter_chains:
-- filters: []
-  )EOF";
-
-  const std::string listener_updated = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-enable_reuse_port: true
-socket_options:
-    - level: 1
-      name: 9
-      int_value: 2
-filter_chains:
-- filters: []
-  )EOF";
-  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
-}
-
-TEST_P(ListenerManagerImplTest,
-       UpdateListenerWithDifferentSocketOptionsWithMultiAddressesDeprecatedBehavior) {
-  const std::string listener_origin = R"EOF(
-name: foo
-address:
-  socket_address:
-      address: 127.0.0.1
-      port_value: 1234
-additional_addresses:
-- address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 5678
-  socket_options:
-    socket_options:
-    - level: 1
-      name: 9
-      int_value: 2
-enable_reuse_port: true
-socket_options:
-    - level: 1
-      name: 9
-      int_value: 1
-filter_chains:
-- filters: []
-  )EOF";
-
-  const std::string listener_updated = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-additional_addresses:
-- address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 5678
-  socket_options:
-    socket_options:
-    - level: 1
-      name: 9
-      int_value: 3
-enable_reuse_port: true
-socket_options:
-    - level: 1
-      name: 9
-      int_value: 1
-filter_chains:
-- filters: []
-  )EOF";
-  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated,
-                                                              true);
-}
-
 // The socket options update is only available when enable_reuse_port as true.
 // Linux is the only platform allowing the enable_reuse_port as true.
 #ifdef __linux__
@@ -2385,71 +2296,6 @@ filter_chains:
       "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener";
   testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
                                                     expected_error_message);
-}
-
-// The socket options update is only available when enable_reuse_port as true.
-// Linux is the only platform allowing the enable_reuse_port as true.
-#ifdef __linux__
-TEST_P(ListenerManagerImplTest, UpdateListenerRejectReusePortUpdate) {
-  // Add and initialize foo listener and the default value of enable_reuse_port is true.
-  const std::string listener_origin = R"EOF(
-name: foo
-address:
-  socket_address:
-      address: 127.0.0.1
-      port_value: 1234
-enable_reuse_port: true
-filter_chains:
-- filters: []
-  )EOF";
-
-  // update listener foo, with enable_reuse_port as false.
-  const std::string listener_updated = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-enable_reuse_port: false
-filter_chains:
-- filters: []
-  )EOF";
-
-  const std::string expected_error_message =
-      "Listener foo: reuse port cannot be changed during an update";
-  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
-                                                    expected_error_message);
-}
-#endif
-
-// The deprecated behavior is the update of `enable_reuse_port` will be ignored and
-// listener update success.
-TEST_P(ListenerManagerImplTest, UpdateListenerReusePortUpdateDeprecatedBehavior) {
-  // Add and initialize foo listener and the default value of enable_reuse_port is true.
-  const std::string listener_origin = R"EOF(
-name: foo
-address:
-  socket_address:
-      address: 127.0.0.1
-      port_value: 1234
-enable_reuse_port: true
-filter_chains:
-- filters: []
-  )EOF";
-
-  // update listener foo, with enable_reuse_port as false.
-  const std::string listener_updated = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-enable_reuse_port: false
-filter_chains:
-- filters: []
-  )EOF";
-
-  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
 }
 
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
@@ -5954,11 +5800,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillRepeatedly(Return(-1));
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
                                      Network::Address::InstanceConstSharedPtr{
                                          new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
                                      Network::Address::InstanceConstSharedPtr{
-                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)},
+                                     overload_state, false);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
@@ -6038,10 +5886,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
-      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), overload_state, false);
 
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls_, ioctl(_, _, _, _, _, _, _));
@@ -6103,10 +5952,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
   EXPECT_CALL(os_sys_calls_, ioctl(_, _, _, _, _, _, _))
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
 #endif
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
-      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), overload_state, false);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
@@ -6152,9 +6002,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::AcceptedSocketImpl socket(
       std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
-      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), overload_state, false);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
@@ -6235,10 +6086,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),
-      std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678));
+      std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678), overload_state, false);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;

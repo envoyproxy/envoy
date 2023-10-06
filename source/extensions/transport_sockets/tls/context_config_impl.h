@@ -165,6 +165,9 @@ public:
   bool disableStatelessSessionResumption() const override {
     return disable_stateless_session_resumption_;
   }
+  bool disableStatefulSessionResumption() const override {
+    return disable_stateful_session_resumption_;
+  }
 
   bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
 
@@ -190,6 +193,7 @@ private:
 
   absl::optional<std::chrono::seconds> session_timeout_;
   const bool disable_stateless_session_resumption_;
+  const bool disable_stateful_session_resumption_;
   bool full_scan_certs_on_sni_mismatch_;
 };
 

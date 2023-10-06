@@ -28,6 +28,9 @@ on:
         type: string
       given_ref:
         type: string
+    secrets:
+      ENVOY_CI_SYNC_APP_ID:
+      ENVOY_CI_SYNC_APP_KEY:
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
@@ -90,3 +93,27 @@ jobs:
       run_pre_with: ${{ matrix.run_pre_with }}
       env: ${{ matrix.env }}
       trusted: true
+      repo_ref: ${{ inputs.repo_ref }}
+
+  publish_docs:
+    # For normal commits to Envoy main this will trigger an update in the website repo,
+    # which will update its envoy dep shas, and rebuild the website for the latest docs
+    #
+    # For commits that create a release, it instead triggers an update in the archive repo,
+    # which builds a static version of the docs for the release and commits it to the archive.
+    # In turn the archive repo triggers an update in the website so the new release docs are
+    # included in the published site
+    if: ${{ inputs.trusted }}
+    runs-on: ubuntu-22.04
+    needs:
+    - publish
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.18
+      with:
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+        key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
+        ref: main
+        repository: ${{ inputs.version_dev != '' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
+        workflow: envoy-sync.yaml
+        inputs: |
+          commit_sha: ${{ inputs.version_dev != '' && github.sha || '' }}

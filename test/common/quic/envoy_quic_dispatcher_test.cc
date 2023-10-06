@@ -193,7 +193,9 @@ public:
               }));
       EXPECT_CALL(test.proof_source_->filterChain(), networkFilterFactories())
           .WillOnce(ReturnRef(filter_factory_));
-      EXPECT_CALL(test.listener_config_, filterChainFactory());
+      EXPECT_CALL(test.listener_config_, filterChainFactory()).Times(2u);
+      EXPECT_CALL(test.listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+          .WillRepeatedly(Return(true));
       EXPECT_CALL(test.listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([](Network::Connection& connection,
                               const Filter::NetworkFilterFactoriesList& filter_factories) {
@@ -261,7 +263,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   processValidChloPacketAndInitializeFilters(false);
 }
 
-TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
+TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringNetworkFilterInstallation) {
   Network::MockFilterChainManager filter_chain_manager;
   std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
   Network::MockConnectionCallbacks network_connection_callbacks;
@@ -288,7 +290,9 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
       .WillOnce(Return(&proof_source_->filterChain()));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillOnce(ReturnRef(filter_factory));
-  EXPECT_CALL(listener_config_, filterChainFactory());
+  EXPECT_CALL(listener_config_, filterChainFactory()).Times(2u);
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+      .WillRepeatedly(Return(true));
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
       .WillOnce(Invoke([](Network::Connection& connection,
                           const Filter::NetworkFilterFactoriesList& filter_factories) {
@@ -311,8 +315,29 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
                                     54321);
 
   processValidChloPacket(peer_addr);
-  connection_id_ =
-      quic::test::TestConnectionId(quic::test::TestConnectionIdToUInt64(connection_id_) + 1);
+}
+
+TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringListenerFilterInstallation) {
+  Network::MockFilterChainManager filter_chain_manager;
+
+  EXPECT_CALL(listener_config_, filterChainFactory());
+  // Failure in creating listener filter chain should pause network filter chain installation as
+  // well.
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _)).Times(0u);
+
+  // Set QuicDispatcher::new_sessions_allowed_per_event_loop_ to
+  // |kNumSessionsToCreatePerLoopForTests| so that received CHLOs can be
+  // processed immediately.
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                        ? quic::QuicIpAddress::Loopback4()
+                                        : quic::QuicIpAddress::Loopback6(),
+                                    54321);
+
+  processValidChloPacket(peer_addr);
+  EXPECT_EQ(0u, envoy_quic_dispatcher_.NumSessions());
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
@@ -425,7 +450,9 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
       .WillOnce(Return(&proof_source_->filterChain()));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillOnce(ReturnRef(filter_factory));
-  EXPECT_CALL(listener_config_, filterChainFactory());
+  EXPECT_CALL(listener_config_, filterChainFactory()).Times(2u);
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+      .WillRepeatedly(Return(true));
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
       .WillOnce(Invoke([](Network::Connection& connection,
                           const Filter::NetworkFilterFactoriesList& filter_factories) {
