@@ -1,6 +1,8 @@
 package io.envoyproxy.envoymobile
 
-/** Trailers representing an inbound response. */
+/**
+ * Trailers representing an inbound response.
+ */
 @Suppress("EmptyClassBlock")
 class ResponseTrailers : Trailers {
   /**

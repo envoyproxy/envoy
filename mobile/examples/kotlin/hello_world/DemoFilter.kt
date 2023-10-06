@@ -12,7 +12,9 @@ import io.envoyproxy.envoymobile.ResponseTrailers
 import io.envoyproxy.envoymobile.StreamIntel
 import java.nio.ByteBuffer
 
-/** A filter implemented as a simple example of Envoy response filter. */
+/**
+ * A filter implemented as a simple example of Envoy response filter.
+ */
 class DemoFilter : ResponseFilter {
   override fun onResponseHeaders(
     headers: ResponseHeaders,
@@ -42,7 +44,10 @@ class DemoFilter : ResponseFilter {
     return FilterTrailersStatus.Continue(trailers)
   }
 
-  override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {
+  override fun onError(
+    error: EnvoyError,
+    finalStreamIntel: FinalStreamIntel
+  ) {
     Log.d("DemoFilter", "On error!")
   }
 
@@ -50,5 +55,7 @@ class DemoFilter : ResponseFilter {
     Log.d("DemoFilter", "On cancel!")
   }
 
-  @Suppress("EmptyFunctionBlock") override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
+  @Suppress("EmptyFunctionBlock")
+  override fun onComplete(finalStreamIntel: FinalStreamIntel) {
+  }
 }

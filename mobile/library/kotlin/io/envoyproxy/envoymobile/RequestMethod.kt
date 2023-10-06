@@ -2,7 +2,9 @@ package io.envoyproxy.envoymobile
 
 import java.lang.IllegalArgumentException
 
-/** Represents an HTTP request method. */
+/**
+ * Represents an HTTP request method.
+ */
 enum class RequestMethod(internal val stringValue: String) {
   DELETE("DELETE"),
   GET("GET"),

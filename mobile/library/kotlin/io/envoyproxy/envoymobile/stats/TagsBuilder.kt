@@ -22,8 +22,9 @@ public class TagsBuilder {
   /**
    * Append a value to the Tag name.
    *
-   * @param name: The Tag name.
+   * @param name:  The Tag name.
    * @param value: The value associated to the Tag name.
+   *
    * @return TagsBuilder, This builder.
    */
   public fun add(name: String, value: String): TagsBuilder {
@@ -36,6 +37,7 @@ public class TagsBuilder {
    *
    * @param name: The Tag name.
    * @param value: The value associated to the Tag name.
+   *
    * @return TagsBuilder, This builder.
    */
   public fun set(name: String, value: String): TagsBuilder {
@@ -47,6 +49,7 @@ public class TagsBuilder {
    * Remove all Tags with this name.
    *
    * @param name: The Tag name to remove.
+   *
    * @return TagsBuilder, This builder.
    */
   public fun remove(name: String): TagsBuilder {
@@ -58,6 +61,7 @@ public class TagsBuilder {
    * Adds all tags from map to this builder.
    *
    * @param tags: A map of tags.
+   *
    * @return TagsBuilder, This builder.
    */
   public fun putAll(tags: Map<String, String>): TagsBuilder {

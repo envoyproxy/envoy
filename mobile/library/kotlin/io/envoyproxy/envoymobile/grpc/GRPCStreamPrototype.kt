@@ -9,13 +9,14 @@ import java.util.concurrent.Executors
 /**
  * A type representing a gRPC stream that has not yet been started.
  *
- * Constructed via `GRPCClient`, and used to assign response callbacks prior to starting a
- * `GRPCStream` by calling `start()`.
+ * Constructed via `GRPCClient`, and used to assign response callbacks
+ * prior to starting a `GRPCStream` by calling `start()`.
  */
-class GRPCStreamPrototype(private val underlyingStream: StreamPrototype) {
+class GRPCStreamPrototype(
+  private val underlyingStream: StreamPrototype
+) {
   /**
    * Start a new gRPC stream.
-   *
    * @param executor Executor on which to receive callback events.
    * @return The new gRPC stream.
    */
@@ -27,8 +28,7 @@ class GRPCStreamPrototype(private val underlyingStream: StreamPrototype) {
   /**
    * Specify a callback for when response headers are received by the stream.
    *
-   * @param closure Closure which will receive the headers and flag indicating if the stream is
-   *   headers-only.
+   * @param closure Closure which will receive the headers and flag indicating if the stream is headers-only.
    * @return This stream, for chaining syntax.
    */
   fun setOnResponseHeaders(
@@ -39,8 +39,8 @@ class GRPCStreamPrototype(private val underlyingStream: StreamPrototype) {
   }
 
   /**
-   * Specify a callback for when a new message has been received by the stream. If `endStream` is
-   * `true`, the stream is complete.
+   * Specify a callback for when a new message has been received by the stream.
+   * If `endStream` is `true`, the stream is complete.
    *
    * @param closure Closure which will receive messages on the stream.
    * @return This stream, for chaining syntax.
@@ -50,29 +50,26 @@ class GRPCStreamPrototype(private val underlyingStream: StreamPrototype) {
   ): GRPCStreamPrototype {
     val byteBufferedOutputStream = ByteArrayOutputStream()
     val processor = GRPCMessageProcessor()
-    var processState: GRPCMessageProcessor.ProcessState =
-      GRPCMessageProcessor.ProcessState.CompressionFlag
+    var processState: GRPCMessageProcessor.ProcessState = GRPCMessageProcessor.ProcessState.CompressionFlag
     underlyingStream.setOnResponseData { byteBuffer, _, streamIntel ->
-      val byteBufferArray =
-        if (byteBuffer.hasArray()) {
-          byteBuffer.array()
-        } else {
-          val array = ByteArray(byteBuffer.remaining())
-          byteBuffer.get(array)
-          array
-        }
+      val byteBufferArray = if (byteBuffer.hasArray()) {
+        byteBuffer.array()
+      } else {
+        val array = ByteArray(byteBuffer.remaining())
+        byteBuffer.get(array)
+        array
+      }
       byteBufferedOutputStream.write(byteBufferArray)
 
-      processState =
-        processor.processData(byteBufferedOutputStream, processState, streamIntel, closure)
+      processState = processor.processData(byteBufferedOutputStream, processState, streamIntel, closure)
     }
 
     return this
   }
 
   /**
-   * Specify a callback for when trailers are received by the stream. If the closure is called, the
-   * stream is complete.
+   * Specify a callback for when trailers are received by the stream.
+   * If the closure is called, the stream is complete.
    *
    * @param closure Closure which will receive the trailers.
    * @return This stream, for chaining syntax.
@@ -85,8 +82,8 @@ class GRPCStreamPrototype(private val underlyingStream: StreamPrototype) {
   }
 
   /**
-   * Specify a callback for when an internal Envoy exception occurs with the stream. If the closure
-   * is called, the stream is complete.
+   * Specify a callback for when an internal Envoy exception occurs with the stream.
+   * If the closure is called, the stream is complete.
    *
    * @param closure Closure which will be called when an error occurs.
    * @return This stream, for chaining syntax.
@@ -99,20 +96,24 @@ class GRPCStreamPrototype(private val underlyingStream: StreamPrototype) {
   }
 
   /**
-   * Specify a callback for when the stream is canceled. If the closure is called, the stream is
-   * complete.
+   * Specify a callback for when the stream is canceled.
+   * If the closure is called, the stream is complete.
    *
    * @param closure Closure which will be called when the stream is canceled.
    * @return This stream, for chaining syntax.
    */
-  fun setOnCancel(closure: (finalStreamIntel: FinalStreamIntel) -> Unit): GRPCStreamPrototype {
+  fun setOnCancel(
+    closure: (finalStreamIntel: FinalStreamIntel) -> Unit
+  ): GRPCStreamPrototype {
     underlyingStream.setOnCancel(closure)
     return this
   }
 }
 
 private class GRPCMessageProcessor {
-  /** Represents the process state of the response stream's body data. */
+  /**
+   * Represents the process state of the response stream's body data.
+   */
   sealed class ProcessState {
     // Awaiting a gRPC compression flag.
     object CompressionFlag : ProcessState()
@@ -125,8 +126,8 @@ private class GRPCMessageProcessor {
   }
 
   /**
-   * Recursively processes a buffer of data, buffering it into messages based on state. When a
-   * message has been fully buffered, `onMessage` will be called with the message.
+   * Recursively processes a buffer of data, buffering it into messages based on state.
+   * When a message has been fully buffered, `onMessage` will be called with the message.
    *
    * @param bufferedStream The buffer of data from which to determine state and messages.
    * @param processState The current process state of the buffering.
@@ -186,7 +187,9 @@ private class GRPCMessageProcessor {
         )
         bufferedStream.reset()
         bufferedStream.write(
-          byteArray.sliceArray(GRPC_PREFIX_LENGTH + processState.messageLength until byteArray.size)
+          byteArray.sliceArray(
+            GRPC_PREFIX_LENGTH + processState.messageLength until byteArray.size
+          )
         )
 
         val remainingLength = GRPC_PREFIX_LENGTH + processState.messageLength until byteArray.size

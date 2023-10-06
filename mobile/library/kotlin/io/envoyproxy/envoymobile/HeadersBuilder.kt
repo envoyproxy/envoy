@@ -1,8 +1,8 @@
 package io.envoyproxy.envoymobile
 
 /**
- * Base builder class used to construct `Headers` instances. See `{Request|Response}HeadersBuilder`
- * for usage.
+ * Base builder class used to construct `Headers` instances.
+ * See `{Request|Response}HeadersBuilder` for usage.
  */
 open class HeadersBuilder {
   protected val container: HeadersContainer
@@ -19,8 +19,9 @@ open class HeadersBuilder {
   /**
    * Append a value to the header name.
    *
-   * @param name: The header name.
+   * @param name:  The header name.
    * @param value: The value associated to the header name.
+   *
    * @return HeadersBuilder, This builder.
    */
   open fun add(name: String, value: String): HeadersBuilder {
@@ -36,6 +37,7 @@ open class HeadersBuilder {
    *
    * @param name: The header name.
    * @param value: The value associated to the header name.
+   *
    * @return HeadersBuilder, This builder.
    */
   open fun set(name: String, value: MutableList<String>): HeadersBuilder {
@@ -50,6 +52,7 @@ open class HeadersBuilder {
    * Remove all headers with this name.
    *
    * @param name: The header name to remove.
+   *
    * @return HeadersBuilder, This builder.
    */
   open fun remove(name: String): HeadersBuilder {
@@ -65,6 +68,7 @@ open class HeadersBuilder {
    *
    * @param name: The header name.
    * @param value: The value associated to the header name.
+   *
    * @return HeadersBuilder, This builder.
    */
   internal open fun internalSet(name: String, value: MutableList<String>): HeadersBuilder {
@@ -72,8 +76,6 @@ open class HeadersBuilder {
     return this
   }
 
-  private fun isRestrictedHeader(name: String) =
-    name.startsWith(":") ||
-      name.startsWith("x-envoy-mobile", ignoreCase = true) ||
-      name.equals("host", ignoreCase = true)
+  private fun isRestrictedHeader(name: String) = name.startsWith(":") ||
+    name.startsWith("x-envoy-mobile", ignoreCase = true) || name.equals("host", ignoreCase = true)
 }

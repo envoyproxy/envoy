@@ -41,7 +41,10 @@ class DemoFilter : ResponseFilter {
     return FilterTrailersStatus.Continue(trailers)
   }
 
-  override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {
+  override fun onError(
+    error: EnvoyError,
+    finalStreamIntel: FinalStreamIntel
+  ) {
     Log.d("DemoFilter", "On error!")
   }
 
@@ -49,5 +52,7 @@ class DemoFilter : ResponseFilter {
     Log.d("DemoFilter", "On cancel!")
   }
 
-  @Suppress("EmptyFunctionBlock") override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
+  @Suppress("EmptyFunctionBlock")
+  override fun onComplete(finalStreamIntel: FinalStreamIntel) {
+  }
 }

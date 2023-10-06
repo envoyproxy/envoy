@@ -1,16 +1,19 @@
 package test.kotlin.integration.proxying
 
 import android.content.Context
+
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.Custom
 import io.envoyproxy.envoymobile.EngineBuilder
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
 // A convenient wrapper for creating an builder for an engine that
 // proxies network requests.
 class Proxy constructor(val context: Context, val port: Int) {
-  fun http(): EngineBuilder {
-    val config =
-      """
+    fun http(): EngineBuilder {
+      val config = """
 static_resources:
   listeners:
   - name: base_api_listener
@@ -93,12 +96,11 @@ layered_runtime:
           # Global stats do not play well with engines with limited lifetimes
           disallow_global_stats: true
 """
-    return AndroidEngineBuilder(context, Custom(config))
-  }
+      return AndroidEngineBuilder(context, Custom(config))
+    }
 
-  fun https(): EngineBuilder {
-    val config =
-      """
+    fun https(): EngineBuilder {
+      val config = """
 static_resources:
   listeners:
   - name: base_api_listener
@@ -185,6 +187,6 @@ layered_runtime:
           # Global stats do not play well with engines with limited lifetimes
           disallow_global_stats: true
 """
-    return AndroidEngineBuilder(context, Custom(config))
-  }
+      return AndroidEngineBuilder(context, Custom(config))
+    }
 }

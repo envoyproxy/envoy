@@ -8,7 +8,9 @@ import java.nio.ByteOrder
  *
  * Constructed using `GRPCStreamPrototype`, and used to write to the network.
  */
-class GRPCStream(private val underlyingStream: Stream) {
+class GRPCStream(
+  private val underlyingStream: Stream
+) {
   /**
    * Send headers over the gRPC stream.
    *
@@ -48,7 +50,9 @@ class GRPCStream(private val underlyingStream: Stream) {
     return this
   }
 
-  /** Cancel the stream forcefully regardless of whether the peer has more data to send. */
+  /**
+   * Cancel the stream forcefully regardless of whether the peer has more data to send.
+   */
   fun cancel() {
     underlyingStream.cancel()
   }

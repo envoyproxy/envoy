@@ -1,6 +1,8 @@
 package io.envoyproxy.envoymobile
 
-/** Builder used for constructing instances of `ResponseHeaders`. */
+/**
+ * Builder used for constructing instances of `ResponseHeaders`.
+ */
 class ResponseHeadersBuilder : HeadersBuilder {
 
   /*
@@ -14,9 +16,8 @@ class ResponseHeadersBuilder : HeadersBuilder {
    *
    * @param headers: The headers to start with.
    */
-  internal constructor(
-    headers: MutableMap<String, MutableList<String>>
-  ) : super(HeadersContainer(headers))
+  internal constructor(headers: MutableMap<String, MutableList<String>>)
+    : super(HeadersContainer(headers))
 
   /*
    * Instantiate a new builder.
@@ -49,6 +50,7 @@ class ResponseHeadersBuilder : HeadersBuilder {
    * Add an HTTP status to the response headers. Must be a positive integer.
    *
    * @param status: The HTTP status to add.
+   *
    * @return ResponseHeadersBuilder, This builder.
    */
   fun addHttpStatus(status: Int): ResponseHeadersBuilder {
