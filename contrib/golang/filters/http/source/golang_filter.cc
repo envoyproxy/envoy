@@ -1720,11 +1720,11 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
     }
     // upper level config changed, merged_config_id_ is outdated.
     // there is a concurrency race:
-    // 1. when A envoy worker thread using the cached merged_config_id_ and it will call into Go
+    // 1. when A envoy worker thread is using the cached merged_config_id_ and it will call into Go
     //    after some time.
     // 2. while B envoy worker thread may update the merged_config_id_ in getMergedConfigId, that
     //    will delete the id.
-    // so, we delay to delete id in the Go side.
+    // so, we delay deleting the id in the Go side.
     dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_, 1);
   }
 
