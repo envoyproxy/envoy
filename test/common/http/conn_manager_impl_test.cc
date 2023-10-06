@@ -4341,6 +4341,9 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerNa
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(false);
   proxy_status_config_->set_set_recommended_response_code(true);
@@ -4353,13 +4356,16 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "custom_server_name; error=connection_timeout; details=\"bar; UT\"");
+            "custom_server_name; error=http_response_timeout; details=\"bar; UT\"");
   // Changed from request, since set_recommended_response_code is true. Here,
   // 504 is the recommended response code for UpstreamRequestTimeout.
   EXPECT_EQ(altered_headers->getStatusValue(), "504");
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(false);
   proxy_status_config_->set_remove_connection_termination_details(false);
@@ -4374,7 +4380,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "custom_server_name; error=connection_timeout; details=\"bar; UT\"");
+            "custom_server_name; error=http_response_timeout; details=\"bar; UT\"");
   // Unchanged from request, since set_recommended_response_code is false. Here,
   // 504 would be the recommended response code for UpstreamRequestTimeout,
   EXPECT_NE(altered_headers->getStatusValue(), "504");
@@ -4382,6 +4388,9 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(true);
   proxy_status_config_->set_set_recommended_response_code(false);
@@ -4393,7 +4402,8 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
-  EXPECT_EQ(altered_headers->getProxyStatusValue(), "custom_server_name; error=connection_timeout");
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "custom_server_name; error=http_response_timeout");
   // Unchanged.
   EXPECT_EQ(altered_headers->getStatusValue(), "403");
   // Since remove_details=true, we should not have "baz", the value of
@@ -4402,6 +4412,9 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(false);
 
@@ -4415,7 +4428,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
   ASSERT_TRUE(altered_headers->ProxyStatus());
   // Expect to see the appended previous value: "SomeCDN; custom_server_name; ...".
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "SomeCDN, custom_server_name; error=connection_timeout; details=\"baz; UT\"");
+            "SomeCDN, custom_server_name; error=http_response_timeout; details=\"baz; UT\"");
 }
 
 } // namespace Http

@@ -246,11 +246,15 @@ pkg_tar(
 genrule(
     name = "html_release",
     outs = ["html_release.tar.gz"],
+    # BUILD_SHA must be set in release builds
+    # The Envoy workspace will provide this on stamped builds. For external builds
+    # you must either pass an env var or pass it through the workspace's status.
     cmd = """
     . $(location //bazel:volatile_env) \
+    && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
     && $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_DOCS_SHA:-$${BUILD_SCM_REVISION}}" \
+         --build_sha="$$_BUILD_SHA" \
          --docs_tag="$${BUILD_DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \
@@ -290,5 +294,5 @@ genrule(
 
 alias(
     name = "docs",
-    actual = ":html",
+    actual = ":html_release",
 )

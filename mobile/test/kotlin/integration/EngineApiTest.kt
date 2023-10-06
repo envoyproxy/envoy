@@ -17,11 +17,12 @@ class EngineApiTest {
   @Test
   fun `verify engine APIs`() {
     val countDownLatch = CountDownLatch(1)
-    val engine = EngineBuilder()
-      .addLogLevel(LogLevel.INFO)
-      .addStatsFlushSeconds(1)
-      .setOnEngineRunning { countDownLatch.countDown() }
-      .build()
+    val engine =
+      EngineBuilder()
+        .addLogLevel(LogLevel.INFO)
+        .addStatsFlushSeconds(1)
+        .setOnEngineRunning { countDownLatch.countDown() }
+        .build()
 
     assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
 

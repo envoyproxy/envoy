@@ -195,7 +195,7 @@ paths:
   protobuf:
     include:
     - api/test
-    - bazel/cc_proto_descriptor_library
+    - api/bazel/cc_proto_descriptor_library
     - ci/prebuilt
     - source/common/protobuf
     - source/extensions/filters/http/grpc_field_extraction
@@ -246,7 +246,7 @@ paths:
   # Files in these paths can use MessageLite::SerializeAsString
   serialize_as_string:
     include:
-    - bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
+    - api/bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
     - contrib/config/source/kv_store_xds_delegate.cc
     - source/common/protobuf/utility.h
     - source/common/protobuf/utility.cc

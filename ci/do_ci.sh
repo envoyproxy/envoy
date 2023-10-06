@@ -565,11 +565,17 @@ case $CI_TARGET in
               -- --stdout \
                  -d "$ENVOY_RELEASE_TARBALL" \
             | tar xfO - envoy > distribution/custom/envoy
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/zstd \
+              -- --stdout \
+                 -d "$ENVOY_RELEASE_TARBALL" \
+            | tar xfO - envoy-contrib > distribution/custom/envoy-contrib
         # Build the packages
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               --remote_download_toplevel \
               -c opt \
               --//distribution:envoy-binary=//distribution:custom/envoy \
+              --//distribution:envoy-contrib-binary=//distribution:custom/envoy-contrib \
               //distribution:packages.tar.gz
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
             cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
@@ -648,7 +654,23 @@ case $CI_TARGET in
         setup_clang_toolchain
         echo "generating docs..."
         # Build docs.
-        "${ENVOY_SRCDIR}/docs/build.sh"
+        [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
+        rm -rf "${DOCS_OUTPUT_DIR}"
+        mkdir -p "${DOCS_OUTPUT_DIR}"
+        if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
+            export SPHINX_RUNNER_ARGS="-v warn"
+            BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
+        fi
+        if [[ -n "${DOCS_BUILD_RST}" ]]; then
+            bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
+            cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+        fi
+        DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --//tools/tarball:target=//docs:html \
+              //tools/tarball:unpack \
+              "$DOCS_OUTPUT_DIR"
         ;;
 
     docs-upload)

@@ -271,9 +271,11 @@ class RstFormatVisitor(visitor.Visitor):
 
         if not os.environ.get("DOCS_RST_CHECK"):
             return message
-        error = self.backticks_check(message)
-        if error:
-            logger.warning(f"Bad RST ({msg_proto.name}): {error}")
+        if error := self.backticks_check(message):
+            error_message = f"Bad RST ({msg_proto.name}): {error}"
+            if ctx.name.startswith("envoy."):
+                raise ProtodocError(error_message)
+            logger.warning(error_message)
         return message
 
     @lru_cache
