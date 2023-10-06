@@ -133,6 +133,11 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
+    // This will cause codecs to use legacy header validation and path normalization
+    return nullptr;
+  }
   ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
   if (!config.has_typed_header_validation_config()) {
     // If header validator is not configured ensure that the defaults match Envoy's original
@@ -183,6 +188,12 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
     throw EnvoyException(
         fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
                     config.typed_header_validation_config().name()));
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
+    throw EnvoyException(
+        "Header validator can not be enabled since this Envoy binary does not support it.");
   }
 #endif
   return header_validator_factory;
@@ -629,7 +640,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.getServerFactoryContext(),
              context_.clusterManager(), context_, stats_prefix_);
-  helper.processFilters(config.http_filters(), "http", "http", filter_factories_);
+  THROW_IF_NOT_OK(helper.processFilters(config.http_filters(), "http", "http", filter_factories_));
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
@@ -642,7 +653,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
       Http::DependencyManager upgrade_dependency_manager;
-      helper.processFilters(upgrade_config.filters(), name, "http upgrade", *factories);
+      THROW_IF_NOT_OK(
+          helper.processFilters(upgrade_config.filters(), name, "http upgrade", *factories));
       // TODO(auni53): Validate encode dependencies too.
       auto status = upgrade_dependency_manager.validDecodeDependencies();
       if (!status.ok()) {

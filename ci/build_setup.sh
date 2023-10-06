@@ -87,7 +87,6 @@ fi
 export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export PATH=${LLVM_ROOT}/bin:${PATH}
-export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
   BAZEL_BUILD_EXTRA_OPTIONS+=("--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1")
@@ -138,7 +137,6 @@ BAZEL_BUILD_OPTIONS=(
   "${BAZEL_GLOBAL_OPTIONS[@]}"
   "--verbose_failures"
   "--experimental_generate_json_trace_profile"
-  "--action_env=CLANG_FORMAT"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
@@ -193,9 +191,6 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 # This is where we copy the build profile to.
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
-
-export BUILDIFIER_BIN="${BUILDIFIER_BIN:-/usr/local/bin/buildifier}"
-export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
 
 if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]]; then
   # shellcheck source=ci/filter_example_setup.sh

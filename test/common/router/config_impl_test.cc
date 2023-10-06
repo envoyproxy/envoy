@@ -2277,31 +2277,27 @@ virtual_hosts:
       {"local_service_grpc", "default-boring-service"}, {});
   {
     TestConfigImpl config(route_configuration, factory_context_, true);
-    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)
-                  ->routeEntry()
-                  ->routeName(),
-              "catchall-route");
+    EXPECT_EQ(
+        config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)->routeName(),
+        "catchall-route");
   }
   // Set ignore_port_in_host_matching to true, and path-parameters will be ignored.
   route_configuration.set_ignore_path_parameters_in_path_matching(true);
   {
     TestConfigImpl config(route_configuration, factory_context_, true);
-    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)
-                  ->routeEntry()
-                  ->routeName(),
-              "business-specific-route");
+    EXPECT_EQ(
+        config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)->routeName(),
+        "business-specific-route");
     EXPECT_EQ(
         config
             .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d#foo=bar", "GET"),
                    0)
-            ->routeEntry()
             ->routeName(),
         "business-specific-route");
     EXPECT_EQ(
         config
             .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d;&foo=bar", "GET"),
                    0)
-            ->routeEntry()
             ->routeName(),
         "business-specific-route");
   }
@@ -2336,34 +2332,26 @@ virtual_hosts:
       {"local_service_grpc", "default_catch_all_service"}, {});
   {
     TestConfigImpl config(route_configuration, factory_context_, true);
-    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->routeName(),
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeName(),
               "default-route");
-    EXPECT_EQ(
-        config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeEntry()->routeName(),
-        "default-route");
-    EXPECT_EQ(
-        config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeEntry()->routeName(),
-        "default-route");
-    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)
-                  ->routeEntry()
-                  ->routeName(),
+    EXPECT_EQ(config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeName(),
+              "default-route");
+    EXPECT_EQ(config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeName(),
+              "default-route");
+    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)->routeName(),
               "default-route");
   }
   // Set ignore_port_in_host_matching to true, and port will be ignored.
   route_configuration.set_ignore_port_in_host_matching(true);
   {
     TestConfigImpl config(route_configuration, factory_context_, true);
-    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->routeName(),
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeName(),
               "default-route");
-    EXPECT_EQ(
-        config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeEntry()->routeName(),
-        "business-specific-route");
-    EXPECT_EQ(
-        config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeEntry()->routeName(),
-        "business-specific-route");
-    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)
-                  ->routeEntry()
-                  ->routeName(),
+    EXPECT_EQ(config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeName(),
+              "business-specific-route");
+    EXPECT_EQ(config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeName(),
+              "business-specific-route");
+    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)->routeName(),
               "business-specific-route");
   }
 }
@@ -2713,6 +2701,20 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("example.com", "/?debug3=foo", "GET");
     EXPECT_EQ("local_service_with_string_match_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  { // Repeated parameter - match should only track the first, and match
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("example.com", "/?debug3=foo&debug3=bar", "GET");
+    EXPECT_EQ("local_service_with_string_match_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  { // Repeated parameter - match should only track the first, and not match
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("example.com", "/?debug3=bar&debug3=foo", "GET");
+    EXPECT_EQ("local_service_without_query_parameters",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
 
@@ -3203,10 +3205,19 @@ TEST_F(RouterMatcherHashPolicyTest, HashQueryParameters) {
                                                                  nullptr));
   }
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo?param=xyz", "GET");
-    Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
-                                                                nullptr));
+    Http::TestRequestHeaderMapImpl headers1 = genHeaders("www.lyft.com", "/foo?param=xyz", "GET");
+    Router::RouteConstSharedPtr route1 = config().route(headers1, 0);
+    auto val1 = route1->routeEntry()->hashPolicy()->generateHash(nullptr, headers1, add_cookie_nop_,
+                                                                 nullptr);
+    EXPECT_TRUE(val1);
+
+    // Only the first appearance of the query parameter should be considered
+    Http::TestRequestHeaderMapImpl headers2 =
+        genHeaders("www.lyft.com", "/foo?param=xyz&param=qwer", "GET");
+    Router::RouteConstSharedPtr route2 = config().route(headers2, 0);
+    auto val2 = route1->routeEntry()->hashPolicy()->generateHash(nullptr, headers2, add_cookie_nop_,
+                                                                 nullptr);
+    EXPECT_EQ(val1, val2);
   }
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar?param=xyz", "GET");
@@ -3384,13 +3395,13 @@ TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
   EXPECT_NE(hash_1, hash_2);
 }
 
-TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
+// Verify that invalid enums (which are now fatal) don't pass early config
+// validate checks.
+TEST_F(RouterMatcherHashPolicyTest, InvalidHashPoliciesInvalid) {
   {
-    auto hash_policy = firstRouteHashPolicy();
-    EXPECT_EQ(envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
-                  POLICY_SPECIFIER_NOT_SET,
-              hash_policy->policy_specifier_case());
-    EXPECT_THROW(config(), EnvoyException);
+    auto* hash_policy = firstRouteHashPolicy();
+    EXPECT_THROW(MessageUtil::validate(*hash_policy, ProtobufMessage::getStrictValidationVisitor()),
+                 EnvoyException);
   }
   {
     auto route = route_config_.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
@@ -3400,7 +3411,8 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
     EXPECT_EQ(envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
                   POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
-    EXPECT_THROW(config(), EnvoyException);
+    EXPECT_THROW(MessageUtil::validate(*route, ProtobufMessage::getStrictValidationVisitor()),
+                 EnvoyException);
   }
 }
 
@@ -5491,14 +5503,16 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context, false);
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
-    EXPECT_EQ("route-test", config.route(headers, 0)->routeEntry()->routeName());
+    EXPECT_EQ("route-test", config.route(headers, 0)->routeName());
   }
 
   {
     Http::TestRequestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/host", false, false);
-    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
-    EXPECT_EQ("route-test-2", redirect->routeName());
+    const auto route = config.route(headers, 0);
+    const DirectResponseEntry* redirect = route->directResponseEntry();
+    EXPECT_NE(nullptr, redirect);
+    EXPECT_EQ("route-test-2", route->routeName());
   }
 }
 
@@ -6677,6 +6691,9 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ(nullptr, config.route(headers, stream_info, 0));
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ("", config.name());
+  EXPECT_FALSE(config.usesVhds());
+  EXPECT_FALSE(config.mostSpecificHeaderMutationsWins());
+  EXPECT_EQ(0Ul, config.maxDirectResponseBodySizeBytes());
 }
 
 class BadHttpRouteConfigurationsTest : public testing::Test, public ConfigImplTestBase {};
@@ -9470,44 +9487,6 @@ virtual_hosts:
   EXPECT_EQ("/one?one=0&two=1&three=2&four=3&go=ls", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/one?one=0&two=1&three=2&four=3&go=ls", headers.get_(Http::Headers::get().Path));
-  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
-}
-
-TEST_F(RouteMatcherTest,
-       DEPRECATED_FEATURE_TEST(PatternMatchWildcardFilenameQueryParametersTruncated)) {
-
-  mergeValues({{"envoy.reloadable_features.append_query_parameters_path_rewriter", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: path_pattern
-    domains: ["*"]
-    routes:
-      - match:
-          path_match_policy:
-            name: envoy.path.match.uri_template.uri_template_matcher
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-              path_template: "/api/cart/item/{one}/**.m3u8"
-          case_sensitive: false
-        route:
-          cluster: "path-pattern-cluster-one"
-          path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.uri_template_rewriter
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
-              path_template_rewrite: "/{one}"
-  )EOF";
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  Http::TestRequestHeaderMapImpl headers = genHeaders(
-      "path.prefix.com", "/api/cart/item/one/song.m3u8?one=0&two=1&three=2&four=3&go=ls", "GET");
-  const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ("/one", route->currentUrlPathAfterRewrite(headers));
-  route->finalizeRequestHeaders(headers, stream_info, true);
-  EXPECT_EQ("/one", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 

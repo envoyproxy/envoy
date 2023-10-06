@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/extensions/access_loggers/stream/v3/stream.pb.h"
 #include "envoy/registry/registry.h"
 

@@ -11,10 +11,15 @@ if [[ -z "$CACHE_PATH" ]]; then
     exit 1
 fi
 
-DOCKER_CACHE_PATH="${CACHE_PATH}/docker"
-DOCKER_CACHE_TARBALL="${DOCKER_CACHE_PATH}/docker.tar.zst"
+if [[ -e "${CACHE_PATH}/all" ]]; then
+    DOCKER_CACHE_PATH="${CACHE_PATH}/all"
+    BAZEL_CACHE_PATH="${CACHE_PATH}/all"
+else
+    DOCKER_CACHE_PATH="${CACHE_PATH}/docker"
+    BAZEL_CACHE_PATH="${CACHE_PATH}/bazel"
+fi
 
-BAZEL_CACHE_PATH="${CACHE_PATH}/bazel"
+DOCKER_CACHE_TARBALL="${DOCKER_CACHE_PATH}/docker.tar.zst"
 BAZEL_CACHE_TARBALL="${BAZEL_CACHE_PATH}/bazel.tar.zst"
 
 
@@ -42,9 +47,7 @@ remount_docker () {
 extract_docker () {
     if [[ -e "${DOCKER_CACHE_TARBALL}" ]]; then
         echo "Extracting docker cache ${DOCKER_CACHE_TARBALL} -> /var/lib/docker ..."
-        ls -alh "$DOCKER_CACHE_TARBALL"
         zstd --stdout -d "$DOCKER_CACHE_TARBALL" | tar --warning=no-timestamp -xf - -C /var/lib/docker
-        touch /tmp/DOCKER_CACHE_RESTORED
     else
         echo "No Docker cache to restore, starting Docker with no data"
     fi
@@ -54,6 +57,11 @@ extract_bazel () {
     if [[ -e "${BAZEL_CACHE_TARBALL}" ]]; then
         echo "Extracting bazel cache ${BAZEL_CACHE_TARBALL} -> ${ENVOY_DOCKER_BUILD_DIR} ..."
         zstd --stdout -d "$BAZEL_CACHE_TARBALL" | tar --warning=no-timestamp -xf - -C "${ENVOY_DOCKER_BUILD_DIR}"
+        if id -u vsts &> /dev/null; then
+            sudo chown -R vsts:vsts "${ENVOY_DOCKER_BUILD_DIR}"
+        else
+            sudo chown -R azure-pipelines:azure-pipelines "${ENVOY_DOCKER_BUILD_DIR}"
+        fi
     else
         echo "No bazel cache to restore, starting bazel with no data"
     fi

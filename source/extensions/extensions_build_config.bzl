@@ -153,7 +153,9 @@ EXTENSIONS = {
     "envoy.filters.http.json_to_metadata":            "//source/extensions/filters/http/json_to_metadata:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
-    # Disabled by default
+    # Disabled by default. kill_request is not built into most prebuilt images.
+    # For instructions for building with disabled-by-default filters enabled, see
+    # https://github.com/envoyproxy/envoy/blob/main/bazel/README.md#enabling-and-disabling-extensions
     "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
     "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
@@ -212,6 +214,12 @@ EXTENSIONS = {
 
     "envoy.filters.udp.dns_filter":                     "//source/extensions/filters/udp/dns_filter:config",
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
+
+    #
+    # UDP Session filters
+    #
+
+    "envoy.filters.udp.session.http_capsule":           "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
 
     #
     # Resource monitors

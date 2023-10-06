@@ -960,19 +960,19 @@ public:
   void doOnConfigUpdateVerifyNoThrow(const envoy::service::runtime::v3::Runtime& runtime,
                                      uint32_t callback_index = 0) {
     const auto decoded_resources = TestUtility::decodeResources({runtime});
-    VERBOSE_EXPECT_NO_THROW(
-        rtds_callbacks_[callback_index]->onConfigUpdate(decoded_resources.refvec_, ""));
+    EXPECT_TRUE(
+        rtds_callbacks_[callback_index]->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
 
   void doDeltaOnConfigUpdateVerifyNoThrow(const envoy::service::runtime::v3::Runtime& runtime) {
     const auto decoded_resources = TestUtility::decodeResources({runtime});
-    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, {}, ""));
+    EXPECT_TRUE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
   }
 
   void doDeltaOnConfigRemovalVerifyNoThrow(const std::string& resource_name) {
     Protobuf::RepeatedPtrField<std::string> removed_resources;
     *removed_resources.Add() = resource_name;
-    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""));
+    EXPECT_TRUE(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, "").ok());
   }
 
   std::vector<std::string> layers_{"some_resource"};
@@ -986,9 +986,9 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
   setup();
 
   EXPECT_CALL(rtds_init_callback_, Call());
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, ""), EnvoyException,
-                            "Unexpected RTDS resource length, number of added recources 0, number "
-                            "of removed recources 0");
+  EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate({}, "").message(),
+            "Unexpected RTDS resource length, number of added recources 0, number "
+            "of removed recources 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -1004,10 +1004,9 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
   const auto decoded_resources = TestUtility::decodeResources({runtime, runtime});
 
   EXPECT_CALL(rtds_init_callback_, Call());
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "Unexpected RTDS resource length, number of added recources 2, number "
-                            "of removed recources 0");
+  EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "Unexpected RTDS resource length, number of added recources 2, number "
+            "of removed recources 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -1041,9 +1040,8 @@ TEST_F(RtdsLoaderImplTest, WrongResourceName) {
       baz: meh
   )EOF");
   const auto decoded_resources = TestUtility::decodeResources({runtime});
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "Unexpected RTDS runtime (expecting some_resource): other_resource");
+  EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "Unexpected RTDS runtime (expecting some_resource): other_resource");
 
   EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
   EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
@@ -1192,10 +1190,9 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalFailure) {
 
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   *removed_resources.Add() = "some_wrong_resource_name";
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""),
-                            EnvoyException,
-                            "Unexpected removal of unknown RTDS runtime layer "
-                            "some_wrong_resource_name, expected some_resource");
+  EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, "").message(),
+            "Unexpected removal of unknown RTDS runtime layer "
+            "some_wrong_resource_name, expected some_resource");
 
   // Removal failed, the keys point to the same value before the removal call.
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());

@@ -3,6 +3,7 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
 #include "source/server/config_validation/server.h"
 
 #include "test/integration/server.h"
@@ -179,7 +180,7 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
                             Filesystem::fileSystemForTest());
 
   // Execute dummy methods.
-  server.drainListeners();
+  server.drainListeners(absl::nullopt);
   server.failHealthcheck(true);
   server.lifecycleNotifier();
   server.secretManager();
@@ -202,10 +203,14 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockListenerConfig listener_config;
-  server.dispatcher().createListener(nullptr, listener_callbacks, server.runtime(),
-                                     listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  server.dispatcher().createListener(nullptr, listener_callbacks, server.runtime(), listener_config,
+                                     overload_state);
 
   server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
+
+  ValidationListenerComponentFactory listener_component_factory(server);
+  listener_component_factory.getTcpListenerConfigProviderManager();
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against

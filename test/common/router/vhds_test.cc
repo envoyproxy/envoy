@@ -136,8 +136,9 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, removed_resources, "1");
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
 
   EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
   EXPECT_TRUE(messageDifferencer_.Equals(
@@ -196,8 +197,9 @@ vhds:
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, removed_resources, "1");
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
   EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
 
   config_update_info->onRdsUpdate(updated_route_config, "2");

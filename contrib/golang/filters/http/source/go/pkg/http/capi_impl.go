@@ -58,6 +58,15 @@ const (
 	ValueUpstreamRemoteAddress   = 10
 	ValueUpstreamClusterName     = 11
 	ValueVirtualClusterName      = 12
+
+	// NOTE: this is a trade-off value.
+	// When the number of header is less this value, we could use the slice on the stack,
+	// otherwise, we have to allocate a new slice on the heap,
+	// and the slice on the stack will be wasted.
+	// So, we choose a value that many requests' number of header is less than this value.
+	// But also, it should not be too large, otherwise it might be waste stack memory.
+	maxStackAllocedHeaderSize = 16
+	maxStackAllocedSliceLen   = maxStackAllocedHeaderSize * 2
 )
 
 type httpCApiImpl struct{}
@@ -123,10 +132,16 @@ func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *strin
 }
 
 func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
-	// TODO: use a memory pool for better performance,
-	// since these go strings in strs, will be copied into the following map.
-	strs := make([]string, num*2)
-	// but, this buffer can not be reused safely,
+	var strs []string
+	if num <= maxStackAllocedHeaderSize {
+		// NOTE: only const length slice may be allocated on stack.
+		strs = make([]string, maxStackAllocedSliceLen)
+	} else {
+		// TODO: maybe we could use a memory pool for better performance,
+		// since these go strings in strs, will be copied into the following map.
+		strs = make([]string, num*2)
+	}
+	// NOTE: this buffer can not be reused safely,
 	// since strings may refer to this buffer as string data, and string is const in go.
 	// we have to make sure the all strings is not using before reusing,
 	// but strings may be alive beyond the request life.
@@ -168,18 +183,30 @@ func (c *httpCApiImpl) HttpRemoveHeader(r unsafe.Pointer, key *string) {
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64) {
+func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte {
 	buf := make([]byte, length)
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
-	sHeader := (*reflect.StringHeader)(unsafe.Pointer(value))
-	sHeader.Data = bHeader.Data
-	sHeader.Len = int(length)
 	res := C.envoyGoFilterHttpGetBuffer(r, C.ulonglong(bufferPtr), unsafe.Pointer(bHeader.Data))
+	handleCApiStatus(res)
+	return buf
+}
+
+func (c *httpCApiImpl) HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) {
+	res := C.envoyGoFilterHttpDrainBuffer(r, C.ulonglong(bufferPtr), C.uint64_t(length))
 	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
 	sHeader := (*reflect.StringHeader)(unsafe.Pointer(&value))
+	c.httpSetBufferHelper(r, bufferPtr, unsafe.Pointer(sHeader.Data), C.int(sHeader.Len), action)
+}
+
+func (c *httpCApiImpl) HttpSetBytesBufferHelper(r unsafe.Pointer, bufferPtr uint64, value []byte, action api.BufferAction) {
+	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&value))
+	c.httpSetBufferHelper(r, bufferPtr, unsafe.Pointer(bHeader.Data), C.int(bHeader.Len), action)
+}
+
+func (c *httpCApiImpl) httpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, data unsafe.Pointer, length C.int, action api.BufferAction) {
 	var act C.bufferAction
 	switch action {
 	case api.SetBuffer:
@@ -189,16 +216,24 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 	case api.PrependBuffer:
 		act = C.Prepend
 	}
-	res := C.envoyGoFilterHttpSetBufferHelper(r, C.ulonglong(bufferPtr), unsafe.Pointer(sHeader.Data), C.int(sHeader.Len), act)
+	res := C.envoyGoFilterHttpSetBufferHelper(r, C.ulonglong(bufferPtr), data, length, act)
 	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
-	// TODO: use a memory pool for better performance,
-	// but, should be very careful, since string is const in go,
-	// and we have to make sure the strings is not using before reusing,
-	// strings may be alive beyond the request life.
-	strs := make([]string, num*2)
+	var strs []string
+	if num <= maxStackAllocedHeaderSize {
+		// NOTE: only const length slice may be allocated on stack.
+		strs = make([]string, maxStackAllocedSliceLen)
+	} else {
+		// TODO: maybe we could use a memory pool for better performance,
+		// since these go strings in strs, will be copied into the following map.
+		strs = make([]string, num*2)
+	}
+	// NOTE: this buffer can not be reused safely,
+	// since strings may refer to this buffer as string data, and string is const in go.
+	// we have to make sure the all strings is not using before reusing,
+	// but strings may be alive beyond the request life.
 	buf := make([]byte, bytes)
 	sHeader := (*reflect.SliceHeader)(unsafe.Pointer(&strs))
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))

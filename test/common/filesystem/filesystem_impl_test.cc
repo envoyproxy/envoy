@@ -82,7 +82,7 @@ TEST_F(FileSystemImplTest, FileReadToEndSuccess) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
-  EXPECT_EQ(data, file_system_.fileReadToEnd(file_path));
+  EXPECT_EQ(data, file_system_.fileReadToEnd(file_path).value());
 }
 
 // Files are read into std::string; verify that all bytes (e.g., non-ascii characters) come back
@@ -94,7 +94,7 @@ TEST_F(FileSystemImplTest, FileReadToEndSuccessBinary) {
   }
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
-  const std::string read = file_system_.fileReadToEnd(file_path);
+  const std::string read = file_system_.fileReadToEnd(file_path).value();
   const std::vector<uint8_t> binary_read(read.begin(), read.end());
   EXPECT_EQ(binary_read.size(), 256);
   for (unsigned i = 0; i < 256; i++) {
@@ -102,10 +102,12 @@ TEST_F(FileSystemImplTest, FileReadToEndSuccessBinary) {
   }
 }
 
-TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
+TEST_F(FileSystemImplTest, FileReadToEndPathDoesNotExist) {
   unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
-  EXPECT_THROW(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
-               EnvoyException);
+  EXPECT_THAT(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist"))
+                  .status()
+                  .message(),
+              testing::StartsWith("Invalid path:"));
 }
 
 #ifndef WIN32
@@ -117,14 +119,14 @@ TEST_F(FileSystemImplTest, DISABLED_FileReadToEndNotReadable) {
 
   std::filesystem::permissions(file_path, std::filesystem::perms::owner_all,
                                std::filesystem::perm_options::remove);
-  EXPECT_THROW(file_system_.fileReadToEnd(file_path), EnvoyException);
+  EXPECT_FALSE(file_system_.fileReadToEnd(file_path).status().ok());
 }
 #endif
 
 TEST_F(FileSystemImplTest, FileReadToEndDenylisted) {
-  EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
-  EXPECT_THROW(file_system_.fileReadToEnd("/proc/cpuinfo"), EnvoyException);
-  EXPECT_THROW(file_system_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
+  EXPECT_FALSE(file_system_.fileReadToEnd("/dev/urandom").status().ok());
+  EXPECT_FALSE(file_system_.fileReadToEnd("/proc/cpuinfo").status().ok());
+  EXPECT_FALSE(file_system_.fileReadToEnd("/sys/block/sda/dev").status().ok());
 }
 
 #ifndef WIN32
@@ -143,36 +145,36 @@ TEST_F(FileSystemImplTest, CanonicalPathFail) {
 
 TEST_F(FileSystemImplTest, SplitPathFromFilename) {
   PathSplitResult result;
-  result = file_system_.splitPathFromFilename("/foo/bar/baz");
+  result = file_system_.splitPathFromFilename("/foo/bar/baz").value();
   EXPECT_EQ(result.directory_, "/foo/bar");
   EXPECT_EQ(result.file_, "baz");
-  result = file_system_.splitPathFromFilename("/foo/bar");
+  result = file_system_.splitPathFromFilename("/foo/bar").value();
   EXPECT_EQ(result.directory_, "/foo");
   EXPECT_EQ(result.file_, "bar");
-  result = file_system_.splitPathFromFilename("/foo");
+  result = file_system_.splitPathFromFilename("/foo").value();
   EXPECT_EQ(result.directory_, "/");
   EXPECT_EQ(result.file_, "foo");
-  result = file_system_.splitPathFromFilename("/");
+  result = file_system_.splitPathFromFilename("/").value();
   EXPECT_EQ(result.directory_, "/");
   EXPECT_EQ(result.file_, "");
-  EXPECT_THROW(file_system_.splitPathFromFilename("nopathdelimeter"), EnvoyException);
+  EXPECT_FALSE(file_system_.splitPathFromFilename("nopathdelimeter").ok());
 #ifdef WIN32
-  result = file_system_.splitPathFromFilename("c:\\foo/bar");
+  result = file_system_.splitPathFromFilename("c:\\foo/bar").value();
   EXPECT_EQ(result.directory_, "c:\\foo");
   EXPECT_EQ(result.file_, "bar");
-  result = file_system_.splitPathFromFilename("c:/foo\\bar");
+  result = file_system_.splitPathFromFilename("c:/foo\\bar").value();
   EXPECT_EQ(result.directory_, "c:/foo");
   EXPECT_EQ(result.file_, "bar");
-  result = file_system_.splitPathFromFilename("c:\\foo");
+  result = file_system_.splitPathFromFilename("c:\\foo").value();
   EXPECT_EQ(result.directory_, "c:\\");
   EXPECT_EQ(result.file_, "foo");
-  result = file_system_.splitPathFromFilename("c:foo");
+  result = file_system_.splitPathFromFilename("c:foo").value();
   EXPECT_EQ(result.directory_, "c:");
   EXPECT_EQ(result.file_, "foo");
-  result = file_system_.splitPathFromFilename("c:");
+  result = file_system_.splitPathFromFilename("c:").value();
   EXPECT_EQ(result.directory_, "c:");
   EXPECT_EQ(result.file_, "");
-  result = file_system_.splitPathFromFilename("\\\\?\\C:\\");
+  result = file_system_.splitPathFromFilename("\\\\?\\C:\\").value();
   EXPECT_EQ(result.directory_, "\\\\?\\C:\\");
   EXPECT_EQ(result.file_, "");
 #endif

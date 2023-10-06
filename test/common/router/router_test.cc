@@ -4270,8 +4270,6 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
 TEST_F(RouterTest, HttpInternalRedirectMatchedToDirectResponseSucceeded) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  std::string route_name("route-test-name");
-  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
 
   enableRedirects();
   sendRequest();
@@ -4759,16 +4757,12 @@ TEST_F(RouterTest, AltStatName) {
 
 TEST_F(RouterTest, Redirect) {
   MockDirectResponseEntry direct_response;
-  std::string route_name("route-test-name");
   EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("hello"));
-  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-  absl::string_view route_name_view(route_name);
-  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -4783,16 +4777,12 @@ TEST_F(RouterTest, Redirect) {
 
 TEST_F(RouterTest, RedirectFound) {
   MockDirectResponseEntry direct_response;
-  std::string route_name("route-test-name");
   EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("hello"));
-  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-  absl::string_view route_name_view(route_name);
-  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "302"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -4807,13 +4797,9 @@ TEST_F(RouterTest, RedirectFound) {
 
 TEST_F(RouterTest, DirectResponse) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  std::string route_name("route-test-name");
-  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-  absl::string_view route_name_view(route_name);
-  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -4829,14 +4815,10 @@ TEST_F(RouterTest, DirectResponse) {
 
 TEST_F(RouterTest, DirectResponseWithBody) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  std::string route_name("route-test-name");
-  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   const std::string response_body("static response");
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(response_body));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-  absl::string_view route_name_view(route_name);
-  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"}, {"content-length", "15"}, {"content-type", "text/plain"}};
@@ -4854,14 +4836,10 @@ TEST_F(RouterTest, DirectResponseWithBody) {
 
 TEST_F(RouterTest, DirectResponseWithLocation) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  std::string route_name("route-test-name");
   EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("http://host/"));
-  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Created));
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-  absl::string_view route_name_view(route_name);
-  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "201"},
                                                    {"location", "http://host/"}};
@@ -4878,14 +4856,10 @@ TEST_F(RouterTest, DirectResponseWithLocation) {
 
 TEST_F(RouterTest, DirectResponseWithoutLocation) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  std::string route_name("route-test-name");
   EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("http://host/"));
-  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-  absl::string_view route_name_view(route_name);
-  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -4932,6 +4906,30 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   EXPECT_TRUE(filter_state_verified);
   EXPECT_TRUE(callbacks_.streamInfo().upstreamInfo()->upstreamFilterState()->hasDataWithName(
       "upstream data"));
+}
+
+TEST_F(RouterTest, PropagatesShadowState) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  ON_CALL(callbacks_.stream_info_, isShadow()).WillByDefault(Return(true));
+
+  // This pattern helps ensure that we're actually invoking the callback.
+  bool shadow_state_verified = false;
+  router_->config().upstream_logs_.push_back(std::make_shared<TestAccessLog>(
+      [&](const auto& stream_info) { shadow_state_verified = stream_info.isShadow(); }));
+  expectResponseTimerCreate();
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  ASSERT_THAT(response_decoder, testing::NotNull());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_TRUE(shadow_state_verified);
 }
 
 TEST_F(RouterTest, UpstreamSSLConnection) {

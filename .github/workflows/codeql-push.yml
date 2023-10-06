@@ -25,8 +25,14 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
 
     steps:
+    - name: Pre-cleanup
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.18
+      with:
+        to_remove: |
+          /usr/local/lib/android
+
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.

@@ -57,6 +57,13 @@ TEST_P(AdminInstanceTest, Getters) {
             envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED);
   EXPECT_NE(nullptr, admin_.scopedRouteConfigProvider());
+#ifdef ENVOY_ENABLE_UHV
+  // In UHV mode there is always UHV factory
+  EXPECT_NE(nullptr, admin_.makeHeaderValidator(Http::Protocol::Http11));
+#else
+  // In non UHV mode, header validator can not be created
+  EXPECT_EQ(nullptr, admin_.makeHeaderValidator(Http::Protocol::Http11));
+#endif
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
@@ -323,7 +330,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.routeConfigProvider().config();
   peer.routeConfigProvider().configInfo();
   peer.routeConfigProvider().lastUpdated();
-  peer.routeConfigProvider().onConfigUpdate();
+  ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
 
   peer.scopedRouteConfigProvider().lastUpdated();
   peer.scopedRouteConfigProvider().getConfigProto();
@@ -336,6 +343,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.overloadState().tryAllocateResource(overload_name, 0);
   peer.overloadState().tryDeallocateResource(overload_name, 0);
   peer.overloadState().isResourceMonitorEnabled(overload_name);
+  peer.overloadState().getProactiveResourceMonitorForTest(overload_name);
 
   peer.overloadManager().scaledTimerFactory();
 

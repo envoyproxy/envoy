@@ -79,14 +79,24 @@ type StreamFilter interface {
 	StreamDecoderFilter
 	// response stream
 	StreamEncoderFilter
-	// log when the request is finished
+
+	// log
 	OnLog()
+	OnLogDownstreamStart()
+	OnLogDownstreamPeriodic()
+
 	// destroy filter
 	OnDestroy(DestroyReason)
 	// TODO add more for stream complete
 }
 
 func (*PassThroughStreamFilter) OnLog() {
+}
+
+func (*PassThroughStreamFilter) OnLogDownstreamStart() {
+}
+
+func (*PassThroughStreamFilter) OnLogDownstreamPeriodic() {
 }
 
 func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {

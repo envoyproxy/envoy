@@ -36,7 +36,7 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run tests'

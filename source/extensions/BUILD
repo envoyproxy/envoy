@@ -1,7 +1,7 @@
+load("@envoy_toolshed//:macros.bzl", "json_data")
 load("//bazel:envoy_build_system.bzl", "envoy_extension_package")
-load("@envoy_api//bazel:utils.bzl", "json_data")
-load(":extensions_build_config.bzl", "EXTENSIONS")
 load(":all_extensions.bzl", "envoy_all_extensions")
+load(":extensions_build_config.bzl", "EXTENSIONS")
 
 licenses(["notice"])  # Apache 2
 

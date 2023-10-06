@@ -32,6 +32,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
@@ -506,7 +507,7 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
 Utility::QueryParamsMulti Utility::QueryParamsMulti::parseQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    return Utility::QueryParamsMulti();
+    return {};
   }
 
   start++;
@@ -528,7 +529,7 @@ Utility::QueryParamsMulti
 Utility::QueryParamsMulti::parseAndDecodeQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    return Utility::QueryParamsMulti();
+    return {};
   }
 
   start++;
@@ -609,6 +610,15 @@ void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_vi
   this->data_[key] = std::vector<std::string>{std::string(value)};
 }
 
+absl::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
+  auto it = this->data_.find(key);
+  if (it == this->data_.end()) {
+    return std::nullopt;
+  }
+
+  return absl::optional<std::string>{it->second.at(0)};
+}
+
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   absl::string_view path_str = path.getStringView();
   size_t query_offset = path_str.find('?');
@@ -622,8 +632,7 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 std::string Utility::stripQueryString(const HeaderString& path) {
   absl::string_view path_str = path.getStringView();
   size_t query_offset = path_str.find('?');
-  return std::string(path_str.data(),
-                     query_offset != path_str.npos ? query_offset : path_str.size());
+  return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
 std::string Utility::replaceQueryString(const HeaderString& path,

@@ -23,10 +23,10 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch
-/*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @mattklein123 @htuch
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch @yanavlasov
+/*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @htuch @yanavlasov
 # jwt_authn http filter extension
-/*/extensions/filters/http/jwt_authn @qiwzhang @lizan
+/*/extensions/filters/http/jwt_authn @taoxuy @lizan
 # grpc_field_extraction http filter extension
 /*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
 # grpc_http1_reverse_bridge http filter extension
@@ -75,7 +75,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
-/*/extensions/filters/http/composite @mattklein123 @mattklein123
+/*/extensions/filters/http/composite @mattklein123 @tyxia @yanavlasov
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
 # previous hosts
@@ -84,8 +84,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
-/*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123 @tonya11en
-/*/extensions/common/aws @lavignes @mattklein123 @tonya11en
+/*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123
+/*/extensions/common/aws @lavignes @mattklein123
 # adaptive concurrency limit extension.
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
 # admission control extension.
@@ -112,7 +112,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
-/*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
+/*/extensions/filters/http/grpc_json_transcoder @nareddyt @lizan
 /*/extensions/filters/http/router @alyssawilk @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
@@ -147,8 +147,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
-/*/extensions/filters/http/aws_request_signing @derekargueta @mattklein123 @marcomagdy @tonya11en
-/*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
+/*/extensions/filters/http/aws_request_signing @derekargueta @mattklein123 @marcomagdy
+/*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123
 /*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
 # Watchdog Extensions
@@ -170,13 +170,13 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # runtime fraction input matcher
 /*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @UNOWNED
 # CEL input matcher
-/*/extensions/matching/input_matchers/cel_matcher @tyxia @UNOWNED
+/*/extensions/matching/input_matchers/cel_matcher @tyxia @yanavlasov
 # environment generic input
 /*/extensions/matching/common_inputs/environment @donyu @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @UNOWNED
 # CEL data input
-/*/extensions/matching/http/cel_input @tyxia @UNOWNED
+/*/extensions/matching/http/cel_input @tyxia @yanavlasov
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @UNOWNED
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
@@ -349,6 +349,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
 /contrib/client_ssl_auth/ @UNOWNED @UNOWNED
+/contrib/checksum/ @ravenblackx @phlax
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
@@ -363,6 +364,6 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @realtimetodie @realtimetodie
-/contrib/dlb/ @mattklein123 @daixiang0
+/contrib/dlb @mattklein123 @daixiang0
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch

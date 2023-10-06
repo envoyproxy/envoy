@@ -105,8 +105,8 @@ envoy_cc_library(
     deps = [
         "utility_lib_header",
     ] + envoy_select_enable_lite_protos([
-        "//bazel/cc_proto_descriptor_library:create_dynamic_message",
-        "//bazel/cc_proto_descriptor_library:text_format_transcoder",
+        "@envoy_api//bazel/cc_proto_descriptor_library:create_dynamic_message",
+        "@envoy_api//bazel/cc_proto_descriptor_library:text_format_transcoder",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/annotations:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto_descriptor",
@@ -121,6 +121,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto_descriptor",
