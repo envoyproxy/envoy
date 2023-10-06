@@ -78,7 +78,7 @@ GoUint64 HttpFilterDsoImpl::envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUi
 
 void HttpFilterDsoImpl::envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0, GoInt p1) {
   ASSERT(envoy_go_filter_destroy_http_plugin_config_ != nullptr);
-  return envoy_go_filter_destroy_http_plugin_config_(p0);
+  return envoy_go_filter_destroy_http_plugin_config_(p0, p1);
 }
 
 GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
