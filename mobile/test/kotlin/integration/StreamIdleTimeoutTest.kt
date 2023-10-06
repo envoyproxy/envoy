@@ -1,6 +1,5 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -12,6 +11,7 @@ import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -22,8 +22,9 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val TEST_RESPONSE_FILTER_TYPE = "type.googleapis.com/" +
-  "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val TEST_RESPONSE_FILTER_TYPE =
+  "type.googleapis.com/" +
+    "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 
 class StreamIdleTimeoutTest {
 
@@ -34,9 +35,7 @@ class StreamIdleTimeoutTest {
   private val filterExpectation = CountDownLatch(1)
   private val callbackExpectation = CountDownLatch(1)
 
-  class IdleTimeoutValidationFilter(
-    private val latch: CountDownLatch
-  ) : ResponseFilter {
+  class IdleTimeoutValidationFilter(private val latch: CountDownLatch) : ResponseFilter {
     override fun onResponseHeaders(
       headers: ResponseHeaders,
       endStream: Boolean,
@@ -64,6 +63,7 @@ class StreamIdleTimeoutTest {
       assertThat(error.errorCode).isEqualTo(4)
       latch.countDown()
     }
+
     override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
     override fun onCancel(finalStreamIntel: FinalStreamIntel) {
@@ -73,26 +73,29 @@ class StreamIdleTimeoutTest {
 
   @Test
   fun `stream idle timeout triggers onError callbacks`() {
-    val engine = EngineBuilder(Standard())
-      .addPlatformFilter(
-        name = "idle_timeout_validation_filter",
-        factory = { IdleTimeoutValidationFilter(filterExpectation) }
-      )
-      .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
-      .addStreamIdleTimeoutSeconds(1)
-      .build()
+    val engine =
+      EngineBuilder(Standard())
+        .addPlatformFilter(
+          name = "idle_timeout_validation_filter",
+          factory = { IdleTimeoutValidationFilter(filterExpectation) }
+        )
+        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .addStreamIdleTimeoutSeconds(1)
+        .build()
 
     val client = engine.streamClient()
 
-    val requestHeaders = RequestHeadersBuilder(
-      method = RequestMethod.GET,
-      scheme = "https",
-      authority = "example.com",
-      path = "/test"
-    )
-      .build()
+    val requestHeaders =
+      RequestHeadersBuilder(
+          method = RequestMethod.GET,
+          scheme = "https",
+          authority = "example.com",
+          path = "/test"
+        )
+        .build()
 
-    client.newStreamPrototype()
+    client
+      .newStreamPrototype()
       .setOnError { error, _ ->
         assertThat(error.errorCode).isEqualTo(4)
         callbackExpectation.countDown()

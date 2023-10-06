@@ -116,13 +116,11 @@ CAPIStatus envoyGoFilterDownstreamInfo(void* f, int info_type, void* ret) {
 // Upstream
 //
 
-void* envoyGoFilterUpstreamConnect(
-    void* library_id, void* addr,
-    unsigned long long int connID) { // NOLINT(readability-identifier-naming)
+void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, unsigned long long int conn_id) {
   std::string id = copyGoString(library_id);
   auto dynamic_lib = Dso::DsoManager<Dso::NetworkFilterDsoImpl>::getDsoByID(id);
   UpstreamConnPtr conn_ptr =
-      std::make_shared<UpstreamConn>(copyGoString(addr), dynamic_lib, connID);
+      std::make_shared<UpstreamConn>(copyGoString(addr), dynamic_lib, conn_id);
   // the upstream connect wrapper will be deleted by envoyGoFilterUpstreamFinalize
   UpstreamConnWrapper* wrapper = new UpstreamConnWrapper(conn_ptr);
   conn_ptr->setWrapper(wrapper);
