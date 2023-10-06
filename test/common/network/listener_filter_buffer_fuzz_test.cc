@@ -70,7 +70,7 @@ public:
             EXPECT_EQ(MSG_PEEK, flags);
             auto copy_size = std::min(length, available_data_.size());
             ::memcpy(buffer, available_data_.data(), copy_size);
-            return Api::IoCallUint64Result(copy_size, Api::IoError::none()));
+            return Api::IoCallUint64Result(copy_size, Api::IoError::none());
           });
           drained_size_ = 0;
         }
