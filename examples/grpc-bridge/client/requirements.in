@@ -2,3 +2,4 @@ requests>=2.22.0
 grpcio
 grpcio-tools
 protobuf>=3.18.0
+urllib3>=1.26.17
