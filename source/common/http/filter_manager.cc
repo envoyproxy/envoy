@@ -459,8 +459,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
 
   this->streamInfo().filterState()->setData(
       FS_LOCAL_REPLAY_KEY,
-      std::make_shared<LocalReplyOwnerType>(this->filter_context_.filter_name,
-                                            this->filter_context_.config_name,
+      std::make_shared<LocalReplyOwnerType>(this->filter_context_.config_name,
                                             std::string(details)),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::FilterChain);
 
@@ -1721,8 +1720,7 @@ void ActiveStreamEncoderFilter::sendLocalReply(
 
   this->streamInfo().filterState()->setData(
       FS_LOCAL_REPLAY_KEY,
-      std::make_shared<LocalReplyOwnerType>(this->filter_context_.filter_name,
-                                            this->filter_context_.config_name,
+      std::make_shared<LocalReplyOwnerType>(this->filter_context_.config_name,
                                             std::string(details)),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::FilterChain);
 

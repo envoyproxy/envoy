@@ -124,7 +124,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
                 .filterState()
                 ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
                 ->serializeAsString(),
-            "filter1|filter1|details");
+            "filter1|details");
 
   filter_manager_->destroyFilters();
 }
@@ -194,7 +194,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
                 .filterState()
                 ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
                 ->serializeAsString(),
-            "filter2|filter2|details");
+            "filter2|details");
 
   filter_manager_->destroyFilters();
 }
@@ -263,7 +263,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
                 .filterState()
                 ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
                 ->serializeAsString(),
-            "filterName1|configName1|details");
+            "configName1|details");
 
   filter_manager_->destroyFilters();
 }
@@ -337,7 +337,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
                 .filterState()
                 ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
                 ->serializeAsString(),
-            "filterName1|configName1|details2");
+            "configName1|details2");
 
   filter_manager_->destroyFilters();
 }
@@ -650,7 +650,7 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
                 .filterState()
                 ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
                 ->serializeAsString(),
-            "filter1|filter1|bad_metadata");
+            "filter1|bad_metadata");
 
   filter_manager_->destroyFilters();
 }
@@ -697,7 +697,7 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
                 .filterState()
                 ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
                 ->serializeAsString(),
-            "filter2|filter2|bad_metadata");
+            "filter2|bad_metadata");
 
   filter_manager_->destroyFilters();
 }

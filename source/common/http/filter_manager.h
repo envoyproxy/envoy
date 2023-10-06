@@ -39,14 +39,12 @@ struct ActiveStreamFilterBase;
 constexpr char FS_LOCAL_REPLAY_KEY[] = "filter_manager.local_replay_owner";
 class LocalReplyOwnerType : public StreamInfo::FilterState::Object {
 public:
-  LocalReplyOwnerType(const std::string& filter_type, const std::string& filter_name,
-                      const std::string& details)
-      : filter_type(filter_type), filter_name(filter_name), details(details) {}
+  LocalReplyOwnerType(const std::string& filter_name, const std::string& details)
+      : filter_name(filter_name), details(details) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto message = std::make_unique<ProtobufWkt::Struct>();
     auto& fields = *message->mutable_fields();
-    *fields["filter_type"].mutable_string_value() = filter_type;
     *fields["filter_name"].mutable_string_value() = filter_name;
     *fields["details"].mutable_string_value() = details;
 
@@ -54,11 +52,10 @@ public:
   }
 
   absl::optional<std::string> serializeAsString() const override {
-    return filter_type + "|" + filter_name + "|" + details;
+    return filter_name + "|" + details;
   }
 
 private:
-  std::string filter_type;
   std::string filter_name;
   std::string details;
 };
