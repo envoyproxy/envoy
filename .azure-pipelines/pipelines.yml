@@ -45,7 +45,7 @@ variables:
 ## Variable settings
 # Caches (tip: append a version suffix while testing caches)
 - name: cacheKeyVersion
-  value: v2
+  value: v3
 - name: cacheKeyBazel
   value: '.bazelversion | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 - name: cacheKeyDocker

@@ -26,7 +26,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch @yanavlasov
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @htuch @yanavlasov
 # jwt_authn http filter extension
-/*/extensions/filters/http/jwt_authn @qiwzhang @lizan
+/*/extensions/filters/http/jwt_authn @taoxuy @lizan
 # grpc_field_extraction http filter extension
 /*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
 # grpc_http1_reverse_bridge http filter extension
@@ -112,7 +112,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
-/*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
+/*/extensions/filters/http/grpc_json_transcoder @nareddyt @lizan
 /*/extensions/filters/http/router @alyssawilk @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
