@@ -26,6 +26,7 @@ pygithub
 pygments>=2.15.0
 pyreadline
 pyyaml
+requests>=2.31.0
 setuptools
 slackclient
 thrift
