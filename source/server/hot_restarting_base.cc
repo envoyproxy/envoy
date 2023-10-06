@@ -157,6 +157,7 @@ bool RpcStream::replyIsExpectedType(const HotRestartMessage* proto,
 // should only get control data in a PassListenSocketReply, it should only be the fd passing type,
 // and there should only be one at a time. Crash on any other control data.
 void RpcStream::getPassedFdIfPresent(HotRestartMessage* out, msghdr* message) {
+  // NOLINTNEXTLINE(clang-analyzer-core.UndefinedBinaryOperatorResult)
   cmsghdr* cmsg = CMSG_FIRSTHDR(message);
   if (cmsg != nullptr) {
     RELEASE_ASSERT(cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS &&

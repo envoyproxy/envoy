@@ -51,8 +51,9 @@ using FilterConfigTestOk = FilterConfigTestBase;
 TEST_F(FilterConfigTestOk, DescriptorInline) {
   parseConfigProto();
   *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() =
-      api_->fileSystem().fileReadToEnd(
-          TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
+      api_->fileSystem()
+          .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
@@ -232,8 +233,9 @@ TEST_F(FilterConfigTestException, ErrorParsingDescriptorFromFile) {
 TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceTyep) {
   parseConfigProto();
   *proto_config_.mutable_descriptor_set()->mutable_inline_string() =
-      api_->fileSystem().fileReadToEnd(
-          TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
+      api_->fileSystem()
+          .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
                                      *api_),
