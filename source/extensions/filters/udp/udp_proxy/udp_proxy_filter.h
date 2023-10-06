@@ -507,6 +507,7 @@ private:
 
     void onNewSession();
     void onData(Network::UdpRecvData& data);
+    void processUpstreamDatagram(Network::UdpRecvData& data);
     void writeDownstream(Network::UdpRecvData& data);
     void resetIdleTimer();
 

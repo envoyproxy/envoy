@@ -588,14 +588,7 @@ void UdpProxyFilter::UdpActiveSession::processPacket(
 
   Network::UdpRecvData recv_data{
       {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
-  for (auto& active_write_filter : write_filters_) {
-    auto status = active_write_filter->write_filter_->onWrite(recv_data);
-    if (status == WriteFilterStatus::StopIteration) {
-      return;
-    }
-  }
-
-  writeDownstream(recv_data);
+  processUpstreamDatagram(recv_data);
 }
 
 void UdpProxyFilter::ActiveSession::resetIdleTimer() {
@@ -604,6 +597,17 @@ void UdpProxyFilter::ActiveSession::resetIdleTimer() {
   }
 
   idle_timer_->enableTimer(cluster_.filter_.config_->sessionTimeout());
+}
+
+void UdpProxyFilter::ActiveSession::processUpstreamDatagram(Network::UdpRecvData& recv_data) {
+  for (auto& active_write_filter : write_filters_) {
+    auto status = active_write_filter->write_filter_->onWrite(recv_data);
+    if (status == WriteFilterStatus::StopIteration) {
+      return;
+    }
+  }
+
+  writeDownstream(recv_data);
 }
 
 void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_data) {
@@ -967,15 +971,7 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamData(Buffer::Instance& da
   Network::UdpRecvData recv_data{{addresses_.local_, addresses_.peer_},
                                  std::make_unique<Buffer::OwnedImpl>(data),
                                  cluster_.filter_.config_->timeSource().monotonicTime()};
-
-  for (auto& active_write_filter : write_filters_) {
-    auto status = active_write_filter->write_filter_->onWrite(recv_data);
-    if (status == WriteFilterStatus::StopIteration) {
-      return;
-    }
-  }
-
-  writeDownstream(recv_data);
+  processUpstreamDatagram(recv_data);
 }
 
 void UdpProxyFilter::TunnelingActiveSession::onIdleTimer() {
