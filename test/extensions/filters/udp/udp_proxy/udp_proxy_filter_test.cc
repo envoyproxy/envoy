@@ -7,6 +7,7 @@
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
@@ -15,6 +16,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/socket.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
@@ -966,6 +968,28 @@ session_filters:
       "Only one of use_per_packet_load_balancing or session_filters can be used.");
 }
 
+TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndTunneling) {
+  auto config = R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(readConfig(config)), EnvoyException,
+      "Only one of use_per_packet_load_balancing or tunneling_config can be used.");
+}
+
 // Verify that on second data packet sent from the client, another upstream host is selected.
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingBasicFlow) {
   InSequence s;
@@ -1468,10 +1492,15 @@ public:
                   absl::optional<std::string> opt_authority = absl::nullopt,
                   absl::optional<std::string> opt_path = absl::nullopt,
                   absl::optional<HeaderToAdd> header_to_add = absl::nullopt) {
+    // In case connect-udp is used, Envoy expect the H2 headers to be normalized with H1,
+    // so expect that the request headers here match H1 headers, even though
+    // eventually H2 headers will be sent. When the headers are normalized to H1, the method
+    // is replaced with GET, a header with the 'upgrade' key is added with 'connect-udp'
+    // value and a header with the 'connection' key is added with 'Upgrade' value.
     std::string scheme = is_ssl ? "https" : "http";
     std::string authority =
         opt_authority.has_value() ? opt_authority.value() : "default.host.com:10";
-    std::string method = use_post ? "POST" : "CONNECT";
+    std::string method = use_post ? "POST" : "GET";
     std::string path =
         opt_path.has_value() ? opt_path.value() : "/.well-known/masque/udp/default.target.host/20/";
 
@@ -1480,7 +1509,8 @@ public:
 
     if (!use_post) {
       headers.addCopy("capsule-protocol", "?1");
-      headers.addCopy(":protocol", "connect-udp");
+      headers.addCopy("upgrade", "connect-udp");
+      headers.addCopy("connection", "Upgrade");
     }
 
     if (header_to_add) {
@@ -1626,7 +1656,7 @@ TEST_F(HttpUpstreamImplTest, FailureResponseHeadersEndStream) {
   EXPECT_CALL(creation_callbacks_, onStreamFailure());
 
   Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "101"}, {"upgrade", "connect-udp"}});
   upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/true);
 }
 
@@ -1638,7 +1668,7 @@ TEST_F(HttpUpstreamImplTest, SuccessResponseHeaders) {
   EXPECT_CALL(creation_callbacks_, onStreamSuccess(_));
 
   Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "101"}, {"upgrade", "connect-udp"}});
   upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/false);
 }
 
@@ -1665,7 +1695,7 @@ TEST_F(HttpUpstreamImplTest, DecodeDataAfterSuccessHeaders) {
 
   Buffer::OwnedImpl data;
   Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "101"}, {"upgrade", "connect-udp"}});
 
   EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
   EXPECT_CALL(creation_callbacks_, onStreamSuccess(_));
@@ -1692,7 +1722,7 @@ TEST_F(HttpUpstreamImplTest, DecodeTrailersAfterSuccessHeaders) {
   setAndExpectRequestEncoder(expectedHeaders());
 
   Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "101"}, {"upgrade", "connect-udp"}});
 
   EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
   EXPECT_CALL(creation_callbacks_, onStreamSuccess(_));
@@ -1857,6 +1887,164 @@ TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   auto invalid_pool =
       factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_TRUE(invalid_pool == nullptr);
+}
+
+TEST(TunnelingConfigImplTest, DefaultConfigs) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.set_use_post(true);
+  TunnelingConfigImpl config(proto_config, context);
+
+  EXPECT_EQ(1, config.maxConnectAttempts());
+  EXPECT_EQ(1024, config.maxBufferedDatagrams());
+  EXPECT_EQ(16384, config.maxBufferedBytes());
+}
+
+TEST(TunnelingConfigImplTest, DefaultPostPath) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.set_use_post(true);
+  TunnelingConfigImpl config(proto_config, context);
+
+  EXPECT_EQ("/", config.postPath());
+}
+
+TEST(TunnelingConfigImplTest, PostPathWithoutPostMethod) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.set_post_path("/path");
+  EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                            "Can't set a post path when POST method isn't used");
+}
+
+TEST(TunnelingConfigImplTest, PostWithInvalidPath) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.set_use_post(true);
+  proto_config.set_post_path("path");
+  EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                            "Path must start with '/'");
+}
+
+TEST(TunnelingConfigImplTest, ValidProxyPort) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.mutable_proxy_port()->set_value(443);
+  TunnelingConfigImpl config(proto_config, context);
+  EXPECT_EQ(443, config.proxyPort());
+}
+
+TEST(TunnelingConfigImplTest, ProxyPortOutOfRange) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  {
+    TunnelingConfig proto_config;
+    proto_config.mutable_proxy_port()->set_value(0);
+    EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                              "Port value not in range");
+  }
+  {
+    TunnelingConfig proto_config;
+    proto_config.mutable_proxy_port()->set_value(65536);
+    EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                              "Port value not in range");
+  }
+}
+
+TEST(TunnelingConfigImplTest, InvalidHeadersToAdd) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  {
+    TunnelingConfig proto_config;
+    auto* header_to_add = proto_config.add_headers_to_add();
+    auto* header = header_to_add->mutable_header();
+    // Can't add pseudo header.
+    header->set_key(":method");
+    header->set_value("GET");
+    EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                              ":-prefixed or host headers may not be modified");
+  }
+
+  {
+    TunnelingConfig proto_config;
+    auto* header_to_add = proto_config.add_headers_to_add();
+    auto* header = header_to_add->mutable_header();
+    // Can't modify host.
+    header->set_key("host");
+    header->set_value("example.net:80");
+    EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                              ":-prefixed or host headers may not be modified");
+  }
+}
+
+TEST(TunnelingConfigImplTest, HeadersToAdd) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  stream_info.filterState()->setData(
+      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"),
+      Envoy::StreamInfo::FilterState::StateType::Mutable);
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%FILTER_STATE(test_key:PLAIN)%");
+  TunnelingConfigImpl config(proto_config, context);
+
+  auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
+  config.headerEvaluator().evaluateHeaders(
+      headers, *Http::StaticEmptyHeaders::get().request_headers,
+      *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  EXPECT_EQ("test_val", headers.getByKey("test_key"));
+}
+
+TEST(TunnelingConfigImplTest, ProxyHostFromFilterState) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  stream_info.filterState()->setData(
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
+      Envoy::StreamInfo::FilterState::StateType::Mutable);
+
+  TunnelingConfig proto_config;
+  proto_config.set_proxy_host("%FILTER_STATE(test-proxy-host:PLAIN)%");
+  TunnelingConfigImpl config(proto_config, context);
+
+  EXPECT_EQ("test.host.com", config.proxyHost(stream_info));
+}
+
+TEST(TunnelingConfigImplTest, TargetHostFromFilterState) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  stream_info.filterState()->setData(
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
+      Envoy::StreamInfo::FilterState::StateType::Mutable);
+
+  TunnelingConfig proto_config;
+  proto_config.set_target_host("%FILTER_STATE(test-proxy-host:PLAIN)%");
+  TunnelingConfigImpl config(proto_config, context);
+
+  EXPECT_EQ("test.host.com", config.targetHost(stream_info));
+}
+
+TEST(TunnelingConfigImplTest, BufferingState) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  {
+    TunnelingConfig proto_config;
+    TunnelingConfigImpl config(proto_config, context);
+    // Buffering should be disabled by default.
+    EXPECT_FALSE(config.bufferEnabled());
+  }
+
+  {
+    TunnelingConfig proto_config;
+    proto_config.mutable_buffer_options(); // Will set buffering.
+    TunnelingConfigImpl config(proto_config, context);
+    EXPECT_TRUE(config.bufferEnabled());
+  }
 }
 
 } // namespace
