@@ -141,8 +141,8 @@ response_rules:
   Buffer::OwnedImpl buffer_;
   Http::TestRequestHeaderMapImpl incoming_headers_{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/json"}};
-  Http::TestResponseHeaderMapImpl response_headers_{
-      {":status", "200"}, {"Content-Type", "application/json"}};
+  Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
+                                                    {"Content-Type", "application/json"}};
 };
 
 TEST_F(FilterTest, BasicStringMatch) {

@@ -302,7 +302,8 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
 void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
                          bool& processing_finished_flag, Stats::Counter& success,
                          Stats::Counter& no_body, Stats::Counter& non_json,
-                         Http::StreamFilterCallbacks& filter_callback, bool should_clear_route_cache) {
+                         Http::StreamFilterCallbacks& filter_callback,
+                         bool should_clear_route_cache) {
   // In case we have trailers but no body.
   if (!body || body->length() == 0) {
     handleAllOnMissing(rules, processing_finished_flag, filter_callback, should_clear_route_cache);
