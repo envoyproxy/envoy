@@ -4293,7 +4293,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
-  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  socket_swap.write_matcher_->setWriteOverride(Api::IoError::none());
   // Shut down the server and upstreams before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();
@@ -4333,7 +4333,7 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
               HasSubstr("upstream_reset_before_response_started{connection_termination}"));
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  socket_swap.write_matcher_->setWriteOverride(Api::IoError::none());
   // Shut down the server before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();
