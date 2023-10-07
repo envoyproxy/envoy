@@ -41,6 +41,8 @@ public:
 
 /*
  * Encoder of request.
+ * TODO(wbpcode): to merge RequestEncoder and ResponseDecoder into one class. By
+ * this way, it possible to support stream remapping in the future.
  */
 class RequestEncoder {
 public:

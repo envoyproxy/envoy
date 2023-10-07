@@ -22,6 +22,9 @@ public:
    * If request decoding success then this method will be called.
    * @param frame request frame from decoding. Frist frame should be StreamRequest
    * frame.
+   * NOTE: This method will be called multiple times for the multiple frames request.
+   * FrameFlags and embedded StreamFlags could be used to correlate frames of same
+   * request.
    */
   virtual void onDecodingSuccess(StreamFramePtr frame) PURE;
 
@@ -58,6 +61,10 @@ public:
    * If response decoding success then this method will be called.
    * @param frame response frame from decoding. Frist frame should be StreamResponse
    * frame.
+   * NOTE: This method will be called multiple times for the multiple frames response.
+   * FrameFlags and embedded StreamFlags could be used to correlate frames of same
+   * request. And the StreamFlags could also be used to correlate the response with
+   * the request.
    */
   virtual void onDecodingSuccess(StreamFramePtr frame) PURE;
 
