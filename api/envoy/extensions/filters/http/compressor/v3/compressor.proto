@@ -131,17 +131,11 @@ message Compressor {
   bool choose_first = 9;
 }
 
-// Per-route overrides of `ResponseDirectionConfig`. Anything added here should be optional,
+// Per-route overrides of ``ResponseDirectionConfig``. Anything added here should be optional,
 // to allow overriding arbitrary subsets of configuration. Omitted fields must have no effect.
 message ResponseDirectionOverrides {
-  // If true, removes accept-encoding from the request headers before dispatching it to the upstream
-  // so that responses do not get compressed before reaching the filter.
-  //
-  // .. attention::
-  //
-  //    To avoid interfering with other compression filters in the same chain use this option in
-  //    the filter closest to the upstream.
-  bool remove_accept_encoding_header = 3;
+  // If set, overrides ``remove_accept_encoding_header`` on the filter's ``ResponseDirectionConfig``.
+  google.protobuf.BoolValue remove_accept_encoding_header = 1;
 }
 
 // Per-route overrides. As per-route overrides are needed, they should be

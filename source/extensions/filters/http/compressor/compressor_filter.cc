@@ -179,8 +179,10 @@ CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
       // Consequently, if `response_direction_config.common_direction_config.enabled` ever gets
       // added, its absence must enable compression.
       response_compression_enabled_ = true;
-      remove_accept_encoding_header_ =
-          config.overrides().response_direction_config().remove_accept_encoding_header();
+      if (config.overrides().response_direction_config().has_remove_accept_encoding_header()) {
+        remove_accept_encoding_header_ =
+            config.overrides().response_direction_config().remove_accept_encoding_header().value();
+      }
     }
     break;
   case CompressorPerRoute::OVERRIDE_NOT_SET:
