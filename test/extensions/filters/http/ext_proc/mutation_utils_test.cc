@@ -63,6 +63,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-replace-this", "Yes"},
       {"x-remove-this", "Yes"},
       {"x-envoy-strange-thing", "No"},
+      {"Set-Cookie", "xyz"},      
   };
 
   envoy::service::ext_proc::v3::HeaderMutation mutation;
@@ -130,6 +131,10 @@ TEST(MutationUtils, TestApplyMutations) {
   s = mutation.add_set_headers();
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_value("100");
+  s = mutation.add_set_headers();
+s->mutable_append()->set_value(true);
+s->mutable_header()->set_key("Set-Cookie");
+s->mutable_header()->set_value("3");
 
   // Use the default mutation rules
   Checker checker(HeaderMutationRules::default_instance());
@@ -152,7 +157,9 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-append-this", "3"},
       {"x-remove-and-append-this", "4"},
       {"x-replace-this", "nope"},
-      /*     {"x-envoy-strange-thing", "No"}, */
+      {"x-envoy-strange-thing", "No"},
+      {"Set-Cookie", "xyz"},
+      {"Set-Cookie", "3"},
   };
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
@@ -415,7 +422,7 @@ TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
 TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
-  Http::TestRequestHeaderMapImpl headers{
+  Http::TestResponseHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
   };
 
@@ -432,7 +439,7 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
   EXPECT_TRUE(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 
-  Http::TestRequestHeaderMapImpl expected_headers{
+  Http::TestResponseHeaderMapImpl expected_headers{
       {"Set-Cookie", "Value123"},
       {"Set-Cookie", "Value234"},
   };
