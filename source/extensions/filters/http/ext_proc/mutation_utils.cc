@@ -178,25 +178,27 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
     const LowerCaseString header_name(sh.header().key());
 
-    ENVOY_LOG(warn, "append_action value: {}", sh.append_action());
     ENVOY_LOG(error, "append_action value: {}", sh.append_action());
+    ENVOY_LOG(error, "header name: {}", header_name);
+    ENVOY_LOG(error, "header value: {}, header raw value: {}", sh.header().value(),
+              sh.header().raw_value());
 
     if (sh.append_action()) {
       switch (sh.append_action()) {
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        headers.addReferenceKey(header_name, header_value);
+        headers.addCopy(header_name, header_value);
         break;
       case HeaderValueOption::ADD_IF_ABSENT:
         if (headers.get(header_name).empty()) {
-          headers.addReferenceKey(header_name, header_value);
+          headers.addCopy(header_name, header_value);
         }
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        headers.setReferenceKey(header_name, header_value);
+        headers.setCopy(header_name, header_value);
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS:
         if (!headers.get(header_name).empty()) {
-          headers.setReferenceKey(header_name, header_value);
+          headers.setCopy(header_name, header_value);
         }
         break;
       default:

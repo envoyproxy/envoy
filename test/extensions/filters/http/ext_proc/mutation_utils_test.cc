@@ -413,6 +413,8 @@ TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
 }
 
 TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {"set-cookie", "Value123"},
   };
@@ -438,6 +440,8 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
 }
 
 TEST(MutationUtils, TestAppendActionAddIfAbsent) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {"set-cookie", "Value123"},
   };
@@ -463,6 +467,8 @@ TEST(MutationUtils, TestAppendActionAddIfAbsent) {
 }
 
 TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {"set-cookie", "Value123"},
   };
@@ -488,6 +494,8 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
 }
 
 TEST(MutationUtils, TestAppendActionOverwriteOrAdd) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {"set-cookie", "Value123"},
   };
