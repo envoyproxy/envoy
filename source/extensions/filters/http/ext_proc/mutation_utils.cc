@@ -193,7 +193,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         check_op =
             (!headers.get(header_name).empty()) ? CheckOperation::APPEND : CheckOperation::SET;
         checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                        check_op, header_name, header_value, sh, append_mode);
+                                        check_op, header_name, header_value, append_mode);
         if (checkResult == CheckResult::FAIL) {
           return absl::InvalidArgumentError(absl::StrCat(
               "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
@@ -204,7 +204,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
           append_mode = true;
           check_op = CheckOperation::SET;
           checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                          check_op, header_name, header_value, sh, append_mode);
+                                          check_op, header_name, header_value, append_mode);
           if (checkResult == CheckResult::FAIL) {
             return absl::InvalidArgumentError(absl::StrCat(
                 "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
@@ -215,7 +215,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         append_mode = false;
         check_op = CheckOperation::SET;
         checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                        check_op, header_name, header_value, sh, append_mode);
+                                        check_op, header_name, header_value, append_mode);
         if (checkResult == CheckResult::FAIL) {
           return absl::InvalidArgumentError(absl::StrCat(
               "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
@@ -226,7 +226,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
           append_mode = false;
           check_op = CheckOperation::SET;
           checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                          check_op, header_name, header_value, sh, append_mode);
+                                          check_op, header_name, header_value, append_mode);
           if (checkResult == CheckResult::FAIL) {
             return absl::InvalidArgumentError(absl::StrCat(
                 "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
@@ -244,7 +244,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                 ? CheckOperation::APPEND
                                 : CheckOperation::SET;
       auto checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                           check_op, header_name, header_value, sh, append_mode);
+                                           check_op, header_name, header_value, append_mode);
       if (checkResult == CheckResult::FAIL) {
         return absl::InvalidArgumentError(absl::StrCat(
             "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
