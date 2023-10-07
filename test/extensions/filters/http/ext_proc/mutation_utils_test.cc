@@ -63,7 +63,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-replace-this", "Yes"},
       {"x-remove-this", "Yes"},
       {"x-envoy-strange-thing", "No"},
-      {"Set-Cookie", "xyz"},      
+      {"Set-Cookie", "xyz"},
   };
 
   envoy::service::ext_proc::v3::HeaderMutation mutation;
@@ -132,9 +132,9 @@ TEST(MutationUtils, TestApplyMutations) {
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_value("100");
   s = mutation.add_set_headers();
-s->mutable_append()->set_value(true);
-s->mutable_header()->set_key("Set-Cookie");
-s->mutable_header()->set_value("3");
+  s->mutable_append()->set_value(true);
+  s->mutable_header()->set_key("Set-Cookie");
+  s->mutable_header()->set_value("3");
 
   // Use the default mutation rules
   Checker checker(HeaderMutationRules::default_instance());
