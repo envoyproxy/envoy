@@ -46,7 +46,7 @@ class RequestEncoder {
 public:
   virtual ~RequestEncoder() = default;
 
-  virtual void encode(const Request&, RequestEncoderCallback& callback) PURE;
+  virtual void encode(const StreamFrame&, RequestEncoderCallback& callback) PURE;
 };
 
 /*
@@ -56,7 +56,7 @@ class ResponseEncoder {
 public:
   virtual ~ResponseEncoder() = default;
 
-  virtual void encode(const Response&, ResponseEncoderCallback& callback) PURE;
+  virtual void encode(const StreamFrame&, ResponseEncoderCallback& callback) PURE;
 };
 
 class MessageCreator {

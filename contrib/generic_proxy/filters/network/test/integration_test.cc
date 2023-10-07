@@ -66,7 +66,7 @@ public:
   using TestReadFilterSharedPtr = std::shared_ptr<TestReadFilter>;
 
   struct TestRequestEncoderCallback : public RequestEncoderCallback {
-    void onEncodingSuccess(Buffer::Instance& buffer) override {
+    void onEncodingSuccess(Buffer::Instance& buffer, bool) override {
       buffer_.move(buffer);
       complete_ = true;
       request_bytes_ = buffer_.length();
@@ -78,7 +78,7 @@ public:
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
 
   struct TestResponseEncoderCallback : public ResponseEncoderCallback {
-    void onEncodingSuccess(Buffer::Instance& buffer) override {
+    void onEncodingSuccess(Buffer::Instance& buffer, bool) override {
       buffer_.move(buffer);
       complete_ = true;
       response_bytes_ = buffer_.length();
@@ -92,8 +92,13 @@ public:
   struct TestResponseDecoderCallback : public ResponseDecoderCallback {
     TestResponseDecoderCallback(IntegrationTest& parent) : parent_(parent) {}
 
-    void onDecodingSuccess(ResponsePtr response, ExtendedOptions) override {
-      response_ = std::move(response);
+    void onDecodingSuccess(StreamFramePtr response) override {
+      StreamFramePtrHelper<Response> helper(std::move(response));
+
+      if (helper.typed_frame_ != nullptr) {
+        response_ = std::move(helper.typed_frame_);
+      }
+
       complete_ = true;
       parent_.integration_->dispatcher_->exit();
     }

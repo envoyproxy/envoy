@@ -33,6 +33,11 @@ public:
   }
   void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
 
+  // StreamFrame
+  FrameFlags frameFlags() const override { return stream_frame_flags_; }
+
+  FrameFlags stream_frame_flags_;
+
   absl::flat_hash_map<std::string, std::string> data_;
 };
 
@@ -93,16 +98,16 @@ public:
         request->data_.emplace(pair);
       }
       absl::optional<uint64_t> stream_id;
-      bool wait_response = true;
+      bool one_way_stream = false;
       if (auto it = request->data_.find("stream_id"); it != request->data_.end()) {
         stream_id = std::stoull(it->second);
       }
-      if (auto it = request->data_.find("wait_response"); it != request->data_.end()) {
-        wait_response = it->second == "true";
+      if (auto it = request->data_.find("one_way"); it != request->data_.end()) {
+        one_way_stream = it->second == "true";
       }
-      ExtendedOptions request_options{stream_id, wait_response, false, false};
+      request->stream_frame_flags_ = {{stream_id.value_or(0), one_way_stream, false, false}, true};
 
-      callback_->onDecodingSuccess(std::move(request), request_options);
+      callback_->onDecodingSuccess(std::move(request));
       return true;
     }
 
@@ -170,9 +175,10 @@ public:
       if (auto it = response->data_.find("close_connection"); it != response->data_.end()) {
         close_connection = it->second == "true";
       }
-      ExtendedOptions response_options{stream_id, false, close_connection, false};
+      response->stream_frame_flags_ = {{stream_id.value_or(0), false, close_connection, false},
+                                       true};
 
-      callback_->onDecodingSuccess(std::move(response), response_options);
+      callback_->onDecodingSuccess(std::move(response));
       return true;
     }
 
@@ -214,7 +220,7 @@ public:
 
   class FakeRequestEncoder : public RequestEncoder {
   public:
-    void encode(const Request& request, RequestEncoderCallback& callback) override {
+    void encode(const StreamFrame& request, RequestEncoderCallback& callback) override {
       const FakeRequest* typed_request = dynamic_cast<const FakeRequest*>(&request);
       ASSERT(typed_request != nullptr);
 
@@ -228,7 +234,7 @@ public:
       buffer_.writeBEInt<uint32_t>(body.size());
       buffer_.add(body);
 
-      callback.onEncodingSuccess(buffer_);
+      callback.onEncodingSuccess(buffer_, true);
     }
 
     Buffer::OwnedImpl buffer_;
@@ -236,7 +242,7 @@ public:
 
   class FakeResponseEncoder : public ResponseEncoder {
   public:
-    void encode(const Response& response, ResponseEncoderCallback& callback) override {
+    void encode(const StreamFrame& response, ResponseEncoderCallback& callback) override {
       const FakeResponse* typed_response = dynamic_cast<const FakeResponse*>(&response);
       ASSERT(typed_response != nullptr);
 
@@ -251,7 +257,7 @@ public:
       buffer_.writeBEInt<uint32_t>(static_cast<int32_t>(typed_response->status_.raw_code()));
       buffer_.add(body);
 
-      callback.onEncodingSuccess(buffer_);
+      callback.onEncodingSuccess(buffer_, true);
     }
 
     Buffer::OwnedImpl buffer_;

@@ -81,17 +81,20 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
   // PendingResponseCallback
-  void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
+  void onDecodingSuccess(StreamFramePtr response) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;
   OptRef<Network::Connection> connection() override;
   void onConnectionClose(Network::ConnectionEvent event) override;
 
   // RequestEncoderCallback
-  void onEncodingSuccess(Buffer::Instance& buffer) override;
+  void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) override;
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
   void encodeBufferToUpstream(Buffer::Instance& buffer);
+
+  void sendRequestStartToUpstream();
+  void sendRequestFrameToUpstream();
 
   bool stream_reset_{};
 
@@ -100,6 +103,8 @@ public:
 
   uint64_t stream_id_{};
   bool wait_response_{};
+
+  bool request_stream_header_sent_{};
 
   absl::optional<Upstream::TcpPoolData> tcp_pool_data_;
   std::unique_ptr<UpstreamManagerImpl> upstream_manager_;
@@ -120,6 +125,7 @@ using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 
 class RouterFilter : public DecoderFilter,
                      public Upstream::LoadBalancerContextBase,
+                     public StreamFrameHandler,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   RouterFilter(Server::Configuration::FactoryContext& context) : context_(context) {}
@@ -129,11 +135,14 @@ public:
 
   void setDecoderFilterCallbacks(DecoderFilterCallback& callbacks) override {
     callbacks_ = &callbacks;
+    // Set handler for following request frames.
+    callbacks_->setRequestFramesHandler(this);
     protocol_options_ = callbacks_->downstreamCodec().protocolOptions();
   }
-  FilterStatus onStreamDecoded(Request& request) override;
+  FilterStatus onStreamDecoded(StreamRequest& request) override;
 
-  void onUpstreamResponse(ResponsePtr response, ExtendedOptions options);
+  void onResponseStart(StreamResponsePtr response);
+  void onResponseFrame(StreamFramePtr frame);
   void completeDirectly();
 
   void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason);
@@ -146,6 +155,9 @@ public:
   // Upstream::LoadBalancerContextBase
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   const Network::Connection* downstreamConnection() const override;
+
+  // StreamFrameHandler
+  void onStreamFrame(StreamFramePtr frame) override;
 
 private:
   friend class UpstreamRequest;
@@ -162,7 +174,9 @@ private:
 
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  Request* request_{};
+  Request* request_stream_{};
+  std::list<StreamFramePtr> request_stream_frames_;
+  bool request_stream_end_{};
 
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;
 
