@@ -65,7 +65,7 @@ private:
                     Stats::Counter& rejected_mutations,
                     Filters::Common::MutationRules::CheckOperation check_op,
                     Http::LowerCaseString header_name, absl::string_view header_value,
-                    envoy::config::core::v3::HeaderValueOption sh, bool append_mode);
+                    bool append_mode);
 };
 
 } // namespace ExternalProcessing

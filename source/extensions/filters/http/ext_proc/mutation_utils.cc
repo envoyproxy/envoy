@@ -289,7 +289,7 @@ MutationUtils::handleCheckResult(Http::HeaderMap& headers, bool replacing_messag
                                  Stats::Counter& rejected_mutations,
                                  Filters::Common::MutationRules::CheckOperation check_op,
                                  Http::LowerCaseString header_name, absl::string_view header_value,
-                                 envoy::config::core::v3::HeaderValueOption sh, bool append_mode) {
+                                  bool append_mode) {
   auto check_result = checker.check(check_op, header_name, header_value);
   if (replacing_message && header_name == Http::Headers::get().Method) {
     // Special handling to allow changing ":method" when the
@@ -299,7 +299,7 @@ MutationUtils::handleCheckResult(Http::HeaderMap& headers, bool replacing_messag
 
   switch (check_result) {
   case CheckResult::OK:
-    ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append_mode);
+    ENVOY_LOG(error, "Setting header {} append = {}", header_name, append_mode);
     if (append_mode) {
       headers.addCopy(header_name, header_value);
     } else {
