@@ -433,7 +433,8 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 
   Http::TestRequestHeaderMapImpl expected_headers{
-      {"set-cookie", "Value123, Value234"},
+    {"set-cookie", "Value123"},
+    {"set-cookie", "Value234"},
   };
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));

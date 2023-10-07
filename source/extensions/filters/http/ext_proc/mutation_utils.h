@@ -58,6 +58,12 @@ private:
   // Check whether the header size after mutation is over the HCM size config.
   static absl::Status headerMutationResultCheck(const Http::HeaderMap& headers,
                                                 Stats::Counter& rejected_mutations);
+
+  static Filters::Common::MutationRules::CheckResult
+      handleCheckResult(Http::HeaderMap& headers, bool replacing_message,
+                               const Filters::Common::MutationRules::Checker& checker, Stats::Counter& rejected_mutations,
+                               Filters::Common::MutationRules::CheckOperation check_op, Http::LowerCaseString header_name,
+                               absl::string_view header_value, envoy::config::core::v3::HeaderValueOption sh, bool append_mode);
 };
 
 } // namespace ExternalProcessing
