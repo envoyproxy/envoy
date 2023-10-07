@@ -283,13 +283,11 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
 }
 
 // Define a common function to handle the check result logic
-Filters::Common::MutationRules::CheckResult
-MutationUtils::handleCheckResult(Http::HeaderMap& headers, bool replacing_message,
-                                 const Filters::Common::MutationRules::Checker& checker,
-                                 Stats::Counter& rejected_mutations,
-                                 Filters::Common::MutationRules::CheckOperation check_op,
-                                 Http::LowerCaseString header_name, absl::string_view header_value,
-                                  bool append_mode) {
+Filters::Common::MutationRules::CheckResult MutationUtils::handleCheckResult(
+    Http::HeaderMap& headers, bool replacing_message,
+    const Filters::Common::MutationRules::Checker& checker, Stats::Counter& rejected_mutations,
+    Filters::Common::MutationRules::CheckOperation check_op, Http::LowerCaseString header_name,
+    absl::string_view header_value, bool append_mode) {
   auto check_result = checker.check(check_op, header_name, header_value);
   if (replacing_message && header_name == Http::Headers::get().Method) {
     // Special handling to allow changing ":method" when the

@@ -152,7 +152,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-append-this", "3"},
       {"x-remove-and-append-this", "4"},
       {"x-replace-this", "nope"},
- /*     {"x-envoy-strange-thing", "No"}, */
+      /*     {"x-envoy-strange-thing", "No"}, */
   };
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
