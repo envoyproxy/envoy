@@ -25,10 +25,11 @@ aio-api-bazel==0.0.2 \
     --hash=sha256:56e36463d236e477b7e282f2d870185a0b978b50e2c3803c1ebf8b8ac4b18f5b \
     --hash=sha256:d3f563b7698e874437d80538a89dd4d79bc37de2e850c846330ae456e3f21dcc
     # via -r requirements.in
-aio-api-github==0.2.4 \
-    --hash=sha256:ccbc7c6c61b25994e87474d78c48549e9fbc98c2cc04314b50b80ba1f40fd521 \
-    --hash=sha256:eccfccd1503f50384de3f6526bd780ca02107cb440a666b2c1ab978d99c7db5e
+aio-api-github==0.2.5 \
+    --hash=sha256:301a357209831ac2bc0fb5c79f8b8795a5363da5cabc2229f10155bdb6d42f5d \
+    --hash=sha256:3532d0892e875e8bb6b188c0beba4e8bac9d5147e249ce987bb2beef1e7b711e
     # via
+    #   -r requirements.in
     #   envoy-base-utils
     #   envoy-dependency-check
 aio-api-nist==0.0.3 \
@@ -435,9 +436,9 @@ docutils==0.19 \
     #   envoy-docs-sphinx-runner
     #   sphinx
     #   sphinx-rtd-theme
-envoy-base-utils==0.4.11 \
-    --hash=sha256:5ced696c470b4c3090e6fc3f74e7e33f5fe217e775b1fc1fb56dfc756b781fbe \
-    --hash=sha256:97c79177bb89360b7772e58fb20c671c67bf0b6cdee74c0b9f8a80433f0370cc
+envoy-base-utils==0.4.13 \
+    --hash=sha256:58a35870e15ca00e921f9ab8266c6a1f83dc40f830bf0f1002e940aae2067a06 \
+    --hash=sha256:a3a1f1289ad7fabb33766699912d06a81385f4e3619f6bec80d5bdaab5e606a8
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -453,9 +454,9 @@ envoy-code-check==0.5.8 \
     --hash=sha256:03f32588cc9ed98ab6703cbca6f81df1527db71c3a0f962be6a6084ded40d528 \
     --hash=sha256:2b12c51098c78d393823cf055a54e9308c37321d769041f01a2f35b04074d6f3
     # via -r requirements.in
-envoy-dependency-check==0.1.8 \
-    --hash=sha256:ac9820e446bb44e05121e5c93c210f40ca37076580b0d082da2c63e7784c338a \
-    --hash=sha256:e92272ca1f4d850d3eb3bde3c22cff39c103e7850fbda8d1686814bfc8c45338
+envoy-dependency-check==0.1.10 \
+    --hash=sha256:4a637e0ed7184791b495041f9baf44567a95cbb979e1e5f26f6a8c33f724cf9e \
+    --hash=sha256:e6ae41249f298c865a357edcd8e4850354f222ea4f0dd629c737706b23670c75
     # via -r requirements.in
 envoy-distribution-distrotest==0.0.10 \
     --hash=sha256:83e912c48da22eb3e514fc1142247d33eb7ed0d59e94eca2ffbd178a26fbf808 \
@@ -476,9 +477,9 @@ envoy-distribution-verify==0.0.11 \
 envoy-docker-utils==0.0.2 \
     --hash=sha256:a12cb57f0b6e204d646cbf94f927b3a8f5a27ed15f60d0576176584ec16a4b76
     # via envoy-distribution-distrotest
-envoy-docs-sphinx-runner==0.2.8 \
-    --hash=sha256:129db23430fd3fae3cf62fda74b9479c6880698fef46f895058c98f1f3cf8e20 \
-    --hash=sha256:736cc88874bdf42778cec02648fcbd82971154d38618b3699e17c049bdec74c9
+envoy-docs-sphinx-runner==0.2.9 \
+    --hash=sha256:1fa789b1d29ea929df67b07e5ca910d62e2057cd229719725030889da53b1a09 \
+    --hash=sha256:4bfa1946104e263471d522b47d683e127124a5ad47334d69de4aea0eac282576
     # via -r requirements.in
 envoy-github-abstract==0.0.22 \
     --hash=sha256:2dd65e2f247a4947d0198b295c82716c13162e30c433b7625c27d59eee7bcf78 \
@@ -636,9 +637,9 @@ gitdb==4.0.10 \
     --hash=sha256:6eb990b69df4e15bad899ea868dc46572c3f75339735663b81de79b06f17eb9a \
     --hash=sha256:c286cf298426064079ed96a9e4a9d39e7f3e9bf15ba60701e95f5492f28415c7
     # via gitpython
-gitpython==3.1.36 \
-    --hash=sha256:4bb0c2a6995e85064140d31a33289aa5dce80133a23d36fcd372d716c54d3ebf \
-    --hash=sha256:8d22b5cfefd17c79914226982bb7851d6ade47545b1735a9d010a2a4c26d8388
+gitpython==3.1.37 \
+    --hash=sha256:5f4c4187de49616d710a77e98ddf17b4782060a1788df441846bddefbb89ab33 \
+    --hash=sha256:f9b9ddc0761c125d5780eab2d64be4873fc6817c2899cbcb34b02344bdc7bc54
     # via -r requirements.in
 google-api-core==2.11.1 \
     --hash=sha256:25d29e05a0058ed5f19c61c0a78b1b53adea4d9364b464d014fbda941f6d1c9a \
@@ -1071,9 +1072,9 @@ pyflakes==3.1.0 \
     --hash=sha256:4132f6d49cb4dae6819e5379898f2b8cce3c5f23994194c24b77d5da2e36f774 \
     --hash=sha256:a0aae034c444db0071aa077972ba4768d40c830d9539fd45bf4cd3f8f6992efc
     # via flake8
-pygithub==1.59.1 \
-    --hash=sha256:3d87a822e6c868142f0c2c4bf16cce4696b5a7a4d142a7bd160e1bdf75bc54a9 \
-    --hash=sha256:c44e3a121c15bf9d3a5cc98d94c9a047a5132a9b01d22264627f58ade9ddc217
+pygithub==2.1.1 \
+    --hash=sha256:4b528d5d6f35e991ea5fd3f942f58748f24938805cb7fcf24486546637917337 \
+    --hash=sha256:ecf12c2809c44147bce63b047b3d2e9dac8a41b63e90fcb263c703f64936b97c
     # via -r requirements.in
 pygments==2.15.1 \
     --hash=sha256:8ace4d3c1dd481894b2005f560ead0f9f19ee64fe983366be1a21e171d12775c \
@@ -1112,6 +1113,10 @@ pyparsing==3.1.0 \
 pyreadline==2.1 \
     --hash=sha256:4530592fc2e85b25b1a9f79664433da09237c1a270e4d78ea5aa3a2c7229e2d1
     # via -r requirements.in
+python-dateutil==2.8.2 \
+    --hash=sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86 \
+    --hash=sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9
+    # via pygithub
 python-gnupg==0.5.1 \
     --hash=sha256:5674bad4e93876c0b0d3197e314d7f942d39018bf31e2b833f6788a6813c3fb8 \
     --hash=sha256:bf9b2d9032ef38139b7d64184176cd0b293eaeae6e4f93f50e304c7051174482
@@ -1201,6 +1206,7 @@ six==1.16.0 \
     #   google-auth
     #   gsutil
     #   oauth2client
+    #   python-dateutil
     #   pyu2f
     #   sphinxcontrib-httpdomain
     #   thrift
@@ -1296,16 +1302,19 @@ trycast==1.0.0 \
 typing-extensions==4.7.1 \
     --hash=sha256:440d5dd3af93b060174bf433bccd69b0babc3b15b1a8dca43789fd7f61514b36 \
     --hash=sha256:b75ddc264f0ba5615db7ba217daeb99701ad295353c45f9e95963337ceeeffb2
-    # via aiodocker
+    # via
+    #   aiodocker
+    #   pygithub
 uritemplate==4.1.1 \
     --hash=sha256:4346edfc5c3b79f694bccd6d6099a322bbeb628dbf2cd86eea55a456ce5124f0 \
     --hash=sha256:830c08b8d99bdd312ea4ead05994a38e8936266f84b9a7878232db50b044e02e
     # via gidgethub
-urllib3==1.26.16 \
-    --hash=sha256:8d36afa7616d8ab714608411b4a3b13e58f463aee519024578e062e141dce20f \
-    --hash=sha256:8f135f6502756bde6b2a9b28989df5fbe87c9970cecaa69041edcce7f0589b14
+urllib3==1.26.17 \
+    --hash=sha256:24d6a242c28d29af46c3fae832c36db3bbebcc533dd1bb549172cd739c82df21 \
+    --hash=sha256:94a757d178c9be92ef5539b8840d48dc9cf1b2709c9d6b588232a055c524458b
     # via
     #   google-auth
+    #   pygithub
     #   requests
 uvloop==0.17.0 \
     --hash=sha256:0949caf774b9fcefc7c5756bacbbbd3fc4c05a6b7eebc7c7ad6f825b23998d6d \

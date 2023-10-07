@@ -2,8 +2,6 @@ syntax = "proto2";
 
 package testdata.dynamic_descriptors;
 
-import "bazel/cc_proto_descriptor_library/testdata/test.proto";
-
 message FooCopy {
   optional string bar = 1;
 

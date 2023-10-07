@@ -93,7 +93,7 @@ std::unique_ptr<google::protobuf::Message> TextFormatTranscoder::createEmptyDyna
     absl::string_view type_name, google::protobuf::io::ErrorCollector* error_collector) const {
   const google::protobuf::Descriptor* descriptor =
       internals_->descriptor_pool.FindMessageTypeByName(std::string(type_name));
-  // If you're built with the full runtime then embeddng the descriptors and
+  // If you're built with the full runtime then embedding the descriptors and
   // loading them would be information duplicated by the global descriptor
   // pool which hurts builds like superroot that are near all the blaze/forge
   // size limits. Teams that care about not silently falling into this fallback
