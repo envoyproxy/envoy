@@ -213,13 +213,13 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         append_mode = false;
-        check_op =CheckOperation::SET;
+        check_op = CheckOperation::SET;
         checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
                                         check_op, header_name, header_value, sh, append_mode);
         if (checkResult == CheckResult::FAIL) {
           return absl::InvalidArgumentError(absl::StrCat(
               "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
-        }        
+        }
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS:
         if (!headers.get(header_name).empty()) {
