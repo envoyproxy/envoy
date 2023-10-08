@@ -421,7 +421,10 @@ TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
 
 TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.send_header_raw_value", "false"},
+      {"envoy.reloadable_features.header_value_option_change_action", "true"},
+  });
   Http::TestResponseHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
   };
@@ -449,7 +452,10 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
 
 TEST(MutationUtils, TestAppendActionAddIfAbsent) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.send_header_raw_value", "false"},
+      {"envoy.reloadable_features.header_value_option_change_action", "true"},
+  });
   Http::TestRequestHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
   };
@@ -476,7 +482,10 @@ TEST(MutationUtils, TestAppendActionAddIfAbsent) {
 
 TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.send_header_raw_value", "false"},
+      {"envoy.reloadable_features.header_value_option_change_action", "true"},
+  });
   Http::TestRequestHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
   };
@@ -503,7 +512,10 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
 
 TEST(MutationUtils, TestAppendActionOverwriteOrAdd) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.send_header_raw_value", "false"},
+      {"envoy.reloadable_features.header_value_option_change_action", "true"},
+  });
   Http::TestRequestHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
   };

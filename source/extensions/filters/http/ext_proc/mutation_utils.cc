@@ -187,7 +187,8 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     ENVOY_LOG(error, "header value: {}, header raw value: {}", sh.header().value(),
               sh.header().raw_value());
 
-    if (!sh.has_append()) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.header_value_option_change_action")) {
       switch (sh.append_action()) {
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         ENVOY_LOG(error, "Inside append action APPEND_IF_EXISTS_OR_ADD {} ",
