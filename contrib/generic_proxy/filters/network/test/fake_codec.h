@@ -105,7 +105,15 @@ public:
       if (auto it = request->data_.find("one_way"); it != request->data_.end()) {
         one_way_stream = it->second == "true";
       }
-      request->stream_frame_flags_ = {{stream_id.value_or(0), one_way_stream, false, false}, true};
+
+      // Mock multiple frames in one request.
+      bool end_stream = true;
+      if (auto it = request->data_.find("end_stream"); it != request->data_.end()) {
+        end_stream = it->second == "true";
+      }
+
+      request->stream_frame_flags_ = {{stream_id.value_or(0), one_way_stream, false, false},
+                                      end_stream};
 
       callback_->onDecodingSuccess(std::move(request));
       return true;
@@ -175,8 +183,15 @@ public:
       if (auto it = response->data_.find("close_connection"); it != response->data_.end()) {
         close_connection = it->second == "true";
       }
+
+      // Mock multiple frames in one response.
+      bool end_stream = true;
+      if (auto it = response->data_.find("end_stream"); it != response->data_.end()) {
+        end_stream = it->second == "true";
+      }
+
       response->stream_frame_flags_ = {{stream_id.value_or(0), false, close_connection, false},
-                                       true};
+                                       end_stream};
 
       callback_->onDecodingSuccess(std::move(response));
       return true;
@@ -234,7 +249,7 @@ public:
       buffer_.writeBEInt<uint32_t>(body.size());
       buffer_.add(body);
 
-      callback.onEncodingSuccess(buffer_, true);
+      callback.onEncodingSuccess(buffer_, request.frameFlags().endStream());
     }
 
     Buffer::OwnedImpl buffer_;
@@ -257,7 +272,7 @@ public:
       buffer_.writeBEInt<uint32_t>(static_cast<int32_t>(typed_response->status_.raw_code()));
       buffer_.add(body);
 
-      callback.onEncodingSuccess(buffer_, true);
+      callback.onEncodingSuccess(buffer_, response.frameFlags().endStream());
     }
 
     Buffer::OwnedImpl buffer_;
