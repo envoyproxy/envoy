@@ -34,6 +34,7 @@ CONTRIB_V3_ALLOW_LIST = [
     'envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3',
     'envoy.extensions.filters.network.generic_proxy.matcher.v3',
     'envoy.extensions.filters.network.generic_proxy.router.v3',
+    'envoy.extensions.filters.network.generic_proxy.local_ratelimit.v3',
     'envoy.extensions.filters.network.generic_proxy.v3',
     'envoy.extensions.filters.network.kafka_broker.v3',
     'envoy.extensions.filters.network.mysql_proxy.v3',

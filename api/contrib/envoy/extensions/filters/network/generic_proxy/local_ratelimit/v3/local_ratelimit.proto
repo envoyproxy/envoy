@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.generic_proxy.local_ratelimit.v3;
+
+import "contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.local_ratelimit.v3";
+option java_outer_classname = "LocalRatelimitProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/generic_proxy/local_ratelimit/v3;local_ratelimitv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Local_ratelimit configuration for generic proxy]
+// [#extension: envoy.filters.generic.local_ratelimit]
+
+enum UnitType {
+  UNKNOWN = 0;
+
+  // Seconds
+  SS = 1;
+
+  // Minute
+  MM = 2;
+
+  // Hour
+  HH = 3;
+
+  // Day
+  DD = 4;
+}
+
+message RateLimiter {
+  // Unit time
+  UnitType unit = 1;
+
+  // The number of requests allowed per unit time
+  uint32 rate = 2 [(validate.rules).uint32 = {gte: 1}];
+}
+
+message RateLimitEntry {
+  // Local traffic limiting matching rule. If matcher is empty, all requests
+  // on the configured route are restricted.
+  matcher.v3.RequestMatcher matcher = 1;
+
+  // The rate limit token bucket that matches the rule
+  RateLimiter limiter = 2 [(validate.rules).message = {required: true}];
+}
+
+// Listener generic_proxy local limit filter config .
+message LocalRateLimit {
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Multiple traffic limiting rules. When any traffic limiting rule takes
+  // effect, the traffic limiting operation is triggered. Envoy will return
+  // a local response.
+  repeated RateLimitEntry rate_limits = 2;
+}
