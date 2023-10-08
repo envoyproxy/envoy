@@ -63,7 +63,6 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-replace-this", "Yes"},
       {"x-remove-this", "Yes"},
       {"x-envoy-strange-thing", "No"},
-      {"Set-Cookie", "xyz"},
   };
 
   envoy::service::ext_proc::v3::HeaderMutation mutation;
@@ -133,8 +132,8 @@ TEST(MutationUtils, TestApplyMutations) {
   s->mutable_header()->set_value("100");
   s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
-  s->mutable_header()->set_key("Set-Cookie");
-  s->mutable_header()->set_value("3");
+  s->mutable_header()->set_key("x-append-this");
+  s->mutable_header()->set_value("1");
 
   // Use the default mutation rules
   Checker checker(HeaderMutationRules::default_instance());
@@ -158,8 +157,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-remove-and-append-this", "4"},
       {"x-replace-this", "nope"},
       {"x-envoy-strange-thing", "No"},
-      {"Set-Cookie", "xyz"},
-      {"Set-Cookie", "3"},
+      {"x-append-this", "1"},
   };
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
@@ -430,11 +428,21 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
   };
 
   envoy::service::ext_proc::v3::HeaderMutation mutation;
-  auto* set_header = mutation.add_set_headers();
-  set_header->mutable_header()->set_key("Set-Cookie");
-  set_header->mutable_header()->set_value("Value234");
-  set_header->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
-                                    HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("Set-Cookie");
+  s->mutable_header()->set_value("Value234");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("Set-Cookie");
+  s->mutable_header()->set_value("Value123");
+  s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("other-header");
+  s->mutable_header()->set_value("xyz");
+  s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
 
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
@@ -445,6 +453,7 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
   Http::TestResponseHeaderMapImpl expected_headers{
       {"Set-Cookie", "Value123"},
       {"Set-Cookie", "Value234"},
+      {"other-header", "xyz"},
   };
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
@@ -461,11 +470,21 @@ TEST(MutationUtils, TestAppendActionAddIfAbsent) {
   };
 
   envoy::service::ext_proc::v3::HeaderMutation mutation;
-  auto* set_header = mutation.add_set_headers();
-  set_header->mutable_header()->set_key("Set-Cookie");
-  set_header->mutable_header()->set_value("Value234");
-  set_header->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
-                                    HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("Set-Cookie");
+  s->mutable_header()->set_value("Value234");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("Set-Cookie");
+  s->mutable_header()->set_value("Value123");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("other-header");
+  s->mutable_header()->set_value("Value123");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
 
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
@@ -473,39 +492,8 @@ TEST(MutationUtils, TestAppendActionAddIfAbsent) {
   EXPECT_TRUE(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 
-  Http::TestRequestHeaderMapImpl expected_headers{
-      {"Set-cookie", "Value123"},
-  };
-
-  EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
-}
-
-TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.send_header_raw_value", "false"},
-      {"envoy.reloadable_features.header_value_option_change_action", "true"},
-  });
-  Http::TestRequestHeaderMapImpl headers{
-      {"Set-Cookie", "Value123"},
-  };
-
-  envoy::service::ext_proc::v3::HeaderMutation mutation;
-  auto* set_header = mutation.add_set_headers();
-  set_header->mutable_header()->set_key("Set-Cookie");
-  set_header->mutable_header()->set_value("Value234");
-  set_header->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
-                                    HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
-
-  Checker checker(HeaderMutationRules::default_instance());
-  Envoy::Stats::MockCounter rejections;
-
-  EXPECT_TRUE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
-
-  Http::TestRequestHeaderMapImpl expected_headers{
-      {"set-cookie", "Value234"},
-  };
+  Http::TestRequestHeaderMapImpl expected_headers{{"Set-cookie", "Value123"},
+                                                  {"other-header", "Value123"}};
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
 }
@@ -521,12 +509,57 @@ TEST(MutationUtils, TestAppendActionOverwriteOrAdd) {
   };
 
   envoy::service::ext_proc::v3::HeaderMutation mutation;
-  auto* set_header = mutation.add_set_headers();
-  set_header->mutable_header()->set_key("Set-Cookie");
-  set_header->mutable_header()->set_value("Value234");
-  set_header->set_append_action(
-      envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
-          HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("Set-Cookie");
+  s->mutable_header()->set_value("Value234");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("Set-Cookie");
+  s->mutable_header()->set_value("Value123");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("other-header");
+  s->mutable_header()->set_value("new value");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+
+  EXPECT_TRUE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+
+  Http::TestRequestHeaderMapImpl expected_headers{{"Set-Cookie", "Value123"},
+                                                  {"other-header", "new value"}};
+
+  EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+}
+
+TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.send_header_raw_value", "false"},
+      {"envoy.reloadable_features.header_value_option_change_action", "true"},
+  });
+  Http::TestRequestHeaderMapImpl headers{
+      {"Set-Cookie", "Value123"},
+  };
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("Set-Cookie");
+  s->mutable_header()->set_value("Value234");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
+
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("other-header");
+  s->mutable_header()->set_value("new value");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
 
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
@@ -535,7 +568,7 @@ TEST(MutationUtils, TestAppendActionOverwriteOrAdd) {
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 
   Http::TestRequestHeaderMapImpl expected_headers{
-      {"Set-Cookie", "Value234"},
+      {"set-cookie", "Value234"},
   };
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));

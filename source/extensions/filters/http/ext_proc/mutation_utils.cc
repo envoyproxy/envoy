@@ -152,6 +152,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
   bool append_mode_for_append_action;
   Filters::Common::MutationRules::CheckOperation check_op_for_append_action;
   Filters::Common::MutationRules::CheckResult checkResult_for_append_action;
+  auto is_duplicate = false;
 
   for (const auto& sh : mutation.set_headers()) {
     if (!sh.has_header()) {
@@ -193,15 +194,32 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         ENVOY_LOG(error, "Inside append action APPEND_IF_EXISTS_OR_ADD {} ",
                   HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
-        append_mode_for_append_action = true;
-        check_op_for_append_action =
-            (!headers.get(header_name).empty()) ? CheckOperation::APPEND : CheckOperation::SET;
-        checkResult_for_append_action = handleCheckResult(
-            headers, replacing_message, checker, rejected_mutations, check_op_for_append_action,
-            header_name, header_value, append_mode_for_append_action);
-        if (checkResult_for_append_action == CheckResult::FAIL) {
-          return absl::InvalidArgumentError(absl::StrCat(
-              "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
+        // Check if the header already exists with the same name and value.
+        if (!headers.get(header_name).empty()) {
+          is_duplicate = false;
+          Http::HeaderMap::GetResult result = headers.get(header_name);
+          for (size_t i = 0; i < result.size(); ++i) {
+            const Http::HeaderEntry* entry = result[i];
+            const absl::string_view& existing_value = entry->value().getStringView();
+
+            // Compare the existing value with your desired header_value
+            if (existing_value == header_value) {
+              is_duplicate = true;
+              break;
+            }
+          }
+        }
+        if (!is_duplicate) {
+          append_mode_for_append_action = true;
+          check_op_for_append_action =
+              (!headers.get(header_name).empty()) ? CheckOperation::APPEND : CheckOperation::SET;
+          checkResult_for_append_action = handleCheckResult(
+              headers, replacing_message, checker, rejected_mutations, check_op_for_append_action,
+              header_name, header_value, append_mode_for_append_action);
+          if (checkResult_for_append_action == CheckResult::FAIL) {
+            return absl::InvalidArgumentError(absl::StrCat(
+                "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
+          }
         }
         break;
       case HeaderValueOption::ADD_IF_ABSENT:
@@ -262,32 +280,6 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         return absl::InvalidArgumentError(absl::StrCat(
             "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
       }
-      /*
-  auto check_result = checker.check(check_op, header_name, header_value);
-  if (replacing_message && header_name == Http::Headers::get().Method) {
-    // Special handling to allow changing ":method" when the
-    // CONTINUE_AND_REPLACE option is selected, to stay compatible.
-    check_result = CheckResult::OK;
-  }
-  switch (check_result) {
-  case CheckResult::OK:
-    ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
-    if (append) {
-      headers.addCopy(header_name, header_value);
-    } else {
-      headers.setCopy(header_name, header_value);
-    }
-    break;
-  case CheckResult::IGNORE:
-    ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
-    rejected_mutations.inc();
-    break;
-  case CheckResult::FAIL:
-    ENVOY_LOG(debug, "Header {} may not be modified. Returning error", header_name);
-    rejected_mutations.inc();
-    return absl::InvalidArgumentError(absl::StrCat(
-        "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
-  } */
     }
   }
 
