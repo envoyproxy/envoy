@@ -11,6 +11,46 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 
+using TunnelingConfig =
+    envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig::UdpTunnelingConfig;
+
+class TunnelingConfigImpl : public UdpTunnelingConfig {
+public:
+  TunnelingConfigImpl(const TunnelingConfig& config,
+                      Server::Configuration::FactoryContext& context);
+
+  const std::string proxyHost(const StreamInfo::StreamInfo& stream_info) const override {
+    return proxy_host_formatter_->formatWithContext({}, stream_info);
+  }
+
+  const std::string targetHost(const StreamInfo::StreamInfo& stream_info) const override {
+    return target_host_formatter_->formatWithContext({}, stream_info);
+  }
+
+  const absl::optional<uint32_t>& proxyPort() const override { return proxy_port_; };
+  uint32_t defaultTargetPort() const override { return target_port_; };
+  bool usePost() const override { return use_post_; };
+  const std::string& postPath() const override { return post_path_; }
+  Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; };
+  uint32_t maxConnectAttempts() const override { return max_connect_attempts_; };
+  bool bufferEnabled() const override { return buffer_enabled_; };
+  uint32_t maxBufferedDatagrams() const override { return max_buffered_datagrams_; };
+  uint64_t maxBufferedBytes() const override { return max_buffered_bytes_; };
+
+private:
+  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  Formatter::FormatterPtr proxy_host_formatter_;
+  absl::optional<uint32_t> proxy_port_;
+  Formatter::FormatterPtr target_host_formatter_;
+  const uint32_t target_port_;
+  bool use_post_;
+  std::string post_path_;
+  const uint32_t max_connect_attempts_;
+  bool buffer_enabled_;
+  uint32_t max_buffered_datagrams_;
+  uint64_t max_buffered_bytes_;
+};
+
 class UdpProxyFilterConfigImpl : public UdpProxyFilterConfig,
                                  public FilterChainFactory,
                                  Logger::Loggable<Logger::Id::config> {
@@ -34,7 +74,6 @@ public:
   const Udp::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const override { return stats_; }
   TimeSource& timeSource() const override { return time_source_; }
-  Random::RandomGenerator& randomGenerator() const override { return random_; }
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const override {
     return upstream_socket_config_;
   }
@@ -46,6 +85,7 @@ public:
   }
   const FilterChainFactory& sessionFilterFactory() const override { return *this; };
   bool hasSessionFilters() const override { return !filter_factories_.empty(); }
+  const UdpTunnelingConfigPtr& tunnelingConfig() const override { return tunneling_config_; };
 
   // FilterChainFactory
   void createFilterChain(FilterChainFactoryCallbacks& callbacks) const override {
@@ -73,7 +113,7 @@ private:
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
   std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
   std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
-  Random::RandomGenerator& random_;
+  UdpTunnelingConfigPtr tunneling_config_;
   std::list<SessionFilters::FilterFactoryCb> filter_factories_;
 };
 
