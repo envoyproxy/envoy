@@ -24,7 +24,9 @@ envoy_cc_win32_library(
     include_prefix = "source/common/filesystem",
     strip_include_prefix = "win32",
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/filesystem:filesystem_interface",
+        "//source/common/common:fmt_lib",
     ],
 )
 
@@ -116,11 +118,11 @@ envoy_cc_library(
     deps = [
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
-        "//source/common/buffer:buffer_lib",
         "//source/common/network:default_socket_interface_lib",
     ] + select({
         "//bazel:windows_x86_64": [

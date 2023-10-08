@@ -9,6 +9,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
 #include "test/mocks/upstream/health_checker.h"
@@ -32,6 +33,7 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(void, setEventLogger, (Upstream::HealthCheckEventLoggerPtr));
+  MOCK_METHOD(Server::Configuration::ServerFactoryContext&, serverFactoryContext, ());
 
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     if (!event_logger_) {
@@ -47,6 +49,7 @@ public:
   testing::NiceMock<Envoy::Api::MockApi> api_{};
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   std::unique_ptr<testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>> event_logger_;
+  testing::NiceMock<MockServerFactoryContext> server_context_;
 };
 
 } // namespace Configuration

@@ -16,14 +16,13 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
 
+class ClusterFactory;
+class ClusterTest;
+
 class Cluster : public Upstream::BaseDynamicClusterImpl,
                 public Extensions::Common::DynamicForwardProxy::DfpCluster,
                 public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
 public:
-  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
-          const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
-          Upstream::ClusterFactoryContext& context,
-          Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
   ~Cluster() override;
 
   // Upstream::Cluster
@@ -54,6 +53,13 @@ public:
   void checkIdleSubCluster();
 
 private:
+  friend class ClusterFactory;
+  friend class ClusterTest;
+
+  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+          const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
+          Upstream::ClusterFactoryContext& context,
+          Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();
@@ -130,8 +136,9 @@ private:
     LoadBalancerFactory(Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      return std::make_unique<LoadBalancer>(cluster_);
+    }
 
   private:
     Cluster& cluster_;
@@ -198,7 +205,8 @@ public:
   ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.dynamic_forward_proxy") {}
 
 private:
-  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,

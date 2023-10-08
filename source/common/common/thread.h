@@ -255,7 +255,7 @@ public:
 #endif
 
 #ifdef ENVOY_DISABLE_EXCEPTIONS
-#define MULTI_CATCH(ExceptionType, Handler)
+#define MULTI_CATCH(ExceptionType, Handler, Handler2)
 #else
 #define MULTI_CATCH(Exception, Handler, Handler2)                                                  \
   catch (Exception) {                                                                              \

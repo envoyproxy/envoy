@@ -88,14 +88,16 @@ protected:
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-               Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+                   Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> Filter::NetworkFilterFactoriesList {
               return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, filter_chain_factory_context);
+                  filters, filter_chain_factory_context, network_config_provider_manager_);
             }));
     ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
         .WillByDefault(Return(&tcp_listener_config_provider_manager_));
+    ON_CALL(listener_factory_, getQuicListenerConfigProviderManager())
+        .WillByDefault(Return(&quic_listener_config_provider_manager_));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -113,6 +115,15 @@ protected:
                        -> std::vector<Network::UdpListenerFilterFactoryCb> {
               return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters,
                                                                                           context);
+            }));
+    ON_CALL(listener_factory_, createQuicListenerFilterFactoryList(_, _))
+        .WillByDefault(Invoke(
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                       filters,
+                   Configuration::ListenerFactoryContext& context)
+                -> Filter::QuicListenerFilterFactoriesList {
+              return ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
+                  filters, context, *listener_factory_.getQuicListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
       return listener_tag_++;
@@ -158,13 +169,18 @@ protected:
             [raw_listener, need_init](
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
                 Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
+                -> Filter::NetworkFilterFactoriesList {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
                 filter_chain_factory_context.initManager().add(notifier->target_);
               }
-              return {[notifier](Network::FilterManager&) -> void {}};
+
+              Filter::NetworkFilterFactoriesList factories;
+              factories.push_back(
+                  std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+                      [notifier](Network::FilterManager&) -> void {}));
+              return factories;
             }));
 
     return raw_listener;
@@ -185,13 +201,18 @@ protected:
             [raw_listener, need_init](
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
                 Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
+                -> Filter::NetworkFilterFactoriesList {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
                 filter_chain_factory_context.initManager().add(notifier->target_);
               }
-              return {[notifier](Network::FilterManager&) -> void {}};
+
+              Filter::NetworkFilterFactoriesList factories;
+              factories.push_back(
+                  std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+                      [notifier](Network::FilterManager&) -> void {}));
+              return factories;
             }));
 
     return raw_listener;
@@ -348,7 +369,11 @@ protected:
       )EOF";
       TestUtility::loadFromYaml(filter_chain_matcher, *listener.mutable_filter_chain_matcher());
     }
-    return manager_->addOrUpdateListener(listener, version_info, added_via_api);
+    auto status_or_error = manager_->addOrUpdateListener(listener, version_info, added_via_api);
+    if (status_or_error.status().ok()) {
+      return status_or_error.value();
+    }
+    throw EnvoyException(std::string(status_or_error.status().message()));
   }
 
   void testListenerUpdateWithSocketOptionsChange(const std::string& origin,
@@ -430,49 +455,6 @@ protected:
     EXPECT_CALL(*listener_origin, onDestroy());
   }
 
-  void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(
-      const std::string& origin, const std::string& updated, bool multiple_addresses = false) {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.enable_update_listener_socket_options", "false"}});
-    InSequence s;
-
-    EXPECT_CALL(*worker_, start(_, _));
-    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
-
-    ListenerHandle* listener_origin = expectListenerCreate(true, true);
-    if (multiple_addresses) {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
-    } else {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
-    }
-    EXPECT_CALL(listener_origin->target_, initialize());
-    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
-    checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
-    EXPECT_CALL(*worker_, addListener(_, _, _, _));
-    listener_origin->target_.ready();
-    worker_->callAddCompletion();
-    EXPECT_EQ(1UL, manager_->listeners().size());
-    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
-
-    ListenerHandle* listener_updated = expectListenerCreate(true, true);
-    if (multiple_addresses) {
-      EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
-    } else {
-      EXPECT_CALL(*listener_factory_.socket_, duplicate());
-    }
-    EXPECT_CALL(listener_updated->target_, initialize());
-    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(updated)));
-
-    // Should be both active and warming now.
-    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
-    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
-    checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
-
-    EXPECT_CALL(*listener_updated, onDestroy());
-    EXPECT_CALL(*listener_origin, onDestroy());
-  }
-
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
@@ -504,7 +486,9 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
+  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
 };
 } // namespace Server
 } // namespace Envoy

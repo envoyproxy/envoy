@@ -13,11 +13,13 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions,
-    Network::ConnectionSocketPtr connection_socket, quic::ConnectionIdGeneratorInterface& generator)
+    Network::ConnectionSocketPtr connection_socket, quic::ConnectionIdGeneratorInterface& generator,
+    std::unique_ptr<QuicListenerFilterManagerImpl> listener_filter_manager)
     : quic::QuicConnection(server_connection_id, initial_self_address, initial_peer_address,
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_SERVER, supported_versions, generator),
-      QuicNetworkConnection(std::move(connection_socket)) {
+      QuicNetworkConnection(std::move(connection_socket)),
+      listener_filter_manager_(std::move(listener_filter_manager)) {
 #ifndef WIN32
   // Defer sending while processing UDP packets till the end of the current event loop to optimize
   // UDP GSO sendmsg efficiency. But this optimization causes some test failures under Windows,
@@ -46,6 +48,14 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
 void EnvoyQuicServerConnection::OnCanWrite() {
   quic::QuicConnection::OnCanWrite();
   onWriteEventDone();
+}
+
+void EnvoyQuicServerConnection::OnEffectivePeerMigrationValidated(bool is_migration_linkable) {
+  quic::QuicConnection::OnEffectivePeerMigrationValidated(is_migration_linkable);
+  if (listener_filter_manager_ != nullptr && networkConnection() != nullptr) {
+    // This connection might become closed after this call.
+    listener_filter_manager_->onPeerAddressChanged(effective_peer_address(), *networkConnection());
+  }
 }
 
 } // namespace Quic

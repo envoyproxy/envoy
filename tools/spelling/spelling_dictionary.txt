@@ -26,15 +26,19 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+bm
 BSON
 BPF
 Bdecoded
 Bencoded
+CIO
+deadcode
 DFP
 DOM
 GiB
 IPTOS
 Repick
+Reserializer
 SION
 TRA
 Websockets
@@ -70,7 +74,9 @@ FIXME
 HEXDIG
 HEXDIGIT
 HPE
+Kwasi
 LRU
+Mensah
 NAK
 OWS
 Preconnecting
@@ -248,6 +254,7 @@ hls
 iframe
 ingressed
 integrations
+iouring
 jkl
 lang
 libsxg
@@ -632,6 +639,7 @@ cryptographic
 cryptographically
 cstate
 cstring
+ctad
 ctor
 ctrl
 customizations
@@ -925,6 +933,7 @@ metatable
 microbenchmarks
 midp
 milli
+mimics
 misconfiguration
 misconfigured
 mixin
@@ -1207,6 +1216,7 @@ serv
 servercert
 setenv
 setsockopt
+sfixed
 sig
 sigaction
 sigactions
@@ -1216,6 +1226,7 @@ signalstack
 siloed
 sim
 sinked
+sint
 sizeof
 smatch
 snapshotted
@@ -1285,6 +1296,7 @@ subtypes
 subzone
 suf
 superclass
+superroot
 superset
 svc
 symlink
@@ -1393,6 +1405,7 @@ versa
 versioned
 vhost
 viewable
+viewport
 vip
 virtualhost
 virtualize
@@ -1451,3 +1464,4 @@ SSLKEYLOGFILE
 DLB
 PCIE
 EDNS
+CNAME

@@ -22,6 +22,14 @@ namespace NetworkFilters {
 namespace GenericProxy {
 namespace {
 
+class GenericProxyIntegrationTest : public BaseIntegrationTest {
+public:
+  GenericProxyIntegrationTest(const std::string config_yaml)
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, config_yaml) {
+    skip_tag_extraction_rule_check_ = true;
+  };
+};
+
 class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -91,6 +99,12 @@ public:
     }
     void onDecodingFailure() override {}
     void writeToConnection(Buffer::Instance&) override {}
+    OptRef<Network::Connection> connection() override {
+      if (parent_.upstream_connection_ != nullptr) {
+        return parent_.upstream_connection_->connection();
+      }
+      return {};
+    }
 
     bool complete_{};
     ResponsePtr response_;
@@ -99,8 +113,7 @@ public:
   using TestResponseDecoderCallbackSharedPtr = std::shared_ptr<TestResponseDecoderCallback>;
 
   void initialize(const std::string& config_yaml, CodecFactoryPtr codec_factory) {
-    integration_ =
-        std::make_unique<BaseIntegrationTest>(Network::Address::IpVersion::v4, config_yaml);
+    integration_ = std::make_unique<GenericProxyIntegrationTest>(config_yaml);
     integration_->initialize();
 
     // Create codec for downstream client.
@@ -198,6 +211,8 @@ public:
   void waitForUpstreamRequestForTest(uint64_t num_bytes, std::string* data) {
     auto result = upstream_connection_->waitForData(num_bytes, data);
     RELEASE_ASSERT(result, result.failure_message());
+    // Clear data for next test.
+    upstream_connection_->clearData();
   }
 
   // Send upstream response.
@@ -254,7 +269,7 @@ public:
   TestResponseEncoderCallbackSharedPtr response_encoder_callback_;
 
   // Integration test server.
-  std::unique_ptr<BaseIntegrationTest> integration_;
+  std::unique_ptr<GenericProxyIntegrationTest> integration_;
 
   // Callbacks for downstream connection.
   ConnectionCallbacksSharedPtr connection_callbacks_;
@@ -379,8 +394,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
   cleanup();
 }
 
-// https://github.com/envoyproxy/envoy/issues/27842
-TEST_P(IntegrationTest, DISABLED_MultipleRequests) {
+TEST_P(IntegrationTest, MultipleRequests) {
   FakeStreamCodecFactoryConfig codec_factory_config;
   codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);

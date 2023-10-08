@@ -1,6 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("@envoy_api//bazel:utils.bzl", "json_data")
+load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
@@ -41,8 +41,8 @@ genrule(
     outs = ["gnu_build_id.ldscript"],
     cmd = """
       echo --build-id=0x$$(
-          grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-        | sed 's/^BUILD_SCM_REVISION //') \\
+          grep -E "^BUILD_SCM_REVISION" bazel-out/volatile-status.txt \
+        | sed 's/^BUILD_SCM_REVISION //') \
         > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -55,8 +55,8 @@ genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],
     cmd = """
-      grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-    | sed 's/^BUILD_SCM_REVISION //' \\
+      grep -E "^BUILD_SCM_REVISION" bazel-out/volatile-status.txt \
+    | sed 's/^BUILD_SCM_REVISION //' \
     | tr -d '\\n' \\
     > $@
     """,
@@ -380,6 +380,11 @@ config_setting(
 config_setting(
     name = "disable_exceptions",
     values = {"define": "envoy_exceptions=disabled"},
+)
+
+config_setting(
+    name = "disable_full_protos",
+    values = {"define": "envoy_full_protos=disabled"},
 )
 
 config_setting(
@@ -872,4 +877,13 @@ platform(
         "@platforms//os:ios",
         "@build_bazel_apple_support//constraints:device",
     ],
+)
+
+# A dependency required by python protobuf
+# Envoy does not have any C++ code that includes python.h so this dummy
+# target is enough. However if such code is added in the future when this
+# should be changed to alias "@system_python//:python_headers"
+cc_library(
+    name = "python_headers",
+    visibility = ["//visibility:public"],
 )

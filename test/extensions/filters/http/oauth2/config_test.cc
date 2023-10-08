@@ -132,7 +132,7 @@ config:
   EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 

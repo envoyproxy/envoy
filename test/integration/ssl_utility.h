@@ -108,6 +108,11 @@ public:
   getCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
     return *context.cert_validator_;
   }
+
+  static Extensions::TransportSockets::Tls::CertValidator&
+  getMutableCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
+    return *context.cert_validator_;
+  }
 };
 
 } // namespace Tls

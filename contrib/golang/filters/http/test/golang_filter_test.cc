@@ -18,7 +18,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -121,6 +120,7 @@ public:
     config_ = std::make_shared<FilterConfig>(
         proto_config, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), "",
         context_);
+    config_->newGoPluginConfig();
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);

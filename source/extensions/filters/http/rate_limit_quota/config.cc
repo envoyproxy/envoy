@@ -4,8 +4,9 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
+#include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,10 +21,17 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
   FilterConfigConstSharedPtr config = std::make_shared<
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>(
       filter_config);
-  return
-      [config = std::move(config), &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(config, context));
-      };
+
+  // Quota bucket TLS object is created on the main thread and shared between worker threads.
+  std::shared_ptr<QuotaBucket> bucket_cache = std::make_shared<QuotaBucket>(context);
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+      Grpc::GrpcServiceConfigWithHashKey(config->rlqs_server());
+  return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache),
+          config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
+        config, context, bucket_cache->tls.get()->quotaBuckets(),
+        bucket_cache->tls.get()->rateLimitClient(), config_with_hash_key));
+  };
 }
 
 /**

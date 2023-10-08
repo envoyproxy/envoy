@@ -19,6 +19,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -137,7 +138,11 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
-  stream_info_.setRouteName("route-test-name");
+
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_ = "route-test-name";
+
+  stream_info_.route_ = route;
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
   request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
   request_headers_.addCopy(Http::Headers::get().RequestId, "id");
@@ -277,7 +282,7 @@ typed_config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 
-  stream_info_.response_code_ = 200;
+  stream_info_.setResponseCode(200);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 }
@@ -317,11 +322,11 @@ typed_config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 
-  stream_info_.response_code_ = 500;
+  stream_info_.setResponseCode(500);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 
-  stream_info_.response_code_ = 200;
+  stream_info_.setResponseCode(200);
   stream_info_.end_time_ =
       stream_info_.startTimeMonotonic() + std::chrono::microseconds(1001000000000000);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
@@ -599,7 +604,7 @@ typed_config:
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
-  stream_info_.response_code_ = 500;
+  stream_info_.setResponseCode(500);
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -682,7 +687,7 @@ typed_config:
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
-  stream_info_.response_code_ = 500;
+  stream_info_.setResponseCode(500);
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -801,7 +806,7 @@ status_code_filter:
   Http::TestResponseTrailerMapImpl response_trailers;
   TestStreamInfo info(time_source);
 
-  info.response_code_ = 400;
+  info.setResponseCode(400);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
   EXPECT_TRUE(filter.evaluate(info, request_headers, response_headers, response_trailers,
                               AccessLog::AccessLogType::NotSet));
@@ -828,13 +833,13 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  stream_info_.response_code_ = 499;
+  stream_info_.setResponseCode(499);
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 
-  stream_info_.response_code_ = 500;
+  stream_info_.setResponseCode(500);
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
@@ -1108,9 +1113,9 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  for (const auto& [flag_string, response_flag] :
-       StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
-    UNREFERENCED_PARAMETER(flag_string);
+  for (const auto& [flag_strings, response_flag] :
+       StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+    UNREFERENCED_PARAMETER(flag_strings);
 
     TestStreamInfo stream_info(time_source_);
     stream_info.setResponseFlag(response_flag);
@@ -1247,7 +1252,7 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
-  const std::string yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 name: accesslog
 filter:
   grpc_status_filter:
@@ -1317,7 +1322,7 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterHttpCodes) {
-  const std::string yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 name: accesslog
 filter:
   grpc_status_filter:
@@ -1338,7 +1343,7 @@ typed_config:
       {"UNAVAILABLE", 502},       {"UNAVAILABLE", 503}, {"UNAVAILABLE", 504}};
 
   for (const auto& [response_string, response_code] : statusMapping) {
-    stream_info_.response_code_ = response_code;
+    stream_info_.setResponseCode(response_code);
 
     const InstanceSharedPtr log = AccessLogFactory::fromProto(
         parseAccessLogFromV3Yaml(fmt::format(yaml_template, response_string)), context_);
@@ -1661,9 +1666,9 @@ public:
   ~TestHeaderFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Runtime::Loader&, Random::RandomGenerator&) override {
+                         Server::Configuration::CommonFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
-        config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+        config, context.messageValidationVisitor(), *this);
     const auto& header_config =
         TestUtility::downcastAndValidate<const envoy::config::accesslog::v3::HeaderFilter&>(
             *factory_config);
@@ -1740,9 +1745,9 @@ public:
   ~SampleExtensionFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Runtime::Loader&, Random::RandomGenerator&) override {
+                         Server::Configuration::CommonFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
-        config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+        config, context.messageValidationVisitor(), *this);
 
     ProtobufWkt::Struct struct_config =
         *dynamic_cast<const ProtobufWkt::Struct*>(factory_config.get());
@@ -1844,7 +1849,7 @@ typed_config:
   InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   request_headers_.addCopy("log", "true");
-  stream_info_.response_code_ = 404;
+  stream_info_.setResponseCode(404);
   EXPECT_CALL(*file_, write(_));
   logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
               AccessLog::AccessLogType::NotSet);

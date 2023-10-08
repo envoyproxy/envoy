@@ -37,7 +37,7 @@ public:
   }
 
   void validateMatcher(const std::string& matcher_yaml) {
-    checkMatcher(fmt::format(matcher_yaml, header_key, header_value));
+    checkMatcher(fmt::format(fmt::runtime(matcher_yaml), header_key, header_value));
   }
 
 private:

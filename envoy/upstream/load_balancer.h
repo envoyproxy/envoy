@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -44,6 +45,12 @@ public:
    * balancing.
    */
   virtual const Network::Connection* downstreamConnection() const PURE;
+
+  /**
+   * @return const StreamInfo* the incoming request stream info or nullptr to use during load
+   * balancing.
+   */
+  virtual const StreamInfo::StreamInfo* requestStreamInfo() const PURE;
 
   /**
    * @return const Http::HeaderMap* the incoming headers or nullptr to use during load
@@ -169,14 +176,13 @@ public:
 
   /**
    * @return LoadBalancerPtr a new worker local load balancer.
-   * TODO(wbpcode): remove this method in the future and used the new method below.
-   */
-  virtual LoadBalancerPtr create() PURE;
-
-  /**
-   * @return LoadBalancerPtr a new worker local load balancer.
    */
   virtual LoadBalancerPtr create(LoadBalancerParams params) PURE;
+
+  /**
+   * @return bool whether the load balancer should be recreated when the host set changes.
+   */
+  virtual bool recreateOnHostChange() const { return true; }
 };
 
 using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;

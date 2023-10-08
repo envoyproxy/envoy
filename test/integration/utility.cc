@@ -8,7 +8,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
-#include "envoy/http/header_validator_factory.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/api/api_impl.h"
@@ -22,6 +21,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
+#include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
@@ -46,6 +47,14 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
+
+using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ClientHttp1HeaderValidator;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ClientHttp2HeaderValidator;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator;
+
 namespace {
 
 RawConnectionDriver::DoWriteCallback writeBufferCallback(Buffer::Instance& data) {
@@ -319,22 +328,56 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_->connect();
 }
 
+// This factory is needed to avoid dealing with the ServerFactoryContext, which is
+// problematic in dedicated threads for fake upstreams or test client.
+// UHV is needed in fake upstreams or test client for translation
+// of extended CONNECT to upgrade, which is done by the codecs.
+class FakeHeaderValidatorFactory : public Http::HeaderValidatorFactory {
+public:
+  FakeHeaderValidatorFactory(const HeaderValidatorConfig& config) : config_(config) {}
+
+  Http::ServerHeaderValidatorPtr
+  createServerHeaderValidator(Http::Protocol protocol, Http::HeaderValidatorStats& stats) override {
+    ConfigOverrides config_overrides;
+
+    switch (protocol) {
+    case Http::Protocol::Http3:
+    case Http::Protocol::Http2:
+      return std::make_unique<ServerHttp2HeaderValidator>(config_, protocol, stats,
+                                                          config_overrides);
+    case Http::Protocol::Http11:
+    case Http::Protocol::Http10:
+      return std::make_unique<ServerHttp1HeaderValidator>(config_, protocol, stats,
+                                                          config_overrides);
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  Http::ClientHeaderValidatorPtr
+  createClientHeaderValidator(Http::Protocol protocol, Http::HeaderValidatorStats& stats) override {
+    ConfigOverrides config_overrides;
+
+    switch (protocol) {
+    case Http::Protocol::Http3:
+    case Http::Protocol::Http2:
+      return std::make_unique<ClientHttp2HeaderValidator>(config_, protocol, stats,
+                                                          config_overrides);
+    case Http::Protocol::Http11:
+    case Http::Protocol::Http10:
+      return std::make_unique<ClientHttp1HeaderValidator>(config_, protocol, stats,
+                                                          config_overrides);
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+private:
+  const HeaderValidatorConfig config_;
+};
+
 Http::HeaderValidatorFactoryPtr
-IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view config) {
+IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] const HeaderValidatorConfig& config) {
 #ifdef ENVOY_ENABLE_UHV
-  auto* factory = Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
-      "envoy.http.header_validators.envoy_default");
-  ASSERT(factory != nullptr);
-
-  envoy::config::core::v3::TypedExtensionConfig typed_config;
-  Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
-  testing::NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_context;
-  ON_CALL(server_context, messageValidationVisitor())
-      .WillByDefault(testing::ReturnRef(ProtobufMessage::getNullValidationVisitor()));
-
-  TestUtility::loadFromYaml(std::string(config), typed_config);
-
-  return factory->createFromProto(typed_config.typed_config(), server_context);
+  return std::make_unique<FakeHeaderValidatorFactory>(config);
 #else
   return nullptr;
 #endif

@@ -175,7 +175,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   return host;
 }
 
-LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
+LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams) {
   auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple

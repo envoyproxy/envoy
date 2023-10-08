@@ -1,6 +1,7 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/singleton/manager.h"
 
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
@@ -84,6 +85,7 @@ ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
 }
 
 BuilderPtr createBuilder(Protobuf::Arena* arena) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults
@@ -108,6 +110,14 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
   return builder;
+}
+
+SINGLETON_MANAGER_REGISTRATION(expression_builder);
+
+BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
+  return context.singletonManager().getTyped<BuilderInstance>(
+      SINGLETON_MANAGER_REGISTERED_NAME(expression_builder),
+      [] { return std::make_shared<BuilderInstance>(createBuilder(nullptr)); });
 }
 
 ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr) {

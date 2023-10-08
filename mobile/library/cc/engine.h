@@ -19,6 +19,7 @@ class Engine : public std::enable_shared_from_this<Engine> {
 public:
   ~Engine();
 
+  std::string dumpStats();
   StreamClientSharedPtr streamClient();
   PulseClientSharedPtr pulseClient();
 

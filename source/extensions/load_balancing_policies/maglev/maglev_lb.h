@@ -144,8 +144,7 @@ private:
 /**
  * Thread aware load balancer implementation for Maglev.
  */
-class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase,
-                           Logger::Loggable<Logger::Id::upstream> {
+class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
   MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,

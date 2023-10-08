@@ -82,38 +82,32 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
 
   RouteEntryImplBaseConstSharedPtr route;
   switch (route_config.match().path_specifier_case()) {
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
     route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                    factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
     route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                  factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
     route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                   factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
     route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                     factory_context, validator);
     break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
     route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
     route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
-  }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // throw the error below.
-  }
   }
   if (!route) {
     throw EnvoyException("Invalid route config");
@@ -141,7 +135,10 @@ public:
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
                                           absl::string_view type_url) override {
     static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name());
+        createReflectableMessage(
+            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
+            ->GetDescriptor()
+            ->full_name());
     if (type_url == request_header_input_name) {
       return absl::OkStatus();
     }
@@ -597,8 +594,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
-    weighted_clusters_config_ = std::make_unique<WeightedClustersConfig>(
-        weighted_clusters, total_weight, route.route().weighted_clusters().header_name());
+    weighted_clusters_config_ =
+        std::make_unique<WeightedClustersConfig>(std::move(weighted_clusters), total_weight,
+                                                 route.route().weighted_clusters().header_name());
 
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
@@ -626,7 +624,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (!route.route().rate_limits().empty()) {
     rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), validator);
+        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), factory_context);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -649,7 +647,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     if (!success) {
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
-    if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect) {
+    if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                               Http::Headers::get().MethodValues.Connect) ||
+        (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+         absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                                Http::Headers::get().UpgradeValues.ConnectUdp))) {
       connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
     } else if (upgrade_config.has_connect_config()) {
       throw EnvoyException(absl::StrCat("Non-CONNECT upgrade type ", upgrade_config.upgrade_type(),
@@ -785,8 +787,8 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
     return false;
   }
   if (!config_query_parameters_.empty()) {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.getPathValue());
+    auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
     if (!matches) {
       return false;
@@ -1009,13 +1011,7 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
     if (!new_path.ok()) {
       return std::string(headers.getPathValue());
     }
-
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.append_query_parameters_path_rewriter")) {
-      return path.replace(0, just_path.size(), new_path.value());
-    } else {
-      return *std::move(new_path);
-    }
+    return path.replace(0, just_path.size(), new_path.value());
   }
 
   // There are no rewrites configured.
@@ -1371,6 +1367,14 @@ void RouteEntryImplBase::validateClusters(
   }
 }
 
+bool RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
+  absl::optional<bool> result = per_filter_configs_.disabled(config_name);
+  if (result.has_value()) {
+    return result.value();
+  }
+  return vhost_->filterDisabled(config_name);
+}
+
 void RouteEntryImplBase::traversePerFilterConfig(
     const std::string& filter_name,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
@@ -1592,7 +1596,9 @@ ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& 
 RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                    const StreamInfo::StreamInfo& stream_info,
                                                    uint64_t random_value) const {
-  if (Http::HeaderUtility::isConnect(headers) &&
+  if ((Http::HeaderUtility::isConnect(headers) ||
+       (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+        Http::HeaderUtility::isConnectUdpRequest(headers))) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return clusterEntry(headers, random_value);
   }
@@ -1674,7 +1680,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
   if (!virtual_host.rate_limits().empty()) {
     rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), validator);
+        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), factory_context);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
@@ -1724,6 +1730,14 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 }
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
+
+bool CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
+  absl::optional<bool> result = per_filter_configs_.disabled(config_name);
+  if (result.has_value()) {
+    return result.value();
+  }
+  return global_route_config_->filterDisabled(config_name);
+}
 
 const RouteSpecificFilterConfig*
 CommonVirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
@@ -2107,7 +2121,6 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
     const std::string& name, const ProtobufWkt::Any& typed_config, bool is_optional,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-
   Server::Configuration::NamedHttpFilterConfigFactory* factory =
       Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           typed_config);
@@ -2151,8 +2164,8 @@ PerFilterConfigs::PerFilterConfigs(
   const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
 
-  absl::string_view filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
+  std::string filter_config_type =
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;
@@ -2178,9 +2191,23 @@ PerFilterConfigs::PerFilterConfigs(
       Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
                                                     filter_config);
 
+      // The filter is marked as disabled explicitly and the config is ignored directly.
+      if (filter_config.disabled()) {
+        configs_.emplace(name, FilterConfig{nullptr, true});
+        continue;
+      }
+
+      // If the field `config` is not configured, we treat it as configuration error.
       if (!filter_config.has_config()) {
         throw EnvoyException(
             fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
+      }
+
+      // If the field `config` is configured but is empty, we treat the filter as disabled
+      // explicitly.
+      if (filter_config.config().type_url().empty()) {
+        configs_.emplace(name, FilterConfig{nullptr, false});
+        continue;
       }
 
       config = createRouteSpecificFilterConfig(name, filter_config.config(),
@@ -2191,15 +2218,25 @@ PerFilterConfigs::PerFilterConfigs(
                                                factory_context, validator);
     }
 
-    if (config != nullptr) {
-      configs_[name] = std::move(config);
-    }
+    // If a filter is explicitly configured we treat it as enabled.
+    // The config may be nullptr because the filter could be optional.
+    configs_.emplace(name, FilterConfig{std::move(config), false});
   }
 }
 
 const RouteSpecificFilterConfig* PerFilterConfigs::get(const std::string& name) const {
   auto it = configs_.find(name);
-  return it == configs_.end() ? nullptr : it->second.get();
+  return it == configs_.end() ? nullptr : it->second.config_.get();
+}
+
+absl::optional<bool> PerFilterConfigs::disabled(absl::string_view name) const {
+  // Quick exit if there are no configs.
+  if (configs_.empty()) {
+    return absl::nullopt;
+  }
+
+  const auto it = configs_.find(name);
+  return it != configs_.end() ? absl::optional<bool>{it->second.disabled_} : absl::nullopt;
 }
 
 Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(

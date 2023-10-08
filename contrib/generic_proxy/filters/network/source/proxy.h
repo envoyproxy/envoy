@@ -8,11 +8,13 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
+#include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
 #include "source/common/tracing/tracer_impl.h"
@@ -27,7 +29,9 @@
 #include "contrib/generic_proxy/filters/network/source/rds.h"
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
+#include "contrib/generic_proxy/filters/network/source/stats.h"
 #include "contrib/generic_proxy/filters/network/source/upstream.h"
+#include "stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,11 +56,14 @@ public:
                    Rds::RouteConfigProviderSharedPtr route_config_provider,
                    std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
                    Tracing::ConnectionManagerTracingConfigPtr tracing_config,
+                   std::vector<AccessLogInstanceSharedPtr>&& access_logs,
                    Envoy::Server::Configuration::FactoryContext& context)
-      : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
-        route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
-        drain_decision_(context.drainDecision()), tracer_(std::move(tracer)),
-        tracing_config_(std::move(tracing_config)) {}
+      : stat_prefix_(stat_prefix),
+        stats_(GenericFilterStats::generateStats(stat_prefix_, context.scope())),
+        codec_factory_(std::move(codec)), route_config_provider_(std::move(route_config_provider)),
+        factories_(std::move(factories)), drain_decision_(context.drainDecision()),
+        tracer_(std::move(tracer)), tracing_config_(std::move(tracing_config)),
+        access_logs_(std::move(access_logs)), time_source_(context.timeSource()) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
@@ -71,6 +78,10 @@ public:
   OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const override {
     return makeOptRefFromPtr<const Tracing::ConnectionManagerTracingConfig>(tracing_config_.get());
   }
+  GenericFilterStats& stats() override { return stats_; }
+  const std::vector<AccessLogInstanceSharedPtr>& accessLogs() const override {
+    return access_logs_;
+  }
 
   // FilterChainFactory
   void createFilterChain(FilterChainManager& manager) override {
@@ -84,6 +95,7 @@ private:
   friend class Filter;
 
   const std::string stat_prefix_;
+  GenericFilterStats stats_;
 
   CodecFactoryPtr codec_factory_;
 
@@ -95,6 +107,9 @@ private:
 
   Tracing::TracerSharedPtr tracer_;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
+  std::vector<AccessLogInstanceSharedPtr> access_logs_;
+
+  TimeSource& time_source_;
 };
 
 class ActiveStream : public FilterChainManager,
@@ -266,6 +281,7 @@ private:
   const Tracing::CustomTagMap* customTags() const override;
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
+  bool spawnUpstreamSpan() const override;
 
   bool active_stream_reset_{false};
 
@@ -286,6 +302,8 @@ private:
   size_t next_encoder_filter_index_{0};
 
   StreamInfo::StreamInfoImpl stream_info_;
+
+  Stats::TimespanPtr request_timer_;
 
   OptRef<const Tracing::ConnectionManagerTracingConfig> connection_manager_tracing_config_;
   Tracing::SpanPtr active_span_;
@@ -308,6 +326,7 @@ public:
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> connection() override;
 
   // UpstreamManager
   void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) override;
@@ -327,8 +346,8 @@ class Filter : public Envoy::Network::ReadFilter,
                public RequestDecoderCallback {
 public:
   Filter(FilterConfigSharedPtr config, TimeSource& time_source, Runtime::Loader& runtime)
-      : config_(std::move(config)), drain_decision_(config_->drainDecision()),
-        time_source_(time_source), runtime_(runtime) {
+      : config_(std::move(config)), stats_(config_->stats()),
+        drain_decision_(config_->drainDecision()), time_source_(time_source), runtime_(runtime) {
     request_decoder_ = config_->codecFactory().requestDecoder();
     request_decoder_->setDecoderCallback(*this);
     response_encoder_ = config_->codecFactory().responseEncoder();
@@ -349,7 +368,8 @@ public:
   // RequestDecoderCallback
   void onDecodingSuccess(RequestPtr request, ExtendedOptions options) override;
   void onDecodingFailure() override;
-  void writeToConnection(Buffer::Instance& data) override;
+  void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> connection() override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
@@ -364,7 +384,7 @@ public:
     // If these is bound upstream connection, clean it up.
     if (upstream_manager_ != nullptr) {
       upstream_manager_->cleanUp(true);
-      connection().dispatcher().deferredDelete(std::move(upstream_manager_));
+      downstreamConnection().dispatcher().deferredDelete(std::move(upstream_manager_));
       upstream_manager_ = nullptr;
     }
   }
@@ -373,7 +393,7 @@ public:
 
   void sendReplyDownstream(Response& response, ResponseEncoderCallback& callback);
 
-  Network::Connection& connection() {
+  Network::Connection& downstreamConnection() {
     ASSERT(callbacks_ != nullptr);
     return callbacks_->connection();
   }
@@ -426,6 +446,7 @@ private:
   bool downstream_connection_closed_{};
 
   FilterConfigSharedPtr config_{};
+  GenericFilterStats& stats_;
   const Network::DrainDecision& drain_decision_;
   bool stream_drain_decision_{};
   TimeSource& time_source_;

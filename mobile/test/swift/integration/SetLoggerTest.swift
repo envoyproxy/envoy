@@ -86,8 +86,8 @@ static_resources:
       }
       .build()
 
-    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 1), .completed)
-    XCTAssertEqual(XCTWaiter.wait(for: [loggingExpectation], timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 10), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [loggingExpectation], timeout: 10), .completed)
 
     // Send a request to trigger the test filter which should log an event.
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",

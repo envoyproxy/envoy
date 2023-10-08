@@ -141,6 +141,7 @@ EXTENSIONS = {
     "envoy.filters.http.file_system_buffer":            "//source/extensions/filters/http/file_system_buffer:config",
     "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
     "envoy.filters.http.geoip":                     "//source/extensions/filters/http/geoip:config",
+    "envoy.filters.http.grpc_field_extraction":         "//source/extensions/filters/http/grpc_field_extraction:config",
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
@@ -149,9 +150,12 @@ EXTENSIONS = {
     "envoy.filters.http.header_to_metadata":            "//source/extensions/filters/http/header_to_metadata:config",
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
+    "envoy.filters.http.json_to_metadata":            "//source/extensions/filters/http/json_to_metadata:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
-    # Disabled by default
+    # Disabled by default. kill_request is not built into most prebuilt images.
+    # For instructions for building with disabled-by-default filters enabled, see
+    # https://github.com/envoyproxy/envoy/blob/main/bazel/README.md#enabling-and-disabling-extensions
     "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
     "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
@@ -210,6 +214,12 @@ EXTENSIONS = {
 
     "envoy.filters.udp.dns_filter":                     "//source/extensions/filters/udp/dns_filter:config",
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
+
+    #
+    # UDP Session filters
+    #
+
+    "envoy.filters.udp.session.http_capsule":           "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
 
     #
     # Resource monitors
@@ -299,6 +309,7 @@ EXTENSIONS = {
 
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
+    "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",
 
     #
     # Watchdog actions

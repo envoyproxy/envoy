@@ -252,6 +252,23 @@ public:
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Wait for a proactive resource usage in the overload manager to be == a given value.
+   * @param overload_state used to lookup corresponding proactive resource.
+   * @param resource_name name of the proactive resource to lookup.
+   * @param expected_value target resource usage value.
+   * @param time_system the time system to use for waiting.
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
+   * @param timeout the maximum time to wait before timing out.
+   * @return AssertionSuccess() if the resource usage was == to the value within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitForProactiveOverloadResourceUsageEq(
+      Server::ThreadLocalOverloadState& overload_state,
+      const Server::OverloadProactiveResourceName resource_name, int64_t expected_value,
+      Event::TestTimeSystem& time_system, Event::Dispatcher& dispatcher,
+      std::chrono::milliseconds timeout);
+
+  /**
    * Wait for a gauge to >= a given value.
    * @param store supplies the stats store.
    * @param name gauge name.
@@ -369,6 +386,7 @@ public:
    */
   static std::string uniqueFilename(absl::string_view prefix = "");
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two protos of the same type for equality.
    *
@@ -410,6 +428,7 @@ public:
            lhs.version() == rhs.version() && lhs.hasResource() == rhs.hasResource() &&
            (!lhs.hasResource() || protoEqual(lhs.resource(), rhs.resource()));
   }
+#endif
 
   /**
    * Symmetrically pad a string with '=' out to a desired length.
@@ -438,6 +457,7 @@ public:
   static std::vector<std::string> split(const std::string& source, const std::string& split,
                                         bool keep_empty_string = false);
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two RepeatedPtrFields of the same type for equality.
    *
@@ -502,6 +522,7 @@ public:
 
     return AssertionSuccess();
   }
+#endif
 
   /**
    * Returns a "novel" IPv4 loopback address, if available.
@@ -948,6 +969,19 @@ public:
     }
     header_map_->verifyByteSizeInternalForTest();
   }
+  TestHeaderMapImplBase(const std::initializer_list<std::pair<std::string, std::string>>& values,
+                        const uint32_t max_headers_kb, const uint32_t max_headers_count) {
+    if (header_map_) {
+      header_map_.reset();
+    }
+    header_map_ = Impl::create(max_headers_kb, max_headers_count);
+
+    for (auto& value : values) {
+      header_map_->addCopy(LowerCaseString(value.first), value.second);
+    }
+    header_map_->verifyByteSizeInternalForTest();
+  }
+
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
       : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
@@ -990,6 +1024,9 @@ public:
   // HeaderMap
   bool operator==(const HeaderMap& rhs) const override { return header_map_->operator==(rhs); }
   bool operator!=(const HeaderMap& rhs) const override { return header_map_->operator!=(rhs); }
+
+  bool operator==(const TestHeaderMapImplBase& rhs) const { return header_map_->operator==(rhs); }
+  bool operator!=(const TestHeaderMapImplBase& rhs) const { return header_map_->operator!=(rhs); }
   void addViaMove(HeaderString&& key, HeaderString&& value) override {
     header_map_->addViaMove(std::move(key), std::move(value));
     header_map_->verifyByteSizeInternalForTest();
@@ -1030,6 +1067,8 @@ public:
     header_map_->verifyByteSizeInternalForTest();
   }
   uint64_t byteSize() const override { return header_map_->byteSize(); }
+  uint32_t maxHeadersKb() const override { return header_map_->maxHeadersKb(); }
+  uint32_t maxHeadersCount() const override { return header_map_->maxHeadersCount(); }
   HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }
@@ -1209,6 +1248,7 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   return equal;
 }
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 MATCHER_P(ProtoEq, expected, "") {
   const bool equal =
       TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/false);
@@ -1305,6 +1345,8 @@ MATCHER_P(Percent, rhs, "") {
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
 
+#endif
+
 #ifdef ENVOY_ENABLE_YAML
 MATCHER_P(JsonStringEq, expected, "") {
   const bool equal = TestUtility::jsonStringEqual(arg, expected);
@@ -1319,6 +1361,14 @@ MATCHER_P(JsonStringEq, expected, "") {
   }
   return equal;
 }
+#endif
+
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
 #endif
 
 } // namespace Envoy

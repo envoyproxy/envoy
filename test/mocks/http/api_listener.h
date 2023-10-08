@@ -12,7 +12,7 @@ public:
   ~MockApiListener() override;
 
   // Http::ApiListener
-  MOCK_METHOD(RequestDecoder&, newStream,
+  MOCK_METHOD(RequestDecoderHandlePtr, newStreamHandle,
               (ResponseEncoder & response_encoder, bool is_internally_created));
 };
 

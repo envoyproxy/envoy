@@ -128,14 +128,8 @@ def envoy_cc_library(
         visibility = visibility,
         tags = tags,
         textual_hdrs = textual_hdrs,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//envoy/common:base_includes",
-            repository + "//source/common/common:fmt_lib",
-            envoy_external_dep_path("abseil_flat_hash_map"),
-            envoy_external_dep_path("abseil_flat_hash_set"),
-            envoy_external_dep_path("abseil_strings"),
-            envoy_external_dep_path("fmtlib"),
-        ] + envoy_pch_deps(repository, "//source/common/common:common_pch"),
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
+               envoy_pch_deps(repository, "//source/common/common:common_pch"),
         alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,

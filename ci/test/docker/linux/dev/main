@@ -18,7 +18,7 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD+PUSH: mocktest/repo-debug-dev:MOCKSHA
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_SUFFIX= --sbom=false --provenance=false --push -t mocktest/repo-debug-dev:MOCKSHA .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_PREFIX=dbg/ --sbom=false --provenance=false --push -t mocktest/repo-debug-dev:MOCKSHA .
 >> TAG: mocktest/repo-debug-dev:MOCKSHA -> mocktest/repo:debug-dev-MOCKSHA
 > docker buildx imagetools create docker.io/mocktest/repo-debug-dev:MOCKSHA --tag docker.io/mocktest/repo:debug-dev-MOCKSHA
 >> TAG: mocktest/repo-debug-dev:MOCKSHA -> mocktest/repo-debug-dev:latest
@@ -40,7 +40,7 @@
 >> BUILDX: use multi-builder
 > docker buildx use multi-builder
 >> BUILD+PUSH: mocktest/repo-contrib-debug-dev:MOCKSHA
-> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_SUFFIX= --sbom=false --provenance=false --push -t mocktest/repo-contrib-debug-dev:MOCKSHA .
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_PREFIX=dbg/ --sbom=false --provenance=false --push -t mocktest/repo-contrib-debug-dev:MOCKSHA .
 >> TAG: mocktest/repo-contrib-debug-dev:MOCKSHA -> mocktest/repo:contrib-debug-dev-MOCKSHA
 > docker buildx imagetools create docker.io/mocktest/repo-contrib-debug-dev:MOCKSHA --tag docker.io/mocktest/repo:contrib-debug-dev-MOCKSHA
 >> TAG: mocktest/repo-contrib-debug-dev:MOCKSHA -> mocktest/repo-contrib-debug-dev:latest

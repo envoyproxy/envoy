@@ -199,6 +199,10 @@ public:
     return clusters;
   }
 
+  const ClusterInitializationMap& clusterInitializationMap() const {
+    return cluster_initialization_map_;
+  }
+
   OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
     return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
   }

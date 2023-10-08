@@ -235,7 +235,8 @@ OutputBufferStream::OutputBufferStream(char* data, size_t size)
 int OutputBufferStream::bytesWritten() const { return pptr() - pbase(); }
 
 absl::string_view OutputBufferStream::contents() const {
-  return absl::string_view(pbase(), bytesWritten());
+  const std::string::size_type written = bytesWritten();
+  return {pbase(), written};
 }
 
 ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {
@@ -400,7 +401,7 @@ std::string StringUtil::removeTokens(absl::string_view source, absl::string_view
                                      absl::string_view joiner) {
   auto values = Envoy::StringUtil::splitToken(source, delimiters, false, true);
   auto end = std::remove_if(values.begin(), values.end(),
-                            [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
+                            [&](absl::string_view t) { return tokens_to_remove.contains(t); });
   return absl::StrJoin(values.begin(), end, joiner);
 }
 
@@ -433,7 +434,7 @@ size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
 }
 
 std::string StringUtil::subspan(absl::string_view source, size_t start, size_t end) {
-  return std::string(source.data() + start, end - start);
+  return {source.data() + start, end - start};
 }
 
 std::string StringUtil::escape(const absl::string_view source) {

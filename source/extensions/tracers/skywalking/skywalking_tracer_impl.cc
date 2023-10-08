@@ -67,11 +67,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
     // throw exception that not be wrapped by TracerException. See
     // https://github.com/SkyAPM/cpp2sky/issues/117. So, we need to catch all exceptions here to
     // avoid Envoy crash in the runtime.
-    try {
+    TRY_NEEDS_AUDIT {
       SpanContextPtr span_context =
           createSpanContext(toStdStringView(header_value_string)); // NOLINT(std::string_view)
       tracing_context = tracing_context_factory_->create(span_context);
-    } catch (std::exception& e) {
+    }
+    END_TRY catch (std::exception& e) {
       ENVOY_LOG(
           warn,
           "New SkyWalking Span/Segment with previous span context cannot be created for error: {}",

@@ -68,7 +68,6 @@ class TestEnvoyHTTPFilterFactory(name : String) : EnvoyHTTPFilterFactory {
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
-    adminInterfaceEnabled: Boolean = false,
     grpcStatsDomain: String = "stats.example.com",
     connectTimeoutSeconds: Int = 123,
     dnsRefreshSeconds: Int = 234,
@@ -81,6 +80,9 @@ class EnvoyConfigurationTest {
     dnsCacheSaveIntervalSeconds: Int = 101,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
+    http3ConnectionOptions: String = "5RTO",
+    http3ClientConnectionOptions: String = "MPQC",
+    quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -99,13 +101,16 @@ class EnvoyConfigurationTest {
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false,
-    rtdsLayerName: String = "",
+    rtdsResourceName: String = "",
     rtdsTimeoutSeconds: Int = 0,
-    adsAddress: String = "",
-    adsPort: Int = 0,
-    adsJwtToken: String = "",
-    adsJwtTokenLifetimeSeconds: Int = 0,
-    adsSslRootCerts: String = "",
+    xdsAddress: String = "",
+    xdsPort: Int = 0,
+    xdsAuthHeader: String = "",
+    xdsAuthToken: String = "",
+    xdsJwtToken: String = "",
+    xdsJwtTokenLifetimeSeconds: Int = 0,
+    xdsSslRootCerts: String = "",
+    xdsSni: String = "",
     nodeId: String = "",
     nodeRegion: String = "",
     nodeZone: String = "",
@@ -116,7 +121,6 @@ class EnvoyConfigurationTest {
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
-      adminInterfaceEnabled,
       grpcStatsDomain,
       connectTimeoutSeconds,
       dnsRefreshSeconds,
@@ -129,6 +133,9 @@ class EnvoyConfigurationTest {
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      http3ConnectionOptions,
+      http3ClientConnectionOptions,
+      quicHints,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
@@ -149,13 +156,16 @@ class EnvoyConfigurationTest {
       statSinks,
       runtimeGuards,
       enablePlatformCertificatesValidation,
-      rtdsLayerName,
+      rtdsResourceName,
       rtdsTimeoutSeconds,
-      adsAddress,
-      adsPort,
-      adsJwtToken,
-      adsJwtTokenLifetimeSeconds,
-      adsSslRootCerts,
+      xdsAddress,
+      xdsPort,
+      xdsAuthHeader,
+      xdsAuthToken,
+      xdsJwtToken,
+      xdsJwtTokenLifetimeSeconds,
+      xdsSslRootCerts,
+      xdsSni,
       nodeId,
       nodeRegion,
       nodeZone,
@@ -166,6 +176,10 @@ class EnvoyConfigurationTest {
     )
   }
 
+  fun isGoogleGrpcDisabled(): Boolean {
+    return System.getProperty("envoy_jni_google_grpc_disabled") != null;
+  }
+
   @Test
   fun `configuration default values`() {
     JniLibrary.loadTestLibrary()
@@ -173,8 +187,6 @@ class EnvoyConfigurationTest {
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
     assertThat(resolvedTemplate).contains("connect_timeout: 123s")
-
-    assertThat(resolvedTemplate).doesNotContain("admin: *admin_interface")
 
     // DNS
     assertThat(resolvedTemplate).contains("dns_refresh_rate: 234s")
@@ -197,6 +209,11 @@ class EnvoyConfigurationTest {
     // H3
     assertThat(resolvedTemplate).contains("http3_protocol_options:");
     assertThat(resolvedTemplate).contains("name: alternate_protocols_cache");
+    assertThat(resolvedTemplate).contains("hostname: www.abc.com");
+    assertThat(resolvedTemplate).contains("hostname: www.def.com");
+    assertThat(resolvedTemplate).contains("port: 443");
+    assertThat(resolvedTemplate).contains("connection_options: 5RTO");
+    assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
 
     // Gzip
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
@@ -243,7 +260,6 @@ class EnvoyConfigurationTest {
   fun `configuration resolves with alternate values`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      adminInterfaceEnabled = false,
       grpcStatsDomain = "",
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
@@ -316,14 +332,17 @@ class EnvoyConfigurationTest {
   }
 
   @Test
-  fun `test adding RTDS and ADS`() {
+  fun `test adding RTDS`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, adsAddress = "FAKE_ADDRESS", adsPort = 0
+      rtdsResourceName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
     assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
@@ -331,9 +350,13 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS and CDS`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0, enableCds = true
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0, enableCds = true
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -347,7 +370,7 @@ class EnvoyConfigurationTest {
   fun `test not using enableCds`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, adsAddress = "FAKE_ADDRESS", adsPort = 0
+      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -358,9 +381,13 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test enableCds with default string`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      enableCds = true, adsAddress = "FAKE_ADDRESS", adsPort = 0
+      enableCds = true, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -371,9 +398,13 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test RTDS default timeout`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsLayerName = "fake_rtds_layer", adsAddress = "FAKE_ADDRESS", adsPort = 0
+      rtdsResourceName = "fake_rtds_layer", xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
@@ -395,5 +426,5 @@ class EnvoyConfigurationTest {
     // statsSinks
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
     assertThat(resolvedTemplate).contains("stats.example.com");
-  }
+ }
 }

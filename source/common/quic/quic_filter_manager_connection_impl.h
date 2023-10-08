@@ -59,13 +59,20 @@ public:
     }
     close(type);
   }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+  Network::DetectedCloseType detectedCloseType() const override {
+    return Network::DetectedCloseType::Normal;
+  }
+  Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   // No-op. TCP_NODELAY doesn't apply to UDP.
   void noDelay(bool /*enable*/) override {}
   // Neither readDisable nor detectEarlyCloseWhenReadDisabled are supported for QUIC.
   // Crash in debug mode if they are called.
-  void readDisable(bool /*disable*/) override { IS_ENVOY_BUG("Unexpected call to readDisable"); }
+  ReadDisableStatus readDisable(bool /*disable*/) override {
+    IS_ENVOY_BUG("Unexpected call to readDisable");
+    return ReadDisableStatus::NoTransition;
+  }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {
     IS_ENVOY_BUG("Unexpected call to detectEarlyCloseWhenReadDisabled");
   }
@@ -170,6 +177,8 @@ protected:
                               quic::ConnectionCloseSource source,
                               const quic::ParsedQuicVersion& version);
 
+  // Apply delay close policy if there is any.
+  void maybeApplyDelayedClose();
   void closeConnectionImmediately() override;
 
   virtual bool hasDataToWrite() PURE;

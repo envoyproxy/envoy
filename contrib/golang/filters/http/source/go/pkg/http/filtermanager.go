@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 var httpFilterConfigFactoryAndParser = sync.Map{}
@@ -50,6 +50,8 @@ func getOrCreateHttpFilterFactory(name string, configId uint64) api.StreamFilter
 	if v, ok := httpFilterConfigFactoryAndParser.Load(name); ok {
 		return (v.(*filterConfigFactoryAndParser)).configFactory(config)
 	}
+
+	api.LogErrorf("plugin %s not found, pass through by default", name)
 
 	// pass through by default
 	return PassThroughFactory(config)

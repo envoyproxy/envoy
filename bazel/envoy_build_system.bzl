@@ -100,6 +100,7 @@ def _envoy_directory_genrule_impl(ctx):
         outputs = [tree],
         command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
         env = {"GENRULE_OUTPUT_DIR": tree.path},
+        toolchain = None,
     )
     return [DefaultInfo(files = depset([tree]))]
 
@@ -205,7 +206,8 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
         include_paths.append("external/com_google_googleapis")
 
     if "well_known_protos" in external_deps:
-        srcs.append("@com_google_protobuf//:well_known_protos")
+        srcs.append("@com_google_protobuf//:well_known_type_protos")
+        srcs.append("@com_google_protobuf//:descriptor_proto_srcs")
         include_paths.append("external/com_google_protobuf/src")
 
     options = ["--include_imports"]

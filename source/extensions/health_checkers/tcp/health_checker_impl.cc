@@ -53,9 +53,14 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
         if (!config.tcp_health_check().send().text().empty()) {
           send_repeated.Add()->CopyFrom(config.tcp_health_check().send());
         }
-        return PayloadMatcher::loadProtoBytes(send_repeated);
-      }()),
-      receive_bytes_(PayloadMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
+        auto bytes_or_error = PayloadMatcher::loadProtoBytes(send_repeated);
+        THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
+        return bytes_or_error.value();
+      }()) {
+  auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.tcp_health_check().receive());
+  THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
+  receive_bytes_ = bytes_or_error.value();
+}
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);

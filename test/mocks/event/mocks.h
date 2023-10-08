@@ -70,17 +70,12 @@ public:
     return Filesystem::WatcherPtr{createFilesystemWatcher_()};
   }
 
-  Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
-                                      bool bind_to_port, bool ignore_global_conn_limit) override {
+  Network::ListenerPtr
+  createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                 Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
+                 Server::ThreadLocalOverloadStateOptRef overload_state) override {
     return Network::ListenerPtr{
-        createListener_(std::move(socket), cb, runtime, bind_to_port, ignore_global_conn_limit)};
-  }
-
-  Network::UdpListenerPtr
-  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-                    const envoy::config::core::v3::UdpSocketConfig& config) override {
-    return Network::UdpListenerPtr{createUdpListener_(socket, cb, config)};
+        createListener_(std::move(socket), cb, runtime, listener_config, overload_state)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -143,10 +138,8 @@ public:
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
-               Runtime::Loader& runtime, bool bind_to_port, bool ignore_global_conn_limit));
-  MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-               const envoy::config::core::v3::UdpSocketConfig& config));
+               Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
+               Server::ThreadLocalOverloadStateOptRef overload_state));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));

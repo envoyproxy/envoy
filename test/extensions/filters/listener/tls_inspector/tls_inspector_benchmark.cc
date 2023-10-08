@@ -65,7 +65,7 @@ public:
   const std::vector<uint8_t> client_hello_;
 };
 
-static void BM_TlsInspector(benchmark::State& state) {
+static void bmTlsInspector(benchmark::State& state) {
   NiceMock<FastMockOsSysCalls> os_sys_calls(Tls::Test::generateClientHello(
       Config::TLS_MIN_SUPPORTED_VERSION, Config::TLS_MAX_SUPPORTED_VERSION, "example.com",
       "\x02h2\x08http/1.1"));
@@ -100,7 +100,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   }
 }
 
-BENCHMARK(BM_TlsInspector)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bmTlsInspector)->Unit(benchmark::kMicrosecond);
 
 } // namespace TlsInspector
 } // namespace ListenerFilters

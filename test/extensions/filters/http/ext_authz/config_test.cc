@@ -63,12 +63,14 @@ public:
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config) {
     // Delegate call to mock async client manager to real async client manager.
     ON_CALL(context_, getServerFactoryContext()).WillByDefault(testing::ReturnRef(server_context_));
-    ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& config,
-                                  Stats::Scope& scope, bool skip_cluster_check) {
-          return async_client_manager_->getOrCreateRawAsyncClient(config, scope,
-                                                                  skip_cluster_check);
-        }));
+    ON_CALL(context_.cluster_manager_.async_client_manager_,
+            getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillByDefault(
+            Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                       Stats::Scope& scope, bool skip_cluster_check) {
+              return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+                  config_with_hash_key, scope, skip_cluster_check);
+            }));
     ExtAuthzFilterConfig factory;
     return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_);
   }
@@ -204,8 +206,11 @@ private:
   void expectGrpcClientSentRequest(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config,
       int requests_sent_per_thread) {
-    Grpc::RawAsyncClientSharedPtr async_client = async_client_manager_->getOrCreateRawAsyncClient(
-        ext_authz_config.grpc_service(), context_.scope(), false);
+    Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+        Envoy::Grpc::GrpcServiceConfigWithHashKey(ext_authz_config.grpc_service());
+    Grpc::RawAsyncClientSharedPtr async_client =
+        async_client_manager_->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key,
+                                                                    context_.scope(), false);
     Grpc::MockAsyncClient* mock_async_client =
         dynamic_cast<Grpc::MockAsyncClient*>(async_client.get());
     EXPECT_NE(mock_async_client, nullptr);

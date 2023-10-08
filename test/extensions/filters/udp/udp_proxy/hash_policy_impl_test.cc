@@ -6,6 +6,8 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {

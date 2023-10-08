@@ -46,7 +46,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  try {
+  TRY_NEEDS_AUDIT {
     ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
               use_unsigned_payload);
     if (use_unsigned_payload) {
@@ -55,7 +55,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       config.signer().signEmptyPayload(headers);
     }
     config.stats().signing_added_.inc();
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY catch (const EnvoyException& e) {
     // TODO: sign should not throw to avoid exceptions in the request path
     ENVOY_LOG(debug, "signing failed: {}", e.what());
     config.stats().signing_failed_.inc();
@@ -82,13 +83,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const std::string hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
 
-  try {
+  TRY_NEEDS_AUDIT {
     ENVOY_LOG(debug, "aws request signing from decodeData");
     ASSERT(request_headers_ != nullptr);
     config.signer().sign(*request_headers_, hash);
     config.stats().signing_added_.inc();
     config.stats().payload_signing_added_.inc();
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY catch (const EnvoyException& e) {
     // TODO: sign should not throw to avoid exceptions in the request path
     ENVOY_LOG(debug, "signing failed: {}", e.what());
     config.stats().signing_failed_.inc();

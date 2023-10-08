@@ -43,6 +43,10 @@ MockListenerConfig::MockListenerConfig()
       .WillByDefault(Return(socket_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, maxConnectionsToAcceptPerSocketEvent())
+      .WillByDefault(Return(Network::DefaultMaxConnectionsToAcceptPerSocketEvent));
+  ON_CALL(*this, ignoreGlobalConnLimit()).WillByDefault(Return(false));
+  ON_CALL(*this, bindToPort()).WillByDefault(Return(true));
 }
 MockListenerConfig::~MockListenerConfig() = default;
 
@@ -125,6 +129,12 @@ MockListenerFilterManager::~MockListenerFilterManager() = default;
 
 MockFilterChain::MockFilterChain() = default;
 MockFilterChain::~MockFilterChain() = default;
+
+MockFilterChainInfo::MockFilterChainInfo() {
+  ON_CALL(*this, name()).WillByDefault(Invoke([this]() {
+    return absl::string_view{filter_chain_name_};
+  }));
+}
 
 MockFilterChainManager::MockFilterChainManager() = default;
 MockFilterChainManager::~MockFilterChainManager() = default;

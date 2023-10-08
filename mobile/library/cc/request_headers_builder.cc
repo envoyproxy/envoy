@@ -42,8 +42,10 @@ RequestHeadersBuilder::enableRequestCompression(CompressionAlgorithm algorithm) 
   switch (algorithm) {
   case CompressionAlgorithm::Gzip:
     value = "gzip";
+    break;
   case CompressionAlgorithm::Brotli:
     value = "brotli";
+    break;
   }
   internalSet("x-envoy-mobile-compression", std::vector<std::string>{value});
   return *this;

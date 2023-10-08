@@ -68,6 +68,7 @@ private:
   const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   uint32_t overprovisioning_factor_;
+  bool weighted_priority_health_;
 };
 
 /**
@@ -78,10 +79,12 @@ public:
   StrictDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
+
+DECLARE_FACTORY(StrictDnsClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

@@ -3,7 +3,7 @@ CONTRIB_EXTENSIONS = {
     #
     # HTTP filters
     #
-
+    "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
@@ -21,6 +21,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.generic_proxy":                      "//contrib/generic_proxy/filters/network/source:config",
+    "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
 
     #
     # Sip proxy
@@ -52,7 +53,7 @@ CONTRIB_EXTENSIONS = {
     # Connection Balance extensions
     #
 
-    "envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
+    "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
 
     #
     # Regex engines

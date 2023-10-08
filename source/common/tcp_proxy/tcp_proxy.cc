@@ -11,6 +11,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -40,6 +41,17 @@ namespace TcpProxy {
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
+
+class PerConnectionClusterFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return PerConnectionCluster::key(); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<PerConnectionCluster>(data);
+  }
+};
+
+REGISTER_FACTORY(PerConnectionClusterFactory, StreamInfo::FilterState::ObjectFactory);
 
 Config::SimpleRouteImpl::SimpleRouteImpl(const Config& parent, absl::string_view cluster_name)
     : parent_(parent), cluster_name_(cluster_name) {}
@@ -293,11 +305,14 @@ void Filter::readDisableDownstream(bool disable) {
     // despite the downstream connection being closed.
     return;
   }
-  read_callbacks_->connection().readDisable(disable);
 
-  if (disable) {
+  const Network::Connection::ReadDisableStatus read_disable_status =
+      read_callbacks_->connection().readDisable(disable);
+
+  if (read_disable_status == Network::Connection::ReadDisableStatus::TransitionedToReadDisabled) {
     config_->stats().downstream_flow_control_paused_reading_total_.inc();
-  } else {
+  } else if (read_disable_status ==
+             Network::Connection::ReadDisableStatus::TransitionedToReadEnabled) {
     config_->stats().downstream_flow_control_resumed_reading_total_.inc();
   }
 }
@@ -333,7 +348,8 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
-  ASSERT(!on_high_watermark_called_);
+  // TCP Tunneling may call on high/low watermark multiple times.
+  ASSERT(parent_->config_->tunnelingConfigHelper() || !on_high_watermark_called_);
   on_high_watermark_called_ = true;
 
   if (parent_ != nullptr) {
@@ -343,7 +359,8 @@ void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
-  ASSERT(on_high_watermark_called_);
+  // TCP Tunneling may call on high/low watermark multiple times.
+  ASSERT(parent_->config_->tunnelingConfigHelper() || on_high_watermark_called_);
   on_high_watermark_called_ = false;
 
   if (parent_ != nullptr) {
@@ -626,10 +643,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
-  return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
-                               *Http::StaticEmptyHeaders::get().response_headers,
-                               *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                               absl::string_view(), AccessLog::AccessLogType::NotSet);
+  return hostname_fmt_->formatWithContext({}, stream_info);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -736,6 +750,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
       disableIdleTimer();
     }
   }
+
   if (generic_conn_pool_) {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
@@ -780,6 +795,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         establishUpstreamConnection();
       }
     } else {
+      // TODO(botengyao): propagate RST back to downstream connection if RST is received.
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       }
@@ -849,6 +865,11 @@ void Filter::onAccessLogFlushInterval() {
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
                     AccessLog::AccessLogType::TcpPeriodic);
+  }
+  const SystemTime now = read_callbacks_->connection().dispatcher().timeSource().systemTime();
+  getStreamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
+  if (getStreamInfo().getUpstreamBytesMeter()) {
+    getStreamInfo().getUpstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
   }
   resetAccessLogFlushTimer();
 }

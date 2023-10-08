@@ -693,16 +693,16 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
 // This is multiple addresses version test for the above one.
 TEST_P(ListenerMultiAddressesIntegrationTest,
        MultipleLdsUpdatesSharingListenSocketFactoryWithMultiAddresses) {
-// https://github.com/envoyproxy/envoy/issues/26336
-#if defined(__arm64__)
-  return;
-#endif
   on_server_init_function_ = [&]() {
     createLdsStream();
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);
   };
   initialize();
+// https://github.com/envoyproxy/envoy/issues/26336
+#if defined(__aarch64__)
+  return;
+#endif
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);

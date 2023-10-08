@@ -107,8 +107,6 @@ public:
       : subset_config_(subset_config), cluster_info_(cluster_info), runtime_(runtime),
         random_(random), time_source_(time_source) {}
 
-  Upstream::LoadBalancerPtr create() override { PANIC("not implemented"); };
-
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
     auto child_lb_creator =
         std::make_unique<ChildLoadBalancerCreatorImpl>(subset_config_, cluster_info_);
@@ -118,6 +116,7 @@ public:
         params.local_priority_set, cluster_info_.lbStats(), cluster_info_.statsScope(), runtime_,
         random_, time_source_);
   }
+  bool recreateOnHostChange() const override { return false; }
 
 private:
   const SubsetLoadBalancerConfig& subset_config_;

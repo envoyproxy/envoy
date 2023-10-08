@@ -1,0 +1,10 @@
+frames {
+  qframe {
+    connection_close {
+      error_code: 0,
+      ietf_error: 0,
+      error_phrase: "oops",
+      transport_close_frame_type: 0,
+    }
+  }
+}

@@ -58,6 +58,16 @@ IoHandlePtr TestIoSocketHandle::duplicate() {
                                               domain_);
 }
 
+Api::SysCallIntResult TestIoSocketHandle::connect(Address::InstanceConstSharedPtr address) {
+  if (write_override_) {
+    auto result = write_override_(this, nullptr, 0);
+    if (result.has_value()) {
+      return Api::SysCallIntResult{-1, EINPROGRESS};
+    }
+  }
+  return Test::IoSocketHandlePlatformImpl::connect(address);
+}
+
 IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
                                             absl::optional<int> domain) const {
   return std::make_unique<TestIoSocketHandle>(write_override_proc_, socket_fd, socket_v6only,

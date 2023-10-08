@@ -63,7 +63,7 @@ Instructions for generating a self-signed certificate and private key for testin
 Statistics
 ----------
 
-The SXG filter outputs statistics in the *<stat_prefix>.sxg.* namespace.
+The SXG filter outputs statistics in the ``<stat_prefix>.sxg.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description

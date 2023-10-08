@@ -26,9 +26,12 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["admin_test.cc"]),
     deps = [
         "//source/extensions/common/tap:admin",
+        "//source/extensions/common/tap:tap_config_base",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:admin_stream_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
     ],
 )

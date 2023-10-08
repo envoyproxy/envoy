@@ -1,40 +1,76 @@
 #!/bin/bash -e
 
-DOCKER_CACHE_PATH="$1"
-DOCKER_CACHE_ARCH="$2"
+ENVOY_DOCKER_BUILD_DIR="$1"
+CACHE_PATH="$2"
+CACHE_ARCH="$3"
 
-if [[ -z "$DOCKER_CACHE_PATH" ]]; then
+echo "Docker restored: $DOCKER_RESTORED"
+echo "Bazel restored: $BAZEL_RESTORED"
+
+if [[ -z "$CACHE_PATH" ]]; then
     echo "prime_docker_cache called without path arg" >&2
     exit 1
 fi
 
-if [[ "$DOCKER_CACHE_ARCH" == ".arm64" ]]; then
-    DOCKER_CACHE_ARCH=linux/arm64
+if [[ "$CACHE_ARCH" == ".arm64" ]]; then
+    CACHE_ARCH=linux/arm64
 else
-    DOCKER_CACHE_ARCH=linux/amd64
+    CACHE_ARCH=linux/amd64
 fi
 
-DOCKER_CACHE_TARBALL="${DOCKER_CACHE_PATH}/docker.tar.zst"
+DOCKER_CACHE_TARBALL="${CACHE_PATH}/docker/docker.tar.zst"
+BAZEL_CACHE_TARBALL="${CACHE_PATH}/bazel/bazel.tar.zst"
+BAZEL_PATH=/tmp/envoy-docker-build
 
-echo "Stopping Docker ..."
-systemctl stop docker
+echo
+echo "================ Load caches ==================="
+if [[ "$DOCKER_RESTORED" == "true" ]] || [[ "$BAZEL_RESTORED" == "true" ]]; then
+    sudo ./.azure-pipelines/docker/load_caches.sh "$ENVOY_DOCKER_BUILD_DIR" "$CACHE_PATH" "" true
+else
+    sudo ./.azure-pipelines/docker/clean_docker.sh
+    echo "No caches to restore"
+fi
+echo "==================================================="
+echo
 
-echo "Restarting Docker with empty /var/lib/docker ..."
-mv /var/lib/docker/ /var/lib/docker.old
-mkdir /var/lib/docker
-systemctl start docker
+echo
+echo "================ Docker fetch ======================"
+if [[ "$DOCKER_RESTORED" != "true" ]]; then
+    echo "Fetching Docker"
+    ./ci/run_envoy_docker.sh uname -a
+    docker images
+else
+    echo "Not fetching Docker as it was restored"
+fi
+echo "==================================================="
+echo
 
-BUILD_IMAGE=$(head -n1 .devcontainer/Dockerfile  | cut -d: -f2)
+echo
+echo "================ Bazel fetch ======================"
+# Fetch bazel dependencies
+if [[ "$BAZEL_RESTORED" != "true" ]]; then
+    echo "Fetching bazel"
+    ./ci/run_envoy_docker.sh './ci/do_ci.sh fetch'
+else
+    echo "Not fetching bazel as it was restored"
+fi
+echo "==================================================="
+echo
 
-echo "Pulling build image for ${DOCKER_CACHE_ARCH} (${BUILD_IMAGE}) ..."
-docker pull -q --platform "${DOCKER_CACHE_ARCH}" "envoyproxy/envoy-build-ubuntu:${BUILD_IMAGE}"
+df -h
 
-echo "Stopping docker"
-systemctl stop docker
+echo
+echo "================ Save caches ======================"
+# Save the caches -> tarballs
+if [[ "$DOCKER_RESTORED" != "true" ]]; then
+    echo "Stopping docker"
+    sudo systemctl stop docker docker.socket
+    sudo ./.azure-pipelines/docker/create_cache.sh "${DOCKER_CACHE_TARBALL}" . /var/lib/docker
+fi
 
-echo "Exporting /var/lib/docker -> ${DOCKER_CACHE_PATH}"
-mkdir -p "$DOCKER_CACHE_PATH"
-tar cf - -C /var/lib/docker . | zstd - -T0 -o "$DOCKER_CACHE_TARBALL"
-
-echo "Docker cache tarball created: ${DOCKER_CACHE_TARBALL}"
-ls -lh "$DOCKER_CACHE_TARBALL"
+if [[ "$BAZEL_RESTORED" != "true" ]]; then
+    sudo ./.azure-pipelines/docker/create_cache.sh "${BAZEL_CACHE_TARBALL}" . "${BAZEL_PATH}"
+fi
+sudo chmod o+r -R "${CACHE_PATH}"
+echo "==================================================="
+echo

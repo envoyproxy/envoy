@@ -363,6 +363,38 @@ Specify whether to enable transparent response Brotli decompression. Defaults to
 Default values from the `brotli decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
 are used.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableHttp3``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable HTTP/3. Defaults to true. Only available when the Envoy Mobile build has HTTP/3 included.
+When HTTP/3 is enabled, the client will first talk HTTP/2 with the servers and upon receiving alt-svc in the response,
+following traffic will be sent via HTTP/3.
+
+**Example**::
+
+  // Kotlin
+  builder.enableHttp3(true)
+
+  // Swift
+  builder.enableHttp3(true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addQuicHint``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a host port pair that's known to support QUIC. Only available when HTTP/3 is enabled.
+It can be called multiple times to append a list of QUIC hints.
+This allows HTTP/3 to be used for the first request to the hosts and avoid the HTTP/2 -> HTTP/3 switch as mentioned in enableHttp3.
+
+**Example**::
+
+  // Kotlin
+  builder.addQuicHint("www.example.com", 443)
+
+  // Swift
+  builder.addQuicHint("www.example.com", 443)
+
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableSocketTagging``
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -495,67 +527,44 @@ Note that Envoy will fail to start up in debug mode if an unknown guard is speci
   // Swift
   builder.setRuntimeGuard("feature", true)
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-``addRtdsLayer``
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Adds an RTDS layer to the bootstrap configuration.
-Requires that ADS be configured via `setAggregatedDiscoveryService()`.
-See the following link for details:
-https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto
-
-**Example**::
-
-  // Kotlin
-  builder.addRtdsLayer(layerName = "rtds_layer_name", timeoutSeconds = 10)
-
-  // Swift
-  builder.addRTDSLayer(layerName: "rtds_layer_name", timeoutSeconds: 10)
-
-  // C++
-  builder.addRtdsLayer("rtds_layer_name", 10)
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-``addCdsLayer``
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Adds a CDS layer to the bootstrap configuration.
-Requires that ADS be configured via `setAggregatedDiscoveryService()`.
-See the following link for details:
-https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cds
-
-**Example**::
-
-  // Kotlin
-  builder.addCdsLayer(resourcesLocator = "xdstp://td-location.com/cluster_location", timeoutSeconds = 10)
-
-  // Swift
-  builder.addCDSLayer(resourcesLocator: "xdstp://td-location.com/cluster_location", timeoutSeconds: 10)
-
-  // C++
-  builder.addCdsLayer("xdstp://td-location.com/cluster_location", 10)
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``setAggregatedDiscoveryService``
+``setXds``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Adds ADS to bootstrap configuration, for instance to be used with RTDS and CDS layers.
-Optional params allow configuring a JWT token and SSL. See the following link for details:
-https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads
+Sets the Bootstrap configuration up with `xDS <https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads>`_
+to fetch dynamic configuration from an xDS management server. The xDS management server must
+support the ADS protocol. At this moment, only the State-of-the-World (SotW) xDS protocol is
+supported, not the Delta protocol. The Envoy Mobile client will communicate with the configured
+xDS management server over gRPC.
+
+Use the XdsBuilder class to configure the xDS for the Envoy Mobile engine.  For example, the
+`addRuntimeDiscoveryService()` method can be used to configure the
+`Runtime Discovery Service (RTDS) <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto>`_
+and the `addClusterDiscoveryService()` method to configure the
+`Cluster Discovery Service (CDS) <https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cds>`_.
 
 Parameters:
-address, port, (optional) jwt_token, (optional) jwt_token_lifetime_seconds, (optional) ssl_root_certs
+xds_builder
 
 **Example**::
 
   // Kotlin
-  builder.setAggregatedDiscoveryService(address = "192.168.1.1", port = 0)
+  val xdsBuilder = new XdsBuilder(address = "my_xds_server.com", port = 443)
+                       .addRuntimeDiscoveryService("my_rtds_resource")
+                       .addClusterDiscoveryService()
+  builder.setXds(xdsBuilder)
 
   // Swift
-  builder.setAggregatedDiscoveryService(address: "192.168.1.1", port: 0)
+  var xdsBuilder = XdsBuilder(address: "my_xds_server.com", port: 443)
+                       .addRuntimeDiscoveryService("my_rtds_resource")
+                       .addClusterDiscoveryService()
+  builder.setXds(xdsBuilder)
 
   // C++
-  builder.setAggregatedDiscoveryService("192.168.1.1", 0)
+  XdsBuilder xds_builder(/*address=*/"my_xds_server.com", /*port=*/443);
+  xds_builder.addRuntimeDiscoveryService("my_rtds_resource")
+      .addClusterDiscoveryService();
+  builder.setXds(std::move(xds_builder));
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``setNodeId``

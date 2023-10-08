@@ -1148,6 +1148,18 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsConnectUdpRequest) {
+  EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
+      Http::TestRequestHeaderMapImpl{{"upgrade", "connect-udp"}}));
+  // Should use case-insensitive comparison for the upgrade values.
+  EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
+      Http::TestRequestHeaderMapImpl{{"upgrade", "CONNECT-UDP"}}));
+  // Extended CONNECT requests should be normalized to HTTP/1.1.
+  EXPECT_FALSE(HeaderUtility::isConnectUdpRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":protocol", "connect-udp"}}));
+  EXPECT_FALSE(HeaderUtility::isConnectUdpRequest(Http::TestRequestHeaderMapImpl{}));
+}
+
 TEST(HeaderIsValidTest, IsConnectResponse) {
   RequestHeaderMapPtr connect_request{new TestRequestHeaderMapImpl{{":method", "CONNECT"}}};
   RequestHeaderMapPtr get_request{new TestRequestHeaderMapImpl{{":method", "GET"}}};
@@ -1158,6 +1170,45 @@ TEST(HeaderIsValidTest, IsConnectResponse) {
   EXPECT_FALSE(HeaderUtility::isConnectResponse(connect_request.get(), failure_response));
   EXPECT_FALSE(HeaderUtility::isConnectResponse(nullptr, success_response));
   EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request.get(), success_response));
+}
+
+TEST(HeaderIsValidTest, RewriteAuthorityForConnectUdp) {
+  TestRequestHeaderMapImpl connect_udp_request{
+      {":path", "/.well-known/masque/udp/foo.lyft.com/80/"}, {":authority", "example.org"}};
+  EXPECT_TRUE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_request));
+  EXPECT_EQ(connect_udp_request.getHostValue(), "foo.lyft.com:80");
+
+  TestRequestHeaderMapImpl connect_udp_request_ipv6{
+      {":path", "/.well-known/masque/udp/2001%3A0db8%3A85a3%3A%3A8a2e%3A0370%3A7334/80/"},
+      {":authority", "example.org"}};
+  EXPECT_TRUE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_request_ipv6));
+  EXPECT_EQ(connect_udp_request_ipv6.getHostValue(), "[2001:0db8:85a3::8a2e:0370:7334]:80");
+
+  TestRequestHeaderMapImpl connect_udp_request_ipv6_not_escaped{
+      {":path", "/.well-known/masque/udp/2001:0db8:85a3::8a2e:0370:7334/80"},
+      {":authority", "example.org"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_request_ipv6_not_escaped));
+
+  TestRequestHeaderMapImpl connect_udp_request_ipv6_zoneid{
+      {":path", "/.well-known/masque/udp/fe80::a%25ee1/80/"}, {":authority", "example.org"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_request_ipv6_zoneid));
+
+  TestRequestHeaderMapImpl connect_udp_malformed1{
+      {":path", "/well-known/masque/udp/foo.lyft.com/80/"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_malformed1));
+
+  TestRequestHeaderMapImpl connect_udp_malformed2{{":path", "/masque/udp/foo.lyft.com/80/"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_malformed2));
+
+  TestRequestHeaderMapImpl connect_udp_no_path{{":authority", "example.org"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_no_path));
+
+  TestRequestHeaderMapImpl connect_udp_empty_host{{":path", "/.well-known/masque/udp//80/"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_empty_host));
+
+  TestRequestHeaderMapImpl connect_udp_empty_port{
+      {":path", "/.well-known/masque/udp/foo.lyft.com//"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_empty_port));
 }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS

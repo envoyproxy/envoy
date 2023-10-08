@@ -25,6 +25,7 @@
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
@@ -587,6 +588,9 @@ public:
   const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
   }
+  OptRef<const Network::FilterChainInfo> filterChainInfo() const override {
+    return StreamInfoImpl::downstreamAddressProvider().filterChainInfo();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
@@ -607,7 +611,9 @@ public:
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
-        filter_chain_factory_(filter_chain_factory) {}
+        filter_chain_factory_(filter_chain_factory),
+        no_downgrade_to_canonical_name_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.no_downgrade_to_canonical_name")) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
@@ -908,6 +914,18 @@ private:
     const Http::FilterContext& context_;
   };
 
+  class FilterChainOptionsImpl : public FilterChainOptions {
+  public:
+    FilterChainOptionsImpl(Router::RouteConstSharedPtr route) : route_(std::move(route)) {}
+
+    bool filterDisabled(absl::string_view config_name) const override {
+      return route_ != nullptr && route_->filterDisabled(config_name);
+    }
+
+  private:
+    const Router::RouteConstSharedPtr route_;
+  };
+
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
@@ -1030,6 +1048,8 @@ private:
   // clang-format on
 
   State state_;
+
+  const bool no_downgrade_to_canonical_name_{};
 };
 
 // The DownstreamFilterManager has explicit handling to send local replies.
@@ -1050,9 +1070,7 @@ public:
                       proxy_100_continue, buffer_limit, filter_chain_factory),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span),
-        local_reply_(local_reply),
-        avoid_reentrant_filter_invocation_during_local_reply_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {}
+        local_reply_(local_reply) {}
   ~DownstreamFilterManager() override {
     ASSERT(prepared_local_reply_ == nullptr,
            "Filter Manager destroyed without executing prepared local reply");
@@ -1125,7 +1143,6 @@ private:
 private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
-  const bool avoid_reentrant_filter_invocation_during_local_reply_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
 };
 

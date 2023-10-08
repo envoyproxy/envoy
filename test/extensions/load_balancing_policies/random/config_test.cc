@@ -42,8 +42,6 @@ TEST(RandomConfigTest, ValidateFail) {
 
   auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
   EXPECT_NE(nullptr, thread_local_lb);
-
-  EXPECT_DEATH(thread_local_lb_factory->create(), "not implemented");
 }
 
 } // namespace

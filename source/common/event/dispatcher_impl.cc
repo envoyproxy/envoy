@@ -27,7 +27,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
-#include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
@@ -191,23 +190,16 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, file_system_)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
-                                                    Network::TcpListenerCallbacks& cb,
-                                                    Runtime::Loader& runtime, bool bind_to_port,
-                                                    bool ignore_global_conn_limit) {
+Network::ListenerPtr
+DispatcherImpl::createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                               Runtime::Loader& runtime,
+                               const Network::ListenerConfig& listener_config,
+                               Server::ThreadLocalOverloadStateOptRef overload_state) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(*this, random_generator_, runtime,
-                                                    std::move(socket), cb, bind_to_port,
-                                                    ignore_global_conn_limit);
-}
-
-Network::UdpListenerPtr
-DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
-                                  Network::UdpListenerCallbacks& cb,
-                                  const envoy::config::core::v3::UdpSocketConfig& config) {
-  ASSERT(isThreadSafe());
-  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource(),
-                                                    config);
+  return std::make_unique<Network::TcpListenerImpl>(
+      *this, random_generator_, runtime, std::move(socket), cb, listener_config.bindToPort(),
+      listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

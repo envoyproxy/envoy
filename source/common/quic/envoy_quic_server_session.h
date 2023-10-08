@@ -115,9 +115,11 @@ protected:
   quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
-    // TODO(jeongseokson): Http3 Datagram support should be turned on by returning
-    // quic::HttpDatagramSupport::kRfc once the CONNECT-UDP support work is completed.
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+    return quic::HttpDatagramSupport::kRfc;
+#else
     return quic::HttpDatagramSupport::kNone;
+#endif
   }
 
   // QuicFilterManagerConnectionImpl
