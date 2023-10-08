@@ -149,6 +149,10 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
   }
 
+  bool append_mode_for_append_action;
+  Filters::Common::MutationRules::CheckOperation check_op_for_append_action;
+  Filters::Common::MutationRules::CheckResult checkResult_for_append_action;
+
   for (const auto& sh : mutation.set_headers()) {
     if (!sh.has_header()) {
       continue;
@@ -183,51 +187,59 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     ENVOY_LOG(error, "header value: {}, header raw value: {}", sh.header().value(),
               sh.header().raw_value());
 
-    if (sh.append_action()) {
-      bool append_mode;
-      CheckOperation check_op;
-      CheckResult checkResult;
+    if (!sh.has_append()) {
       switch (sh.append_action()) {
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        append_mode = true;
-        check_op =
+        ENVOY_LOG(error, "Inside append action APPEND_IF_EXISTS_OR_ADD {} ",
+                  HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+        append_mode_for_append_action = true;
+        check_op_for_append_action =
             (!headers.get(header_name).empty()) ? CheckOperation::APPEND : CheckOperation::SET;
-        checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                        check_op, header_name, header_value, append_mode);
-        if (checkResult == CheckResult::FAIL) {
+        checkResult_for_append_action = handleCheckResult(
+            headers, replacing_message, checker, rejected_mutations, check_op_for_append_action,
+            header_name, header_value, append_mode_for_append_action);
+        if (checkResult_for_append_action == CheckResult::FAIL) {
           return absl::InvalidArgumentError(absl::StrCat(
               "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
         }
         break;
       case HeaderValueOption::ADD_IF_ABSENT:
+        ENVOY_LOG(error, "Inside append action ADD_IF_ABSENT {}", HeaderValueOption::ADD_IF_ABSENT);
         if (headers.get(header_name).empty()) {
-          append_mode = true;
-          check_op = CheckOperation::SET;
-          checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                          check_op, header_name, header_value, append_mode);
-          if (checkResult == CheckResult::FAIL) {
+          append_mode_for_append_action = true;
+          check_op_for_append_action = CheckOperation::SET;
+          checkResult_for_append_action = handleCheckResult(
+              headers, replacing_message, checker, rejected_mutations, check_op_for_append_action,
+              header_name, header_value, append_mode_for_append_action);
+          if (checkResult_for_append_action == CheckResult::FAIL) {
             return absl::InvalidArgumentError(absl::StrCat(
                 "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
           }
         }
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        append_mode = false;
-        check_op = CheckOperation::SET;
-        checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                        check_op, header_name, header_value, append_mode);
-        if (checkResult == CheckResult::FAIL) {
+        ENVOY_LOG(error, "Inside append action OVERWRITE_IF_EXISTS_OR_ADD {}",
+                  HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+        append_mode_for_append_action = false;
+        check_op_for_append_action = CheckOperation::SET;
+        checkResult_for_append_action = handleCheckResult(
+            headers, replacing_message, checker, rejected_mutations, check_op_for_append_action,
+            header_name, header_value, append_mode_for_append_action);
+        if (checkResult_for_append_action == CheckResult::FAIL) {
           return absl::InvalidArgumentError(absl::StrCat(
               "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
         }
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS:
+        ENVOY_LOG(error, "Inside append action OVERWRITE_IF_EXISTS{}",
+                  HeaderValueOption::OVERWRITE_IF_EXISTS);
         if (!headers.get(header_name).empty()) {
-          append_mode = false;
-          check_op = CheckOperation::SET;
-          checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                          check_op, header_name, header_value, append_mode);
-          if (checkResult == CheckResult::FAIL) {
+          append_mode_for_append_action = false;
+          check_op_for_append_action = CheckOperation::SET;
+          checkResult_for_append_action = handleCheckResult(
+              headers, replacing_message, checker, rejected_mutations, check_op_for_append_action,
+              header_name, header_value, append_mode_for_append_action);
+          if (checkResult_for_append_action == CheckResult::FAIL) {
             return absl::InvalidArgumentError(absl::StrCat(
                 "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
           }
