@@ -115,13 +115,14 @@ envoy_entry_point(
     name = "get_project_json",
     pkg = "envoy.base.utils",
     script = "envoy.project_data",
+    init_data = [":__init__.py"],
 )
 
 genrule(
     name = "project",
     outs = ["project.json"],
     cmd = """
-    $(location :get_project_json) . > $@
+    $(location :get_project_json) $$(dirname $(location @envoy//:VERSION.txt)) > $@
     """,
     tools = [
         ":get_project_json",
@@ -139,6 +140,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -149,6 +151,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -159,6 +162,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -169,6 +173,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -179,6 +184,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 ''')

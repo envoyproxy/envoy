@@ -23,9 +23,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // is appended to the address specified in the
 // :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`
 // field. The extra address should have a different IP version than the address in the
-// `source_address` field. The address which has the same IP
+// ``source_address`` field. The address which has the same IP
 // version with the target host's address IP version will be used as bind address.
-// If there is no same IP version address found, the address in the `source_address` field will
+// If there is no same IP version address found, the address in the ``source_address`` field will
 // be returned.
 message DefaultLocalAddressSelector {
 }
