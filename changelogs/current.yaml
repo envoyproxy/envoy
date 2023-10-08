@@ -355,4 +355,4 @@ deprecated:
 - area: http ext_proc filter
   change: |
     Change to hornor HeaderValueOption.change_action. This change can be reverted temporarily by
-    setting the runtime guard ``envoy.reloadable_features.header_value_option_change_action`` to false. 
+    setting the runtime guard ``envoy.reloadable_features.header_value_option_change_action`` to false.
