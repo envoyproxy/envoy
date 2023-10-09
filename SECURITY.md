@@ -465,11 +465,11 @@ and security team to ensure they still qualify for inclusion on the list.
 
 | Organization  | End User | Last Review |
 |:-------------:|:--------:|:-----------:|
-| Aspen Mesh    | No       | 06/21       |
 | AWS           | No       | 06/21       |
 | Cilium        | No       | 06/21       |
 | Cloud Foundry | No       | 06/21       |
 | Datawire      | No       | 06/21       |
+| F5            | No       | 06/21       |
 | Google        | No       | 06/21       |
 | IBM           | No       | 06/21       |
 | Istio         | No       | 06/21       |

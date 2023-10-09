@@ -1226,7 +1226,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   // Rewrites the host of CONNECT-UDP requests.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      HeaderUtility::isConnectUdp(*request_headers_) &&
+      HeaderUtility::isConnectUdpRequest(*request_headers_) &&
       !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
     sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().InvalidPath);
