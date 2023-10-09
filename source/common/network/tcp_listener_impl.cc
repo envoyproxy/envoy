@@ -26,14 +26,32 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     return false;
   }
 
-  // If the connection limit is not set, don't limit the connections, but still track them.
-  // TODO(tonya11en): In integration tests, threadsafeSnapshot is necessary since the FakeUpstreams
-  // use a listener and do not run in a worker thread. In practice, this code path will always be
-  // run on a worker thread, but to prevent failed assertions in test environments, threadsafe
-  // snapshots must be used. This must be revisited.
-  const uint64_t global_cx_limit = runtime_.threadsafeSnapshot()->getInteger(
-      GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
-  return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
+  if (track_global_cx_limit_in_overload_manager_) {
+    // Check if deprecated runtime flag `overload.global_downstream_max_connections` is configured
+    // simultaneously with downstream connections monitor in overload manager.
+    if (runtime_.threadsafeSnapshot()->get(GlobalMaxCxRuntimeKey)) {
+      ENVOY_LOG_ONCE_MISC(
+          warn,
+          "Global downstream connections limits is configured via deprecated runtime key {} and in "
+          "{}. Using overload manager config.",
+          GlobalMaxCxRuntimeKey,
+          Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections);
+    }
+    // Try to allocate resource within overload manager. We do it once here, instead of checking if
+    // it is possible to allocate resource in this method and then actually allocating it later in
+    // the code to avoid race conditions.
+    return !(overload_state_->tryAllocateResource(
+        Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1));
+  } else {
+    // If the connection limit is not set, don't limit the connections, but still track them.
+    // TODO(tonya11en): In integration tests, threadsafeSnapshot is necessary since the
+    // FakeUpstreams use a listener and do not run in a worker thread. In practice, this code path
+    // will always be run on a worker thread, but to prevent failed assertions in test environments,
+    // threadsafe snapshots must be used. This must be revisited.
+    const uint64_t global_cx_limit = runtime_.threadsafeSnapshot()->getInteger(
+        GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
+    return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
+  }
 }
 
 void TcpListenerImpl::onSocketEvent(short flags) {
@@ -88,8 +106,9 @@ void TcpListenerImpl::onSocketEvent(short flags) {
                                                   local_address->ip()->version() ==
                                                       Address::IpVersion::v6);
 
-    cb_.onAccept(
-        std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
+    cb_.onAccept(std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address,
+                                                      remote_address, overload_state_,
+                                                      track_global_cx_limit_in_overload_manager_));
   }
 
   ENVOY_LOG_MISC(trace, "TcpListener accepted {} new connections.",
@@ -101,11 +120,18 @@ TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::Rand
                                  Runtime::Loader& runtime, SocketSharedPtr socket,
                                  TcpListenerCallbacks& cb, bool bind_to_port,
                                  bool ignore_global_conn_limit,
-                                 uint32_t max_connections_to_accept_per_socket_event)
+                                 uint32_t max_connections_to_accept_per_socket_event,
+                                 Server::ThreadLocalOverloadStateOptRef overload_state)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random), runtime_(runtime),
       bind_to_port_(bind_to_port), reject_fraction_(0.0),
       ignore_global_conn_limit_(ignore_global_conn_limit),
-      max_connections_to_accept_per_socket_event_(max_connections_to_accept_per_socket_event) {
+      max_connections_to_accept_per_socket_event_(max_connections_to_accept_per_socket_event),
+      overload_state_(overload_state),
+      track_global_cx_limit_in_overload_manager_(
+          overload_state_
+              ? overload_state_->isResourceMonitorEnabled(
+                    Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)
+              : false) {
   if (bind_to_port) {
     // Use level triggered mode to avoid potential loss of the trigger due to
     // transient accept errors or early termination due to accepting

@@ -11,15 +11,15 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.2"
-"source/common/json:94.1"
+"source/common/json:94.6"
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:96.5"
 "source/common/quic:93.3"
-"source/common/secret:95.0"
+"source/common/secret:95.1"
 "source/common/signal:87.2" # Death tests don't report LCOV
-"source/common/tcp:94.1"
+"source/common/tcp:94.5"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:90.7"
@@ -31,12 +31,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
-"source/extensions/filters/http/cache:93.4"
+"source/extensions/filters/http/cache:94.0"
 "source/extensions/filters/http/grpc_json_transcoder:93.7" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/wasm:1.9"
-"source/extensions/filters/listener/original_dst:87.9"
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/common:96.4"
 "source/extensions/filters/network/mongo_proxy:96.0"
@@ -47,7 +46,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:78.6" # Death tests don't report LCOV
 "source/extensions/stat_sinks/statsd:80.8" # Death tests don't report LCOV
-"source/extensions/tracers:95.8"
+"source/extensions/tracers:95.9"
 "source/extensions/tracers/common:73.8"
 "source/extensions/tracers/common/ot:71.8"
 "source/extensions/tracers/opencensus:93.2"
@@ -60,10 +59,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
-"source/extensions/listener_managers/validation_listener_manager:70.0"
+"source/extensions/listener_managers/validation_listener_manager:70.5"
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:90.7" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/config_validation:88.4"
+"source/server/config_validation:88.9"
 "source/extensions/health_checkers:96.0"
 "source/extensions/health_checkers/http:93.9"
 "source/extensions/health_checkers/grpc:92.0"

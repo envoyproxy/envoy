@@ -366,8 +366,9 @@ void testUtil(const TestUtilOptions& options) {
       Network::Test::getCanonicalLoopbackAddress(options.version()));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher->createListener(socket, callbacks, runtime, listener_config);
+      dispatcher->createListener(socket, callbacks, runtime, listener_config, overload_state);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
@@ -723,8 +724,9 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       Network::Test::getCanonicalLoopbackAddress(options.version()));
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher->createListener(socket, callbacks, runtime, listener_config);
+      dispatcher->createListener(socket, callbacks, runtime, listener_config, overload_state);
 
   Stats::TestUtil::TestStore client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
@@ -3056,8 +3058,9 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      dispatcher_->createListener(socket, callbacks, runtime_, listener_config, overload_state);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -3114,8 +3117,9 @@ TEST_P(SslSocketTest, HalfClose) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, runtime_, listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, runtime_,
+                                                              listener_config, overload_state);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -3198,8 +3202,9 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, runtime_, listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, runtime_,
+                                                              listener_config, overload_state);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -3288,8 +3293,9 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, runtime_, listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, runtime_,
+                                                              listener_config, overload_state);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -3394,8 +3400,9 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      dispatcher_->createListener(socket, callbacks, runtime_, listener_config, overload_state);
 
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -3496,10 +3503,11 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener1 =
-      dispatcher->createListener(socket1, callbacks, runtime, listener_config);
+      dispatcher->createListener(socket1, callbacks, runtime, listener_config, overload_state);
   Network::ListenerPtr listener2 =
-      dispatcher->createListener(socket2, callbacks, runtime, listener_config);
+      dispatcher->createListener(socket2, callbacks, runtime, listener_config, overload_state);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
@@ -3641,9 +3649,10 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
       Network::Test::getCanonicalLoopbackAddress(ip_version));
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   Network::ListenerPtr listener =
-      dispatcher->createListener(tcp_socket, callbacks, runtime, listener_config);
+      dispatcher->createListener(tcp_socket, callbacks, runtime, listener_config, overload_state);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
@@ -4290,10 +4299,11 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      dispatcher_->createListener(socket, callbacks, runtime_, listener_config, overload_state);
   Network::ListenerPtr listener2 =
-      dispatcher_->createListener(socket2, callbacks, runtime_, listener_config);
+      dispatcher_->createListener(socket2, callbacks, runtime_, listener_config, overload_state);
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -4414,8 +4424,9 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   NiceMock<Network::MockListenerConfig> listener_config;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher->createListener(socket, callbacks, runtime_, listener_config);
+      dispatcher->createListener(socket, callbacks, runtime_, listener_config, overload_state);
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
@@ -4677,8 +4688,9 @@ TEST_P(SslSocketTest, SslError) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      dispatcher_->createListener(socket, callbacks, runtime_, listener_config, overload_state);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -5208,8 +5220,9 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      dispatcher_->createListener(socket, callbacks, runtime_, listener_config, overload_state);
 
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -5911,8 +5924,9 @@ protected:
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
     NiceMock<Network::MockListenerConfig> listener_config;
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config);
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config,
+                                            overload_state);
 
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
     auto client_cfg =
