@@ -113,6 +113,23 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v
   }
   const auto& body = route.direct_response().body();
 
+  const std::string& filename = body.filename();
+  if (!filename.empty()) {
+    if (!api.fileSystem().fileExists(filename)) {
+      throw EnvoyException(fmt::format("response body file {} does not exist", filename));
+    }
+    const ssize_t size = api.fileSystem().fileSize(filename);
+    if (size < 0) {
+      throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
+    }
+    if (static_cast<uint64_t>(size) > max_body_size_bytes) {
+      throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
+                                       filename, size, max_body_size_bytes));
+    }
+    auto file_or_error = api.fileSystem().fileReadToEnd(filename);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    return file_or_error.value();
+  }
   const std::string string_body = Envoy::Config::DataSource::read(body, true, api);
   if (string_body.length() > max_body_size_bytes) {
     throw EnvoyException(fmt::format("response body size is {} bytes; maximum is {}",
