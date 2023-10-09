@@ -1163,7 +1163,7 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedInitializationPicksAllHosts) {
                                GetParam().use_new_locality_routing ? "true" : "false"}});
   // Add 3 hosts with weights {6, 3, 1}. Out of 10 refreshes with consecutive
   // random value, 6 times the first host will be chosen, 3 times the second
-  // host will be chosten, and 1 time the third host will be chosen.
+  // host will be chosen, and 1 time the third host will be chosen.
   hostSet().healthy_hosts_ = {
       makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 6),
       makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 3),
