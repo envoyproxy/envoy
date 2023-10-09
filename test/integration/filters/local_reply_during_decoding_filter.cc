@@ -20,6 +20,16 @@ public:
                                        "");
     return Http::FilterHeadersStatus::StopIteration;
   }
+
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    ASSERT(false);
+    return Http::FilterDataStatus::Continue;
+  }
+
+  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap&) override {
+    ASSERT(false);
+    return Http::FilterMetadataStatus::Continue;
+  }
 };
 
 constexpr char LocalReplyDuringDecode::name[];

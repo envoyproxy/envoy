@@ -407,6 +407,12 @@ void ActiveStreamDecoderFilter::drainSavedRequestMetadata() {
 }
 
 void ActiveStreamDecoderFilter::handleMetadataAfterHeadersCallback() {
+  if (parent_.state_.decoder_filter_chain_aborted_) {
+    // The decoder filter chain has been aborted, possibly due to a local reply. In this case,
+    // there's no reason to decode saved metadata.
+    getSavedRequestMetadata()->clear();
+    return;
+  }
   // If we drain accumulated metadata, the iteration must start with the current filter.
   const bool saved_state = iterate_from_current_filter_;
   iterate_from_current_filter_ = true;
