@@ -263,7 +263,7 @@ stages:
       condition: failed()
 
 - stage: linux_x64
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"]  # , "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -325,7 +325,7 @@ stages:
         echo "linux_arm64 released"
 
 - stage: check
-  dependsOn: ["env", "linux_x64"]
+  dependsOn: ["env"]  # , "linux_x64"]
   jobs:
   - job: bazel
     displayName: "linux_x64"
