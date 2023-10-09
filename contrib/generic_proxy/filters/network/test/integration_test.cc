@@ -101,7 +101,10 @@ public:
         response.response_ = std::move(helper.typed_frame_);
       }
 
-      parent_.integration_->dispatcher_->exit();
+      // Exit dispatcher if we have received all the expected response frames.
+      if (responses_[waiting_for_stream_id_].end_stream_) {
+        parent_.integration_->dispatcher_->exit();
+      }
     }
     void onDecodingFailure() override {}
     void writeToConnection(Buffer::Instance&) override {}
@@ -112,6 +115,7 @@ public:
       return {};
     }
 
+    uint64_t waiting_for_stream_id_{};
     std::map<uint64_t, SingleResponse> responses_;
     IntegrationTest& parent_;
   };
@@ -244,9 +248,13 @@ public:
             integration_->dispatcher_->exit();
           }));
       timer->enableTimer(timeout);
+      response_decoder_callback_->waiting_for_stream_id_ = stream_id;
       integration_->dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
       if (timer_fired) {
         return AssertionFailure() << "Timed out waiting for response";
+      }
+      if (timer->enabled()) {
+        timer->disableTimer();
       }
     }
     if (!response_decoder_callback_->responses_[stream_id].end_stream_) {
@@ -595,7 +603,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   sendResponseForTest(response_2);
   sendResponseForTest(response_2_frame_1);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout * 3, 2),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
@@ -617,7 +625,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   sendResponseForTest(response_1);
   sendResponseForTest(response_1_frame_1);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout * 3, 1),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
