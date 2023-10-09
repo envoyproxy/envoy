@@ -7,7 +7,6 @@ import java.util.regex.Pattern
  *
  * Element values must conform to the [Element.ELEMENT_REGEX].
  */
-
 class Element(internal val value: String) {
   init {
     require(ELEMENT_PATTERN.matcher(value).matches()) {

@@ -1,31 +1,22 @@
 package test.kotlin.integration.proxying
 
-import android.content.Intent
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Proxy
 import android.net.ProxyInfo
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
-
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
-import io.envoyproxy.envoymobile.Custom
-import io.envoyproxy.envoymobile.Engine
-import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.ResponseHeaders
-import io.envoyproxy.envoymobile.StreamIntel
-
+import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
 import org.mockito.Mockito
 import org.robolectric.RobolectricTestRunner
 
@@ -54,40 +45,45 @@ class PerformHTTPRequestUsingProxy {
 
     val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
     val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
-    Mockito.doReturn(connectivityManager).`when`(context).getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.getDefaultProxy()).thenReturn(ProxyInfo.buildPacProxy(Uri.parse("https://example.com")))
+    Mockito.doReturn(connectivityManager)
+      .`when`(context)
+      .getSystemService(Context.CONNECTIVITY_SERVICE)
+    Mockito.`when`(connectivityManager.getDefaultProxy())
+      .thenReturn(ProxyInfo.buildPacProxy(Uri.parse("https://example.com")))
 
     val onProxyEngineRunningLatch = CountDownLatch(1)
     val onEngineRunningLatch = CountDownLatch(1)
     val onRespondeHeadersLatch = CountDownLatch(1)
 
-    val proxyEngineBuilder = Proxy(context, port)
-      .http()
-    val proxyEngine = proxyEngineBuilder
-      .addLogLevel(LogLevel.DEBUG)
-      .setOnEngineRunning { onProxyEngineRunningLatch.countDown() }
-      .build()
+    val proxyEngineBuilder = Proxy(context, port).http()
+    val proxyEngine =
+      proxyEngineBuilder
+        .addLogLevel(LogLevel.DEBUG)
+        .setOnEngineRunning { onProxyEngineRunningLatch.countDown() }
+        .build()
 
     onProxyEngineRunningLatch.await(10, TimeUnit.SECONDS)
     assertThat(onProxyEngineRunningLatch.count).isEqualTo(0)
 
     val builder = AndroidEngineBuilder(context)
-    val engine = builder
-      .addLogLevel(LogLevel.DEBUG)
-      .enableProxying(true)
-      .setOnEngineRunning { onEngineRunningLatch.countDown() }
-      .build()
+    val engine =
+      builder
+        .addLogLevel(LogLevel.DEBUG)
+        .enableProxying(true)
+        .setOnEngineRunning { onEngineRunningLatch.countDown() }
+        .build()
 
     onEngineRunningLatch.await(10, TimeUnit.SECONDS)
     assertThat(onEngineRunningLatch.count).isEqualTo(0)
 
-    val requestHeaders = RequestHeadersBuilder(
-      method = RequestMethod.GET,
-      scheme = "http",
-      authority = "api.lyft.com",
-      path = "/ping"
-    )
-      .build()
+    val requestHeaders =
+      RequestHeadersBuilder(
+          method = RequestMethod.GET,
+          scheme = "http",
+          authority = "api.lyft.com",
+          path = "/ping"
+        )
+        .build()
 
     engine
       .streamClient()
@@ -95,7 +91,7 @@ class PerformHTTPRequestUsingProxy {
       .setOnResponseHeaders { responseHeaders, _, _ ->
         val status = responseHeaders.httpStatus ?: 0L
         assertThat(status).isEqualTo(301)
-        assertThat(responseHeaders.value("x-proxy-response")).isNull();
+        assertThat(responseHeaders.value("x-proxy-response")).isNull()
         onRespondeHeadersLatch.countDown()
       }
       .start(Executors.newSingleThreadExecutor())

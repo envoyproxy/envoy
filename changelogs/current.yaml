@@ -241,6 +241,10 @@ new_features:
   change: |
     added support for QUIC listener filters with ECDS support reusing the same config API
     :ref:`listener_filters <envoy_v3_api_field_config.listener.v3.Listener.listener_filters>` as TCP does.
+- area: oauth2
+  change: |
+    added :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
+    to support updating an access token via a refresh token if that is provided by authorization server.
 - area: redis
   change: |
     added support for time command (returns a local response).
