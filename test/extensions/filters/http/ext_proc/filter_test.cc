@@ -3294,8 +3294,11 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
 }
 
 TEST_F(HttpFilterTest, AppendActionTest) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.header_value_option_change_action", "ture"}});
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.send_header_raw_value", "false"},
+      {"envoy.reloadable_features.header_value_option_change_action", "true"},
+  });
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:

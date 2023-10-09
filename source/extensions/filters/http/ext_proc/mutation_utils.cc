@@ -196,11 +196,13 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                   HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
         // Check if the header already exists with the same name and value.
         is_duplicate = false;
+        ENVOY_LOG(error, "1value of is_duplciate {}", is_duplicate);
         if (!headers.get(header_name).empty()) {
           Http::HeaderMap::GetResult result = headers.get(header_name);
           for (size_t i = 0; i < result.size(); ++i) {
             const Http::HeaderEntry* entry = result[i];
             const absl::string_view& existing_value = entry->value().getStringView();
+            ENVOY_LOG(error, "existing header {}; value: {}", header_name, existing_value);
 
             // Compare the existing value with your desired header_value
             if (existing_value == header_value) {
@@ -209,6 +211,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
             }
           }
         }
+        ENVOY_LOG(error, "2value of is_duplciate {}", is_duplicate);
         if (!is_duplicate) {
           append_mode_for_append_action = true;
           check_op_for_append_action =
@@ -299,7 +302,7 @@ Filters::Common::MutationRules::CheckResult MutationUtils::handleCheckResult(
     // CONTINUE_AND_REPLACE option is selected, to stay compatible.
     check_result = CheckResult::OK;
   }
-
+  ENVOY_LOG(error, "before switch check_result {}", check_result);
   switch (check_result) {
   case CheckResult::OK:
     ENVOY_LOG(error, "Setting header {} append = {}", header_name, append_mode);
