@@ -195,8 +195,8 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         ENVOY_LOG(error, "Inside append action APPEND_IF_EXISTS_OR_ADD {} ",
                   HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
         // Check if the header already exists with the same name and value.
+        is_duplicate = false;
         if (!headers.get(header_name).empty()) {
-          is_duplicate = false;
           Http::HeaderMap::GetResult result = headers.get(header_name);
           for (size_t i = 0; i < result.size(); ++i) {
             const Http::HeaderEntry* entry = result[i];

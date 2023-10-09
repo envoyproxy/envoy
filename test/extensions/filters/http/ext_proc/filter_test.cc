@@ -3293,6 +3293,90 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpFilterTest, AppendActionTest) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.header_value_option_change_action", "ture"}});
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  // Initialize request headers.
+  request_headers_.addCopy(LowerCaseString("x-original-header"), "original_value");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Apply the "append_action" to add a value to an existing header.
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
+        auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+        auto s = headers_mut->add_set_headers();
+        s->mutable_header()->set_key("x-original-header");
+        s->mutable_header()->set_value(" appended_value");
+        s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                                 HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+      });
+
+  // Check that the header was appended correctly.
+  TestRequestHeaderMapImpl expected{{":path", "/"},
+                                    {":method", "POST"},
+                                    {":scheme", "http"},
+                                    {"host", "host"},
+                                    {"x-original-header", "original_value"},
+                                    {"x-original-header", "appended_value"}};
+  EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
+
+  // Continue processing data and trailers.
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  // Initialize response headers.
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  // Apply the "append_action" to response headers.
+  processResponseHeaders(false, [](const HttpHeaders& response_headers, ProcessingResponse&,
+                                   HeadersResponse& header_resp) {
+    EXPECT_FALSE(response_headers.end_of_stream());
+    TestRequestHeaderMapImpl expected_response{
+        {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
+    EXPECT_THAT(response_headers.headers(), HeaderProtosEqual(expected_response));
+
+    auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+    auto* s = resp_headers_mut->add_set_headers();
+    s->mutable_header()->set_key("x-original-response-header");
+    s->mutable_header()->set_value("appended_response_value");
+    s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                             HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+  });
+
+  // Check that the response header was appended correctly.
+  TestRequestHeaderMapImpl final_expected_response{
+      {":status", "200"},
+      {"content-type", "text/plain"},
+      {"content-length", "3"},
+      {"x-original-response-header", "appended_response_value"}};
+  EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
+
+  // Continue processing data, encode trailers, and destroy the filter.
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
