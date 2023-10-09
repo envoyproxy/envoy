@@ -1829,6 +1829,26 @@ public:
   }
 };
 
+TEST_P(Http2FrameIntegrationTest, MaxConcurrentStreamsIsRespected) {
+  const int kTotalRequests = 101;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_http2_protocol_options()->mutable_max_concurrent_streams()->set_value(100);
+      });
+  beginSession();
+
+  std::string buffer;
+  for (int i = 0; i < kTotalRequests; ++i) {
+    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "a", "/");
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+  tcp_client_->waitForDisconnect();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy_local", 1);
+}
+
 // Regression test.
 TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   autonomous_upstream_ = true;

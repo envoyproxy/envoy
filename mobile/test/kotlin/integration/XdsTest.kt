@@ -10,8 +10,6 @@ import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -33,18 +31,18 @@ class XdsTest {
     TestJni.startHttp2TestServer()
     TestJni.initXdsTestServer()
     val latch = CountDownLatch(1)
-    engine = AndroidEngineBuilder(appContext)
-      .addLogLevel(LogLevel.DEBUG)
-      .setOnEngineRunning {
-        latch.countDown()
-      }
-      .setXds(
-        XdsBuilder(
-          TestJni.getXdsTestServerHost(),
-          TestJni.getXdsTestServerPort(),
-        ).addClusterDiscoveryService()
-      )
-      .build()
+    engine =
+      AndroidEngineBuilder(appContext)
+        .addLogLevel(LogLevel.DEBUG)
+        .setOnEngineRunning { latch.countDown() }
+        .setXds(
+          XdsBuilder(
+              TestJni.getXdsTestServerHost(),
+              TestJni.getXdsTestServerPort(),
+            )
+            .addClusterDiscoveryService()
+        )
+        .build()
     latch.await()
     TestJni.startXdsTestServer()
   }
@@ -59,8 +57,9 @@ class XdsTest {
   @Test
   fun `test xDS with CDS`() {
     // There are 2 initial clusters: base and base_clear.
-    engine.waitForStatGe("cluster_manager.cluster_added",  2)
-    val cdsResponse = """
+    engine.waitForStatGe("cluster_manager.cluster_added", 2)
+    val cdsResponse =
+      """
       version_info: v1
       resources:
       - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
@@ -84,7 +83,8 @@ class XdsTest {
                 {}
       type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
       nonce: nonce1
-    """.trimIndent()
+    """
+        .trimIndent()
     TestJni.sendDiscoveryResponse(cdsResponse)
     // There are now 3 clusters: base, base_cluster, and xds_cluster.
     engine.waitForStatGe("cluster_manager.cluster_added", 3)

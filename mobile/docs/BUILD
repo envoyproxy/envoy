@@ -1,6 +1,6 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
-load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_py_namespace")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
@@ -8,8 +8,14 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_py_namespace()
+
 envoy_entry_point(
     name = "sphinx",
+    init_data = [
+        "//:py-init",
+        ":py-init",
+    ],
     pkg = "sphinx",
     script = "sphinx-build",
     deps = [
@@ -58,10 +64,42 @@ pkg_tar(
 )
 
 genrule(
-    name = "docs",
-    outs = ["docs.tar.gz"],
+    name = "html_release",
+    outs = ["html_release.tar.gz"],
+    cmd = """
+    . $(location @envoy//bazel:volatile_env) \
+    && VERSION_NUMBER="$$(cat $(location //:VERSION))" \
+    && export ENVOY_BLOB_SHA=$${BUILD_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
+    && export ENVOY_DOCS_VERSION_STRING="$${VERSION_NUMBER}"-"$${ENVOY_BLOB_SHA:0:6}" \
+    && export ENVOY_DOCS_RELEASE_LEVEL=pre-release \
+    && mkdir -p build \
+    && tar xf $(location :rst) -C build \
+    && $(location :sphinx) \
+         -W \
+         --keep-going \
+         -b html \
+         build \
+         output \
+    && tar czf $@ -C output .
+    """,
+    stamp = 1,
+    tools = [
+        ":rst",
+        ":sphinx",
+        "//:VERSION",
+        "@envoy//bazel:volatile_env",
+    ],
+)
+
+genrule(
+    name = "html",
+    outs = ["html.tar.gz"],
     cmd = """
     mkdir -p build \
+    && VERSION_NUMBER="$$(cat $(location //:VERSION))" \
+    && export ENVOY_BLOB_SHA="$${BUILD_SHA:-UNKNOWN}" \
+    && export ENVOY_DOCS_VERSION_STRING="$${VERSION_NUMBER}"-"$${ENVOY_BLOB_SHA:0:6}" \
+    && export ENVOY_DOCS_RELEASE_LEVEL=pre-release \
     && tar xf $(location :rst) -C build \
     && $(location :sphinx) \
          -W \
@@ -74,5 +112,11 @@ genrule(
     tools = [
         ":rst",
         ":sphinx",
+        "//:VERSION",
     ],
+)
+
+alias(
+    name = "docs",
+    actual = ":html_release",
 )

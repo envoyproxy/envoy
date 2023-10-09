@@ -4908,6 +4908,30 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
       "upstream data"));
 }
 
+TEST_F(RouterTest, PropagatesShadowState) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  ON_CALL(callbacks_.stream_info_, isShadow()).WillByDefault(Return(true));
+
+  // This pattern helps ensure that we're actually invoking the callback.
+  bool shadow_state_verified = false;
+  router_->config().upstream_logs_.push_back(std::make_shared<TestAccessLog>(
+      [&](const auto& stream_info) { shadow_state_verified = stream_info.isShadow(); }));
+  expectResponseTimerCreate();
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  ASSERT_THAT(response_decoder, testing::NotNull());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_TRUE(shadow_state_verified);
+}
+
 TEST_F(RouterTest, UpstreamSSLConnection) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;

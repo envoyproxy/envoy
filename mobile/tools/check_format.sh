@@ -30,7 +30,7 @@ FORMAT_ARGS=(
     ./Envoy.xcodeproj/ ./dist/
     ./bazel/envoy_mobile_swift_bazel_support.bzl
     ./bazel/envoy_mobile_repositories.bzl
-    ./examples/swift/swiftpm/Packages/Envoy.xcframework
+    ./examples/swift/swiftpm/Packages/Envoy.xcframework ./tmp
     --skip_envoy_build_rule_check)
 if [[ -n "$TARGET_PATH" ]]; then
     FORMAT_ARGS+=("$TARGET_PATH")
@@ -47,3 +47,20 @@ FORMAT_ARGS+=(
     ./test/swift ./experimental/swift)
 
 export ENVOY_BAZEL_PREFIX="@envoy" && ./bazelw run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
+
+KTFMT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"/ktfmt.sh
+KOTLIN_DIRS=(
+  "library/kotlin"
+  "test/kotlin"
+  "examples/kotlin"
+)
+if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
+  "${KTFMT}" "${KOTLIN_DIRS[@]}"
+else
+  NEEDS_FORMAT=$("${KTFMT}" --dry-run "${KOTLIN_DIRS[@]}")
+  if [[ -n "${NEEDS_FORMAT}" ]]; then
+    echo "ERROR: Run 'tools/check_format.sh fix' to fix"
+    echo "${NEEDS_FORMAT}"
+    exit 1
+  fi
+fi

@@ -7,10 +7,15 @@ load(
     "xcode_schemes",
     "xcodeproj",
 )
+load("@envoy//tools/base:envoy_python.bzl", "envoy_py_namespace")
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
+
+envoy_py_namespace()
+
+exports_files(["VERSION"])
 
 alias(
     name = "ios_xcframework",

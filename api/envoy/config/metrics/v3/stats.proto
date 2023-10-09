@@ -121,8 +121,8 @@ message StatsMatcher {
   // limited by either an exclusion or an inclusion list of :ref:`StringMatcher
   // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` protos:
   //
-  // * If ``reject_all`` is set to `true`, no stats will be instantiated. If ``reject_all`` is set to
-  //   `false`, all stats will be instantiated.
+  // * If ``reject_all`` is set to ``true``, no stats will be instantiated. If ``reject_all`` is set to
+  //   ``false``, all stats will be instantiated.
   //
   // * If an exclusion list is supplied, any stat name matching *any* of the StringMatchers in the
   //   list will not instantiate.
