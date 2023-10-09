@@ -316,7 +316,7 @@ TEST_P(IntegrationTest, RequestRouteNotFound) {
 
   sendRequestForTest(request);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200), 0),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
@@ -355,7 +355,7 @@ TEST_P(IntegrationTest, RequestAndResponse) {
 
   sendResponseForTest(response);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200), 0),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
@@ -462,7 +462,7 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
   sendResponseForTest(response_2);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200), 2),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
@@ -478,7 +478,7 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
   sendResponseForTest(response_1);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200), 1),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
@@ -595,7 +595,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   sendResponseForTest(response_2);
   sendResponseForTest(response_2_frame_1);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200), 2),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
@@ -617,7 +617,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   sendResponseForTest(response_1);
   sendResponseForTest(response_1_frame_1);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200), 1),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
