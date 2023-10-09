@@ -243,6 +243,12 @@ jobs:
           authGPGKey: ${{ parameters.authGPGKey }}
           pathGPGConfiguredHome: /build/.gnupg
           pathGPGHome: $(Build.StagingDirectory)/.gnupg
+      - bash: |
+          set -e -o pipefail
+          mkdir -p distribution/custom
+          cp -a $(Build.StagingDirectory)/*/*64 distribution/custom/
+        workingDirectory: $(Build.SourcesDirectory)
+
 - job: success
   dependsOn: ["docker", "signed_release"]
   displayName: Success (linux artefacts)
