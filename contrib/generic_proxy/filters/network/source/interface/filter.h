@@ -160,7 +160,7 @@ public:
    * the filter chain doesn't support to handle extra frames. We should remove this when the
    * filter chain supports to handle extra frames.
    */
-  virtual void setRequestFramesHandler(StreamFrameHandler* handler) PURE;
+  virtual void setRequestFramesHandler(StreamFrameHandler& handler) PURE;
 
   virtual void completeDirectly() PURE;
 

@@ -105,6 +105,7 @@ public:
   bool wait_response_{};
 
   bool request_stream_header_sent_{};
+  bool response_stream_header_received_{};
 
   absl::optional<Upstream::TcpPoolData> tcp_pool_data_;
   std::unique_ptr<UpstreamManagerImpl> upstream_manager_;
@@ -136,7 +137,7 @@ public:
   void setDecoderFilterCallbacks(DecoderFilterCallback& callbacks) override {
     callbacks_ = &callbacks;
     // Set handler for following request frames.
-    callbacks_->setRequestFramesHandler(this);
+    callbacks_->setRequestFramesHandler(*this);
     protocol_options_ = callbacks_->downstreamCodec().protocolOptions();
   }
   FilterStatus onStreamDecoded(StreamRequest& request) override;

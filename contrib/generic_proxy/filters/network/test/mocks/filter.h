@@ -12,6 +12,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
+class MockStreamFrameHandler : public StreamFrameHandler {
+public:
+  MockStreamFrameHandler();
+
+  MOCK_METHOD(void, onStreamFrame, (StreamFramePtr frame));
+};
+
 class MockDecoderFilter : public DecoderFilter {
 public:
   MockDecoderFilter();
@@ -197,7 +204,7 @@ public:
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(void, onResponseStart, (StreamResponsePtr response));
   MOCK_METHOD(void, onResponseFrame, (StreamFramePtr frame));
-  MOCK_METHOD(void, setRequestFramesHandler, (StreamFrameHandler * handler));
+  MOCK_METHOD(void, setRequestFramesHandler, (StreamFrameHandler & handler));
   MOCK_METHOD(void, completeDirectly, ());
   MOCK_METHOD(void, bindUpstreamConn, (Upstream::TcpPoolData &&));
   MOCK_METHOD(OptRef<UpstreamManager>, boundUpstreamConn, ());

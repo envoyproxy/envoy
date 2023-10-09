@@ -24,10 +24,10 @@ namespace GenericProxy {
  */
 class StreamFlags {
 public:
-  StreamFlags(uint64_t stream_id, bool one_way_stream, bool drain_close, bool is_heartbeat)
+  StreamFlags(uint64_t stream_id = 0, bool one_way_stream = false, bool drain_close = false,
+              bool is_heartbeat = false)
       : stream_id_(stream_id), one_way_stream_(one_way_stream), drain_close_(drain_close),
         is_heartbeat_(is_heartbeat) {}
-  StreamFlags() = default;
 
   /**
    * @return the stream id of the request or response. This is used to match the
@@ -81,9 +81,8 @@ public:
    * @param stream_flags StreamFlags of the stream.
    * @param end_stream whether the current frame is the last frame of the request or response.
    */
-  FrameFlags(StreamFlags stream_flags, bool end_stream)
+  FrameFlags(StreamFlags stream_flags = StreamFlags(), bool end_stream = true)
       : stream_flags_(stream_flags), end_stream_(end_stream) {}
-  FrameFlags() = default;
 
   /**
    * Get flags of stream that the frame belongs to. The flags MUST be same for all frames of the

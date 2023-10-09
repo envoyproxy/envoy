@@ -112,8 +112,8 @@ public:
         end_stream = it->second == "true";
       }
 
-      request->stream_frame_flags_ = {{stream_id.value_or(0), one_way_stream, false, false},
-                                      end_stream};
+      request->stream_frame_flags_ =
+          FrameFlags(StreamFlags(stream_id.value_or(0), one_way_stream, false, false), end_stream);
 
       callback_->onDecodingSuccess(std::move(request));
       return true;
@@ -190,8 +190,8 @@ public:
         end_stream = it->second == "true";
       }
 
-      response->stream_frame_flags_ = {{stream_id.value_or(0), false, close_connection, false},
-                                       end_stream};
+      response->stream_frame_flags_ = FrameFlags(
+          StreamFlags(stream_id.value_or(0), false, close_connection, false), end_stream);
 
       callback_->onDecodingSuccess(std::move(response));
       return true;

@@ -245,12 +245,18 @@ void UpstreamRequest::onDecodingSuccess(StreamFramePtr response) {
     clearStream(response->frameFlags().streamFlags().drainClose());
   }
 
-  StreamFramePtrHelper<StreamResponse> helper(std::move(response));
-
-  if (helper.frame_ != nullptr) {
-    parent_.onResponseFrame(std::move(helper.frame_));
+  if (response_stream_header_received_) {
+    parent_.onResponseFrame(std::move(response));
     return;
   }
+
+  StreamFramePtrHelper<StreamResponse> helper(std::move(response));
+  if (helper.typed_frame_ == nullptr) {
+    ENVOY_LOG(error, "upstream request: first frame is not StreamResponse");
+    resetStream(StreamResetReason::ProtocolError);
+    return;
+  }
+  response_stream_header_received_ = true;
   parent_.onResponseStart(std::move(helper.typed_frame_));
 }
 

@@ -167,11 +167,10 @@ public:
     void onResponseFrame(StreamFramePtr frame) override {
       parent_.onResponseFrame(std::move(frame));
     }
-    void setRequestFramesHandler(StreamFrameHandler* handler) override {
-      ASSERT(handler != nullptr, "request frames handler cannot be nullptr");
+    void setRequestFramesHandler(StreamFrameHandler& handler) override {
       ASSERT(parent_.request_stream_frame_handler_ == nullptr,
              "request frames handler is already set");
-      parent_.request_stream_frame_handler_ = handler;
+      parent_.request_stream_frame_handler_ = &handler;
     }
     void completeDirectly() override { parent_.completeDirectly(); }
     void bindUpstreamConn(Upstream::TcpPoolData&& pool_data) override;
@@ -439,6 +438,7 @@ public:
   }
 
   std::list<ActiveStreamPtr>& activeStreamsForTest() { return active_streams_; }
+  const auto& frameHandlersForTest() { return frame_handlers_; }
 
   // This may be called multiple times in some scenarios. But it is safe.
   void resetStreamsForUnexpectedError();

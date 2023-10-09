@@ -211,8 +211,8 @@ void ActiveStream::onResponseStart(ResponsePtr response) {
 }
 
 void ActiveStream::onResponseFrame(StreamFramePtr frame) {
-  response_stream_frames_.emplace_back(std::move(frame));
   response_stream_end_ = frame->frameFlags().endStream();
+  response_stream_frames_.emplace_back(std::move(frame));
   // Try to send the frame to downstream immediately.
   sendResponseFrameToDownstream();
 }
@@ -262,6 +262,8 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) 
   if (!end_stream) {
     return;
   }
+
+  ENVOY_LOG(debug, "Generic proxy: downstream response complete");
 
   ASSERT(response_stream_end_);
   ASSERT(response_stream_frames_.empty());
@@ -482,6 +484,13 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool)
 }
 
 void Filter::onDecodingSuccess(StreamFramePtr request) {
+  const uint64_t stream_id = request->frameFlags().streamFlags().streamId();
+  // One existing stream expects this frame.
+  if (auto iter = frame_handlers_.find(stream_id); iter != frame_handlers_.end()) {
+    iter->second->onRequestFrame(std::move(request));
+    return;
+  }
+
   StreamFramePtrHelper<StreamRequest> helper(std::move(request));
 
   // Create a new active stream for the leading StreamRequest frame.
@@ -491,18 +500,11 @@ void Filter::onDecodingSuccess(StreamFramePtr request) {
   }
 
   ASSERT(helper.frame_ != nullptr);
-
-  // Variable length frame should be handled by one of the active streams.
-  auto iter = frame_handlers_.find(helper.frame_->frameFlags().streamFlags().streamId());
-  if (iter == frame_handlers_.end()) {
-    // The stream id is not found. It should not happen. We treat it as request
-    // decoding failure.
-    ENVOY_LOG(error, "generic proxy: id {} not found for stream frame",
-              helper.frame_->frameFlags().streamFlags().streamId());
-    onDecodingFailure();
-    return;
-  }
-  iter->second->onRequestFrame(std::move(helper.frame_));
+  // No existing stream expects this non-leading frame. It should not happen.
+  // We treat it as request decoding failure.
+  ENVOY_LOG(error, "generic proxy: id {} not found for stream frame",
+            helper.frame_->frameFlags().streamFlags().streamId());
+  onDecodingFailure();
 }
 
 void Filter::onDecodingFailure() {
