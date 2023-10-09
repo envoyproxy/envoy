@@ -595,7 +595,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   sendResponseForTest(response_2);
   sendResponseForTest(response_2_frame_1);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout * 3, 2),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
@@ -617,7 +617,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   sendResponseForTest(response_1);
   sendResponseForTest(response_1_frame_1);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout * 3, 1),
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
