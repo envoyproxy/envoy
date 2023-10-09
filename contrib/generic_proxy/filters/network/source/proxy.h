@@ -273,6 +273,8 @@ public:
 
   void completeRequest();
 
+  
+  bool response_complete_{true};
 private:
   // Keep these methods private to ensure that these methods are only called by the reference
   // returned by the public tracingConfig() method.
@@ -307,6 +309,8 @@ private:
 
   OptRef<const Tracing::ConnectionManagerTracingConfig> connection_manager_tracing_config_;
   Tracing::SpanPtr active_span_;
+  
+  
 };
 using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
@@ -323,6 +327,7 @@ public:
   void onEventImpl(Network::ConnectionEvent event) override;
 
   // ResponseDecoderCallback
+  void onDecodingSuccess(ResponsePtr response, ExtendedOptions options, bool end_stream) override;
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;
@@ -366,6 +371,8 @@ public:
   }
 
   // RequestDecoderCallback
+
+  void onDecodingSuccess(RequestPtr request, ExtendedOptions options, bool end_stream) override;
   void onDecodingSuccess(RequestPtr request, ExtendedOptions options) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;

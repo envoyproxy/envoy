@@ -81,6 +81,7 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
   // PendingResponseCallback
+  void onDecodingSuccess(ResponsePtr response, ExtendedOptions options, bool end_stream) override;  
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;

@@ -212,6 +212,15 @@ void UpstreamRequest::onBindSuccess(Network::ClientConnection& conn,
   parent_.request_encoder_->encode(*parent_.request_, *this);
 }
 
+void UpstreamRequest::onDecodingSuccess(ResponsePtr response, ExtendedOptions options,
+                                        bool end_stream) {
+  if (end_stream) {
+    clearStream(options.drainClose());
+  }
+
+  parent_.onUpstreamResponse(std::move(response), options);
+}
+
 void UpstreamRequest::onDecodingSuccess(ResponsePtr response, ExtendedOptions options) {
   clearStream(options.drainClose());
   parent_.onUpstreamResponse(std::move(response), options);

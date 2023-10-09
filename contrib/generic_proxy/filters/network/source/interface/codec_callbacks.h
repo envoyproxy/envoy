@@ -76,6 +76,8 @@ class RequestDecoderCallback {
 public:
   virtual ~RequestDecoderCallback() = default;
 
+  virtual void onDecodingSuccess(RequestPtr request, ExtendedOptions options, bool end_stream) PURE;
+
   /**
    * If request decoding success then this method will be called.
    * @param request request from decoding.
@@ -112,6 +114,7 @@ class ResponseDecoderCallback {
 public:
   virtual ~ResponseDecoderCallback() = default;
 
+  virtual void onDecodingSuccess(ResponsePtr response, ExtendedOptions options, bool end_stream) PURE;
   /**
    * If response decoding success then this method will be called.
    * @param response response from decoding.

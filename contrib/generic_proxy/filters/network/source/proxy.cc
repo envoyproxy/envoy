@@ -177,7 +177,9 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer) {
   ASSERT(parent_.downstreamConnection().state() == Network::Connection::State::Open);
   parent_.downstreamConnection().write(buffer, false);
   parent_.stats_.response_.inc();
-  parent_.deferredStream(*this);
+  if (response_complete_) {
+    parent_.deferredStream(*this);
+  }
 }
 
 void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
@@ -314,6 +316,12 @@ void UpstreamManagerImpl::onPoolFailureImpl(ConnectionPool::PoolFailureReason re
   parent_.onBoundUpstreamConnectionEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+void UpstreamManagerImpl::onDecodingSuccess(ResponsePtr response, ExtendedOptions options,
+                                            bool end_stream) {
+  ENVOY_LOG(debug, "response end stream[{}]", end_stream);
+  onDecodingSuccess(std::move(response), options);
+}
+
 void UpstreamManagerImpl::onDecodingSuccess(ResponsePtr response, ExtendedOptions options) {
   // registered_upstream_callbacks_ should be empty because after upstream connection is ready.
   ASSERT(registered_upstream_callbacks_.empty());
@@ -380,6 +388,11 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool)
 
   request_decoder_->decode(data);
   return Envoy::Network::FilterStatus::StopIteration;
+}
+
+void Filter::onDecodingSuccess(RequestPtr request, ExtendedOptions options, bool end_stream) {
+  ENVOY_LOG(debug, "response end stream[{}]", end_stream);
+  onDecodingSuccess(std::move(request), options);
 }
 
 void Filter::onDecodingSuccess(RequestPtr request, ExtendedOptions options) {
