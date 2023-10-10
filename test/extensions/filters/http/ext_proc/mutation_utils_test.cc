@@ -443,9 +443,18 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
   s->mutable_header()->set_value("xyz");
   s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
                            HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  // Attempts to set the status header out of range should
+  // also be ignored.
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":status");
+  s->mutable_header()->set_value("This is not even an integer");
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":status");
+  s->mutable_header()->set_value("100");
 
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(2);
 
   EXPECT_TRUE(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
@@ -485,9 +494,22 @@ TEST(MutationUtils, TestAppendActionAddIfAbsent) {
   s->mutable_header()->set_value("Value123");
   s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
                            HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+  // Attempts to set the status header out of range should
+  // also be ignored.
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":status");
+  s->mutable_header()->set_value("This is not even an integer");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":status");
+  s->mutable_header()->set_value("100");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
 
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(2);
 
   EXPECT_TRUE(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
@@ -525,9 +547,22 @@ TEST(MutationUtils, TestAppendActionOverwriteOrAdd) {
   s->mutable_header()->set_value("new value");
   s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
                            HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+  // Attempts to set the status header out of range should
+  // also be ignored.
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":status");
+  s->mutable_header()->set_value("This is not even an integer");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":status");
+  s->mutable_header()->set_value("100");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
 
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(2);
 
   EXPECT_TRUE(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
@@ -560,9 +595,20 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
   s->mutable_header()->set_value("new value");
   s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
                            HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":status");
+  s->mutable_header()->set_value("This is not even an integer");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":status");
+  s->mutable_header()->set_value("100");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
 
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(2);
 
   EXPECT_TRUE(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
