@@ -27,8 +27,8 @@ namespace DataSource {
  * @return std::string with DataSource contents.
  * @throw EnvoyException if no DataSource case is specified and !allow_empty.
  */
-std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
-                 Api::Api& api);
+std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty, Api::Api& api,
+                 uint64_t max_size = 0);
 
 /**
  * @param source data source.
