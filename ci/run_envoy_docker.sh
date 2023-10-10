@@ -11,11 +11,10 @@ function is_windows() {
 
 read -ra ENVOY_DOCKER_OPTIONS <<< "${ENVOY_DOCKER_OPTIONS:-}"
 
-# TODO(phlax): uppercase these env vars
-export HTTP_PROXY="${http_proxy:-}"
-export HTTPS_PROXY="${https_proxy:-}"
-export NO_PROXY="${no_proxy:-}"
-export GOPROXY="${go_proxy:-}"
+export HTTP_PROXY="${HTTP_PROXY:-${http_proxy:-}}"
+export HTTPS_PROXY="${HTTPS_PROXY:-${https_proxy:-}}"
+export NO_PROXY="${NO_PROXY:-${no_proxy:-}}"
+export GOPROXY="${GOPROXY:-${go_proxy:-}}"
 
 if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
