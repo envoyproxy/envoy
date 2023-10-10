@@ -13,5 +13,5 @@ enum class LogLevel(internal val level: String, val levelInt: Int) {
   WARN("warn", 3),
   ERROR("error", 4),
   CRITICAL("critical", 5),
-  OFF("off", -1);
+  OFF("off", -1)
 }

@@ -10,7 +10,7 @@ def envoy_pkg_deb(
         description = "Envoy built for Debian/Ubuntu",
         preinst = "//distribution/debian:preinst",
         postinst = "//distribution/debian:postinst",
-        supported_distributions = "bullseye focal jammy",
+        supported_distributions = "bookworm bullseye focal jammy",
         architecture = select({
             "//bazel:x86": "amd64",
             "//conditions:default": "arm64",
@@ -49,7 +49,7 @@ def envoy_pkg_deb(
         output_group = "deb",
     )
 
-def envoy_pkg_debs(name, version, release_version, maintainer, bin_files = ":envoy-bin-files", config = ":envoy-config"):
+def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contrib_bin_files, config = ":envoy-config"):
     """Package the Envoy .debs with their .changes files.
 
     Packages are created for the version *and* the release version, eg
@@ -57,7 +57,8 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files = ":env
     - envoy_1.21.0_amd64.deb
     - envoy-1.21_1.21.0_amd64.deb
 
-    This way packages are available for both "envoy" and "envoy-1.21" in package managers.
+    This way packages are available for both "envoy" and "envoy-1.21" in package managers, and users can install either
+    a specifically versioned package, or the latest for that minor version.
     """
 
     # generate deb data for all packages
@@ -67,6 +68,17 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files = ":env
             "//distribution/debian:copyright",
             config,
             bin_files,
+        ],
+        remap_paths = {"/copyright": "/usr/share/doc/envoy/copyright"},
+    )
+
+    # generate deb data for all contrib packages
+    pkg_tar(
+        name = "contrib-deb-data",
+        srcs = [
+            "//distribution/debian:copyright",
+            config,
+            contrib_bin_files,
         ],
         remap_paths = {"/copyright": "/usr/share/doc/envoy/copyright"},
     )
@@ -89,6 +101,24 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files = ":env
         maintainer = maintainer,
     )
 
+    # generate contrib package for this patch version
+    envoy_pkg_deb(
+        name = "envoy-contrib",
+        data = ":contrib-deb-data",
+        version = version,
+        maintainer = maintainer,
+    )
+
+    # generate contrib package for this minor version
+    envoy_pkg_deb(
+        name = "envoy-contrib-%s" % release_version,
+        data = ":contrib-deb-data",
+        version = version,
+        conflicts = ["envoy"],
+        provides = ["envoy"],
+        maintainer = maintainer,
+    )
+
     pkg_tar(
         name = name,
         srcs = [
@@ -96,6 +126,10 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files = ":env
             "envoy.deb",
             "envoy-%s.changes" % release_version,
             "envoy-%s.deb" % release_version,
+            "envoy-contrib.changes",
+            "envoy-contrib.deb",
+            "envoy-contrib-%s.changes" % release_version,
+            "envoy-contrib-%s.deb" % release_version,
         ],
         extension = "tar",
         package_dir = "deb",

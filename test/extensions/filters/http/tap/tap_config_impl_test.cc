@@ -1,8 +1,12 @@
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/utility.h"
 #include "source/extensions/filters/http/tap/tap_config_impl.h"
 
 #include "test/extensions/common/tap/common.h"
 #include "test/extensions/filters/http/tap/common.h"
 #include "test/mocks/common.h"
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -31,7 +35,8 @@ public:
     EXPECT_CALL(*config_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
     time_system_.setSystemTime(std::chrono::seconds(0));
     EXPECT_CALL(matcher_, onNewStream(_)).WillOnce(SaveArgAddress(&statuses_));
-    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, 1);
+    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, 1,
+                                                         OptRef<const Network::Connection>{});
   }
 
   std::shared_ptr<MockHttpTapConfig> config_{std::make_shared<MockHttpTapConfig>()};
@@ -327,9 +332,20 @@ public:
     time_system_.setSystemTime(std::chrono::seconds(0));
     EXPECT_CALL(matcher_, onNewStream(_)).WillOnce(SaveArgAddress(&statuses_));
 
-    // Make sure the record_req_resp_msg_caught_time is true
     tap_config_.set_record_headers_received_time(true);
-    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, 1);
+    tap_config_.set_record_downstream_connection(true);
+
+    connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+    connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 4321));
+
+    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, 1, connection_);
+
+    Network::ConnectionInfoProviderSharedPtr local_connection_info_provider =
+        std::make_shared<Network::ConnectionInfoSetterImpl>(
+            Network::Utility::getCanonicalIpv4LoopbackAddress(),
+            Network::Utility::getCanonicalIpv4LoopbackAddress());
   }
 
   std::shared_ptr<MockHttpTapConfig> config_{std::make_shared<MockHttpTapConfig>()};
@@ -346,11 +362,11 @@ public:
   const Http::TestResponseHeaderMapImpl response_headers_{{"e", "f"}};
   const Http::TestResponseTrailerMapImpl response_trailers_{{"g", "h"}};
   Event::SimulatedTimeSystem time_system_;
+  NiceMock<const Network::MockConnection> connection_;
 };
 
 // Buffered tap with a match and with record_headers_received_time is true.
-TEST_F(HttpPerRequestTapperImplForSpecificConfigTest,
-       BufferedFlowTapWithRecordHeadersReceivedtimeTrue) {
+TEST_F(HttpPerRequestTapperImplForSpecificConfigTest, BufferedFlowTapWithSpecificConfig) {
   EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(false));
   EXPECT_CALL(*config_, maxBufferedRxBytes()).WillRepeatedly(Return(1024));
   EXPECT_CALL(*config_, maxBufferedTxBytes()).WillRepeatedly(Return(1024));
@@ -394,10 +410,18 @@ http_buffered_trace:
       - key: g
         value: h
     headers_received_time: 1970-01-01T00:00:00Z
+  downstream_connection:
+    local_address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    remote_address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 4321
 )EOF")));
   EXPECT_TRUE(tapper_->onDestroyLog());
 }
-// New test for HTTP specific config
 
 } // namespace
 } // namespace TapFilter

@@ -599,7 +599,7 @@ public:
 
   static VirtualClusterStats generateStats(Stats::Scope& scope,
                                            const VirtualClusterStatNames& stat_names) {
-    return VirtualClusterStats(stat_names, scope);
+    return {stat_names, scope};
   }
 };
 

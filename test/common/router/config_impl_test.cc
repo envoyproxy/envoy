@@ -3205,10 +3205,19 @@ TEST_F(RouterMatcherHashPolicyTest, HashQueryParameters) {
                                                                  nullptr));
   }
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo?param=xyz", "GET");
-    Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
-                                                                nullptr));
+    Http::TestRequestHeaderMapImpl headers1 = genHeaders("www.lyft.com", "/foo?param=xyz", "GET");
+    Router::RouteConstSharedPtr route1 = config().route(headers1, 0);
+    auto val1 = route1->routeEntry()->hashPolicy()->generateHash(nullptr, headers1, add_cookie_nop_,
+                                                                 nullptr);
+    EXPECT_TRUE(val1);
+
+    // Only the first appearance of the query parameter should be considered
+    Http::TestRequestHeaderMapImpl headers2 =
+        genHeaders("www.lyft.com", "/foo?param=xyz&param=qwer", "GET");
+    Router::RouteConstSharedPtr route2 = config().route(headers2, 0);
+    auto val2 = route1->routeEntry()->hashPolicy()->generateHash(nullptr, headers2, add_cookie_nop_,
+                                                                 nullptr);
+    EXPECT_EQ(val1, val2);
   }
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar?param=xyz", "GET");
@@ -3386,13 +3395,13 @@ TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
   EXPECT_NE(hash_1, hash_2);
 }
 
-TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
+// Verify that invalid enums (which are now fatal) don't pass early config
+// validate checks.
+TEST_F(RouterMatcherHashPolicyTest, InvalidHashPoliciesInvalid) {
   {
-    auto hash_policy = firstRouteHashPolicy();
-    EXPECT_EQ(envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
-                  POLICY_SPECIFIER_NOT_SET,
-              hash_policy->policy_specifier_case());
-    EXPECT_THROW(config(), EnvoyException);
+    auto* hash_policy = firstRouteHashPolicy();
+    EXPECT_THROW(MessageUtil::validate(*hash_policy, ProtobufMessage::getStrictValidationVisitor()),
+                 EnvoyException);
   }
   {
     auto route = route_config_.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
@@ -3402,7 +3411,8 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
     EXPECT_EQ(envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
                   POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
-    EXPECT_THROW(config(), EnvoyException);
+    EXPECT_THROW(MessageUtil::validate(*route, ProtobufMessage::getStrictValidationVisitor()),
+                 EnvoyException);
   }
 }
 
@@ -7561,7 +7571,7 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
   EXPECT_THROW_WITH_MESSAGE(
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
-      EnvoyException, "response body file missing_file does not exist");
+      EnvoyException, "file missing_file does not exist");
 
   // The default max body size in bytes is 4096 (MaxResponseBodySizeBytes).
   const std::string body(MaxResponseBodySizeBytes + 1, '*');
@@ -7574,7 +7584,7 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   // Change the max body size to 2048 (MaxResponseBodySizeBytes/2) bytes.
   auto filename = TestEnvironment::writeStringToFileForTest("body", body);
   route.mutable_direct_response()->mutable_body()->set_filename(filename);
-  expected_message = "response body file " + filename + " size is 4097 bytes; maximum is 2048";
+  expected_message = "file " + filename + " size is 4097 bytes; maximum is 2048";
   EXPECT_THROW_WITH_MESSAGE(
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2),
       EnvoyException, expected_message);
@@ -7586,6 +7596,26 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
   route.mutable_direct_response()->mutable_body()->set_filename(EMPTY_STRING);
   route.mutable_direct_response()->mutable_body()->set_inline_bytes(body);
+  EXPECT_EQ(
+      MaxResponseBodySizeBytes + 1,
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
+}
+
+TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithEnv) {
+  constexpr uint64_t MaxResponseBodySizeBytes = 4096;
+  envoy::config::route::v3::Route route;
+
+  const std::string body(MaxResponseBodySizeBytes + 1, '*');
+  TestEnvironment::setEnvVar("ResponseBodyContents", body, 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ResponseBodyContents"); });
+
+  route.mutable_direct_response()->mutable_body()->set_environment_variable("ResponseBodyContents");
+
+  std::string expected_message("response body size is 4097 bytes; maximum is 4096");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
+      EnvoyException, expected_message);
   EXPECT_EQ(
       MaxResponseBodySizeBytes + 1,
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
@@ -9477,44 +9507,6 @@ virtual_hosts:
   EXPECT_EQ("/one?one=0&two=1&three=2&four=3&go=ls", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/one?one=0&two=1&three=2&four=3&go=ls", headers.get_(Http::Headers::get().Path));
-  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
-}
-
-TEST_F(RouteMatcherTest,
-       DEPRECATED_FEATURE_TEST(PatternMatchWildcardFilenameQueryParametersTruncated)) {
-
-  mergeValues({{"envoy.reloadable_features.append_query_parameters_path_rewriter", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: path_pattern
-    domains: ["*"]
-    routes:
-      - match:
-          path_match_policy:
-            name: envoy.path.match.uri_template.uri_template_matcher
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-              path_template: "/api/cart/item/{one}/**.m3u8"
-          case_sensitive: false
-        route:
-          cluster: "path-pattern-cluster-one"
-          path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.uri_template_rewriter
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
-              path_template_rewrite: "/{one}"
-  )EOF";
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  Http::TestRequestHeaderMapImpl headers = genHeaders(
-      "path.prefix.com", "/api/cart/item/one/song.m3u8?one=0&two=1&three=2&four=3&go=ls", "GET");
-  const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ("/one", route->currentUrlPathAfterRewrite(headers));
-  route->finalizeRequestHeaders(headers, stream_info, true);
-  EXPECT_EQ("/one", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 

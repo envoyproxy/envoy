@@ -446,7 +446,9 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
-      const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
+      auto file_or_error = api.fileSystem().fileReadToEnd(full_path);
+      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      const std::string text_file{file_or_error.value()};
 
       const auto lines = StringUtil::splitToken(text_file, "\n");
       for (const auto& line : lines) {

@@ -71,7 +71,7 @@ public:
    */
   virtual HttpPerRequestTapperPtr
   createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
-                         uint64_t stream_id) PURE;
+                         uint64_t stream_id, OptRef<const Network::Connection> connection) PURE;
 
   /**
    * @return time source to use for timestamp

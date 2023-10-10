@@ -11,11 +11,10 @@ function is_windows() {
 
 read -ra ENVOY_DOCKER_OPTIONS <<< "${ENVOY_DOCKER_OPTIONS:-}"
 
-# TODO(phlax): uppercase these env vars
-export HTTP_PROXY="${http_proxy:-}"
-export HTTPS_PROXY="${https_proxy:-}"
-export NO_PROXY="${no_proxy:-}"
-export GOPROXY="${go_proxy:-}"
+export HTTP_PROXY="${HTTP_PROXY:-${http_proxy:-}}"
+export HTTPS_PROXY="${HTTPS_PROXY:-${https_proxy:-}}"
+export NO_PROXY="${NO_PROXY:-${no_proxy:-}}"
+export GOPROXY="${GOPROXY:-${go_proxy:-}}"
 
 if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
@@ -117,8 +116,6 @@ fi
 docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
-       -e AZP_BRANCH \
-       -e AZP_COMMIT_SHA \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
@@ -161,7 +158,6 @@ docker run --rm \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \
        -e MOBILE_DOCS_CHECKOUT_DIR \
-       -e NETLIFY_TRIGGER_URL \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \

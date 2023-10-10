@@ -22,7 +22,7 @@ static size_t CacheControlLength = sizeof(CacheControl) - 1;
 
 // NOLINT(namespace-envoy)
 
-static void BM_AccessLogDateTimeFormatter(benchmark::State& state) {
+static void bmAccessLogDateTimeFormatter(benchmark::State& state) {
   int outputBytes = 0;
 
   // Generate a sequence of times for which the delta between each successive
@@ -38,16 +38,17 @@ static void BM_AccessLogDateTimeFormatter(benchmark::State& state) {
     // the AccessLogDateTimeFormatter implementation is optimized further, we
     // should precompute a sequence of input timestamps so the benchmark's own
     // overhead won't obscure changes in the speed of the code being benchmarked.
+    UNREFERENCED_PARAMETER(_);
     time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
     outputBytes += Envoy::AccessLogDateTimeFormatter::fromTime(time).length();
   }
   benchmark::DoNotOptimize(outputBytes);
 }
-BENCHMARK(BM_AccessLogDateTimeFormatter);
+BENCHMARK(bmAccessLogDateTimeFormatter);
 
-// This benchmark is basically similar with the above BM_AccessLogDateTimeFormatter, the only
+// This benchmark is basically similar with the above bmAccessLogDateTimeFormatter, the only
 // difference is the format string input for the Envoy::DateFormatter.
-static void BM_DateTimeFormatterWithSubseconds(benchmark::State& state) {
+static void bmDateTimeFormatterWithSubseconds(benchmark::State& state) {
   int outputBytes = 0;
 
   Envoy::SystemTime time(std::chrono::seconds(1522796769));
@@ -55,18 +56,19 @@ static void BM_DateTimeFormatterWithSubseconds(benchmark::State& state) {
   std::uniform_int_distribution<long> distribution(-10, 20);
   Envoy::DateFormatter date_formatter("%Y-%m-%dT%H:%M:%s.%3f");
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
     outputBytes += date_formatter.fromTime(time).length();
   }
   benchmark::DoNotOptimize(outputBytes);
 }
-BENCHMARK(BM_DateTimeFormatterWithSubseconds);
+BENCHMARK(bmDateTimeFormatterWithSubseconds);
 
-// This benchmark is basically similar with the above BM_DateTimeFormatterWithSubseconds, the
+// This benchmark is basically similar with the above bmDateTimeFormatterWithSubseconds, the
 // differences are: 1. the format string input is long with duplicated subseconds. 2. The purpose
 // is to test DateFormatter.parse() which is called in constructor.
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_DateTimeFormatterWithLongSubsecondsString(benchmark::State& state) {
+static void bmDateTimeFormatterWithLongSubsecondsString(benchmark::State& state) {
   int outputBytes = 0;
 
   Envoy::SystemTime time(std::chrono::seconds(1522796769));
@@ -81,16 +83,17 @@ static void BM_DateTimeFormatterWithLongSubsecondsString(benchmark::State& state
   absl::StrAppend(&input, duplicate_input);
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Envoy::DateFormatter date_formatter(input);
     time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
     outputBytes += date_formatter.fromTime(time).length();
   }
   benchmark::DoNotOptimize(outputBytes);
 }
-BENCHMARK(BM_DateTimeFormatterWithLongSubsecondsString);
+BENCHMARK(bmDateTimeFormatterWithLongSubsecondsString);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_DateTimeFormatterWithoutSubseconds(benchmark::State& state) {
+static void bmDateTimeFormatterWithoutSubseconds(benchmark::State& state) {
   int outputBytes = 0;
 
   Envoy::SystemTime time(std::chrono::seconds(1522796769));
@@ -98,53 +101,58 @@ static void BM_DateTimeFormatterWithoutSubseconds(benchmark::State& state) {
   std::uniform_int_distribution<long> distribution(-10, 20);
   Envoy::DateFormatter date_formatter("%Y-%m-%dT%H:%M:%s");
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
     outputBytes += date_formatter.fromTime(time).length();
   }
   benchmark::DoNotOptimize(outputBytes);
 }
-BENCHMARK(BM_DateTimeFormatterWithoutSubseconds);
+BENCHMARK(bmDateTimeFormatterWithoutSubseconds);
 
-static void BM_RTrimStringView(benchmark::State& state) {
+static void bmRTrimStringView(benchmark::State& state) {
   int accum = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     absl::string_view text(TextToTrim, TextToTrimLength);
     text = Envoy::StringUtil::rtrim(text);
     accum += TextToTrimLength - text.size();
   }
   benchmark::DoNotOptimize(accum);
 }
-BENCHMARK(BM_RTrimStringView);
+BENCHMARK(bmRTrimStringView);
 
-static void BM_RTrimStringViewAlreadyTrimmed(benchmark::State& state) {
+static void bmRTrimStringViewAlreadyTrimmed(benchmark::State& state) {
   int accum = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     absl::string_view text(AlreadyTrimmed, AlreadyTrimmedLength);
     text = Envoy::StringUtil::rtrim(text);
     accum += AlreadyTrimmedLength - text.size();
   }
   benchmark::DoNotOptimize(accum);
 }
-BENCHMARK(BM_RTrimStringViewAlreadyTrimmed);
+BENCHMARK(bmRTrimStringViewAlreadyTrimmed);
 
-static void BM_RTrimStringViewAlreadyTrimmedAndMakeString(benchmark::State& state) {
+static void bmRTrimStringViewAlreadyTrimmedAndMakeString(benchmark::State& state) {
   int accum = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     absl::string_view text(AlreadyTrimmed, AlreadyTrimmedLength);
     std::string string_copy = std::string(Envoy::StringUtil::rtrim(text));
     accum += AlreadyTrimmedLength - string_copy.size();
   }
   benchmark::DoNotOptimize(accum);
 }
-BENCHMARK(BM_RTrimStringViewAlreadyTrimmedAndMakeString);
+BENCHMARK(bmRTrimStringViewAlreadyTrimmedAndMakeString);
 
-static void BM_FindToken(benchmark::State& state) {
+static void bmFindToken(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     RELEASE_ASSERT(Envoy::StringUtil::findToken(cache_control, ",", "no-transform"), "");
   }
 }
-BENCHMARK(BM_FindToken);
+BENCHMARK(bmFindToken);
 
 static bool nextToken(absl::string_view& str, char delim, bool strip_whitespace,
                       absl::string_view* token) {
@@ -180,18 +188,20 @@ static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::s
   return false;
 }
 
-static void BM_FindTokenWithoutSplitting(benchmark::State& state) {
+static void bmFindTokenWithoutSplitting(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     RELEASE_ASSERT(findTokenWithoutSplitting(cache_control, ',', "no-transform", true), "");
   }
 }
-BENCHMARK(BM_FindTokenWithoutSplitting);
+BENCHMARK(bmFindTokenWithoutSplitting);
 
-static void BM_FindTokenValueNestedSplit(benchmark::State& state) {
+static void bmFindTokenValueNestedSplit(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   absl::string_view max_age;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     for (absl::string_view token : Envoy::StringUtil::splitToken(cache_control, ",")) {
       auto name_value = Envoy::StringUtil::splitToken(token, "=");
       if ((name_value.size() == 2) && (Envoy::StringUtil::trim(name_value[0]) == "max-age")) {
@@ -201,10 +211,11 @@ static void BM_FindTokenValueNestedSplit(benchmark::State& state) {
     RELEASE_ASSERT(max_age == "300", "");
   }
 }
-BENCHMARK(BM_FindTokenValueNestedSplit);
+BENCHMARK(bmFindTokenValueNestedSplit);
 
-static void BM_FindTokenValueSearchForEqual(benchmark::State& state) {
+static void bmFindTokenValueSearchForEqual(benchmark::State& state) {
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     const absl::string_view cache_control(CacheControl, CacheControlLength);
     absl::string_view max_age;
     for (absl::string_view token : Envoy::StringUtil::splitToken(cache_control, ",")) {
@@ -217,10 +228,11 @@ static void BM_FindTokenValueSearchForEqual(benchmark::State& state) {
     RELEASE_ASSERT(max_age == "300", "");
   }
 }
-BENCHMARK(BM_FindTokenValueSearchForEqual);
+BENCHMARK(bmFindTokenValueSearchForEqual);
 
-static void BM_FindTokenValueNoSplit(benchmark::State& state) {
+static void bmFindTokenValueNoSplit(benchmark::State& state) {
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     absl::string_view cache_control(CacheControl, CacheControlLength);
     absl::string_view max_age;
     for (absl::string_view token; nextToken(cache_control, ',', true, &token);) {
@@ -232,9 +244,9 @@ static void BM_FindTokenValueNoSplit(benchmark::State& state) {
     RELEASE_ASSERT(max_age == "300", "");
   }
 }
-BENCHMARK(BM_FindTokenValueNoSplit);
+BENCHMARK(bmFindTokenValueNoSplit);
 
-static void BM_RemoveTokensLong(benchmark::State& state) {
+static void bmRemoveTokensLong(benchmark::State& state) {
   auto size = state.range(0);
   std::string input(size, ',');
   std::vector<std::string> to_remove;
@@ -250,14 +262,16 @@ static void BM_RemoveTokensLong(benchmark::State& state) {
     input.append(to_remove[i]);
   }
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Envoy::StringUtil::removeTokens(input, ",", to_remove_set, ",");
     state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) * input.size());
   }
 }
-BENCHMARK(BM_RemoveTokensLong)->Range(8, 8 << 10);
+BENCHMARK(bmRemoveTokensLong)->Range(8, 8 << 10);
 
-static void BM_IntervalSetInsert17(benchmark::State& state) {
+static void bmIntervalSetInsert17(benchmark::State& state) {
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Envoy::IntervalSetImpl<size_t> interval_set;
     interval_set.insert(7, 10);
     interval_set.insert(-2, -1);
@@ -278,28 +292,30 @@ static void BM_IntervalSetInsert17(benchmark::State& state) {
     interval_set.insert(24, 9223372036854775805UL);
   }
 }
-BENCHMARK(BM_IntervalSetInsert17);
+BENCHMARK(bmIntervalSetInsert17);
 
-static void BM_IntervalSet4ToVector(benchmark::State& state) {
+static void bmIntervalSet4ToVector(benchmark::State& state) {
   Envoy::IntervalSetImpl<size_t> interval_set;
   interval_set.insert(7, 10);
   interval_set.insert(-2, -1);
   interval_set.insert(22, 23);
   interval_set.insert(8, 15);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     benchmark::DoNotOptimize(interval_set.toVector());
   }
 }
-BENCHMARK(BM_IntervalSet4ToVector);
+BENCHMARK(bmIntervalSet4ToVector);
 
-static void BM_IntervalSet50ToVector(benchmark::State& state) {
+static void bmIntervalSet50ToVector(benchmark::State& state) {
   Envoy::IntervalSetImpl<size_t> interval_set;
   for (size_t i = 0; i < 100; i += 2) {
     interval_set.insert(i, i + 1);
   }
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     benchmark::DoNotOptimize(interval_set.toVector());
   }
 }
-BENCHMARK(BM_IntervalSet50ToVector);
+BENCHMARK(bmIntervalSet50ToVector);
 } // namespace Envoy

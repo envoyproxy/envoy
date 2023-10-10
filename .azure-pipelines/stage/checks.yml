@@ -77,7 +77,7 @@ jobs:
   timeoutInMinutes: 180
   pool: envoy-x64-small
   steps:
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: $(CI_TARGET)
       cacheName: $(CI_TARGET)

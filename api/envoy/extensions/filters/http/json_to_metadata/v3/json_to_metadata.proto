@@ -99,9 +99,9 @@ message JsonToMetadata {
     repeated Rule rules = 1 [(validate.rules).repeated = {min_items: 1}];
 
     // Allowed content-type for json to metadata transformation.
-    // Default to {"application/json"}.
+    // Default to ``{"application/json"}``.
     //
-    // Set `allow_empty_content_type` if empty/missing content-type header
+    // Set ``allow_empty_content_type`` if empty/missing content-type header
     // is allowed.
     repeated string allow_content_types = 2
         [(validate.rules).repeated = {items {string {min_len: 1}}}];

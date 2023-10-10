@@ -7,6 +7,7 @@
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
 
+#include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
@@ -43,6 +44,8 @@ struct Bucket {
   BucketAction bucket_action;
   // Cache quota usage.
   QuotaUsage quota_usage;
+  // Rate limiter based on token bucket algorithm.
+  TokenBucketPtr token_bucket_limiter;
 };
 
 using BucketsCache = absl::flat_hash_map<size_t, std::unique_ptr<Bucket>>;
