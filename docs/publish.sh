@@ -11,13 +11,10 @@
 
 set -e
 
-DOCS_DIR=generated/docs
-CHECKOUT_DIR=envoy-docs
 BUILD_SHA=$(git rev-parse HEAD)
 
 VERSION="$(cat VERSION.txt)"
 MAIN_BRANCH="refs/heads/main"
-RELEASE_BRANCH_REGEX="^refs/heads/release/v.*"
 DEV_VERSION_REGEX="-dev$"
 
 if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
