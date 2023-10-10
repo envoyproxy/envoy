@@ -1,4 +1,4 @@
-date: October 11, 2023
+date: October 10, 2023
 
 behavior_changes:
 - area: http
@@ -17,14 +17,3 @@ behavior_changes:
     mitigates CPU starvation by connections that simultaneously send high number of requests by allowing requests from other
     connections to make progress. This runtime value can be set to 1 in the presence of abusive HTTP/2 or HTTP/3 connections.
     By default this limit is disabled.
-
-bug_fixes:
-- area: connection limit
-  change: |
-    fixed a use-after-free bug in the connection limit filter.
-- area: tls
-  change: |
-    fixed a bug where handshake may fail when both private key provider and cert validation are set.
-- area: docker/publishing
-  change: |
-    Update base images to resolve various glibc vulnerabilities.
