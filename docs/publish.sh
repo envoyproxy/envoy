@@ -11,13 +11,10 @@
 
 set -e
 
-DOCS_DIR=generated/docs
-CHECKOUT_DIR=envoy-docs
 BUILD_SHA=$(git rev-parse HEAD)
 
 VERSION="$(cat VERSION.txt)"
 MAIN_BRANCH="refs/heads/main"
-RELEASE_BRANCH_REGEX="^refs/heads/release/v.*"
 DEV_VERSION_REGEX="-dev$"
 
 if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
@@ -29,37 +26,4 @@ if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
     else
         echo "Ignoring docs push"
     fi
-    exit 0
-else
-    PUBLISH_DIR="${CHECKOUT_DIR}/docs/envoy/v${VERSION}"
 fi
-
-if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] && ! [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]]; then
-    # Most likely a tag, do nothing.
-    echo 'Ignoring non-release branch for docs push.'
-    exit 0
-fi
-
-DOCS_MAIN_BRANCH="main"
-
-echo 'cloning'
-git clone git@github.com:envoyproxy/envoy-website "${CHECKOUT_DIR}" -b "${DOCS_MAIN_BRANCH}" --depth 1
-
-if [[ -e "$PUBLISH_DIR" ]]; then
-    # Defense against the unexpected.
-    echo 'Docs version already exists, not continuing!.'
-    exit 1
-fi
-
-mkdir -p "$PUBLISH_DIR"
-cp -r "$DOCS_DIR"/* "$PUBLISH_DIR"
-cd "${CHECKOUT_DIR}"
-
-git config user.name "envoy-docs(Azure Pipelines)"
-git config user.email envoy-docs@users.noreply.github.com
-
-set -x
-
-git add .
-git commit -m "docs envoy@$BUILD_SHA"
-git push origin "${DOCS_MAIN_BRANCH}"
