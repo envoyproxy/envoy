@@ -10,12 +10,6 @@ updates:
 # Please ensure any new ones are added here, and any that are removed are removed here also.
 
 - package-ecosystem: "pip"
-  directory: "/.github/actions/pr_notifier"
-  schedule:
-    interval: "daily"
-    time: "06:00"
-
-- package-ecosystem: "pip"
   directory: "/examples/grpc-bridge/client"
   schedule:
     interval: "daily"
