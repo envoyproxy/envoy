@@ -113,17 +113,13 @@ void vclEndptFromAddress(vppcom_endpt_t& endpt,
 Api::IoCallUint64Result vclCallResultToIoCallResult(const int32_t result) {
   if (result >= 0) {
     // Return nullptr as IoError upon success.
-    return {static_cast<unsigned long>(result),
-            Api::IoErrorPtr(nullptr, Envoy::Network::IoSocketError::deleteIoError)};
+    return {static_cast<unsigned long>(result), Api::IoError::none()};
   }
   RELEASE_ASSERT(result != VPPCOM_EINVAL, "Invalid argument passed in.");
-  return {/*rc=*/0,
-          (result == VPPCOM_EAGAIN
-               // EAGAIN is frequent enough that its memory allocation should be avoided.
-               ? Api::IoErrorPtr(Envoy::Network::IoSocketError::getIoSocketEagainInstance(),
-                                 Envoy::Network::IoSocketError::deleteIoError)
-               : Api::IoErrorPtr(new Envoy::Network::IoSocketError(-result),
-                                 Envoy::Network::IoSocketError::deleteIoError))};
+  return {/*rc=*/0, (result == VPPCOM_EAGAIN
+                         // EAGAIN is frequent enough that its memory allocation should be avoided.
+                         ? Envoy::Network::IoSocketError::getIoSocketEagainError()
+                         : Envoy::Network::IoSocketError::create(-result))};
 }
 
 } // namespace
@@ -157,8 +153,7 @@ Api::IoCallUint64Result VclIoHandle::close() {
     VCL_SET_SH_INVALID(sh_);
   }
 
-  return {static_cast<unsigned long>(rc),
-          Api::IoErrorPtr(nullptr, Envoy::Network::IoSocketError::deleteIoError)};
+  return {static_cast<unsigned long>(rc), Api::IoError::none()};
 }
 
 bool VclIoHandle::isOpen() const { return VCL_SH_VALID(sh_); }

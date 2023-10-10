@@ -196,17 +196,15 @@ GoUint64 NetworkFilterDsoImpl::envoyGoFilterOnDownstreamWrite(void* w, GoUint64 
   return envoy_go_filter_on_downstream_write_(w, data_size, data_ptr, slice_num, end_of_stream);
 }
 
-void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamConnectionReady(
-    void* w, GoUint64 connID) { // NOLINT(readability-identifier-naming)
+void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 conn_id) {
   ASSERT(envoy_go_filter_on_upstream_connection_ready_ != nullptr);
-  envoy_go_filter_on_upstream_connection_ready_(w, connID);
+  envoy_go_filter_on_upstream_connection_ready_(w, conn_id);
 }
 
-void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamConnectionFailure(
-    void* w, GoInt reason,
-    GoUint64 connID) { // NOLINT(readability-identifier-naming)
+void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason,
+                                                                    GoUint64 conn_id) {
   ASSERT(envoy_go_filter_on_upstream_connection_failure_ != nullptr);
-  envoy_go_filter_on_upstream_connection_failure_(w, reason, connID);
+  envoy_go_filter_on_upstream_connection_failure_(w, reason, conn_id);
 }
 
 void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamData(void* w, GoUint64 data_size,

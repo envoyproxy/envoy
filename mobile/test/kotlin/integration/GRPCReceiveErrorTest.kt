@@ -1,6 +1,5 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -12,6 +11,7 @@ import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -21,7 +21,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val PBF_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+private const val PBF_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
 private const val FILTER_NAME = "error_validation_filter"
 
 class GRPCReceiveErrorTest {
@@ -63,6 +64,7 @@ class GRPCReceiveErrorTest {
     override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {
       receivedError.countDown()
     }
+
     override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
     override fun onCancel(finalStreamIntel: FinalStreamIntel) {
@@ -72,28 +74,30 @@ class GRPCReceiveErrorTest {
 
   @Test
   fun `errors on stream call onError callback`() {
-    val requestHeader = GRPCRequestHeadersBuilder(
-      scheme = "https",
-      authority = "example.com",
-      path = "/pb.api.v1.Foo/GetBar"
-    ).build()
+    val requestHeader =
+      GRPCRequestHeadersBuilder(
+          scheme = "https",
+          authority = "example.com",
+          path = "/pb.api.v1.Foo/GetBar"
+        )
+        .build()
 
-    val engine = EngineBuilder(Standard())
-      .addPlatformFilter(
-        name = FILTER_NAME,
-        factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
-      )
-      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}")
-      .build()
+    val engine =
+      EngineBuilder(Standard())
+        .addPlatformFilter(
+          name = FILTER_NAME,
+          factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
+        )
+        .addNativeFilter(
+          "envoy.filters.http.platform_bridge",
+          "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}"
+        )
+        .build()
 
     GRPCClient(engine.streamClient())
       .newGRPCStreamPrototype()
-      .setOnError { _, _ ->
-        callbackReceivedError.countDown()
-      }
-      .setOnCancel { _ ->
-        fail("Unexpected call to onCancel response callback")
-      }
+      .setOnError { _, _ -> callbackReceivedError.countDown() }
+      .setOnCancel { _ -> fail("Unexpected call to onCancel response callback") }
       .start()
       .sendHeaders(requestHeader, false)
       .sendMessage(ByteBuffer.wrap(ByteArray(5)))

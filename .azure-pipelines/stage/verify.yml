@@ -12,8 +12,7 @@ jobs:
   displayName: Debs (x64)
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
   timeoutInMinutes: 120
-  pool:
-    vmImage: $(agentUbuntu)
+  pool: envoy-x64-small
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -27,6 +26,7 @@ jobs:
       ciTarget: verify_distro
       cacheName: verify_distro
       publishTestResults: false
+      tmpfsDockerDisabled: true
       env:
         ENVOY_DOCKER_IN_DOCKER: 1
 

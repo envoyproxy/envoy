@@ -54,6 +54,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                   "\nDefault is \"{}\"",
                   Logger::Logger::DEFAULT_LOG_FORMAT);
 
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("envoy", ' ', VersionInfo::version());
   TCLAP::ValueArg<uint32_t> base_id(
       "", "base-id", "Base ID so that multiple envoys can run on the same host if needed", false, 0,

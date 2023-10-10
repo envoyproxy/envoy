@@ -2,6 +2,7 @@
 
 #include "envoy/network/listener.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/socket_option_factory.h"
 
 namespace Envoy {
@@ -163,7 +164,14 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
 UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOptionalHost(
     Network::UdpRecvData::LocalPeerAddresses&& addresses,
     const Upstream::HostConstSharedPtr& host) {
-  auto new_session = std::make_unique<UdpActiveSession>(*this, std::move(addresses), host);
+  ActiveSessionPtr new_session;
+  if (filter_.config_->tunnelingConfig()) {
+    ASSERT(!host);
+    new_session = std::make_unique<TunnelingActiveSession>(*this, std::move(addresses));
+  } else {
+    new_session = std::make_unique<UdpActiveSession>(*this, std::move(addresses), host);
+  }
+
   new_session->createFilterChain();
   new_session->onNewSession();
   auto new_session_ptr = new_session.get();
@@ -186,7 +194,7 @@ UdpProxyFilter::StickySessionClusterInfo::StickySessionClusterInfo(
                                      HeterogeneousActiveSessionEqual(false))) {}
 
 Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::UdpRecvData& data) {
-  bool defer_socket = filter_.config_->hasSessionFilters();
+  bool defer_socket = filter_.config_->hasSessionFilters() || filter_.config_->tunnelingConfig();
   const auto active_session_it = sessions_.find(data.addresses_);
   ActiveSession* active_session;
   if (active_session_it == sessions_.end()) {
@@ -580,14 +588,7 @@ void UdpProxyFilter::UdpActiveSession::processPacket(
 
   Network::UdpRecvData recv_data{
       {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
-  for (auto& active_write_filter : write_filters_) {
-    auto status = active_write_filter->write_filter_->onWrite(recv_data);
-    if (status == WriteFilterStatus::StopIteration) {
-      return;
-    }
-  }
-
-  writeDownstream(recv_data);
+  processUpstreamDatagram(recv_data);
 }
 
 void UdpProxyFilter::ActiveSession::resetIdleTimer() {
@@ -596,6 +597,17 @@ void UdpProxyFilter::ActiveSession::resetIdleTimer() {
   }
 
   idle_timer_->enableTimer(cluster_.filter_.config_->sessionTimeout());
+}
+
+void UdpProxyFilter::ActiveSession::processUpstreamDatagram(Network::UdpRecvData& recv_data) {
+  for (auto& active_write_filter : write_filters_) {
+    auto status = active_write_filter->write_filter_->onWrite(recv_data);
+    if (status == WriteFilterStatus::StopIteration) {
+      return;
+    }
+  }
+
+  writeDownstream(recv_data);
 }
 
 void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_data) {
@@ -615,6 +627,359 @@ void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_d
     cluster_.filter_.config_->stats().downstream_sess_tx_datagrams_.inc();
     ++session_stats_.downstream_sess_tx_datagrams_;
   }
+}
+
+void HttpUpstreamImpl::encodeData(Buffer::Instance& data) {
+  if (!request_encoder_) {
+    return;
+  }
+
+  request_encoder_->encodeData(data, false);
+}
+
+void HttpUpstreamImpl::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
+  request_encoder_ = &request_encoder;
+  request_encoder_->getStream().addCallbacks(*this);
+
+  const std::string& scheme =
+      is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
+
+  std::string host = tunnel_config_.proxyHost(downstream_info_);
+  const auto* dynamic_port =
+      downstream_info_.filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
+          "udp.connect.proxy_port");
+  if (dynamic_port != nullptr && dynamic_port->value() > 0 && dynamic_port->value() <= 65535) {
+    absl::StrAppend(&host, ":", std::to_string(dynamic_port->value()));
+  } else if (tunnel_config_.proxyPort().has_value()) {
+    absl::StrAppend(&host, ":", std::to_string(tunnel_config_.proxyPort().value()));
+  }
+
+  auto headers = Http::RequestHeaderMapImpl::create();
+  headers->addReferenceKey(Http::Headers::get().Scheme, scheme);
+  headers->addReferenceKey(Http::Headers::get().Host, host);
+
+  if (tunnel_config_.usePost()) {
+    headers->addReferenceKey(Http::Headers::get().Method, "POST");
+    headers->addReferenceKey(Http::Headers::get().Path, tunnel_config_.postPath());
+  } else {
+    // The Envoy HTTP/2 and HTTP/3 clients expect the request header map to be in the form of HTTP/1
+    // upgrade to issue an extended CONNECT request.
+    headers->addReferenceKey(Http::Headers::get().Method, "GET");
+    headers->addReferenceKey(Http::Headers::get().Connection, "Upgrade");
+    headers->addReferenceKey(Http::Headers::get().Upgrade, "connect-udp");
+    headers->addReferenceKey(Http::Headers::get().CapsuleProtocol, "?1");
+    const std::string target_tunnel_path = resolveTargetTunnelPath();
+    headers->addReferenceKey(Http::Headers::get().Path, target_tunnel_path);
+  }
+
+  tunnel_config_.headerEvaluator().evaluateHeaders(
+      *headers,
+      downstream_info_.getRequestHeaders() == nullptr
+          ? *Http::StaticEmptyHeaders::get().request_headers
+          : *downstream_info_.getRequestHeaders(),
+      *Http::StaticEmptyHeaders::get().response_headers, downstream_info_);
+
+  const auto status = request_encoder_->encodeHeaders(*headers, false);
+  // Encoding can only fail on missing required request headers.
+  ASSERT(status.ok());
+}
+
+const std::string HttpUpstreamImpl::resolveTargetTunnelPath() {
+  std::string target_host = tunnel_config_.targetHost(downstream_info_);
+  target_host = Http::Utility::PercentEncoding::encode(target_host, ":");
+
+  const auto* dynamic_port =
+      downstream_info_.filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
+          "udp.connect.target_port");
+
+  std::string target_port;
+  if (dynamic_port != nullptr && dynamic_port->value() > 0 && dynamic_port->value() <= 65535) {
+    target_port = std::to_string(dynamic_port->value());
+  } else {
+    target_port = std::to_string(tunnel_config_.defaultTargetPort());
+  }
+
+  // TODO(ohadvano): support configurable URI template.
+  return absl::StrCat("/.well-known/masque/udp/", target_host, "/", target_port, "/");
+}
+
+HttpUpstreamImpl::~HttpUpstreamImpl() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+
+void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_downstream) {
+  if (!request_encoder_) {
+    return;
+  }
+
+  request_encoder_->getStream().removeCallbacks(*this);
+  if (by_downstream) {
+    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  }
+
+  request_encoder_ = nullptr;
+
+  // If we did not receive a valid CONNECT response yet we treat this as a pool
+  // failure, otherwise we forward the event downstream.
+  if (tunnel_creation_callbacks_.has_value()) {
+    tunnel_creation_callbacks_.value().get().onStreamFailure();
+    return;
+  }
+
+  if (!by_downstream) {
+    upstream_callbacks_.onUpstreamEvent(event);
+  }
+}
+
+TunnelingConnectionPoolImpl::TunnelingConnectionPoolImpl(
+    Upstream::ThreadLocalCluster& thread_local_cluster, Upstream::LoadBalancerContext* context,
+    const UdpTunnelingConfig& tunnel_config, UpstreamTunnelCallbacks& upstream_callbacks,
+    StreamInfo::StreamInfo& downstream_info)
+    : upstream_callbacks_(upstream_callbacks), tunnel_config_(tunnel_config),
+      downstream_info_(downstream_info) {
+  // TODO(ohadvano): support upstream HTTP/3.
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  conn_pool_data_ =
+      thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
+}
+
+void TunnelingConnectionPoolImpl::newStream(HttpStreamCallbacks& callbacks) {
+  callbacks_ = &callbacks;
+  upstream_ =
+      std::make_unique<HttpUpstreamImpl>(upstream_callbacks_, tunnel_config_, downstream_info_);
+  Tcp::ConnectionPool::Cancellable* handle =
+      conn_pool_data_.value().newStream(upstream_->responseDecoder(), *this,
+                                        {/*can_send_early_data_=*/false,
+                                         /*can_use_http3_=*/false});
+
+  if (handle != nullptr) {
+    upstream_handle_ = handle;
+  }
+}
+
+void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                                                absl::string_view failure_reason,
+                                                Upstream::HostDescriptionConstSharedPtr host) {
+  upstream_handle_ = nullptr;
+  callbacks_->onStreamFailure(reason, failure_reason, host);
+}
+
+void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_encoder,
+                                              Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                              StreamInfo::StreamInfo& upstream_info,
+                                              absl::optional<Http::Protocol>) {
+  ENVOY_LOG(debug, "Upstream connection [C{}] ready, creating tunnel stream",
+            upstream_info.downstreamAddressProvider().connectionID().value());
+
+  upstream_handle_ = nullptr;
+  upstream_host_ = upstream_host;
+  upstream_info_ = &upstream_info;
+  ssl_info_ = upstream_info.downstreamAddressProvider().sslConnection();
+
+  bool is_ssl = upstream_host->transportSocketFactory().implementsSecureTransport();
+  upstream_->setRequestEncoder(request_encoder, is_ssl);
+  upstream_->setTunnelCreationCallbacks(*this);
+}
+
+TunnelingConnectionPoolPtr TunnelingConnectionPoolFactory::createConnPool(
+    Upstream::ThreadLocalCluster& thread_local_cluster, Upstream::LoadBalancerContext* context,
+    const UdpTunnelingConfig& tunnel_config, UpstreamTunnelCallbacks& upstream_callbacks,
+    StreamInfo::StreamInfo& downstream_info) const {
+  auto pool = std::make_unique<TunnelingConnectionPoolImpl>(
+      thread_local_cluster, context, tunnel_config, upstream_callbacks, downstream_info);
+  return (pool->valid() ? std::move(pool) : nullptr);
+}
+
+UdpProxyFilter::TunnelingActiveSession::TunnelingActiveSession(
+    ClusterInfo& cluster, Network::UdpRecvData::LocalPeerAddresses&& addresses)
+    : ActiveSession(cluster, std::move(addresses), nullptr) {}
+
+void UdpProxyFilter::TunnelingActiveSession::createUpstream() {
+  if (conn_pool_factory_) {
+    // A session filter may call on continueFilterChain(), after already creating the upstream,
+    // so we first check that the factory was not created already.
+    return;
+  }
+
+  conn_pool_factory_ = std::make_unique<TunnelingConnectionPoolFactory>();
+  load_balancer_context_ = std::make_unique<UdpLoadBalancerContext>(
+      cluster_.filter_.config_->hashPolicy(), addresses_.peer_);
+
+  establishUpstreamConnection();
+}
+
+void UdpProxyFilter::TunnelingActiveSession::establishUpstreamConnection() {
+  if (!createConnectionPool()) {
+    ENVOY_LOG(debug, "failed to create upstream connection pool");
+    cluster_.cluster_stats_.sess_tunnel_failure_.inc();
+    cluster_.removeSession(this);
+  }
+}
+
+bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
+  ASSERT(conn_pool_factory_);
+
+  // Check this here because the TCP conn pool will queue our request waiting for a connection that
+  // will never be released.
+  if (!cluster_.cluster_.info()
+           ->resourceManager(Upstream::ResourcePriority::Default)
+           .connections()
+           .canCreate()) {
+    cluster_.cluster_.info()->trafficStats()->upstream_cx_overflow_.inc();
+    return false;
+  }
+
+  if (connect_attempts_ >= cluster_.filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
+    cluster_.cluster_.info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
+    return false;
+  } else if (connect_attempts_ >= 1) {
+    cluster_.cluster_.info()->trafficStats()->upstream_rq_retry_.inc();
+  }
+
+  conn_pool_ = conn_pool_factory_->createConnPool(cluster_.cluster_, load_balancer_context_.get(),
+                                                  *cluster_.filter_.config_->tunnelingConfig(),
+                                                  *this, udp_session_info_);
+
+  if (conn_pool_) {
+    connecting_ = true;
+    connect_attempts_++;
+    conn_pool_->newStream(*this);
+    return true;
+  }
+
+  return false;
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
+    ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
+    Upstream::HostDescriptionConstSharedPtr) {
+  ENVOY_LOG(debug, "Failed to create upstream stream: {}", failure_reason);
+
+  conn_pool_.reset();
+  upstream_.reset();
+
+  switch (reason) {
+  case ConnectionPool::PoolFailureReason::Overflow:
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+    onUpstreamEvent(Network::ConnectionEvent::LocalClose);
+    break;
+  case ConnectionPool::PoolFailureReason::Timeout:
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
+    break;
+  }
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInfo* upstream_info,
+                                                           std::unique_ptr<HttpUpstream>&& upstream,
+                                                           Upstream::HostDescriptionConstSharedPtr&,
+                                                           const Network::ConnectionInfoProvider&,
+                                                           Ssl::ConnectionInfoConstSharedPtr) {
+  // TODO(ohadvano): save the host description to host_ field. This requires refactoring because
+  // currently host_ is of type HostConstSharedPtr and not HostDescriptionConstSharedPtr.
+  ENVOY_LOG(debug, "Upstream connection [C{}] attached to session ID [S{}]",
+            upstream_info->downstreamAddressProvider().connectionID().value(), sessionId());
+
+  upstream_ = std::move(upstream);
+  conn_pool_.reset();
+  connecting_ = false;
+  can_send_upstream_ = true;
+  cluster_.cluster_stats_.sess_tunnel_success_.inc();
+  flushBuffer();
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onUpstreamEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected ||
+      event == Network::ConnectionEvent::ConnectedZeroRtt) {
+    return;
+  }
+
+  bool connecting = connecting_;
+  connecting_ = false;
+
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    upstream_.reset();
+
+    if (connecting) {
+      establishUpstreamConnection();
+    } else {
+      cluster_.removeSession(this);
+    }
+  }
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onAboveWriteBufferHighWatermark() {
+  can_send_upstream_ = false;
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onBelowWriteBufferLowWatermark() {
+  can_send_upstream_ = true;
+  flushBuffer();
+}
+
+void UdpProxyFilter::TunnelingActiveSession::flushBuffer() {
+  while (!datagrams_buffer_.empty()) {
+    BufferedDatagramPtr buffered_datagram = std::move(datagrams_buffer_.front());
+    datagrams_buffer_.pop();
+    buffered_bytes_ -= buffered_datagram->buffer_->length();
+    upstream_->encodeData(*buffered_datagram->buffer_);
+  }
+}
+
+void UdpProxyFilter::TunnelingActiveSession::maybeBufferDatagram(Network::UdpRecvData& data) {
+  if (!cluster_.filter_.config_->tunnelingConfig()->bufferEnabled()) {
+    return;
+  }
+
+  if (datagrams_buffer_.size() ==
+          cluster_.filter_.config_->tunnelingConfig()->maxBufferedDatagrams() ||
+      buffered_bytes_ + data.buffer_->length() >
+          cluster_.filter_.config_->tunnelingConfig()->maxBufferedBytes()) {
+    cluster_.cluster_stats_.sess_tunnel_buffer_overflow_.inc();
+    return;
+  }
+
+  auto buffered_datagram = std::make_unique<Network::UdpRecvData>();
+  buffered_datagram->addresses_ = {std::move(data.addresses_.local_),
+                                   std::move(data.addresses_.peer_)};
+  buffered_datagram->buffer_ = std::move(data.buffer_);
+  buffered_datagram->receive_time_ = data.receive_time_;
+  buffered_bytes_ += buffered_datagram->buffer_->length();
+  datagrams_buffer_.push(std::move(buffered_datagram));
+}
+
+void UdpProxyFilter::TunnelingActiveSession::writeUpstream(Network::UdpRecvData& data) {
+  if (!upstream_ || !can_send_upstream_) {
+    maybeBufferDatagram(data);
+    return;
+  }
+
+  if (upstream_) {
+    upstream_->encodeData(*data.buffer_);
+  }
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onUpstreamData(Buffer::Instance& data, bool) {
+  const uint64_t rx_buffer_length = data.length();
+  ENVOY_LOG(trace, "received {} byte datagram from upstream: downstream={} local={} upstream={}",
+            rx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
+            host_ != nullptr ? host_->address()->asStringView() : "unknown");
+
+  cluster_.cluster_stats_.sess_rx_datagrams_.inc();
+  cluster_.cluster_.info()->trafficStats()->upstream_cx_rx_bytes_total_.add(rx_buffer_length);
+  resetIdleTimer();
+
+  Network::UdpRecvData recv_data{{addresses_.local_, addresses_.peer_},
+                                 std::make_unique<Buffer::OwnedImpl>(data),
+                                 cluster_.filter_.config_->timeSource().monotonicTime()};
+  processUpstreamDatagram(recv_data);
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onIdleTimer() {
+  ENVOY_LOG(debug, "session idle timeout: downstream={} local={}", addresses_.peer_->asStringView(),
+            addresses_.local_->asStringView());
+  cluster_.filter_.config_->stats().idle_timeout_.inc();
+  upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+  cluster_.removeSession(this);
 }
 
 } // namespace UdpProxy
