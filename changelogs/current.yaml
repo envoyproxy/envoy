@@ -1,7 +1,6 @@
-date: Pending
+date: October 10, 2023
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
     Close HTTP/2 and HTTP/3 connections that prematurely reset streams. The runtime key
@@ -18,16 +17,3 @@ behavior_changes:
     mitigates CPU starvation by connections that simultaneously send high number of requests by allowing requests from other
     connections to make progress. This runtime value can be set to 1 in the presence of abusive HTTP/2 or HTTP/3 connections.
     By default this limit is disabled.
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
-
-bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
