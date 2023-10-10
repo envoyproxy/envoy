@@ -332,6 +332,9 @@ new_features:
 - area: original_dst
   change: |
     Added support for the internal listener address recovery using the original destination listener filter.
+- area: tracing
+  change: |
+    Added support for exporting spans via HTTP on the OpenTelemetry tracer.
 
 
 deprecated:
