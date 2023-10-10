@@ -172,14 +172,14 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
   }
 
   if (!Logger::Context::useFineGrainLogger()) {
-    return changeLogLevelsForComponentLog(name_levels);
+    return changeLogLevelsForComponentLoggers(name_levels);
   }
   getFineGrainLogContext().updateVerbositySetting(glob_levels);
 
   return absl::OkStatus();
 }
 
-absl::Status LogsHandler::changeLogLevelsForComponentLog(
+absl::Status LogsHandler::changeLogLevelsForComponentLoggers(
     const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes) {
   std::vector<std::pair<Logger::Logger*, spdlog::level::level_enum>> loggers_to_change;
   for (Logger::Logger& logger : Logger::Registry::loggers()) {
