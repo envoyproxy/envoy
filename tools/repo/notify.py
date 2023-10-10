@@ -22,7 +22,6 @@ from aio.api import github as github
 from aio.core.functional import async_property
 from aio.run import runner
 
-
 ENVOY_REPO = "envoyproxy/envoy"
 
 ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
@@ -76,9 +75,7 @@ class RepoNotifier(runner.Runner):
 
     @cached_property
     def github(self):
-        return github.GithubAPI(
-            self.session, "",
-            oauth_token=self.github_token)
+        return github.GithubAPI(self.session, "", oauth_token=self.github_token)
 
     @cached_property
     def github_token(self):
@@ -92,8 +89,7 @@ class RepoNotifier(runner.Runner):
     async def pulls(self):
         async for pull in self.repo.getiter("pulls"):
             skip = (
-                pull["draft"]
-                or pull["user"]["login"] == "dependabot[bot]"
+                pull["draft"] or pull["user"]["login"] == "dependabot[bot]"
                 or self.is_waiting(pull))
             if skip:
                 continue
@@ -126,10 +122,7 @@ class RepoNotifier(runner.Runner):
     @cached_property
     def slo_max(self):
         """on Monday, allow for 24h + 48h."""
-        hours = (
-            72
-            if datetime.date.today().weekday() == 0
-            else 24)
+        hours = (72 if datetime.date.today().weekday() == 0 else 24)
         return datetime.timedelta(hours=hours)
 
     @async_property(cache=True)
@@ -149,7 +142,8 @@ class RepoNotifier(runner.Runner):
         # TODO: pre-filter these
         async for pull in self.pulls:
             updated_at = dt.fromisoformat(pull["updated_at"].replace('Z', '+00:00'))
-            age = dt.now(datetime.timezone.utc) - dt.fromisoformat(pull["updated_at"].replace('Z', '+00:00'))
+            age = dt.now(datetime.timezone.utc) - dt.fromisoformat(
+                pull["updated_at"].replace('Z', '+00:00'))
             message = self.pr_message(age, pull)
 
             if await self.needs_api_review(pull):
@@ -166,7 +160,8 @@ class RepoNotifier(runner.Runner):
             has_maintainer = False
             for assignee in self.get_assignees(pull, MAINTAINERS, FIRST_PASS):
                 has_maintainer = True
-                maintainers_and_prs[assignee["login"]] = maintainers_and_prs.get(assignee["login"], [])
+                maintainers_and_prs[assignee["login"]] = maintainers_and_prs.get(
+                    assignee["login"], [])
                 maintainers_and_prs[assignee["login"]].append(message)
 
             # If there was no maintainer, track it as unassigned.
@@ -188,10 +183,7 @@ class RepoNotifier(runner.Runner):
             '--dry_run',
             action="store_true",
             help="Dont post slack messages, just show what would be posted")
-        parser.add_argument(
-            '--report',
-            action="store_true",
-            help="Print a report of current state")
+        parser.add_argument('--report', action="store_true", help="Print a report of current state")
 
     def get_assignees(self, pull, primary_assignees, extra_assignees=None):
         has_primary_assignee = False
@@ -229,10 +221,9 @@ class RepoNotifier(runner.Runner):
         await self.post_to_assignees()
 
     async def post_to_assignees(self):
-        review_notifications = (
-            (API_REVIEWERS, await self.shepherd_notifications),
-            (MAINTAINERS, await self.maintainer_notifications),
-            (FIRST_PASS, await self.maintainer_notifications))
+        review_notifications = ((API_REVIEWERS, await self.shepherd_notifications),
+                                (MAINTAINERS, await self.maintainer_notifications),
+                                (FIRST_PASS, await self.maintainer_notifications))
         for assignees, messages in review_notifications:
             await self._post_to_assignees(assignees, messages)
 
@@ -249,7 +240,8 @@ class RepoNotifier(runner.Runner):
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(
-                    f"*Untriaged Issues* (please tag and cc area experts)\n<{ISSUE_LINK}|{ISSUE_LINK}>"))
+                    f"*Untriaged Issues* (please tag and cc area experts)\n<{ISSUE_LINK}|{ISSUE_LINK}>"
+                ))
         except SlackApiError as e:
             self.log.error(f"Unexpected error {e.response['error']}")
 
@@ -257,10 +249,7 @@ class RepoNotifier(runner.Runner):
         """Generate a pr message, bolding the time if it's out-SLO."""
         days = age.days
         hours = age.seconds // 3600
-        markup = (
-            "*"
-            if age > self.slo_max
-            else "")
+        markup = ("*" if age > self.slo_max else "")
         return (
             f"<{pull['html_url']}|{pull['title']}> has been waiting "
             f"{markup}{days} days {hours} hours{markup}")
@@ -275,10 +264,7 @@ class RepoNotifier(runner.Runner):
                 "Missing SLACK_BOT_TOKEN: please export token from "
                 f"{SLACK_EXPORT_URL}")
             return 1
-        return await (
-            self.report()
-            if self.should_report
-            else self.notify())
+        return await (self.report() if self.should_report else self.notify())
 
     async def report(self):
         for maintainer, messages in (await self.maintainer_notifications).items():
@@ -295,12 +281,9 @@ class RepoNotifier(runner.Runner):
     async def send_message(self, channel, text):
         # TODO(phlax): this is blocking, switch to async slack client
         if self.dry_run:
-            self.log.notice(
-                f"Slack message ({channel}):\n{text}")
+            self.log.notice(f"Slack message ({channel}):\n{text}")
             return
-        self.slack_client.chat_postMessage(
-            channel=channel,
-            text=message)
+        self.slack_client.chat_postMessage(channel=channel, text=message)
 
     async def _post_to_assignees(self, assignees, messages):
         # TODO(phlax): this is blocking, switch to async slack client
@@ -310,8 +293,7 @@ class RepoNotifier(runner.Runner):
                 continue
             message = "\n".join(text)
             if self.dry_run:
-                self.log.notice(
-                    f"Slack message ({name}):\n{message}")
+                self.log.notice(f"Slack message ({name}):\n{message}")
                 return
             # Ship texts off to slack.
             try:
