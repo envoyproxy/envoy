@@ -34,6 +34,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         "//source/common/common:hash_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/udp/udp_proxy:config",

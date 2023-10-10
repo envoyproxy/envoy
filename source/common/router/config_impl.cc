@@ -1598,7 +1598,7 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
                                                    uint64_t random_value) const {
   if ((Http::HeaderUtility::isConnect(headers) ||
        (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-        Http::HeaderUtility::isConnectUdp(headers))) &&
+        Http::HeaderUtility::isConnectUdpRequest(headers))) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return clusterEntry(headers, random_value);
   }
