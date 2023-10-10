@@ -164,7 +164,7 @@ class RepoNotifier(runner.Runner):
                 stalled_prs.append(message)
 
             has_maintainer = False
-            for assignee in self.get_assignees(pull, MAINTAINERS):
+            for assignee in self.get_assignees(pull, MAINTAINERS, FIRST_PASS):
                 has_maintainer = True
                 maintainers_and_prs[assignee["login"]] = maintainers_and_prs.get(assignee["login"], [])
                 maintainers_and_prs[assignee["login"]].append(message)
@@ -193,13 +193,12 @@ class RepoNotifier(runner.Runner):
             action="store_true",
             help="Print a report of current state")
 
-    def get_assignees(self, pull, primary_assignees):
+    def get_assignees(self, pull, primary_assignees, extra_assignees=None):
         has_primary_assignee = False
-        first_pass_assignees = []
         for assignee in pull["assignees"]:
             is_assignable = (
                 assignee["login"] in primary_assignees
-                or assignee["login"] in first_pass_assignees)
+                or assignee["login"] in (extra_assignees or []))
             if is_assignable:
                 yield assignee
 
@@ -293,13 +292,14 @@ class RepoNotifier(runner.Runner):
 
     async def send_message(self, channel, text):
         # TODO(phlax): this is blocking, switch to async slack client
+        message = "\n".join(text)
         if self.dry_run:
             self.log.notice(
-                f"Slack message ({channel}):\n{text}")
+                f"Slack message ({channel}):\n{message}")
             return
         self.slack_client.chat_postMessage(
             channel=channel,
-            text=text)
+            text=message)
 
     async def _post_to_assignees(self, assignees, messages):
         # TODO(phlax): this is blocking, switch to async slack client
@@ -307,15 +307,16 @@ class RepoNotifier(runner.Runner):
             # Only send texts if we have the slack UID
             if not (uid := assignees.get(name)):
                 continue
+            message = "\n".join(text)
             if self.dry_run:
                 self.log.notice(
-                    f"Slack message ({name}):\n{text}")
+                    f"Slack message ({name}):\n{message}")
                 return
             # Ship texts off to slack.
             try:
                 response = self.slack_client.conversations_open(users=uid, text="hello")
                 channel_id = response["channel"]["id"]
-                self.slack_client.chat_postText(channel=channel_id, text=text)
+                self.slack_client.chat_postText(channel=channel_id, text=message)
             except SlackApiError as e:
                 print(f"Unexpected error {e.response['error']}")
 
