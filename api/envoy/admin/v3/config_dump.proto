@@ -24,6 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ConfigDump {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ConfigDump";
 
+  // ARB CHANGE
   // This list is serialized and dumped in its entirety at the
   // :ref:`/config_dump <operations_admin_interface_config_dump>` endpoint.
   //
