@@ -4276,9 +4276,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   waitForNextUpstreamRequest();
 
   // Makes us have Envoy's writes to downstream return EBADF
-  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  Api::IoErrorPtr ebadf = Network::IoSocketError::getIoSocketEbadfError();
   socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
-  socket_swap.write_matcher_->setWriteOverride(ebadf);
+  socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
@@ -4293,7 +4293,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
-  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  socket_swap.write_matcher_->setWriteOverride(Api::IoError::none());
   // Shut down the server and upstreams before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();
@@ -4321,9 +4321,9 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   RELEASE_ASSERT(result, result.message());
 
   // Makes us have Envoy's writes to upstream return EBADF
-  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  Api::IoErrorPtr ebadf = Network::IoSocketError::getIoSocketEbadfError();
   socket_swap.write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-  socket_swap.write_matcher_->setWriteOverride(ebadf);
+  socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
 
   Buffer::OwnedImpl data("HTTP body content goes here");
   codec_client_->sendData(*downstream_request, data, true);
@@ -4333,7 +4333,7 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
               HasSubstr("upstream_reset_before_response_started{connection_termination}"));
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  socket_swap.write_matcher_->setWriteOverride(Api::IoError::none());
   // Shut down the server before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();
