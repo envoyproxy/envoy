@@ -581,6 +581,7 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
   });
   Http::TestRequestHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
+      {":status", "500"},
   };
 
   envoy::service::ext_proc::v3::HeaderMutation mutation;
@@ -615,6 +616,7 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {"set-cookie", "Value234"},
+      {":status", "500"},
   };
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
