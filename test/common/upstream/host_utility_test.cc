@@ -387,6 +387,9 @@ public:
     ON_CALL(*clusters_.back()->info_, perEndpointStats()).WillByDefault(Return(true));
     ON_CALL(*clusters_.back()->info_, observabilityName())
         .WillByDefault(ReturnRef(clusters_.back()->info_->name_));
+    static Stats::TagVector empty_tags;
+    ON_CALL(clusters_.back()->info_->stats_store_, fixedTags())
+        .WillByDefault(ReturnRef(empty_tags));
 
     if (warming) {
       cluster_info_maps_.warming_clusters_.emplace(name, *clusters_.back());
@@ -627,6 +630,22 @@ TEST_F(PerEndpointMetricsTest, Tags) {
               UnorderedElementsAreArray({
                   Stats::Tag{"envoy.cluster_name", "cluster1"},
                   Stats::Tag{"envoy.endpoint_address", "127.0.0.2:80"},
+              }));
+}
+
+TEST_F(PerEndpointMetricsTest, FixedTags) {
+  auto& cluster = makeCluster("cluster1", 1);
+  Stats::TagVector fixed_tags{{"fixed1", "value1"}, {"fixed2", "value2"}};
+  EXPECT_CALL(cluster.info_->stats_store_, fixedTags()).WillOnce(ReturnRef(fixed_tags));
+
+  auto [counters, gauges] = run();
+
+  EXPECT_THAT(getMetric("cluster.cluster1.endpoint.127.0.0.1_80.c1", counters).tags(),
+              UnorderedElementsAreArray({
+                  Stats::Tag{"envoy.cluster_name", "cluster1"},
+                  Stats::Tag{"envoy.endpoint_address", "127.0.0.1:80"},
+                  Stats::Tag{"fixed1", "value1"},
+                  Stats::Tag{"fixed2", "value2"},
               }));
 }
 

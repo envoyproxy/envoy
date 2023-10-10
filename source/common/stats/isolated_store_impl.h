@@ -236,6 +236,10 @@ public:
 
   void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {}
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {}
+  const TagVector& fixedTags() override {
+    static const TagVector empty;
+    return empty;
+  }
 
 protected:
   /**

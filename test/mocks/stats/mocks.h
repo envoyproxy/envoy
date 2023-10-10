@@ -360,6 +360,7 @@ public:
   ~MockIsolatedStatsStore() override;
 
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
+  MOCK_METHOD(const TagVector&, fixedTags, ());
 };
 
 class MockStatsMatcher : public StatsMatcher {

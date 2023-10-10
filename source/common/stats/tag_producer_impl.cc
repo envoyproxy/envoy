@@ -21,6 +21,7 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& 
 
   for (const auto& cli_tag : cli_tags) {
     addExtractor(std::make_unique<TagExtractorFixedImpl>(cli_tag.name_, cli_tag.value_));
+    fixed_tags_.push_back(cli_tag);
   }
 
   for (const auto& tag_specifier : config.stats_tags()) {
@@ -43,6 +44,7 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& 
     } else if (tag_specifier.tag_value_case() ==
                envoy::config::metrics::v3::TagSpecifier::TagValueCase::kFixedValue) {
       addExtractor(std::make_unique<TagExtractorFixedImpl>(name, tag_specifier.fixed_value()));
+      fixed_tags_.push_back(Tag{name, tag_specifier.fixed_value()});
     }
   }
 }

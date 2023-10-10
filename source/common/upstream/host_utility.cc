@@ -206,11 +206,17 @@ void HostUtility::forEachHostMetric(
       const std::string cluster_name =
           Stats::Utility::sanitizeStatsName(cluster_ref.get().info()->observabilityName());
 
+      const Stats::TagVector& fixed_tags =
+          cluster_ref.get().info()->statsScope().store().fixedTags();
+
       for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
         for (auto& host : host_set->hosts()) {
 
           Stats::TagVector tags = {{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name},
                                    {"envoy.endpoint_address", host->address()->asString()}};
+          for (const auto& tag : fixed_tags) {
+            tags.push_back(tag);
+          }
 
           const auto& hostname = host->hostname();
           if (!hostname.empty()) {
