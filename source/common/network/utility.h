@@ -95,6 +95,16 @@ public:
   static constexpr absl::string_view UNIX_SCHEME{"unix://"};
 
   /**
+   * Make a URL from a datagram Address::Instance; will be udp:// prefix for
+   * an IP address, and unix:// prefix otherwise. Giving a tcp address to this
+   * function will result in incorrect behavior (addresses don't know if they
+   * are datagram or stream).
+   * @param addr supplies the address to convert to string.
+   * @return The appropriate url string compatible with resolveUrl.
+   */
+  static std::string urlFromDatagramAddress(const Address::Instance& addr);
+
+  /**
    * Resolve a URL.
    * @param url supplies the url to resolve.
    * @return Address::InstanceConstSharedPtr the resolved address.

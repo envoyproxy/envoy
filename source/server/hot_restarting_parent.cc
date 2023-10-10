@@ -16,19 +16,36 @@ using HotRestartMessage = envoy::HotRestartMessage;
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
                                          const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
+  std::string socket_path_udp = socket_path + "_udp";
   child_address_ = main_rpc_stream_.createDomainSocketAddress(restart_epoch_ + 1, "child",
                                                               socket_path, socket_mode);
+  child_address_udp_forwarding_ = udp_forwarding_rpc_stream_.createDomainSocketAddress(
+      restart_epoch_ + 1, "child", socket_path_udp, socket_mode);
   main_rpc_stream_.bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
+  udp_forwarding_rpc_stream_.bindDomainSocket(restart_epoch_, "parent", socket_path_udp,
+                                              socket_mode);
+}
+
+void HotRestartingParent::sendHotRestartMessage(envoy::HotRestartMessage&& msg) {
+  ASSERT(dispatcher_.has_value());
+  dispatcher_->post([this, msg = std::move(msg)]() {
+    udp_forwarding_rpc_stream_.sendHotRestartMessage(child_address_udp_forwarding_, std::move(msg));
+  });
 }
 
 // Network::NonDispatchedUdpPacketHandler
-void HotRestartingParent::Internal::handle(uint32_t /*worker_index*/,
-                                           const Network::UdpRecvData& /*packet*/) {
-  dispatcher_.post([]() {
-    // TODO(ravenblack): encapsulate the packet, dispatch it to the hot restarter thread, and
-    // forward the message over a domain socket to HotRestartingChild.
-    // (Pending PR #29328)
-  });
+void HotRestartingParent::Internal::handle(uint32_t worker_index,
+                                           const Network::UdpRecvData& packet) {
+  envoy::HotRestartMessage msg;
+  auto* packet_msg = msg.mutable_request()->mutable_forwarded_udp_packet();
+  packet_msg->set_local_addr(Network::Utility::urlFromDatagramAddress(*packet.addresses_.local_));
+  packet_msg->set_peer_addr(Network::Utility::urlFromDatagramAddress(*packet.addresses_.peer_));
+  packet_msg->set_receive_time_epoch_microseconds(
+      std::chrono::duration_cast<std::chrono::microseconds>(packet.receive_time_.time_since_epoch())
+          .count());
+  *packet_msg->mutable_payload() = packet.buffer_->toString();
+  packet_msg->set_worker_index(worker_index);
+  udp_sender_.sendHotRestartMessage(std::move(msg));
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
@@ -39,7 +56,8 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
         onSocketEvent();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
-  internal_ = std::make_unique<Internal>(&server, dispatcher);
+  dispatcher_ = dispatcher;
+  internal_ = std::make_unique<Internal>(&server, *this);
 }
 
 void HotRestartingParent::onSocketEvent() {
@@ -95,8 +113,9 @@ void HotRestartingParent::onSocketEvent() {
 
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
-HotRestartingParent::Internal::Internal(Server::Instance* server, Event::Dispatcher& dispatcher)
-    : server_(server), dispatcher_(dispatcher) {
+HotRestartingParent::Internal::Internal(Server::Instance* server,
+                                        HotRestartMessageSender& udp_sender)
+    : server_(server), udp_sender_(udp_sender) {
   Stats::Gauge& hot_restart_generation = hotRestartGeneration(*server->stats().rootScope());
   hot_restart_generation.inc();
 }
