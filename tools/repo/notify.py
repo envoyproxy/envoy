@@ -238,12 +238,14 @@ class RepoNotifier(runner.Runner):
 
     async def post_to_oncall(self):
         try:
+            unassigned = "\n".join(await self.maintainer_notifications)
+            stalled = "\n".join(await self.stalled_prs)
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
-                text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{await self.unassigned_prs}"))
+                text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
-                text=(f"*Stalled PRs* (PRs with review out-SLO, please address)\n{await self.stalled_prs}"))
+                text=(f"*Stalled PRs* (PRs with review out-SLO, please address)\n{stalled}"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(
@@ -292,10 +294,9 @@ class RepoNotifier(runner.Runner):
 
     async def send_message(self, channel, text):
         # TODO(phlax): this is blocking, switch to async slack client
-        message = "\n".join(text)
         if self.dry_run:
             self.log.notice(
-                f"Slack message ({channel}):\n{message}")
+                f"Slack message ({channel}):\n{text}")
             return
         self.slack_client.chat_postMessage(
             channel=channel,
