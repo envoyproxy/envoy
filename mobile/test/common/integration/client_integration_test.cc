@@ -1,9 +1,16 @@
+#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
+#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/udp_packet_writer/default/config.h"
 
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/integration/autonomous_upstream.h"
 
+#include "extension_registry.h"
 #include "library/common/data/utility.h"
 #include "library/common/main_interface.h"
 #include "library/common/network/proxy_settings.h"
@@ -19,7 +26,15 @@ namespace {
 class ClientIntegrationTest : public BaseClientIntegrationTest,
                               public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {}
+  ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {
+    // For H3 tests.
+    Network::forceRegisterUdpDefaultWriterFactoryFactory();
+    Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
+    Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
+    Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+    Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
+    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+  }
 
   void SetUp() override {
     setUpstreamCount(config_helper_.bootstrap().static_resources().clusters_size());
@@ -30,18 +45,18 @@ public:
   }
 
   void createEnvoy() override {
-    BaseClientIntegrationTest::createEnvoy();
     // Allow last minute addition of QUIC hints. This is done lazily as it must be done after
     // upstreams are created.
     if (add_quic_hints_) {
       auto address = fake_upstreams_[0]->localAddress();
-      builder_.addQuicHint(address->ip()->addressAsString(), address->ip()->port());
+      builder_.addQuicHint("localhost", address->ip()->port());
     }
+    BaseClientIntegrationTest::createEnvoy();
   }
 
   void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
-  void basicTest();
+  void basicTest(bool success = true);
   void trickleTest();
 
 protected:
@@ -53,7 +68,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-void ClientIntegrationTest::basicTest() {
+void ClientIntegrationTest::basicTest(bool success) {
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
                                    std::to_string(request_data.length()));
@@ -78,10 +93,12 @@ void ClientIntegrationTest::basicTest() {
 
   terminal_callback_.waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 2);
-  ASSERT_EQ(cc_.on_complete_calls, 1);
+  if (success) {
+    ASSERT_EQ(cc_.on_headers_calls, 1);
+    ASSERT_EQ(cc_.status, "200");
+    ASSERT_EQ(cc_.on_data_calls, 2);
+    ASSERT_EQ(cc_.on_complete_calls, 1);
+  }
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
   }
@@ -216,7 +233,7 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
 }
 
 // Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
-TEST_P(ClientIntegrationTest, DISABLED_Http3WithQuicHints) {
+TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
   EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
@@ -227,10 +244,16 @@ TEST_P(ClientIntegrationTest, DISABLED_Http3WithQuicHints) {
   add_quic_hints_ = true;
 
   initialize();
+
+  auto address = fake_upstreams_[0]->localAddress();
+  default_request_headers_.setHost(absl::StrCat("localhost:", address->ip()->port()));
   default_request_headers_.setScheme("https");
-  basicTest();
-  // HTTP/3
-  ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
+  // As we don't have certs for localhost the H3 handshake will fail.
+  basicTest(false);
+
+  // This verifies the H3 attempt was made due to the quic hints
+  std::string stats = engine_->dumpStats();
+  EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
 }
 
 TEST_P(ClientIntegrationTest, BasicHttps) {

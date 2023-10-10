@@ -22,6 +22,7 @@ envoy_cc_test(
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
+        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
     ],
 )
 
