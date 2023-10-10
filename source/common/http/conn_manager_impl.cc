@@ -679,13 +679,15 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
       runtime_.snapshot().getInteger(ConnectionManagerImpl::PrematureResetTotalStreamCountKey, 500);
 
   if (closed_non_internally_destroyed_requests_ < limit) {
-    return;
-  }
-
-  if (static_cast<double>(number_premature_stream_resets_) /
-          closed_non_internally_destroyed_requests_ <
-      .5) {
-    return;
+    if (number_premature_stream_resets_ < .5 * limit) {
+      return;
+    }
+  } else {
+    if (static_cast<double>(number_premature_stream_resets_) /
+        closed_non_internally_destroyed_requests_ <
+        .5) {
+      return;
+    }
   }
 
   if (drain_state_ == DrainState::NotDraining) {

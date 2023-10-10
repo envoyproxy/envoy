@@ -1096,12 +1096,57 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
   const int total_streams = 100;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
                                     absl::StrCat(total_streams));
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
   initialize();
 
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}};
   codec_client_ = makeHttpConnection(lookupPort("http"));
+
   for (int i = 0; i < total_streams; ++i) {
+    std::cerr << "sending: " << i << "\n";
+    // Send and wait
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    request_encoder_ = &encoder_decoder.first;
+    codec_client_->sendData(*request_encoder_, 0, true);
+    auto response = std::move(encoder_decoder.second);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+  }
+  for (int i = 0; i < total_streams; ++i) {
+    std::cerr << "sending: " << i << "\n";
+    // Send and reset
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    std::cerr << "resetting: " << i << "\n";
+    codec_client_->sendReset(*request_encoder_);
+    ASSERT_TRUE(response->waitForReset());
+  }
+
+  // Envoy should disconnect client due to premature reset check
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", total_streams);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyResets) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
+                            // before opening new one.
+  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
+                                    "true");
+  const int total_streams = 100;
+  config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
+                                    absl::StrCat(total_streams));
+  const int num_reset_streams = total_streams / 2;
+  initialize();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}};
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (int i = 0; i < num_reset_streams; i++) {
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
@@ -1111,7 +1156,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
 
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", total_streams);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", num_reset_streams);
   test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
 }
 
