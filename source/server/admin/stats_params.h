@@ -98,7 +98,7 @@ struct StatsParams {
 
     // Performance note: computing the name is expensive.
     //
-    // In the prometheus case, this is only neccessary if doing regex filtering and a regex is
+    // In the prometheus case, this is only necessary if doing regex filtering and a regex is
     // defined (and the function parameter will be nullptr).
     //
     // In the non-prometheus case, the name is needed if the metric should be shown, so compute it
