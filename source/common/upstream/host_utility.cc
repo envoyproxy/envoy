@@ -212,11 +212,11 @@ void HostUtility::forEachHostMetric(
       for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
         for (auto& host : host_set->hosts()) {
 
-          Stats::TagVector tags = {{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name},
-                                   {"envoy.endpoint_address", host->address()->asString()}};
-          for (const auto& tag : fixed_tags) {
-            tags.push_back(tag);
-          }
+          Stats::TagVector tags;
+          tags.reserve(fixed_tags.size() + 3);
+          tags.insert(tags.end(), fixed_tags.begin(), fixed_tags.end());
+          tags.emplace_back(Stats::Tag{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name});
+          tags.emplace_back(Stats::Tag{"envoy.endpoint_address", host->address()->asString()});
 
           const auto& hostname = host->hostname();
           if (!hostname.empty()) {
