@@ -1122,6 +1122,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
           ASSERT(weights_sum + host_weight >= weights_sum);
           weights_sum += host_weight;
         }
+        normalizer = std::max(1U, normalizer);
         const uint32_t scheduler_cycle_size = weights_sum / normalizer;
 
         for (uint32_t i = 0; i < seed_ % scheduler_cycle_size; ++i) {
