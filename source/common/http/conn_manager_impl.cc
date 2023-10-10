@@ -684,7 +684,7 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
     }
   } else {
     if (static_cast<double>(number_premature_stream_resets_) /
-        closed_non_internally_destroyed_requests_ <
+            closed_non_internally_destroyed_requests_ <
         .5) {
       return;
     }
