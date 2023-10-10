@@ -29,7 +29,8 @@ public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
                     Runtime::Loader& runtime, Network::SocketSharedPtr&& socket,
                     Network::Address::InstanceConstSharedPtr& listen_address,
-                    Network::ConnectionBalancer& connection_balancer);
+                    Network::ConnectionBalancer& connection_balancer,
+                    ThreadLocalOverloadStateOptRef overload_state);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
                     Network::Address::InstanceConstSharedPtr& listen_address,
                     Network::ListenerConfig& config,

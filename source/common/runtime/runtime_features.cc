@@ -72,7 +72,7 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth_use_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_overload_manager_error_unknown_action);
 RUNTIME_GUARD(envoy_reloadable_features_prohibit_route_refresh_after_response_headers_sent);
-RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
+RUNTIME_GUARD(envoy_reloadable_features_proxy_status_upstream_request_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_original_path);
 RUNTIME_GUARD(envoy_reloadable_features_send_header_raw_value);
 RUNTIME_GUARD(envoy_reloadable_features_service_sanitize_non_utf8_strings);
@@ -92,6 +92,7 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses);
 RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
+RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 
 // Begin false flags. These should come with a TODO to flip true.
@@ -126,6 +127,8 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
 // TODO(wbpcode): enable by default after a complete deprecation period.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
+// TODO(pksohn): enable after fixing https://github.com/envoyproxy/envoy/issues/29930
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
