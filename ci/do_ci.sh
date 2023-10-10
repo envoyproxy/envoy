@@ -565,11 +565,17 @@ case $CI_TARGET in
               -- --stdout \
                  -d "$ENVOY_RELEASE_TARBALL" \
             | tar xfO - envoy > distribution/custom/envoy
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/zstd \
+              -- --stdout \
+                 -d "$ENVOY_RELEASE_TARBALL" \
+            | tar xfO - envoy-contrib > distribution/custom/envoy-contrib
         # Build the packages
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               --remote_download_toplevel \
               -c opt \
               --//distribution:envoy-binary=//distribution:custom/envoy \
+              --//distribution:envoy-contrib-binary=//distribution:custom/envoy-contrib \
               //distribution:packages.tar.gz
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
             cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
@@ -853,9 +859,6 @@ case $CI_TARGET in
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
-        # The default config expects these files
-        mkdir -p distribution/custom
-        cp -a /build/*/*64 distribution/custom/
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release

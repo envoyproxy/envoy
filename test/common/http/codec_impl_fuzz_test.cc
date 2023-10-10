@@ -66,6 +66,12 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
   h1_settings.accept_http_10_ = settings.accept_http_10();
   h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
 
+  // If the server accepts a HTTP/1.0 then the default host must be valid.
+  if (h1_settings.accept_http_10_ &&
+      !HeaderUtility::authorityIsValid(h1_settings.default_host_for_http_10_)) {
+    throw EnvoyException("Invalid Http1ServerSettings, HTTP/1.0 is enabled and "
+                         "'default_host_for_http_10' has invalid hostname, skipping test.");
+  }
   return h1_settings;
 }
 

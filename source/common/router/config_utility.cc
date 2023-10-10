@@ -9,6 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/regex.h"
+#include "source/common/config/datasource.h"
 
 namespace Envoy {
 namespace Router {
@@ -111,30 +112,14 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v
     return EMPTY_STRING;
   }
   const auto& body = route.direct_response().body();
-  const std::string& filename = body.filename();
-  if (!filename.empty()) {
-    if (!api.fileSystem().fileExists(filename)) {
-      throw EnvoyException(fmt::format("response body file {} does not exist", filename));
-    }
-    const ssize_t size = api.fileSystem().fileSize(filename);
-    if (size < 0) {
-      throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
-    }
-    if (static_cast<uint64_t>(size) > max_body_size_bytes) {
-      throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
-                                       filename, size, max_body_size_bytes));
-    }
-    auto file_or_error = api.fileSystem().fileReadToEnd(filename);
-    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
-    return file_or_error.value();
-  }
-  const std::string inline_body(body.inline_bytes().empty() ? body.inline_string()
-                                                            : body.inline_bytes());
-  if (inline_body.length() > max_body_size_bytes) {
+
+  const std::string string_body =
+      Envoy::Config::DataSource::read(body, true, api, max_body_size_bytes);
+  if (string_body.length() > max_body_size_bytes) {
     throw EnvoyException(fmt::format("response body size is {} bytes; maximum is {}",
-                                     inline_body.length(), max_body_size_bytes));
+                                     string_body.length(), max_body_size_bytes));
   }
-  return inline_body;
+  return string_body;
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
