@@ -183,26 +183,17 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
     const LowerCaseString header_name(sh.header().key());
 
-    ENVOY_LOG(error, "append_action value: {}", sh.append_action());
-    ENVOY_LOG(error, "header name: {}", header_name);
-    ENVOY_LOG(error, "header value: {}, header raw value: {}", sh.header().value(),
-              sh.header().raw_value());
-
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.header_value_option_change_action")) {
       switch (sh.append_action()) {
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        ENVOY_LOG(error, "Inside append action APPEND_IF_EXISTS_OR_ADD {} ",
-                  HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
         // Check if the header already exists with the same name and value.
         is_duplicate = false;
-        ENVOY_LOG(error, "1value of is_duplciate {}", is_duplicate);
         if (!headers.get(header_name).empty()) {
           Http::HeaderMap::GetResult result = headers.get(header_name);
+          absl::string_view existing_value;
           for (size_t i = 0; i < result.size(); ++i) {
-            const Http::HeaderEntry* entry = result[i];
-            const absl::string_view& existing_value = entry->value().getStringView();
-            ENVOY_LOG(error, "existing header {}; value: {}", header_name, existing_value);
+            existing_value = result[i]->value().getStringView();
 
             // Compare the existing value with your desired header_value
             if (existing_value == header_value) {
@@ -211,7 +202,6 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
             }
           }
         }
-        ENVOY_LOG(error, "2value of is_duplciate {}", is_duplicate);
         if (!is_duplicate) {
           append_mode_for_append_action = true;
           check_op_for_append_action =
@@ -226,7 +216,6 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         }
         break;
       case HeaderValueOption::ADD_IF_ABSENT:
-        ENVOY_LOG(error, "Inside append action ADD_IF_ABSENT {}", HeaderValueOption::ADD_IF_ABSENT);
         if (headers.get(header_name).empty()) {
           append_mode_for_append_action = true;
           check_op_for_append_action = CheckOperation::SET;
@@ -240,8 +229,6 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         }
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        ENVOY_LOG(error, "Inside append action OVERWRITE_IF_EXISTS_OR_ADD {}",
-                  HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         append_mode_for_append_action = false;
         check_op_for_append_action = CheckOperation::SET;
         checkResult_for_append_action = handleCheckResult(
@@ -253,8 +240,6 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         }
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS:
-        ENVOY_LOG(error, "Inside append action OVERWRITE_IF_EXISTS{}",
-                  HeaderValueOption::OVERWRITE_IF_EXISTS);
         if (!headers.get(header_name).empty()) {
           append_mode_for_append_action = false;
           check_op_for_append_action = CheckOperation::SET;
@@ -302,10 +287,9 @@ Filters::Common::MutationRules::CheckResult MutationUtils::handleCheckResult(
     // CONTINUE_AND_REPLACE option is selected, to stay compatible.
     check_result = CheckResult::OK;
   }
-  ENVOY_LOG(error, "before switch check_result {}", check_result);
+  // Print the value as an integer
   switch (check_result) {
   case CheckResult::OK:
-    ENVOY_LOG(error, "Setting header {} append = {}", header_name, append_mode);
     if (append_mode) {
       headers.addCopy(header_name, header_value);
     } else {
@@ -313,11 +297,9 @@ Filters::Common::MutationRules::CheckResult MutationUtils::handleCheckResult(
     }
     break;
   case CheckResult::IGNORE:
-    ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
     rejected_mutations.inc();
     break;
   case CheckResult::FAIL:
-    ENVOY_LOG(debug, "Header {} may not be modified. Returning error", header_name);
     rejected_mutations.inc();
     // You can add additional handling for the FAIL case here if needed.
     break;

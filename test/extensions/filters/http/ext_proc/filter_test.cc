@@ -3316,9 +3316,14 @@ TEST_F(HttpFilterTest, AppendActionTest) {
         auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
         auto s = headers_mut->add_set_headers();
         s->mutable_header()->set_key("x-original-header");
-        s->mutable_header()->set_value(" appended_value");
+        s->mutable_header()->set_value("appended_value");
         s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
                                  HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+        s = headers_mut->add_set_headers();
+        s->mutable_header()->set_key("another-request");
+        s->mutable_header()->set_value("request");
+        s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                                 HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
       });
 
   // Check that the header was appended correctly.
@@ -3327,7 +3332,8 @@ TEST_F(HttpFilterTest, AppendActionTest) {
                                     {":scheme", "http"},
                                     {"host", "host"},
                                     {"x-original-header", "original_value"},
-                                    {"x-original-header", "appended_value"}};
+                                    {"x-original-header", "appended_value"},
+                                    {"another-request", "request"}};
   EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
 
   // Continue processing data and trailers.
@@ -3356,14 +3362,18 @@ TEST_F(HttpFilterTest, AppendActionTest) {
     s->mutable_header()->set_value("appended_response_value");
     s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
                              HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+    s = resp_headers_mut->add_set_headers();
+    s->mutable_header()->set_key("x-original-response-header");
+    s->mutable_header()->set_value("second value");
+    s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                             HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
   });
 
   // Check that the response header was appended correctly.
-  TestRequestHeaderMapImpl final_expected_response{
-      {":status", "200"},
-      {"content-type", "text/plain"},
-      {"content-length", "3"},
-      {"x-original-response-header", "appended_response_value"}};
+  TestRequestHeaderMapImpl final_expected_response{{":status", "200"},
+                                                   {"content-type", "text/plain"},
+                                                   {"content-length", "3"},
+                                                   {"x-original-response-header", "second value"}};
   EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
 
   // Continue processing data, encode trailers, and destroy the filter.
