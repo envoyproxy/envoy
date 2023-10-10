@@ -2106,8 +2106,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(io_handle, recv(_, _, _))
-      .WillOnce(Return(ByMove(
-          Api::IoCallUint64Result(max_size, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(max_size, Api::IoError::none()))));
   EXPECT_CALL(*test_filter, onData(_))
       .WillOnce(Invoke([](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
         return Network::FilterStatus::Continue;

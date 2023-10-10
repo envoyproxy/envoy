@@ -115,6 +115,9 @@ minor_behavior_changes:
   change: |
     Updated the security posture of the :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` to
     robust against untrusted downstreams and upstreams.
+- area: router
+  change: |
+    Enable environment_variable in router direct response.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
