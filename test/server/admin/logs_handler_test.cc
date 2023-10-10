@@ -146,11 +146,12 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::warn);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::info);
 
-  // The level of unmatched loggers will be the default. 
+  // The level of unmatched loggers will be the default.
   query = fmt::format("/logging?paths={}:critical", "logs_handler_test");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   FINE_GRAIN_LOG(info, "After post {}, level for this file is info now!", query);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::critical);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(),
+            spdlog::level::critical);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::trace);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::trace);
 }
