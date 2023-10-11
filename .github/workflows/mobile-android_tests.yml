@@ -118,5 +118,5 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
       run: |
-        docker run -e GITHUB_TOKEN -e CC -e CXX ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
-            "cd mobile && ./bazelw test --build_tests_only --config=test-android --config=mobile-remote-ci --define=signal_trace=disabled //test/kotlin/..."
+        docker run --volume="${PWD}/mobile:/source/mobile" --workdir="/source/mobile" -e GITHUB_TOKEN -e CC -e CXX ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
+            "./bazelw test --build_tests_only --config=test-android --config=mobile-remote-ci --define=signal_trace=disabled //test/kotlin/..."
