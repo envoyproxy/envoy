@@ -2353,8 +2353,8 @@ TEST_P(Http2FrameIntegrationTest, MultipleHeaderOnlyRequestsFollowedByReset) {
 // This test depends on an another patch with premature resets
 TEST_P(Http2FrameIntegrationTest, ResettingDeferredRequestsTriggersPrematureResetCheck) {
   const int kRequestsSentPerIOCycle = 20;
-  // Set premature stream count to the number of streams we are about to send
-  config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count", "20");
+  // Set premature stream count to twice the number of streams we are about to send.
+  config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count", "40");
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   beginSession();
 
