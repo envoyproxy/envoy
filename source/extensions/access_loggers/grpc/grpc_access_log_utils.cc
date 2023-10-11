@@ -301,9 +301,12 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   for (const auto& key : config.filter_state_objects_to_log()) {
-    extractFilterStateData(stream_info.filterState(), key, common_access_log);
-    extractFilterStateData(*stream_info.upstreamInfo()->upstreamFilterState().get(), key,
-                           common_access_log);
+    if (!(extractFilterStateData(stream_info.filterState(), key, common_access_log))) {
+      if (stream_info.upstreamInfo().has_value()) {
+        extractFilterStateData(*(stream_info.upstreamInfo()->upstreamFilterState().get()), key,
+                               common_access_log);
+      }
+    }
   }
 
   Tracing::CustomTagContext ctx{&request_header, stream_info};
@@ -334,7 +337,7 @@ void Utility::extractCommonAccessLogProperties(
   common_access_log.set_access_log_type(access_log_type);
 }
 
-void extractFilterStateData(const StreamInfo::FilterState& filter_state, const std::string& key,
+bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const std::string& key,
                             envoy::data::accesslog::v3::AccessLogCommon& common_access_log) {
   if (auto state = filter_state.getDataReadOnlyGeneric(key); state != nullptr) {
     ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
@@ -347,7 +350,9 @@ void extractFilterStateData(const StreamInfo::FilterState& filter_state, const s
         any.PackFrom(*serialized_proto);
       }
     }
+    return true;
   }
+  return false;
 }
 
 } // namespace GrpcCommon
