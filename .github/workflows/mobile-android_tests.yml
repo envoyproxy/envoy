@@ -16,6 +16,8 @@ concurrency:
 jobs:
   env:
     uses: ./.github/workflows/_env.yml
+    with:
+      prime_build_image: true
     permissions:
       contents: read
       statuses: write
@@ -102,11 +104,6 @@ jobs:
     name: kotlin_tests_linux
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 90
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
-      env:
-        CC: /opt/llvm/bin/clang
-        CXX: /opt/llvm/bin/clang++
     steps:
     - name: Pre-cleanup
       # Using the defaults in
@@ -120,9 +117,10 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile
-        ./bazelw test \
-            --build_tests_only \
-            --config test-android \
-            --config=mobile-remote-ci \
-            --define=signal_trace=disabled \
-            //test/kotlin/...
+        docker run -e GITHUB_TOKEN ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
+            './bazelw test \
+                --build_tests_only \
+                --config test-android \
+                --config=mobile-remote-ci \
+                --define=signal_trace=disabled \
+                //test/kotlin/...'
