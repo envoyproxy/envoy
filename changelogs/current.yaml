@@ -102,6 +102,11 @@ minor_behavior_changes:
     The redis network filter :ref:`connection_rate_limit_per_sec
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
     must be greater than 0. A config that sets this value to 0 will be rejected.
+- area: upstream
+  change: |
+    Deprecate code path of legacy upstream load balancer. Ideally, this is implementation detail changes and should not
+    affect users. However, if there is any user who encounters issues, this behavior can be reverted by setting runtime flag
+    ``envoy_reloadable_features_convert_legacy_lb_config`` to false.
 - area: http
   change: |
     Change the proxy status for ``UpstreamRequestTimeout`` to ``HttpResponseTimeout``.
