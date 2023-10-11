@@ -83,9 +83,6 @@ struct StatsParams {
    */
   template <class StatType>
   bool shouldShowMetric(const StatType& metric, std::string* name_out = nullptr) const {
-    // This duplicates logic in StatsRequest::populateStatsFromScopes, but differs
-    // in one subtle way: in Prometheus we only use metric.name() for filtering,
-    // not rendering, so we only construct the name if there's a filter.
     if (used_only_ && !metric.used()) {
       return false;
     }
