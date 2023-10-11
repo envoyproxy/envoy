@@ -211,9 +211,17 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
     }
   }
 
+  for (const auto& counter : snapshot.hostCounters()) {
+    tls_sink.flushCounter(counter.name(), counter.delta());
+  }
+
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
       tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
+    }
+
+    for (const auto& gauge : snapshot.hostGauges()) {
+      tls_sink.flushGauge(gauge.name(), gauge.value());
     }
   }
   // TODO(efimki): Add support of text readouts stats.
