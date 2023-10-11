@@ -115,9 +115,11 @@ jobs:
     - name: 'Run Kotlin library integration tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
       run: |
         cd mobile
-        docker run -e GITHUB_TOKEN ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
+        docker run -e GITHUB_TOKEN -e CC -e CXX ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
             './bazelw test \
                 --build_tests_only \
                 --config test-android \
