@@ -366,50 +366,28 @@ stages:
         artifactSuffix: ".arm64"
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
-  - job: docs
-    displayName: Publish docs to netlify
+  - job: success
     dependsOn: ["docker", "package_x64", "package_arm64"]
-    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
+    displayName: Success (linux artefacts)
     pool:
       vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.package_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.package_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
-    - task: Cache@2
-      inputs:
-        key: "docs | ./WORKSPACE | **/*.bzl"
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-        AZP_BRANCH: $(Build.SourceBranch)
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Generate docs"
-
-    - script: |
-        ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
-      displayName: "Upload Docs to GCS"
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-        GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-      condition: eq(variables['isMain'], 'true')
-
-    - script: docs/publish.sh
-      displayName: "Publish to GitHub"
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        AZP_BRANCH: $(Build.SourceBranch)
-        NETLIFY_TRIGGER_URL: $(NetlifyTriggerURL)
+    - checkout: none
+    - bash: |
+        echo "building publishable assets complete"
 
   - job: github
     displayName: Publish release tag
-    dependsOn: ["docs"]
+    dependsOn: ["success"]
     condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true), eq(variables['isStableBranch'], 'true'), eq(stageDependencies.env.repo.outputs['state.isDev'], 'false'))
     pool:
       vmImage: "ubuntu-20.04"
