@@ -256,34 +256,21 @@ stages:
         repoFetchDepth: $(REPO_FETCH_DEPTH)
         repoFetchTags: $(REPO_FETCH_TAGS)
 
-  - job: coverage
+  - job: complete
     displayName: "linux_x64"
-    dependsOn: []
-    timeoutInMinutes: 180
-    pool: "envoy-x64-large"
-    strategy:
-      maxParallel: 2
-      matrix:
-        coverage:
-          CI_TARGET: "coverage"
-        fuzz_coverage:
-          CI_TARGET: "fuzz_coverage"
+    dependsOn: ["bazel"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
     steps:
-    - template: bazel.yml
-      parameters:
-        managedAgent: false
-        ciTarget: bazel.$(CI_TARGET)
-        rbe: false
-        # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
-        bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
-
-    - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
-      displayName: "Upload $(CI_TARGET) Report to GCS"
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-        GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-      condition: always()
+    - checkout: none
+    - bash: |
+        echo "checks complete"
 
 - stage: publish
   dependsOn: ["env", "linux_x64", "linux_arm64"]
