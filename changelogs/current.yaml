@@ -80,6 +80,10 @@ minor_behavior_changes:
     Outlier detection will always respect ``max_ejection_percent`` now.
     This behavioral change can be reverted by setting runtime guard
     ``envoy.reloadable_features.check_mep_on_first_eject`` to ``false``.
+- area: outlier detection
+  change: |
+    A node must stay in healthy state for at least one period of
+    :ref:`check interval <envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>` before ejection time multiplier is decremented.
 - area: quic
   change: |
     Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
@@ -102,6 +106,11 @@ minor_behavior_changes:
     The redis network filter :ref:`connection_rate_limit_per_sec
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
     must be greater than 0. A config that sets this value to 0 will be rejected.
+- area: upstream
+  change: |
+    Deprecate code path of legacy upstream load balancer. Ideally, this is implementation detail changes and should not
+    affect users. However, if there is any user who encounters issues, this behavior can be reverted by setting runtime flag
+    ``envoy_reloadable_features_convert_legacy_lb_config`` to false.
 - area: http
   change: |
     Change the proxy status for ``UpstreamRequestTimeout`` to ``HttpResponseTimeout``.
@@ -111,6 +120,10 @@ minor_behavior_changes:
     Added new configuration field :ref:`always_consume_default_token_bucket
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.always_consume_default_token_bucket>`
     to allow for setting if default token bucket should be always consumed or only be consumed when there is no matching descriptor.
+- area: tls_inspector
+  change: |
+    Updated the security posture of the :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` to
+    robust against untrusted downstreams and upstreams.
 - area: router
   change: |
     Enable environment_variable in router direct response.
@@ -169,7 +182,7 @@ bug_fixes:
     Fixed a crash on some versions of macOS when using a listener on a unix-domain socket.
 - area: redis
   change: |
-    Fixed a bug where redis key with ``%`` in the key is failing with a validation error.
+    Fixed a bug where redis key with % in the key is failing with a validation error.
 - area: tracing
   change: |
     Fixed a bug in the Datadog tracer where Datadog's "operation name" field would contain what should be in the "resource name" field.
@@ -182,6 +195,10 @@ bug_fixes:
     resets is applied. The connection is disconnected if more than 50% of resets are premature.
     Setting the runtime key ``envoy.restart_features.send_goaway_for_premature_rst_streams`` to ``false`` completely disables
     this check.
+- area: http
+  change: |
+    Fixed a bug that could cause metadata to be decoded after a local reply has been triggered.
+    Can be disabled by setting ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -354,7 +371,6 @@ new_features:
 - area: original_dst
   change: |
     Added support for the internal listener address recovery using the original destination listener filter.
-
 
 deprecated:
 - area: tracing

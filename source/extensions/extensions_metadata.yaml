@@ -577,7 +577,7 @@ envoy.filters.listener.proxy_protocol:
 envoy.filters.listener.tls_inspector:
   categories:
   - envoy.filters.listener
-  security_posture: robust_to_untrusted_downstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector

@@ -28,6 +28,8 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/http/router:config",
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
+        "@envoy//source/extensions/load_balancing_policies/cluster_provided:config",
+        "@envoy//source/extensions/load_balancing_policies/round_robin:config",
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
         "@envoy//source/extensions/path/match/uri_template:config",
         "@envoy//source/extensions/path/rewrite/uri_template:config",
