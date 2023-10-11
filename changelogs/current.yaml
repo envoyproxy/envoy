@@ -80,6 +80,10 @@ minor_behavior_changes:
     Outlier detection will always respect ``max_ejection_percent`` now.
     This behavioral change can be reverted by setting runtime guard
     ``envoy.reloadable_features.check_mep_on_first_eject`` to ``false``.
+- area: outlier detection
+  change: |
+    A node must stay in healthy state for at least one period of
+    :ref:`check interval <envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>` before ejection time multiplier is decremented.
 - area: quic
   change: |
     Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
