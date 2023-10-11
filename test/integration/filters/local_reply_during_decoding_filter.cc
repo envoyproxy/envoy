@@ -21,11 +21,13 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // Due to the above local reply, this method should never be invoked in tests.
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     ASSERT(false);
     return Http::FilterDataStatus::Continue;
   }
 
+  // Due to the above local reply, this method should never be invoked in tests.
   Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap&) override {
     ASSERT(false);
     return Http::FilterMetadataStatus::Continue;
