@@ -245,7 +245,6 @@ TEST_P(ValidationServerTest1, RunWithoutCrash) {
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest1,
                          ::testing::ValuesIn(ValidationServerTest1::getAllConfigFiles()));
 
-
 // A test to ensure that ENVOY_BUGs are handled when the component factory returns a nullptr for
 // the drain manager.
 TEST_P(RuntimeFeatureValidationServerTest, DrainManagerNullptrCheck) {
@@ -261,7 +260,6 @@ TEST_P(RuntimeFeatureValidationServerTest, DrainManagerNullptrCheck) {
                                              Filesystem::fileSystemForTest()),
                    "Component factory should not return nullptr from createDrainManager()");
 }
-
 
 TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoader) {
   Thread::MutexBasicLockable access_log_lock;
