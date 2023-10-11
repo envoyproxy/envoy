@@ -8,10 +8,9 @@ namespace Filters {
 namespace Common {
 namespace SetFilterState {
 
-std::vector<Value> Config::parse(
-    const Protobuf::RepeatedPtrField<
-        envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue>& proto_values,
-    Server::Configuration::CommonFactoryContext& context) const {
+std::vector<Value>
+Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
+              Server::Configuration::CommonFactoryContext& context) const {
   std::vector<Value> values;
   values.reserve(proto_values.size());
   for (const auto& proto_value : proto_values) {
@@ -24,10 +23,10 @@ std::vector<Value> Config::parse(
     }
     value.state_type_ = proto_value.read_only() ? StateType::ReadOnly : StateType::Mutable;
     switch (proto_value.shared_with_upstream()) {
-    case envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue::ONCE:
+    case FilterStateValueProto::ONCE:
       value.stream_sharing_ = StreamSharing::SharedWithUpstreamConnectionOnce;
       break;
-    case envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue::TRANSITIVE:
+    case FilterStateValueProto::TRANSITIVE:
       value.stream_sharing_ = StreamSharing::SharedWithUpstreamConnection;
       break;
     default:
@@ -37,7 +36,7 @@ std::vector<Value> Config::parse(
     value.skip_if_empty_ = proto_value.skip_if_empty();
     value.value_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
         proto_value.format_string(), context);
-    values.push_back(value);
+    values.push_back(std::move(value));
   }
   return values;
 }

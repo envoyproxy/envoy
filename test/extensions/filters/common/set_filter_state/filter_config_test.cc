@@ -43,17 +43,16 @@ class ConfigTest : public testing::Test {
 public:
   void initialize(const std::vector<std::string>& values,
                   LifeSpan life_span = LifeSpan::FilterChain) {
-    using ProtoValue = envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue;
-    std::vector<ProtoValue> proto_values;
+    std::vector<FilterStateValueProto> proto_values;
     proto_values.reserve(values.size());
     for (const auto& value : values) {
-      ProtoValue proto_value;
+      FilterStateValueProto proto_value;
       TestUtility::loadFromYaml(value, proto_value);
       proto_values.push_back(proto_value);
     }
     config_ = std::make_shared<Config>(
-        Protobuf::RepeatedPtrField<ProtoValue>(proto_values.begin(), proto_values.end()), life_span,
-        context_);
+        Protobuf::RepeatedPtrField<FilterStateValueProto>(proto_values.begin(), proto_values.end()),
+        life_span, context_);
   }
   void update() { config_->updateFilterState({&header_map_}, info_); }
   NiceMock<Server::Configuration::MockFactoryContext> context_;

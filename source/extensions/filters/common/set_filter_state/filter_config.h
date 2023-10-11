@@ -16,6 +16,8 @@ namespace SetFilterState {
 using LifeSpan = StreamInfo::FilterState::LifeSpan;
 using StateType = StreamInfo::FilterState::StateType;
 using StreamSharing = StreamInfo::StreamSharingMayImpactPooling;
+using FilterStateValueProto =
+    envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue;
 
 struct Value {
   std::string key_;
@@ -28,19 +30,15 @@ struct Value {
 
 class Config : public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(
-      const Protobuf::RepeatedPtrField<
-          envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue>& proto_values,
-      LifeSpan life_span, Server::Configuration::CommonFactoryContext& context)
+  Config(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values, LifeSpan life_span,
+         Server::Configuration::CommonFactoryContext& context)
       : life_span_(life_span), values_(parse(proto_values, context)) {}
   void updateFilterState(const Formatter::HttpFormatterContext& context,
                          StreamInfo::StreamInfo& info) const;
 
 private:
-  std::vector<Value> parse(
-      const Protobuf::RepeatedPtrField<
-          envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue>& proto_values,
-      Server::Configuration::CommonFactoryContext& context) const;
+  std::vector<Value> parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
+                           Server::Configuration::CommonFactoryContext& context) const;
   const LifeSpan life_span_;
   const std::vector<Value> values_;
 };
