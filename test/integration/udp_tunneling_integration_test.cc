@@ -3,6 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/upstreams/http/udp/v3/udp_connection_pool.pb.h"
 
 #include "test/integration/http_integration.h"
@@ -328,6 +329,393 @@ TEST_P(ForwardingConnectUdpIntegrationTest, DoNotForwardNonConnectUdp) {
 
   cleanupUpstreamAndDownstream();
 }
+
+// Tunneling downstream UDP over an upstream HTTP CONNECT tunnel.
+class UdpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  UdpTunnelingIntegrationTest()
+      : HttpProtocolIntegrationTest(ConfigHelper::baseUdpListenerConfig()) {}
+
+  struct BufferOptions {
+    uint32_t max_buffered_datagrams_;
+    uint32_t max_buffered_bytes_;
+  };
+
+  struct TestConfig {
+    std::string proxy_host_;
+    std::string target_host_;
+    uint32_t max_connect_attempts_;
+    uint32_t default_target_port_;
+    bool use_post_;
+    std::string post_path_;
+    absl::optional<BufferOptions> buffer_options_;
+    absl::optional<std::string> idle_timeout_;
+  };
+
+  void setup(const TestConfig& config) {
+    config_ = config;
+
+    std::string filter_config =
+        fmt::format(R"EOF(
+name: udp_proxy
+typed_config:
+  '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+  stat_prefix: foo
+  matcher:
+    on_no_match:
+      action:
+        name: route
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+          cluster: cluster_0
+  session_filters:
+  - name: http_capsule
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig
+  tunneling_config:
+    proxy_host: {}
+    target_host: {}
+    default_target_port: {}
+    retry_options:
+      max_connect_attempts: {}
+)EOF",
+                    config.proxy_host_, config.target_host_, config.default_target_port_,
+                    config.max_connect_attempts_);
+
+    if (config.buffer_options_.has_value()) {
+      filter_config += fmt::format(R"EOF(
+    buffer_options:
+      max_buffered_datagrams: {}
+      max_buffered_bytes: {}
+)EOF",
+                                   config.buffer_options_.value().max_buffered_datagrams_,
+                                   config.buffer_options_.value().max_buffered_bytes_);
+    }
+
+    if (config.use_post_) {
+      filter_config += fmt::format(R"EOF(
+    use_post: true
+    post_path: {}
+)EOF",
+                                   config.post_path_);
+    }
+
+    if (config.idle_timeout_.has_value()) {
+      filter_config += fmt::format(R"EOF(
+  idle_timeout: {}
+)EOF",
+                                   config.idle_timeout_.value());
+    }
+
+    config_helper_.renameListener("udp_proxy");
+    config_helper_.addConfigModifier(
+        [filter_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* filter = listener->add_listener_filters();
+          TestUtility::loadFromYaml(filter_config, *filter);
+        });
+
+    HttpIntegrationTest::initialize();
+
+    const uint32_t port = lookupPort("udp_proxy");
+    listener_address_ = Network::Utility::resolveUrl(
+        fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+    client_ = std::make_unique<Network::Test::UdpSyncPeer>(version_);
+  };
+
+  const std::string encapsulate(std::string datagram) {
+    uint8_t capsule_length = datagram.length() + 1;
+    return absl::HexStringToBytes(absl::StrCat("00", Hex::encode(&capsule_length, 1), "00")) +
+           datagram;
+  }
+
+  const std::string expectedCapsules(std::vector<std::string> raw_datagrams) {
+    std::string expected_capsules = "";
+    for (std::string datagram : raw_datagrams) {
+      expected_capsules += encapsulate(datagram);
+    }
+
+    return expected_capsules;
+  }
+
+  void expectPostRequestHeaders(const Http::RequestHeaderMap& headers) {
+    EXPECT_EQ(headers.getMethodValue(), "POST");
+    EXPECT_EQ(headers.getPathValue(), config_.post_path_);
+  }
+
+  void expectConnectRequestHeaders(const Http::RequestHeaderMap& original_headers) {
+    Http::TestRequestHeaderMapImpl headers(original_headers);
+
+    // For connect-udp case, the server codec will transform the H2 headers to H1. For test
+    // convenience, transforming the H1 headers back to H2.
+    Http::Utility::transformUpgradeRequestFromH1toH2(headers);
+    std::string expected_path = absl::StrCat("/.well-known/masque/udp/", config_.target_host_, "/",
+                                             config_.default_target_port_, "/");
+
+    EXPECT_EQ(headers.getMethodValue(), "CONNECT");
+    EXPECT_EQ(headers.getPathValue(), expected_path);
+  }
+
+  void expectRequestHeaders(const Http::RequestHeaderMap& headers) {
+    if (config_.use_post_) {
+      expectPostRequestHeaders(headers);
+    } else {
+      expectConnectRequestHeaders(headers);
+    }
+  }
+
+  void establishConnection(const std::string initial_datagram, int tunnels_count = 1) {
+    // Initial datagram will create a session and a tunnel request.
+    client_->write(initial_datagram, *listener_address_);
+
+    if (!fake_upstream_connection_) {
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    }
+
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    expectRequestHeaders(upstream_request_->headers());
+
+    // Send upgrade headers downstream, fully establishing the connection.
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                     {"capsule-protocol", "?1"}};
+    upstream_request_->encodeHeaders(response_headers, false);
+
+    test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", tunnels_count);
+    test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  }
+
+  void sendCapsuleDownstream(const std::string datagram, bool end_stream = false) {
+    // Send data from upstream to downstream.
+    upstream_request_->encodeData(encapsulate(datagram), end_stream);
+    Network::UdpRecvData response_datagram;
+    client_->recv(response_datagram);
+    EXPECT_EQ(datagram, response_datagram.buffer_->toString());
+  }
+
+  TestConfig config_;
+  Network::Address::InstanceConstSharedPtr listener_address_;
+  std::unique_ptr<Network::Test::UdpSyncPeer> client_;
+};
+
+TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithBuffering) {
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
+  setup(config);
+
+  const std::string datagram1 = "hello";
+  establishConnection(datagram1);
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram1})));
+
+  const std::string datagram2 = "hello2";
+  client_->write(datagram2, *listener_address_);
+  ASSERT_TRUE(
+      upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram1, datagram2})));
+
+  sendCapsuleDownstream("response1", false);
+  sendCapsuleDownstream("response2", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, BasicFlowNoBuffering) {
+  TestConfig config{"host.com", "target.com", 1, 30, false, "", absl::nullopt, absl::nullopt};
+  setup(config);
+
+  establishConnection("hello");
+  // Since there's no buffering, the first datagram is dropped. Send another datagram and expect
+  // that it's the only datagram received upstream.
+  const std::string datagram2 = "hello2";
+  client_->write(datagram2, *listener_address_);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram2})));
+
+  sendCapsuleDownstream("response", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithPost) {
+  TestConfig config{"host.com",           "target.com", 1, 30, true, "/post/path",
+                    BufferOptions{1, 30}, absl::nullopt};
+  setup(config);
+
+  const std::string datagram1 = "hello";
+  establishConnection(datagram1);
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram1})));
+  sendCapsuleDownstream("response", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, TwoConsecutiveDownstreamSessions) {
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
+  setup(config);
+
+  establishConnection("hello1");
+  sendCapsuleDownstream("response2", true); // Will end first session.
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  establishConnection("hello2", 2); // Will create another session.
+  sendCapsuleDownstream("response2", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, IdleTimeout) {
+  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, "0.5s"};
+  setup(config);
+
+  const std::string datagram = "hello";
+  establishConnection(datagram);
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+
+  sendCapsuleDownstream("response1", false);
+  test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
+  ASSERT_TRUE(upstream_request_->waitForReset());
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
+  setup(config);
+
+  // Send two datagrams before the upstream is established. Since the buffer capacity is 1 datagram,
+  // we expect the second one to be dropped.
+  client_->write("hello1", *listener_address_);
+  client_->write("hello2", *listener_address_);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 1);
+
+  // "hello3" will drop because it's sent before the tunnel is established, and the buffer is full.
+  establishConnection("hello3");
+  // Wait for the buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({"hello1"})));
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 2);
+
+  sendCapsuleDownstream("response", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToSize) {
+  TestConfig config{"host.com",   "target.com", 1, 30, false, "", BufferOptions{100, 15},
+                    absl::nullopt};
+  setup(config);
+
+  // Send two datagrams before the upstream is established. Since the buffer capacity is 6 bytes,
+  // we expect the second one to be dropped.
+  client_->write("hello1", *listener_address_);
+  client_->write("hello2", *listener_address_);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 1);
+
+  // "hello3" will drop because it's sent before the tunnel is established, and the buffer is full.
+  establishConnection("hello3");
+  // Wait for the buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({"hello1"})));
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 2);
+
+  sendCapsuleDownstream("response", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
+  TestConfig config{"host.com",   "target.com", 1, 30, false, "", BufferOptions{100, 300},
+                    absl::nullopt};
+  setup(config);
+
+  // Establish connection for first session.
+  establishConnection("hello_1");
+
+  // Establish connection for second session.
+  Network::Test::UdpSyncPeer client2(version_);
+  client2.write("hello_2", *listener_address_);
+
+  FakeStreamPtr upstream_request2;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
+  ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request2->headers());
+
+  // Send upgrade headers downstream, fully establishing the connection.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"capsule-protocol", "?1"}};
+  upstream_request2->encodeHeaders(response_headers, false);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 2);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 2);
+
+  // Wait for buffered datagram for each stream.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({"hello_1"})));
+  ASSERT_TRUE(upstream_request2->waitForData(*dispatcher_, expectedCapsules({"hello_2"})));
+
+  // Send capsule from upstream over the first stream, and close it.
+  sendCapsuleDownstream("response_1", true);
+  // First stream is closed so we expect active sessions to decrease to 1.
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+
+  // Send capsule from upstream over the second stream, and close it.
+  upstream_request2->encodeData(encapsulate("response_2"), true);
+  Network::UdpRecvData response_datagram;
+  client2.recv(response_datagram);
+  EXPECT_EQ("response_2", response_datagram.buffer_->toString());
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
+  setup(config);
+
+  // Initial datagram will create a session and a tunnel request.
+  client_->write("hello", *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
+  TestConfig config{"host.com",           "target.com", 2, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
+  setup(config);
+
+  // Initial datagram will create a session and a tunnel request.
+  client_->write("hello", *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  Http::TestResponseHeaderMapImpl fail_response_headers{{":status", "404"}};
+  upstream_request_->encodeHeaders(fail_response_headers, true);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+
+  // The request is retried, expect new downstream headers
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  // Send upgrade headers downstream, fully establishing the connection.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"capsule-protocol", "?1"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
+  sendCapsuleDownstream("response", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, UdpTunnelingIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace
 } // namespace Envoy

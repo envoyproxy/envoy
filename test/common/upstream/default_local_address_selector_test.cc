@@ -31,7 +31,7 @@ TEST(ConfigTest, NullUpstreamAddress) {
   // This should be exception free.
   UpstreamLocalAddressSelectorConstSharedPtr selector =
       factory.createLocalAddressSelector(upstream_local_addresses, absl::nullopt);
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 } // namespace
 } // namespace Upstream
