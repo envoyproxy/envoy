@@ -3041,15 +3041,11 @@ envoy_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_http_client_lib",
     srcs = [
-        "quiche/quic/core/http/quic_client_promised_info.cc",
-        "quiche/quic/core/http/quic_client_push_promise_index.cc",
         "quiche/quic/core/http/quic_spdy_client_session.cc",
         "quiche/quic/core/http/quic_spdy_client_session_base.cc",
         "quiche/quic/core/http/quic_spdy_client_stream.cc",
     ],
     hdrs = [
-        "quiche/quic/core/http/quic_client_promised_info.h",
-        "quiche/quic/core/http/quic_client_push_promise_index.h",
         "quiche/quic/core/http/quic_spdy_client_session.h",
         "quiche/quic/core/http/quic_spdy_client_session_base.h",
         "quiche/quic/core/http/quic_spdy_client_stream.h",
