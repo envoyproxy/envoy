@@ -119,6 +119,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
   // not common to call this function at a high rate.
   absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> name_levels;
   std::vector<std::pair<absl::string_view, int>> glob_levels;
+  bool use_fine_grain_logger = Logger::Context::useFineGrainLogger();
 
   if (paths != params.end()) {
     // Bulk change log level by name:level pairs, separated by comma.
@@ -137,7 +138,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
         return level_to_use.status();
       }
 
-      if (Logger::Context::useFineGrainLogger()) {
+      if (use_fine_grain_logger) {
         ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", name,
                   spdlog::level::level_string_views[*level_to_use]);
         glob_levels.emplace_back(name, *level_to_use);
@@ -164,7 +165,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
       return level_to_use.status();
     }
 
-    if (Logger::Context::useFineGrainLogger()) {
+    if (use_fine_grain_logger) {
       ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", key,
                 spdlog::level::level_string_views[*level_to_use]);
       glob_levels.emplace_back(key, *level_to_use);
@@ -173,7 +174,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
     }
   }
 
-  if (!Logger::Context::useFineGrainLogger()) {
+  if (!use_fine_grain_logger) {
     return changeLogLevelsForComponentLoggers(name_levels);
   }
   getFineGrainLogContext().updateVerbositySetting(glob_levels);
