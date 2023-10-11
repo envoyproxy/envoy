@@ -75,8 +75,7 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-  // now for Envoy, w/o setting the mode
-  FINE_GRAIN_LOG(info, "Build the logger for this file.");
+  // Enable fine grain logger right now.
   Logger::Context::enableFineGrainLogger();
   postCallback("/logging", header_map, response);
   FINE_GRAIN_LOG(error, response.toString());
@@ -85,10 +84,10 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   FINE_GRAIN_LOG(warn, "After post /logging?level=trace, all level is trace now!");
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
 
-  std::string query = fmt::format("/logging?{}=trace", "logs_handler_test");
+  std::string query = fmt::format("/logging?{}=info", "logs_handler_test");
   postCallback(query, header_map, response);
-  FINE_GRAIN_LOG(info, "After post {}, level for this file is trace now!", query);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
+  FINE_GRAIN_LOG(info, "After post {}, level for this file is info now!", query);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::info);
 
   // Test multiple log levels at once
   const std::string file_one = "admin/logs_handler_test_one.cc";
@@ -109,7 +108,7 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
 
   query = fmt::format("/logging?paths={}:warning", "admin/*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
-  FINE_GRAIN_LOG(trace, "After post {}, level for this file is still trace now!", query);
+  FINE_GRAIN_LOG(trace, "After post {}, level for this file is trace (the default) now!", query);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::warn);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::warn);

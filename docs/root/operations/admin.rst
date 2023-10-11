@@ -331,6 +331,7 @@ modify different aspects of the server:
   - ``/logging?paths=source/common*:warning`` will make the level of ``source/common/event/dispatcher_impl.cc:``, ``source/common/network/tcp_listener_impl.cc`` be warning.
   - ``/logging?paths=???_listener_impl:info`` will make the level of ``source/common/network/tcp_listener_impl.cc``, ``source/common/network/udp_listener_impl.cc`` be info.
   - ``/logging?paths=???_listener_impl:info,tcp_listener_impl:warning``, the level of ``source/common/network/tcp_listener_impl.cc`` will be info, since the first match will take effect.
+  - ``/logging?level=info`` will change the default verbosity level to info. All the unmatched loggers in the following update will be this default level.
 
 .. http:get:: /memory
 
