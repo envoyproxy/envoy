@@ -276,6 +276,7 @@ messageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
   return testing::MakeMatcher(new MessageMatcher(expected_headers));
 }
 
+// Begin unit test for new option via Http Async client.
 class InstanceProfileCredentialsProviderTest : public testing::Test {
 public:
   InstanceProfileCredentialsProviderTest()
@@ -305,27 +306,7 @@ public:
     init_target_handle_->initialize(init_watcher_);
   }
 
-  void setupProviderForLibcurl() {
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials", "true"}});
-    provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
-        *api_, absl::nullopt,
-        [this](Http::RequestMessage& message) -> absl::optional<std::string> {
-          return this->fetch_metadata_.fetch(message);
-        },
-        nullptr, "credentials_provider_cluster");
-  }
-
-  void expectSessionTokenCurl(const absl::optional<std::string>& token) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/api/token"},
-                                           {":authority", "169.254.169.254:80"},
-                                           {":method", "PUT"},
-                                           {":scheme", "http"},
-                                           {"X-aws-ec2-metadata-token-ttl-seconds", "21600"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(token));
-  }
-
-  void expectSessionTokenHttpAsync(const uint64_t status_code, const std::string&& token) {
+  void expectSessionToken(const uint64_t status_code, const std::string&& token) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/api/token"},
                                            {":authority", "169.254.169.254:80"},
                                            {":method", "PUT"},
@@ -354,25 +335,7 @@ public:
         }));
   }
 
-  void expectCredentialListingCurl(const absl::optional<std::string>& listing) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
-                                           {":authority", "169.254.169.254:80"},
-                                           {":scheme", "http"},
-                                           {":method", "GET"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
-  }
-
-  void expectCredentialListingCurlSecure(const absl::optional<std::string>& listing) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
-                                           {":authority", "169.254.169.254:80"},
-                                           {":method", "GET"},
-                                           {":scheme", "http"},
-                                           {"X-aws-ec2-metadata-token", "TOKEN"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
-  }
-
-  void expectCredentialListingHttpAsync(const uint64_t status_code,
-                                        const std::string&& instance_role) {
+  void expectCredentialListing(const uint64_t status_code, const std::string&& instance_role) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
                                            {":authority", "169.254.169.254:80"},
                                            {":scheme", "http"},
@@ -400,8 +363,8 @@ public:
         }));
   }
 
-  void expectCredentialListingHttpAsyncSecure(const uint64_t status_code,
-                                              const std::string&& instance_role) {
+  void expectCredentialListingSecure(const uint64_t status_code,
+                                     const std::string&& instance_role) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
                                            {":authority", "169.254.169.254:80"},
                                            {":scheme", "http"},
@@ -430,27 +393,7 @@ public:
         }));
   }
 
-  void expectDocumentCurl(const absl::optional<std::string>& document) {
-    Http::TestRequestHeaderMapImpl headers{
-        {":path", "/latest/meta-data/iam/security-credentials/doc1"},
-        {":authority", "169.254.169.254:80"},
-        {":scheme", "http"},
-        {":method", "GET"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
-  }
-
-  void expectDocumentCurlSecure(const absl::optional<std::string>& document) {
-    Http::TestRequestHeaderMapImpl headers{
-        {":path", "/latest/meta-data/iam/security-credentials/doc1"},
-        {":authority", "169.254.169.254:80"},
-        {":method", "GET"},
-        {":scheme", "http"},
-        {"X-aws-ec2-metadata-token", "TOKEN"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
-  }
-
-  void expectDocumentHttpAsync(const uint64_t status_code,
-                               const std::string&& credential_document_value) {
+  void expectDocument(const uint64_t status_code, const std::string&& credential_document_value) {
     Http::TestRequestHeaderMapImpl headers{
         {":path", "/latest/meta-data/iam/security-credentials/doc1"},
         {":authority", "169.254.169.254:80"},
@@ -480,8 +423,8 @@ public:
         }));
   }
 
-  void expectDocumentHttpAsyncSecure(const uint64_t status_code,
-                                     const std::string&& credential_document_value) {
+  void expectDocumentSecure(const uint64_t status_code,
+                            const std::string&& credential_document_value) {
     Http::TestRequestHeaderMapImpl headers{
         {":path", "/latest/meta-data/iam/security-credentials/doc1"},
         {":authority", "169.254.169.254:80"},
@@ -527,7 +470,6 @@ public:
   std::chrono::milliseconds expected_duration_;
 };
 
-// Begin unit test for new option via Http Async
 TEST_F(InstanceProfileCredentialsProviderTest, TestAddMissingCluster) {
   // Setup without thread local cluster yet
   envoy::config::cluster::v3::Cluster expected_cluster;
@@ -559,11 +501,11 @@ typed_extension_protocol_options:
   EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithAttribute(expected_cluster), _))
       .WillOnce(Return(true));
 
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("doc1")));
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
+  expectDocumentSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -585,13 +527,15 @@ TEST_F(InstanceProfileCredentialsProviderTest, TestClusterMissing) {
   // init_watcher ready is not called.
   init_watcher_.expectReady().Times(0);
   setupProvider();
+  // Below line is not testing anything, will just avoid asan failure with memory leak.
+  metadata_fetcher_.reset(raw_metadata_fetcher_);
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(403 /*Forbidden*/, std::move(std::string()));
-  expectCredentialListingHttpAsync(403 /*Forbidden*/, std::move(std::string()));
+  expectSessionToken(403 /*Forbidden*/, std::move(std::string()));
+  expectCredentialListing(403 /*Forbidden*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -613,8 +557,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingUnsecure) 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(401 /*Unauthorized*/, std::move(std::string()));
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(401 /*Unauthorized*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -636,8 +580,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("")));
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -659,8 +603,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("")));
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -682,8 +626,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("\n")));
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("\n")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -705,8 +649,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingUnsecur
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("\n")));
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("\n")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -728,9 +672,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingSecure)
 TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocumentHttpAsync(401 /*Unauthorized*/, std::move(std::string()));
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocument(401 /*Unauthorized*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called twice.
@@ -752,9 +696,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocumentHttpAsyncSecure(401 /*Unauthorized*/, std::move(std::string()));
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocumentSecure(401 /*Unauthorized*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called twice.
@@ -776,9 +720,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocumentHttpAsync(200, std::move(std::string()));
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocument(200, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called twice.
@@ -800,9 +744,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocumentHttpAsyncSecure(200, std::move(std::string()));
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocumentSecure(200, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called twice.
@@ -824,9 +768,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("doc1")));
+  expectDocument(200, std::move(R"EOF(
  not json
  )EOF"));
   // init_watcher ready is called.
@@ -850,9 +794,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("doc1")));
+  expectDocumentSecure(200, std::move(R"EOF(
  not json
  )EOF"));
   // init_watcher ready is called.
@@ -876,9 +820,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("doc1")));
+  expectDocument(200, std::move(R"EOF(
  {
    "AccessKeyId": "",
    "SecretAccessKey": "",
@@ -905,9 +849,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("doc1")));
+  expectDocumentSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "",
    "SecretAccessKey": "",
@@ -934,9 +878,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("doc1")));
+  expectDocument(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -983,9 +927,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("doc1")));
+  expectDocumentSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -1032,9 +976,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("doc1")));
+  expectDocument(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -1063,9 +1007,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationUnse
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
 
-  expectSessionTokenHttpAsync(200, std::move(std::string()));
-  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectSessionToken(200, std::move(std::string()));
+  expectCredentialListing(200, std::move(std::string("doc1")));
+  expectDocument(200, std::move(R"EOF(
  {
    "AccessKeyId": "new_akid",
    "SecretAccessKey": "new_secret",
@@ -1097,9 +1041,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationUnse
 TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("doc1")));
+  expectDocumentSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -1128,9 +1072,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationSecu
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
 
-  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
+  expectSessionToken(200, std::move("TOKEN"));
+  expectCredentialListingSecure(200, std::move(std::string("doc1")));
+  expectDocumentSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "new_akid",
    "SecretAccessKey": "new_secret",
@@ -1158,96 +1102,165 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationSecu
   EXPECT_EQ("new_secret", new_credentials.secretAccessKey().value());
   EXPECT_EQ("new_token1", new_credentials.sessionToken().value());
 }
-// End unit test for new option via Http Async
+// End unit test for new option via Http Async client.
 
-// Begin unit test for deprecated option Libcurl
-TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingCurlUnsecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl(absl::optional<std::string>());
+// Begin unit test for deprecated option using Libcurl client.
+// TODO(suniltheta): Remove this test class once libcurl is removed from Envoy.
+class InstanceProfileCredentialsProviderUsingLibcurlTest : public testing::Test {
+public:
+  InstanceProfileCredentialsProviderUsingLibcurlTest()
+      : api_(Api::createApiForTest(time_system_)) {}
+
+  void setupProvider() {
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials", "true"}});
+    provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
+        *api_, absl::nullopt,
+        [this](Http::RequestMessage& message) -> absl::optional<std::string> {
+          return this->fetch_metadata_.fetch(message);
+        },
+        nullptr, "credentials_provider_cluster");
+  }
+
+  void expectSessionToken(const absl::optional<std::string>& token) {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/api/token"},
+                                           {":authority", "169.254.169.254:80"},
+                                           {":method", "PUT"},
+                                           {":scheme", "http"},
+                                           {"X-aws-ec2-metadata-token-ttl-seconds", "21600"}};
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(token));
+  }
+
+  void expectCredentialListing(const absl::optional<std::string>& listing) {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
+                                           {":authority", "169.254.169.254:80"},
+                                           {":scheme", "http"},
+                                           {":method", "GET"}};
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
+  }
+
+  void expectCredentialListingSecure(const absl::optional<std::string>& listing) {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
+                                           {":authority", "169.254.169.254:80"},
+                                           {":method", "GET"},
+                                           {":scheme", "http"},
+                                           {"X-aws-ec2-metadata-token", "TOKEN"}};
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
+  }
+
+  void expectDocument(const absl::optional<std::string>& document) {
+    Http::TestRequestHeaderMapImpl headers{
+        {":path", "/latest/meta-data/iam/security-credentials/doc1"},
+        {":authority", "169.254.169.254:80"},
+        {":scheme", "http"},
+        {":method", "GET"}};
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
+  }
+
+  void expectDocumentSecure(const absl::optional<std::string>& document) {
+    Http::TestRequestHeaderMapImpl headers{
+        {":path", "/latest/meta-data/iam/security-credentials/doc1"},
+        {":authority", "169.254.169.254:80"},
+        {":method", "GET"},
+        {":scheme", "http"},
+        {"X-aws-ec2-metadata-token", "TOKEN"}};
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
+  }
+
+  TestScopedRuntime scoped_runtime;
+  Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
+  NiceMock<MockFetchMetadata> fetch_metadata_;
+  InstanceProfileCredentialsProviderPtr provider_;
+};
+
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingCurlUnsecure) {
+  setupProvider();
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingCurlSecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure(absl::optional<std::string>());
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingCurlSecure) {
+  setupProvider();
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingCurlUnsecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl("");
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingCurlUnsecure) {
+  setupProvider();
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing("");
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingCurlSecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure("\n");
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingCurlSecure) {
+  setupProvider();
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure("\n");
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingCurlUnsecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl("\n");
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingCurlUnsecure) {
+  setupProvider();
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing("\n");
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingCurlSecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure("");
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingCurlSecure) {
+  setupProvider();
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure("");
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentCurlUnsecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl("doc1\ndoc2\ndoc3");
-  expectDocumentCurl(absl::optional<std::string>());
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentCurlUnsecure) {
+  setupProvider();
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing("doc1\ndoc2\ndoc3");
+  expectDocument(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentCurlSecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure("doc1\ndoc2\ndoc3");
-  expectDocumentCurlSecure(absl::optional<std::string>());
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentCurlSecure) {
+  setupProvider();
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure("doc1\ndoc2\ndoc3");
+  expectDocumentSecure(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentCurlUnsecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl("doc1");
-  expectDocumentCurl(R"EOF(
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentCurlUnsecure) {
+  setupProvider();
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing("doc1");
+  expectDocument(R"EOF(
  not json
  )EOF");
   const auto credentials = provider_->getCredentials();
@@ -1256,11 +1269,11 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentCurlUnsecure) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentCurlSecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure("doc1");
-  expectDocumentCurlSecure(R"EOF(
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentCurlSecure) {
+  setupProvider();
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure("doc1");
+  expectDocumentSecure(R"EOF(
 not json
 )EOF");
   const auto credentials = provider_->getCredentials();
@@ -1269,11 +1282,11 @@ not json
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesCurlUnsecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl("doc1");
-  expectDocumentCurl(R"EOF(
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesCurlUnsecure) {
+  setupProvider();
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing("doc1");
+  expectDocument(R"EOF(
  {
    "AccessKeyId": "",
    "SecretAccessKey": "",
@@ -1286,11 +1299,11 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesCurlUnsecure) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesCurlSecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure("doc1");
-  expectDocumentCurlSecure(R"EOF(
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesCurlSecure) {
+  setupProvider();
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure("doc1");
+  expectDocumentSecure(R"EOF(
 {
   "AccessKeyId": "",
   "SecretAccessKey": "",
@@ -1303,11 +1316,11 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesCurlSecure) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsCurlUnsecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl("doc1");
-  expectDocumentCurl(R"EOF(
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsCurlUnsecure) {
+  setupProvider();
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing("doc1");
+  expectDocument(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -1324,11 +1337,11 @@ TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsCurlUnsecure
   EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsCurlSecure) {
-  setupProviderForLibcurl();
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure("doc1");
-  expectDocumentCurlSecure(R"EOF(
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsCurlSecure) {
+  setupProvider();
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure("doc1");
+  expectDocumentSecure(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1345,12 +1358,12 @@ TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsCurlSecure) 
   EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, CredentialExpirationCurlUnsecure) {
-  setupProviderForLibcurl();
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationCurlUnsecure) {
+  setupProvider();
   InSequence sequence;
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl("doc1");
-  expectDocumentCurl(R"EOF(
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing("doc1");
+  expectDocument(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -1362,9 +1375,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, CredentialExpirationCurlUnsecure)
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
-  expectSessionTokenCurl(absl::optional<std::string>());
-  expectCredentialListingCurl("doc1");
-  expectDocumentCurl(R"EOF(
+  expectSessionToken(absl::optional<std::string>());
+  expectCredentialListing("doc1");
+  expectDocument(R"EOF(
  {
    "AccessKeyId": "new_akid",
    "SecretAccessKey": "new_secret",
@@ -1377,12 +1390,12 @@ TEST_F(InstanceProfileCredentialsProviderTest, CredentialExpirationCurlUnsecure)
   EXPECT_EQ("new_token", new_credentials.sessionToken().value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, CredentialExpirationCurlSecure) {
-  setupProviderForLibcurl();
+TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationCurlSecure) {
+  setupProvider();
   InSequence sequence;
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure("doc1");
-  expectDocumentCurlSecure(R"EOF(
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure("doc1");
+  expectDocumentSecure(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1394,9 +1407,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, CredentialExpirationCurlSecure) {
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
-  expectSessionTokenCurl("TOKEN");
-  expectCredentialListingCurlSecure("doc1");
-  expectDocumentCurlSecure(R"EOF(
+  expectSessionToken("TOKEN");
+  expectCredentialListingSecure("doc1");
+  expectDocumentSecure(R"EOF(
 {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
@@ -1408,8 +1421,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, CredentialExpirationCurlSecure) {
   EXPECT_EQ("new_secret", new_credentials.secretAccessKey().value());
   EXPECT_EQ("new_token", new_credentials.sessionToken().value());
 }
-// End unit test for deprecated option Libcurl
+// End unit test for deprecated option using Libcurl client.
 
+// Begin unit test for new option via Http Async client.
 class TaskRoleCredentialsProviderTest : public testing::Test {
 public:
   TaskRoleCredentialsProviderTest()
@@ -1441,27 +1455,7 @@ public:
     init_target_handle_->initialize(init_watcher_);
   }
 
-  void setupProviderForLibcurl() {
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials", "true"}});
-    provider_ = std::make_shared<TaskRoleCredentialsProvider>(
-        *api_, absl::nullopt,
-        [this](Http::RequestMessage& message) -> absl::optional<std::string> {
-          return this->fetch_metadata_.fetch(message);
-        },
-        nullptr, "169.254.170.2:80/path/to/doc", "auth_token", "credentials_provider_cluster");
-  }
-
-  void expectDocumentCurl(const absl::optional<std::string>& document) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/path/to/doc"},
-                                           {":authority", "169.254.170.2:80"},
-                                           {":scheme", "http"},
-                                           {":method", "GET"},
-                                           {"authorization", "auth_token"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
-  }
-
-  void expectDocumentHttpAsync(const uint64_t status_code, const std::string&& document) {
+  void expectDocument(const uint64_t status_code, const std::string&& document) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/path/to/doc"},
                                            {":authority", "169.254.170.2:80"},
                                            {":scheme", "http"},
@@ -1505,7 +1499,6 @@ public:
   std::chrono::milliseconds expected_duration_;
 };
 
-// Begin unit test for new option via Http Async
 TEST_F(TaskRoleCredentialsProviderTest, TestAddMissingCluster) {
   // Setup without thread local cluster yet
   envoy::config::cluster::v3::Cluster expected_cluster;
@@ -1537,7 +1530,7 @@ typed_extension_protocol_options:
   EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithAttribute(expected_cluster), _))
       .WillOnce(Return(true));
 
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1559,12 +1552,14 @@ TEST_F(TaskRoleCredentialsProviderTest, TestClusterMissing) {
   // init_watcher ready is not called.
   init_watcher_.expectReady().Times(0);
   setupProvider();
+  // Below line is not testing anything, will just avoid asan failure with memory leak.
+  metadata_fetcher_.reset(raw_metadata_fetcher_);
 }
 
 TEST_F(TaskRoleCredentialsProviderTest, FailedFetchingDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocumentHttpAsync(403 /*Forbidden*/, std::move(std::string()));
+  expectDocument(403 /*Forbidden*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Expect refresh timer to be started.
@@ -1586,7 +1581,7 @@ TEST_F(TaskRoleCredentialsProviderTest, FailedFetchingDocument) {
 TEST_F(TaskRoleCredentialsProviderTest, EmptyDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocumentHttpAsync(200, std::move(std::string()));
+  expectDocument(200, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Expect refresh timer to be started.
@@ -1609,7 +1604,7 @@ TEST_F(TaskRoleCredentialsProviderTest, MalformedDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 not json
 )EOF"));
   // init_watcher ready is called.
@@ -1634,7 +1629,7 @@ TEST_F(TaskRoleCredentialsProviderTest, EmptyValues) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 {
   "AccessKeyId": "",
   "SecretAccessKey": "",
@@ -1664,7 +1659,7 @@ TEST_F(TaskRoleCredentialsProviderTest, EmptyValues) {
 TEST_F(TaskRoleCredentialsProviderTest, FullCachedCredentials) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1711,7 +1706,7 @@ TEST_F(TaskRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1739,7 +1734,7 @@ TEST_F(TaskRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
 
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
@@ -1771,7 +1766,7 @@ TEST_F(TaskRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
 TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1800,7 +1795,7 @@ TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpiration) {
 
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  expectDocumentHttpAsync(200, std::move(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
@@ -1816,30 +1811,65 @@ TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpiration) {
   EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
   EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
-// End unit test for new option via Http Async
+// End unit test for new option via Http Async client.
 
-// Begin unit test for deprecated option Libcurl
-TEST_F(TaskRoleCredentialsProviderTest, FailedFetchingDocumentCurl) {
-  setupProviderForLibcurl();
-  expectDocumentCurl(absl::optional<std::string>());
+// Begin unit test for deprecated option using Libcurl client.
+// TODO(suniltheta): Remove this test class once libcurl is removed from Envoy.
+class TaskRoleCredentialsProviderUsingLibcurlTest : public testing::Test {
+public:
+  TaskRoleCredentialsProviderUsingLibcurlTest() : api_(Api::createApiForTest(time_system_)) {
+    // Tue Jan  2 03:04:05 UTC 2018
+    time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+  }
+
+  void setupProvider() {
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials", "true"}});
+    provider_ = std::make_shared<TaskRoleCredentialsProvider>(
+        *api_, absl::nullopt,
+        [this](Http::RequestMessage& message) -> absl::optional<std::string> {
+          return this->fetch_metadata_.fetch(message);
+        },
+        nullptr, "169.254.170.2:80/path/to/doc", "auth_token", "credentials_provider_cluster");
+  }
+
+  void expectDocument(const absl::optional<std::string>& document) {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/path/to/doc"},
+                                           {":authority", "169.254.170.2:80"},
+                                           {":scheme", "http"},
+                                           {":method", "GET"},
+                                           {"authorization", "auth_token"}};
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
+  }
+
+  TestScopedRuntime scoped_runtime;
+  Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
+  NiceMock<MockFetchMetadata> fetch_metadata_;
+  TaskRoleCredentialsProviderPtr provider_;
+};
+
+TEST_F(TaskRoleCredentialsProviderUsingLibcurlTest, FailedFetchingDocumentCurl) {
+  setupProvider();
+  expectDocument(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(TaskRoleCredentialsProviderTest, EmptyDocumentCurl) {
-  setupProviderForLibcurl();
-  expectDocumentCurl("");
+TEST_F(TaskRoleCredentialsProviderUsingLibcurlTest, EmptyDocumentCurl) {
+  setupProvider();
+  expectDocument("");
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(TaskRoleCredentialsProviderTest, MalformedDocumentCurl) {
-  setupProviderForLibcurl();
-  expectDocumentCurl(R"EOF(
+TEST_F(TaskRoleCredentialsProviderUsingLibcurlTest, MalformedDocumentCurl) {
+  setupProvider();
+  expectDocument(R"EOF(
 not json
 )EOF");
   const auto credentials = provider_->getCredentials();
@@ -1848,9 +1878,9 @@ not json
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(TaskRoleCredentialsProviderTest, EmptyValuesCurl) {
-  setupProviderForLibcurl();
-  expectDocumentCurl(R"EOF(
+TEST_F(TaskRoleCredentialsProviderUsingLibcurlTest, EmptyValuesCurl) {
+  setupProvider();
+  expectDocument(R"EOF(
 {
   "AccessKeyId": "",
   "SecretAccessKey": "",
@@ -1864,9 +1894,9 @@ TEST_F(TaskRoleCredentialsProviderTest, EmptyValuesCurl) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(TaskRoleCredentialsProviderTest, FullCachedCredentialsCurl) {
-  setupProviderForLibcurl();
-  expectDocumentCurl(R"EOF(
+TEST_F(TaskRoleCredentialsProviderUsingLibcurlTest, FullCachedCredentialsCurl) {
+  setupProvider();
+  expectDocument(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1884,10 +1914,10 @@ TEST_F(TaskRoleCredentialsProviderTest, FullCachedCredentialsCurl) {
   EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(TaskRoleCredentialsProviderTest, NormalCredentialExpirationCurl) {
-  setupProviderForLibcurl();
+TEST_F(TaskRoleCredentialsProviderUsingLibcurlTest, NormalCredentialExpirationCurl) {
+  setupProvider();
   InSequence sequence;
-  expectDocumentCurl(R"EOF(
+  expectDocument(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1900,7 +1930,7 @@ TEST_F(TaskRoleCredentialsProviderTest, NormalCredentialExpirationCurl) {
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
-  expectDocumentCurl(R"EOF(
+  expectDocument(R"EOF(
 {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
@@ -1914,10 +1944,10 @@ TEST_F(TaskRoleCredentialsProviderTest, NormalCredentialExpirationCurl) {
   EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpirationCurl) {
-  setupProviderForLibcurl();
+TEST_F(TaskRoleCredentialsProviderUsingLibcurlTest, TimestampCredentialExpirationCurl) {
+  setupProvider();
   InSequence sequence;
-  expectDocumentCurl(R"EOF(
+  expectDocument(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1929,7 +1959,7 @@ TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpirationCurl) {
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
-  expectDocumentCurl(R"EOF(
+  expectDocument(R"EOF(
 {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
@@ -1942,7 +1972,7 @@ TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpirationCurl) {
   EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
   EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
-// End unit test for deprecated option Libcurl
+// End unit test for deprecated option using Libcurl client.
 
 class DefaultCredentialsProviderChainTest : public testing::Test {
 public:
