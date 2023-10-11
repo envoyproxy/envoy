@@ -1105,7 +1105,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   for (int i = 0; i < total_streams; ++i) {
-    std::cerr << "sending: " << i << "\n";
     // Send and wait
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
@@ -1116,12 +1115,10 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
     EXPECT_TRUE(response->complete());
   }
   for (int i = 0; i < total_streams; ++i) {
-    std::cerr << "sending: " << i << "\n";
     // Send and reset
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    std::cerr << "resetting: " << i << "\n";
     codec_client_->sendReset(*request_encoder_);
     ASSERT_TRUE(response->waitForReset());
   }
