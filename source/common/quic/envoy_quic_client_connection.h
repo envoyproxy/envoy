@@ -12,6 +12,7 @@
 namespace Envoy {
 namespace Quic {
 
+// Limits the max number of sockets created.
 constexpr uint8_t kMaxNumSocketSwitches = 5;
 
 class PacketsToReadDelegate {
