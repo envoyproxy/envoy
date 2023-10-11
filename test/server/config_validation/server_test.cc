@@ -218,22 +218,6 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   listener_component_factory.getTcpListenerConfigProviderManager();
 }
 
-// A test to ensure that ENVOY_BUGs are handled when the component factory returns a nullptr for
-// the drain manager.
-TEST_P(ValidationServerTest, DrainManagerNullptrCheck) {
-  // Setup the server instance.
-  NullptrComponentFactory component_factory;
-  Thread::MutexBasicLockable access_log_lock;
-  Stats::IsolatedStoreImpl stats_store;
-  DangerousDeprecatedTestTime time_system;
-  EXPECT_ENVOY_BUG(ValidationInstance server(options_, time_system.timeSystem(),
-                                             Network::Address::InstanceConstSharedPtr(),
-                                             stats_store, access_log_lock, component_factory,
-                                             Thread::threadFactoryForTest(),
-                                             Filesystem::fileSystemForTest()),
-                   "Component factory should not return nullptr from createDrainManager()");
-}
-
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
 // all the example configs) but can't until light validation is implemented, mocking out access to
 // the filesystem for TLS certs, etc. In the meantime, these are the example configs that work
@@ -260,6 +244,24 @@ TEST_P(ValidationServerTest1, RunWithoutCrash) {
 
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest1,
                          ::testing::ValuesIn(ValidationServerTest1::getAllConfigFiles()));
+
+
+// A test to ensure that ENVOY_BUGs are handled when the component factory returns a nullptr for
+// the drain manager.
+TEST_P(RuntimeFeatureValidationServerTest, DrainManagerNullptrCheck) {
+  // Setup the server instance with a component factory that returns a null DrainManager.
+  NullptrComponentFactory component_factory;
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_ENVOY_BUG(ValidationInstance server(options_, time_system.timeSystem(),
+                                             Network::Address::InstanceConstSharedPtr(),
+                                             stats_store, access_log_lock, component_factory,
+                                             Thread::threadFactoryForTest(),
+                                             Filesystem::fileSystemForTest()),
+                   "Component factory should not return nullptr from createDrainManager()");
+}
+
 
 TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoader) {
   Thread::MutexBasicLockable access_log_lock;
