@@ -223,8 +223,9 @@ void SslSocket::drainErrorQueue() {
     saw_error = true;
 
     if (failure_reason_.empty()) {
-      failure_reason_ = failure_reason_ = new_ssl_failure_format ? "TLS_error:" : "TLS error:"
+      failure_reason_ = failure_reason_ = new_ssl_failure_format ? "TLS_error:" : "TLS error:";
     }
+
     absl::StrAppend(&failure_reason_, new_ssl_failure_format ? "|" : " ", err, ":",
                     absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
                     absl::NullSafeStringView(ERR_func_error_string(err)), ":",
