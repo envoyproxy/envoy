@@ -302,7 +302,8 @@ void Utility::extractCommonAccessLogProperties(
 
   for (const auto& key : config.filter_state_objects_to_log()) {
     if (!(extractFilterStateData(stream_info.filterState(), key, common_access_log))) {
-      if (stream_info.upstreamInfo().has_value()) {
+      if (stream_info.upstreamInfo().has_value() &&
+          stream_info.upstreamInfo()->upstreamFilterState().get() != nullptr) {
         extractFilterStateData(*(stream_info.upstreamInfo()->upstreamFilterState().get()), key,
                                common_access_log);
       }
