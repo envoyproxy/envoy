@@ -93,15 +93,22 @@ func capiStatusToStr(status C.CAPIStatus) string {
 		return errNotInGo
 	case C.CAPIInvalidPhase:
 		return errInvalidPhase
-	case C.CAPIValueNotFound:
-		return errValueNotFound
-	case C.CAPIInternalFailure:
-		return errInternalFailure
-	case C.CAPISerializationFailure:
-		return errSerializationFailure
 	}
 
 	return "unknown status"
+}
+
+func capiStatusToErr(status C.CAPIStatus) error {
+	switch status {
+	case C.CAPIValueNotFound:
+		return api.ErrValueNotFound
+	case C.CAPIInternalFailure:
+		return api.ErrInternalFailure
+	case C.CAPISerializationFailure:
+		return api.ErrSerializationFailure
+	}
+
+	return errors.New("unknown status")
 }
 
 func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
@@ -398,7 +405,7 @@ func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (str
 		return strings.Clone(value), nil
 	}
 
-	return "", errors.New(capiStatusToStr(res))
+	return "", capiStatusToErr(res)
 }
 
 func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
