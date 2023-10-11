@@ -298,7 +298,7 @@ class RepoNotifier(runner.Runner):
             try:
                 response = self.slack_client.conversations_open(users=uid, text="hello")
                 channel_id = response["channel"]["id"]
-                self.slack_client.chat_postText(channel=channel_id, text=message)
+                self.slack_client.chat_postMessage(channel=channel_id, text=message)
             except SlackApiError as e:
                 print(f"Unexpected error {e.response['error']}")
 
