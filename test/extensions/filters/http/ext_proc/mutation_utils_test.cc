@@ -636,23 +636,25 @@ TEST(MutationUtils, TestApplyMutationsWithCheckFailure) {
   auto* s = mutation.add_set_headers();
   s->mutable_header()->set_key("x-check-this-header");
   s->mutable_header()->set_value("value-to-check");
-  s->set_append_action(
-      ::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
   s = mutation.add_set_headers();
   s->mutable_header()->set_key("x-check-this-header");
   s->mutable_header()->set_value("value-to-check");
-  s->set_append_action(
-      ::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+
   s = mutation.add_set_headers();
   s->mutable_header()->set_key("x-check-this-header");
   s->mutable_header()->set_value("value-to-check");
-  s->set_append_action(
-      ::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+
   s = mutation.add_set_headers();
   s->mutable_header()->set_key("x-check-this-header");
   s->mutable_header()->set_value("value-to-check");
-  s->set_append_action(
-      ::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
 
   HeaderMutationRules rules;
   rules.mutable_disallow_all()->set_value(true);
