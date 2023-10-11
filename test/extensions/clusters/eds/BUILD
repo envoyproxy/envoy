@@ -16,6 +16,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:transport_socket_config_lib",
@@ -54,6 +55,7 @@ envoy_cc_benchmark_binary(
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
@@ -85,6 +87,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:leds_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",

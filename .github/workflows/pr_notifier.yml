@@ -26,7 +26,7 @@ jobs:
     - name: Notify about PRs
       run: |
         ARGS=()
-        if [[ ${{ github.event_name == 'pull_request' }} ]]; then
+        if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
             ARGS+=(--dry_run)
         fi
         bazel run //tools/repo:notify -- "${ARGS[@]}"
