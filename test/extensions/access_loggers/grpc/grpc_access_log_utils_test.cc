@@ -65,13 +65,10 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   envoy::data::accesslog::v3::AccessLogCommon common_access_log;
   envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config;
   config.mutable_filter_state_objects_to_log()->Add("downstream_peer");
-  CelStatePrototype prototype(true, CelStateType::Protobuf,
-                              "type.googleapis.com/google.protobuf.StringValue",
+  CelStatePrototype prototype(true, CelStateType::Bytes, "",
                               StreamInfo::FilterState::LifeSpan::FilterChain);
   auto state = std::make_unique<::Envoy::Extensions::Filters::Common::Expr::CelState>(prototype);
-  ProtobufWkt::StringValue v;
-  v.set_value("value_from_downstream_peer");
-  state->setValue(v.SerializeAsString());
+  state->setValue("value_from_downstream_peer");
   stream_info.filter_state_->setData("downstream_peer", std::move(state),
                                      StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
@@ -84,7 +81,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->count("downstream_peer"), 1);
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->size(), 1);
   auto any = (*(common_access_log.mutable_filter_state_objects()))["downstream_peer"];
-  ProtobufWkt::StringValue gotState;
+  ProtobufWkt::BytesValue gotState;
   any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }
@@ -96,15 +93,12 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromUpstream) {
   envoy::data::accesslog::v3::AccessLogCommon common_access_log;
   envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config;
   config.mutable_filter_state_objects_to_log()->Add("upstream_peer");
-  CelStatePrototype prototype(true, CelStateType::Protobuf,
-                              "type.googleapis.com/google.protobuf.StringValue",
+  CelStatePrototype prototype(true, CelStateType::Bytes, "",
                               StreamInfo::FilterState::LifeSpan::FilterChain);
   auto state = std::make_unique<::Envoy::Extensions::Filters::Common::Expr::CelState>(prototype);
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
-  ProtobufWkt::StringValue v;
-  v.set_value("value_from_upstream_peer");
-  state->setValue(v.SerializeAsString());
+  state->setValue("value_from_upstream_peer");
   filter_state->setData("upstream_peer", std::move(state),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Connection);
@@ -118,7 +112,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromUpstream) {
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->count("upstream_peer"), 1);
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->size(), 1);
   auto any = (*(common_access_log.mutable_filter_state_objects()))["upstream_peer"];
-  ProtobufWkt::StringValue gotState;
+  ProtobufWkt::BytesValue gotState;
   any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_upstream_peer");
 }
@@ -131,14 +125,11 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
   envoy::data::accesslog::v3::AccessLogCommon common_access_log;
   envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config;
   config.mutable_filter_state_objects_to_log()->Add("same_key");
-  CelStatePrototype prototype(true, CelStateType::Protobuf,
-                              "type.googleapis.com/google.protobuf.StringValue",
+  CelStatePrototype prototype(true, CelStateType::Bytes, "",
                               StreamInfo::FilterState::LifeSpan::FilterChain);
   auto downstream_state =
       std::make_unique<::Envoy::Extensions::Filters::Common::Expr::CelState>(prototype);
-  ProtobufWkt::StringValue downstream_v;
-  downstream_v.set_value("value_from_downstream_peer");
-  downstream_state->setValue(downstream_v.SerializeAsString());
+  downstream_state->setValue("value_from_downstream_peer");
   stream_info.filter_state_->setData("same_key", std::move(downstream_state),
                                      StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
@@ -147,9 +138,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
       std::make_unique<::Envoy::Extensions::Filters::Common::Expr::CelState>(prototype);
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
-  ProtobufWkt::StringValue upstream_v;
-  upstream_v.set_value("value_from_upstream_peer");
-  upstream_state->setValue(upstream_v.SerializeAsString());
+  upstream_state->setValue("value_from_upstream_peer");
   filter_state->setData("same_key", std::move(upstream_state),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Connection);
@@ -163,7 +152,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->count("same_key"), 1);
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->size(), 1);
   auto any = (*(common_access_log.mutable_filter_state_objects()))["same_key"];
-  ProtobufWkt::StringValue gotState;
+  ProtobufWkt::BytesValue gotState;
   any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }
