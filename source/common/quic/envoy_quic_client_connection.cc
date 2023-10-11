@@ -118,7 +118,8 @@ void EnvoyQuicClientConnection::OnPathDegradingDetected() {
 }
 
 void EnvoyQuicClientConnection::maybeMigratePort() {
-  if (!IsHandshakeConfirmed() || HasPendingPathValidation() || !migrate_port_on_path_degrading_ || num_socket_switches_ >= kMaxNumSocketSwitches) {
+  if (!IsHandshakeConfirmed() || HasPendingPathValidation() || !migrate_port_on_path_degrading_ ||
+      num_socket_switches_ >= kMaxNumSocketSwitches) {
     return;
   }
 

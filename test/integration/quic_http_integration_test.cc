@@ -135,8 +135,7 @@ public:
     return EnvoyQuicClientConnection::OnHandshakeDoneFrame(frame);
   }
 
-  AssertionResult
-  waitForNewCid(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+  AssertionResult waitForNewCid(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     bool timer_fired = false;
     if (!saw_new_cid_) {
       Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
