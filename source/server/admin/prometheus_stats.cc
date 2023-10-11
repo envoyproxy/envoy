@@ -344,12 +344,8 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       cluster_manager,
       [&](Stats::PrimitiveCounterSnapshot&& metric) {
         host_counters.emplace_back(std::move(metric));
-        ASSERT(metric.name().empty());
       },
-      [&](Stats::PrimitiveGaugeSnapshot&& metric) {
-        host_gauges.emplace_back(std::move(metric));
-        ASSERT(metric.name().empty());
-      });
+      [&](Stats::PrimitiveGaugeSnapshot&& metric) { host_gauges.emplace_back(std::move(metric)); });
 
   metric_name_count +=
       outputPrimitiveStatType(response, params, host_counters, "counter", custom_namespaces);
