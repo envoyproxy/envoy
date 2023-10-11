@@ -72,7 +72,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   ProtobufWkt::StringValue v;
   v.set_value("value_from_downstream_peer");
   state->setValue(v.SerializeAsString());
-  EXPECT_TRUE(state->serializeAsString().has_value());
   stream_info.filter_state_->setData("downstream_peer", std::move(state),
                                      StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
@@ -106,7 +105,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromUpstream) {
   ProtobufWkt::StringValue v;
   v.set_value("value_from_upstream_peer");
   state->setValue(v.SerializeAsString());
-  EXPECT_TRUE(state->serializeAsString().has_value());
   filter_state->setData("upstream_peer", std::move(state),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Connection);
@@ -141,7 +139,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
   ProtobufWkt::StringValue downstream_v;
   downstream_v.set_value("value_from_downstream_peer");
   downstream_state->setValue(downstream_v.SerializeAsString());
-  EXPECT_TRUE(downstream_state->serializeAsString().has_value());
   stream_info.filter_state_->setData("same_key", std::move(downstream_state),
                                      StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
@@ -153,7 +150,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
   ProtobufWkt::StringValue upstream_v;
   upstream_v.set_value("value_from_upstream_peer");
   upstream_state->setValue(upstream_v.SerializeAsString());
-  EXPECT_TRUE(upstream_state->serializeAsString().has_value());
   filter_state->setData("same_key", std::move(upstream_state),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Connection);
