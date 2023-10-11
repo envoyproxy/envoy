@@ -178,7 +178,7 @@ bug_fixes:
     Fixed a crash on some versions of macOS when using a listener on a unix-domain socket.
 - area: redis
   change: |
-    Fixed a bug where redis key with ``%`` in the key is failing with a validation error.
+    Fixed a bug where redis key with % in the key is failing with a validation error.
 - area: http
   change: |
     Close HTTP/2 and HTTP/3 connections that prematurely reset streams. The runtime key
@@ -188,6 +188,10 @@ bug_fixes:
     resets is applied. The connection is disconnected if more than 50% of resets are premature.
     Setting the runtime key ``envoy.restart_features.send_goaway_for_premature_rst_streams`` to ``false`` completely disables
     this check.
+- area: http
+  change: |
+    Fixed a bug that could cause metadata to be decoded after a local reply has been triggered.
+    Can be disabled by setting ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -360,7 +364,6 @@ new_features:
 - area: original_dst
   change: |
     Added support for the internal listener address recovery using the original destination listener filter.
-
 
 deprecated:
 - area: tracing
