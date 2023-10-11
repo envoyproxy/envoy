@@ -27,13 +27,18 @@ public:
   std::string read(const std::string& key) const override {
     envoy_data bridged_key = Data::Utility::copyToBridgeData(key);
     envoy_data bridged_value = bridged_store_.read(bridged_key, bridged_store_.context);
-    return Data::Utility::copyToString(bridged_value);
+    std::string result = Data::Utility::copyToString(bridged_value);
+    release_envoy_data(bridged_key);
+    release_envoy_data(bridged_value);
+    return result;
   }
 
   void save(const std::string& key, const std::string& contents) override {
     envoy_data bridged_key = Data::Utility::copyToBridgeData(key);
     envoy_data bridged_value = Data::Utility::copyToBridgeData(contents);
     bridged_store_.save(bridged_key, bridged_value, bridged_store_.context);
+    release_envoy_data(bridged_key);
+    release_envoy_data(bridged_value);
   }
 
 private:
