@@ -195,7 +195,7 @@ public:
                                     StatNameTagVector& stat_tags) PURE;
 
   /**
-   * Returns the configured fixed tags (which don't depend on the name of the stat.
+   * Returns the configured fixed tags (which don't depend on the name of the stat).
    */
   virtual const TagVector& fixedTags() PURE;
 };
