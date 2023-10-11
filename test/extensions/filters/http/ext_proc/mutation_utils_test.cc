@@ -606,7 +606,6 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
   s->mutable_header()->set_value("100");
   s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
                            HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
-
   Checker checker(HeaderMutationRules::default_instance());
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc()).Times(2);
@@ -621,6 +620,55 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
 
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
 }
+
+TEST(MutationUtils, TestApplyMutationsWithCheckFailure) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.send_header_raw_value", "false"},
+      {"envoy.reloadable_features.header_value_option_change_action", "true"},
+  });
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"orignial-header", "any value"},
+  };
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("x-check-this-header");
+  s->mutable_header()->set_value("value-to-check");
+  s->set_append_action(
+      ::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("x-check-this-header");
+  s->mutable_header()->set_value("value-to-check");
+  s->set_append_action(
+      ::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("x-check-this-header");
+  s->mutable_header()->set_value("value-to-check");
+  s->set_append_action(
+      ::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("x-check-this-header");
+  s->mutable_header()->set_value("value-to-check");
+  s->set_append_action(
+      ::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
+
+  HeaderMutationRules rules;
+  rules.mutable_disallow_all()->set_value(true);
+  rules.mutable_disallow_is_error()->set_value(true);
+  Checker checker(rules);
+
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(4); // Expect 1 rejection
+
+  const auto result =
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections);
+
+  // Assert that the result is an InvalidArgumentError with the specified error message
+  EXPECT_EQ(result.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result.message(), "Invalid attempt to modify x-check-this-header");
+} // namespace
 
 } // namespace
 } // namespace ExternalProcessing
