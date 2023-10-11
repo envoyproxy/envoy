@@ -354,10 +354,6 @@ void DetectorImpl::armIntervalTimer() {
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
                                        MonotonicTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-    // Node seems to be healthy and was not ejected since the last check.
-    if (monitor->ejectTimeBackoff() != 0) {
-      monitor->ejectTimeBackoff()--;
-    }
     return;
   }
 
@@ -759,6 +755,22 @@ void DetectorImpl::onIntervalTimer() {
 
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+
+  // Decrement time backoff for all hosts which have not been ejected.
+  for (auto host : host_monitors_) {
+    if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+      auto& monitor = host.second;
+      // Node is healthy and was not ejected since the last check.
+      if (monitor->lastUnejectionTime().has_value() &&
+          ((now - monitor->lastUnejectionTime().value()) >=
+           std::chrono::milliseconds(
+               runtime_.snapshot().getInteger(IntervalMsRuntime, config_.intervalMs())))) {
+        if (monitor->ejectTimeBackoff() != 0) {
+          monitor->ejectTimeBackoff()--;
+        }
+      }
+    }
+  }
 
   armIntervalTimer();
 }

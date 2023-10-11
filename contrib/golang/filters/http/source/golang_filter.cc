@@ -1520,7 +1520,7 @@ void FilterConfig::newGoPluginConfig() {
 
 FilterConfig::~FilterConfig() {
   if (config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_, 0);
   }
 }
 
@@ -1677,10 +1677,10 @@ RoutePluginConfig::RoutePluginConfig(
 RoutePluginConfig::~RoutePluginConfig() {
   absl::WriterMutexLock lock(&mutex_);
   if (config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_, 0);
   }
-  if (merged_config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
+  if (merged_config_id_ > 0 && config_id_ != merged_config_id_) {
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_, 0);
   }
 }
 
@@ -1719,7 +1719,13 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
       return merged_config_id_;
     }
     // upper level config changed, merged_config_id_ is outdated.
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
+    // there is a concurrency race:
+    // 1. when A envoy worker thread is using the cached merged_config_id_ and it will call into Go
+    //    after some time.
+    // 2. while B envoy worker thread may update the merged_config_id_ in getMergedConfigId, that
+    //    will delete the id.
+    // so, we delay deleting the id in the Go side.
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_, 1);
   }
 
   if (config_id_ == 0) {

@@ -593,9 +593,7 @@ public:
   // Mock subset info is used for testing most logic.
   NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
   // Actual subset info is used for testing actual subset config parsing and behavior.
-  std::unique_ptr<LoadBalancerSubsetInfoImplBase<
-      envoy::extensions::load_balancing_policies::subset::v3::Subset>>
-      actual_subset_info_;
+  std::unique_ptr<LoadBalancerSubsetInfoImpl> actual_subset_info_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::config::cluster::v3::Cluster::RingHashLbConfig ring_hash_lb_config_;
   envoy::config::cluster::v3::Cluster::MaglevLbConfig maglev_lb_config_;
@@ -2516,8 +2514,9 @@ TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
   envoy::extensions::load_balancing_policies::subset::v3::Subset subset_proto_config;
   TestUtility::loadFromYaml(yaml, subset_proto_config);
 
-  actual_subset_info_ = std::make_unique<LoadBalancerSubsetInfoImplBase<
-      envoy::extensions::load_balancing_policies::subset::v3::Subset>>(subset_proto_config);
+  actual_subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_proto_config);
+  // Always be true for the LoadBalancerSubsetInfoImpl.
+  EXPECT_TRUE(actual_subset_info_->isEnabled());
 
   // Add hosts initial hosts.
   init({{"tcp://127.0.0.1:80", {{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-0"}, {"D", "D-V-0"}}},

@@ -1447,9 +1447,9 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
     SocketInterfaceSwap socket_swap(downstreamProtocol() == Http::CodecType::HTTP3
                                         ? Network::Socket::Type::Datagram
                                         : Network::Socket::Type::Stream);
-    Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+    Api::IoErrorPtr ebadf = Network::IoSocketError::getIoSocketEbadfError();
     socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
-    socket_swap.write_matcher_->setWriteOverride(ebadf);
+    socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     timeSystem().advanceTimeWait(std::chrono::seconds(TSAN_TIMEOUT_FACTOR));
   }

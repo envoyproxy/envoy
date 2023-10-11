@@ -126,16 +126,17 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   }
 }
 
-Http::Utility::QueryParams buildAutorizationQueryParams(
+Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) {
-  auto query_params = Http::Utility::parseQueryString(proto_config.authorization_endpoint());
-  query_params["client_id"] = proto_config.credentials().client_id();
-  query_params["response_type"] = "code";
+  auto query_params =
+      Http::Utility::QueryParamsMulti::parseQueryString(proto_config.authorization_endpoint());
+  query_params.overwrite("client_id", proto_config.credentials().client_id());
+  query_params.overwrite("response_type", "code");
   std::string scopes_list = absl::StrJoin(authScopesList(proto_config.auth_scopes()), " ");
-  query_params["scope"] =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
-          ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(scopes_list)
-          : Http::Utility::PercentEncoding::encode(scopes_list, ":/=&? ");
+  query_params.overwrite(
+      "scope", Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
+                   ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(scopes_list)
+                   : Http::Utility::PercentEncoding::encode(scopes_list, ":/=&? "));
   return query_params;
 }
 
@@ -309,20 +310,21 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // to the callback path.
 
     if (config_->redirectPathMatcher().match(path_str)) {
-      Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
+      Http::Utility::QueryParamsMulti query_parameters =
+          Http::Utility::QueryParamsMulti::parseQueryString(path_str);
 
-      if (query_parameters.find(queryParamsState()) == query_parameters.end()) {
-        ENVOY_LOG(debug, "state query param does not exist: \n{}", query_parameters);
+      auto stateVal = query_parameters.getFirstValue(queryParamsState());
+      if (!stateVal.has_value()) {
+        ENVOY_LOG(error, "state query param does not exist: \n{}", query_parameters.data());
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
 
       std::string state;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")) {
-        state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(
-            query_parameters.at(queryParamsState()));
+        state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
       } else {
-        state = Http::Utility::PercentEncoding::decode(query_parameters.at(queryParamsState()));
+        state = Http::Utility::PercentEncoding::decode(stateVal.value());
       }
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
@@ -375,25 +377,25 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // At this point, we *are* on /_oauth. We believe this request comes from the authorization
   // server and we expect the query strings to contain the information required to get the access
   // token
-  const auto query_parameters = Http::Utility::parseQueryString(path_str);
-  if (query_parameters.find(queryParamsError()) != query_parameters.end()) {
+  const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
+  if (query_parameters.getFirstValue(queryParamsError()).has_value()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   // if the data we need is not present on the URL, stop execution
-  if (query_parameters.find(queryParamsCode()) == query_parameters.end() ||
-      query_parameters.find(queryParamsState()) == query_parameters.end()) {
+  auto codeVal = query_parameters.getFirstValue(queryParamsCode());
+  auto stateVal = query_parameters.getFirstValue(queryParamsState());
+  if (!codeVal.has_value() || !stateVal.has_value()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  auth_code_ = query_parameters.at(queryParamsCode());
+  auth_code_ = codeVal.value();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")) {
-    state_ = Http::Utility::PercentEncoding::urlDecodeQueryParameter(
-        query_parameters.at(queryParamsState()));
+    state_ = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
   } else {
-    state_ = Http::Utility::PercentEncoding::decode(query_parameters.at(queryParamsState()));
+    state_ = Http::Utility::PercentEncoding::decode(stateVal.value());
   }
 
   Http::Utility::Url state_url;
@@ -468,12 +470,12 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
           : Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
   auto query_params = config_->authorizationQueryParams();
-  query_params["redirect_uri"] = escaped_redirect_uri;
-  query_params["state"] = escaped_state;
+  query_params.overwrite("redirect_uri", escaped_redirect_uri);
+  query_params.overwrite("state", escaped_state);
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
-  const std::string path_and_query_params = Http::Utility::replaceQueryString(
-      Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()), query_params);
+  const std::string path_and_query_params = query_params.replaceQueryString(
+      Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()));
   authorization_endpoint_url.setPathAndQueryParams(path_and_query_params);
   const std::string new_url = authorization_endpoint_url.toString();
 

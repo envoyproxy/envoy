@@ -80,7 +80,7 @@ jobs:
             ref: ${{ inputs.given_ref }}
             bucket: envoy-postsubmit
           env: |
-            if [[ '${{ inputs.version_dev }}' != '' ]]; then
+            if [[ '${{ inputs.version_dev }}' == 'dev' ]]; then
                 export ENVOY_PUBLISH_DRY_RUN=1
             fi
     uses: ./.github/workflows/_ci.yml
@@ -113,7 +113,7 @@ jobs:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
         ref: main
-        repository: ${{ inputs.version_dev != '' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
+        repository: ${{ inputs.version_dev == 'dev' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
         workflow: envoy-sync.yaml
         inputs: |
-          commit_sha: ${{ inputs.version_dev != '' && github.sha || '' }}
+          commit_sha: ${{ inputs.version_dev == 'dev' && github.sha || '' }}
