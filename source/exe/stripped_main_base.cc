@@ -70,7 +70,6 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
 
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
-    Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          log_lock, options_.logFormatEscaped(),
                                                          options_.enableFineGrainLogging());

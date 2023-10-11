@@ -36,6 +36,8 @@ public:
 // separate for legacy reasons.
 class StrippedMainBase {
 public:
+  virtual ~StrippedMainBase() {}
+
   static std::string hotRestartVersion(bool hot_restart_enabled);
 
   // Consumer must guarantee that all passed references are alive until this object is
