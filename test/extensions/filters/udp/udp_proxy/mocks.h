@@ -54,6 +54,10 @@ public:
   MOCK_METHOD(bool, usePost, (), (const));
   MOCK_METHOD(const std::string&, postPath, (), (const));
   MOCK_METHOD(Http::HeaderEvaluator&, headerEvaluator, (), (const));
+  MOCK_METHOD(uint32_t, maxConnectAttempts, (), (const));
+  MOCK_METHOD(bool, bufferEnabled, (), (const));
+  MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const));
+  MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const));
 
   std::string default_proxy_host_ = "default.host.com";
   std::string default_target_host_ = "default.target.host";

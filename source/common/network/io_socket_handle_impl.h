@@ -93,19 +93,16 @@ protected:
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
     if (result.return_value_ >= 0) {
       // Return nullptr as IoError upon success.
-      return Api::IoCallUint64Result(result.return_value_,
-                                     Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+      return Api::IoCallUint64Result(result.return_value_, Api::IoError::none());
     }
     if (result.errno_ == SOCKET_ERROR_INVAL) {
       ENVOY_LOG(error, "Invalid argument passed in.");
     }
     return Api::IoCallUint64Result(
-        /*rc=*/0,
-        (result.errno_ == SOCKET_ERROR_AGAIN
-             // EAGAIN is frequent enough that its memory allocation should be avoided.
-             ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)
-             : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
+        /*rc=*/0, (result.errno_ == SOCKET_ERROR_AGAIN
+                       // EAGAIN is frequent enough that its memory allocation should be avoided.
+                       ? IoSocketError::getIoSocketEagainError()
+                       : IoSocketError::create(result.errno_)));
   }
 
   os_fd_t fd_;

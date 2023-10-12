@@ -285,7 +285,7 @@ Envoy can also be built with the Docker image used for CI, by installing Docker 
 On Linux, run:
 
 ```
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+./ci/run_envoy_docker.sh './ci/do_ci.sh dev'
 ```
 
 From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
