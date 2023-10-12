@@ -92,6 +92,8 @@ public:
         return AssertionFailure() << "Timed out waiting for path response\n";
       }
     }
+    waiting_for_path_response_ = false;
+    saw_path_response_ = false;
     return AssertionSuccess();
   }
 
@@ -133,12 +135,42 @@ public:
     return EnvoyQuicClientConnection::OnHandshakeDoneFrame(frame);
   }
 
+  AssertionResult waitForNewCid(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    bool timer_fired = false;
+    if (!saw_new_cid_) {
+      Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
+        timer_fired = true;
+        dispatcher_.exit();
+      }));
+      timer->enableTimer(timeout);
+      waiting_for_new_cid_ = true;
+      dispatcher_.run(Event::Dispatcher::RunType::Block);
+      if (timer_fired) {
+        return AssertionFailure() << "Timed out waiting for new cid\n";
+      }
+    }
+    waiting_for_new_cid_ = false;
+    return AssertionSuccess();
+  }
+
+  bool OnNewConnectionIdFrame(const quic::QuicNewConnectionIdFrame& frame) override {
+    bool ret = EnvoyQuicClientConnection::OnNewConnectionIdFrame(frame);
+    saw_new_cid_ = true;
+    if (waiting_for_new_cid_) {
+      dispatcher_.exit();
+    }
+    saw_new_cid_ = false;
+    return ret;
+  }
+
 private:
   Event::Dispatcher& dispatcher_;
   bool saw_path_response_{false};
   bool saw_handshake_done_{false};
+  bool saw_new_cid_{false};
   bool waiting_for_path_response_{false};
   bool waiting_for_handshake_done_{false};
+  bool waiting_for_new_cid_{false};
   bool validation_failure_on_path_response_{false};
 };
 
@@ -798,12 +830,20 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   codec_client_->sendData(*request_encoder_, 1024u, false);
 
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
-  auto old_self_addr = quic_connection_->self_address();
-  EXPECT_CALL(*option, setOption(_, _)).Times(3u);
+
+  for (uint8_t i = 0; i < 5; i++) {
+    auto old_self_addr = quic_connection_->self_address();
+    EXPECT_CALL(*option, setOption(_, _)).Times(3u);
+    quic_connection_->OnPathDegradingDetected();
+    ASSERT_TRUE(quic_connection_->waitForPathResponse());
+    auto self_addr = quic_connection_->self_address();
+    EXPECT_NE(old_self_addr, self_addr);
+    ASSERT_TRUE(quic_connection_->waitForNewCid());
+  }
+
+  // port migration is disabled once socket switch limit is reached.
+  EXPECT_CALL(*option, setOption(_, _)).Times(0);
   quic_connection_->OnPathDegradingDetected();
-  ASSERT_TRUE(quic_connection_->waitForPathResponse());
-  auto self_addr = quic_connection_->self_address();
-  EXPECT_NE(old_self_addr, self_addr);
 
   // Send the rest data.
   codec_client_->sendData(*request_encoder_, 1024u, true);

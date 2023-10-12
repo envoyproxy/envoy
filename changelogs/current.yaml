@@ -383,6 +383,9 @@ new_features:
 - area: admin_logging
   change: |
     added support for glob control of fine-grain loggers in admin /logging interface.
+- area: geoip
+  change: |
+    Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
 
 deprecated:
 - area: tracing
