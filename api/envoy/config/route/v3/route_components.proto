@@ -532,6 +532,16 @@ message RouteMatch {
 
     // If specified, the route will match against whether or not a certificate is validated.
     // If not specified, certificate validation status (true or false) will not be considered when route matching.
+    //
+    // .. warning::
+    //
+    //    Client certificate validation is not currently performed upon TLS session resumption. For
+    //    a resumed TLS session the route will match only when ``validated`` is false, regardless of
+    //    whether the client TLS certificate is valid.
+    //
+    //    The only known workaround for this issue is to disable TLS session resumption entirely, by
+    //    setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+    //    and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
     google.protobuf.BoolValue validated = 2;
   }
 
@@ -627,7 +637,7 @@ message RouteMatch {
   // match. The router will check the query string from the ``path`` header
   // against all the specified query parameters. If the number of specified
   // query parameters is nonzero, they all must match the ``path`` header's
-  // query string for a match to occur.  In the event query parameters are
+  // query string for a match to occur. In the event query parameters are
   // repeated, only the first value for each key will be considered.
   //
   // .. note::
