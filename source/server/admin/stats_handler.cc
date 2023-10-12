@@ -96,10 +96,11 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     server_.flushStats();
   }
 
+  bool active_mode;
 #ifdef ENVOY_ADMIN_HTML
-  const bool active_mode = params.format_ == StatsFormat::ActiveHtml;
+  active_mode = params.format_ == StatsFormat::ActiveHtml;
 #else
-  constexpr bool active_mode = false;
+  active_mode = false;
 #endif
   return makeRequest(
       server_.stats(), params, server_.clusterManager(),
