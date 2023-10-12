@@ -19,7 +19,6 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
 
   unittests:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
