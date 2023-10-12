@@ -82,13 +82,6 @@ outputs:
 runs:
   using: composite
   steps:
-
-  - if: ${{ inputs.check_mobile_run != 'false' }}
-    id: should_run
-    name: 'Check what to run'
-    run: ./mobile/tools/what_to_run.sh
-    shell: bash
-
   # Pull request/targets are _never_ trusted.
   #
   # For dispatch events, only specified bots are trusted.
@@ -128,6 +121,23 @@ runs:
       else
           echo "trusted=false" >> "$GITHUB_OUTPUT"
       fi
+    shell: bash
+
+    # If we are in a trusted CI run then the provided commit _must_ be either the latest for
+    # this branch, or an antecdent.
+    - run: |
+        if ! git merge-base --is-ancestor "${{ inputs.repo_ref }}" HEAD; then
+            echo "Provided Envoy ref (${{ inputs.repo_ref }}) is not an ancestor of current branch" >&2
+            exit 1
+        fi
+        git checkout "${{ inputs.repo_ref }}"
+      if: ${{ steps.trusted.outputs.trusted == 'true' && inputs.repo_ref }}
+      name: Check provided ref
+
+  - if: ${{ inputs.check_mobile_run != 'false' }}
+    id: should_run
+    name: 'Check what to run'
+    run: ./mobile/tools/what_to_run.sh
     shell: bash
 
   - id: context
