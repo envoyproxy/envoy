@@ -136,21 +136,11 @@ jobs:
     - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
-        fetch-depth: ${{ ! (inputs.check_mobile_run || inputs.trusted) && 1 || 0 }}
+        fetch-depth: ${{ ! (inputs.check_mobile_run || ! startsWith(github.event_name, 'pull_request')) && 1 || 0 }}
         # WARNING: This allows untrusted code to run!!!
         #  If this is set, then anything before or after in the job should be regarded as
         #  compromised.
-        ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
-    # If we are in a trusted CI run then the provided commit _must_ be either the latest for
-    # this branch, or an antecdent.
-    - run: |
-        if ! git merge-base --is-ancestor "${{ inputs.repo_ref }}" HEAD; then
-            echo "Provided Envoy ref (${{ inputs.repo_ref }}) is not an ancestor of current branch" >&2
-            exit 1
-        fi
-        git checkout "${{ inputs.repo_ref }}"
-      if: ${{ inputs.trusted }}
-      name: Check provided ref
+        ref: ${{ startsWith(github.event_name, 'pull_request') && inputs.repo_ref || '' }}
 
     - uses: ./.github/actions/env
       name: Generate environment variables

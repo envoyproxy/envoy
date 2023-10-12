@@ -8,7 +8,7 @@ on:
     branches:
     - main
     - release/v*
-  pull_request:
+  pull_request_target:
     paths:
     - '**/requirements*.txt'
     - '**/go.mod'
@@ -29,7 +29,7 @@ jobs:
       check_mobile_run: false
     permissions:
       contents: read
-      statuses: write
+      containers: read
 
   prechecks:
     needs:
