@@ -79,13 +79,13 @@ public:
    * @return the Http Code and the response body as a string.
    */
   CodeResponse handlerStats(absl::string_view url) {
-    MockInstance instance;
+    NiceMock<MockInstance> instance;
     EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
     EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
     EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-    EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
+    ON_CALL(instance, stats()).WillByDefault(ReturnRef(*store_));
+    ON_CALL(instance, clusterManager()).WillByDefault(ReturnRef(endpoints_helper_.cm_));
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
-    EXPECT_CALL(instance, clusterManager()).WillRepeatedly(ReturnRef(endpoints_helper_.cm_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
     request_headers_.setPath(url);
