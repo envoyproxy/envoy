@@ -183,8 +183,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
     const LowerCaseString header_name(sh.header().key());
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.header_value_option_change_action")) {
+    if (sh.append_action().has_value()) {
       switch (sh.append_action()) {
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         // Check if the header already exists with the same name and value.
