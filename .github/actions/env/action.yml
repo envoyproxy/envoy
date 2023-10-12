@@ -89,6 +89,16 @@ runs:
     run: ./mobile/tools/what_to_run.sh
     shell: bash
 
+  # Pull request/targets are _never_ trusted.
+  #
+  # For dispatch events, only specified bots are trusted.
+  #
+  # Commits to a branch are always trusted.
+  #
+  # If code is trusted its not allowed to check out any
+  # non-ancestor commit of a stable branch.
+  #
+  # Untrusted code can check out any commit.
   - id: trusted
     name: 'Check if its a trusted run'
     run: |
@@ -109,7 +119,7 @@ runs:
               TRUSTED=
           fi
       fi
-      if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+      if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
           echo "Not trusted pull_request event"
           TRUSTED=
       fi
