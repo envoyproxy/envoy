@@ -191,8 +191,9 @@ bool Filter::addMetadata(const std::string& meta_namespace, const std::string& k
 }
 
 void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
-                                     const StructMap& struct_map, bool& processing_finished_flag,
-                                     bool should_clear_route_cache) {
+                                     bool should_clear_route_cache,
+                                     const StructMap& struct_map, bool& processing_finished_flag
+                                     ) {
   ASSERT(!processing_finished_flag);
   processing_finished_flag = true;
   if (!struct_map.empty()) {
@@ -206,9 +207,9 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
   }
 }
 
-void Filter::handleAllOnMissing(const Rules& rules, bool& processing_finished_flag,
+void Filter::handleAllOnMissing(const Rules& rules, bool should_clear_route_cache,
                                 Http::StreamFilterCallbacks& filter_callback,
-                                bool should_clear_route_cache) {
+                                bool& processing_finished_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_missing()) {
@@ -217,8 +218,8 @@ void Filter::handleAllOnMissing(const Rules& rules, bool& processing_finished_fl
     }
   }
 
-  finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag,
-                          should_clear_route_cache);
+  finalizeDynamicMetadata(filter_callback, should_clear_route_cache, struct_map,
+                          processing_finished_flag);
 }
 
 void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map,
@@ -229,9 +230,9 @@ void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map,
   }
 }
 
-void Filter::handleAllOnError(const Rules& rules, bool& processing_finished_flag,
+void Filter::handleAllOnError(const Rules& rules, bool should_clear_route_cache,
                               Http::StreamFilterCallbacks& filter_callback,
-                              bool should_clear_route_cache) {
+                              bool& processing_finished_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_error()) {
@@ -239,8 +240,8 @@ void Filter::handleAllOnError(const Rules& rules, bool& processing_finished_flag
                     filter_callback);
     }
   }
-  finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag,
-                          should_clear_route_cache);
+  finalizeDynamicMetadata(filter_callback, should_clear_route_cache, struct_map,
+                          processing_finished_flag);
 }
 
 absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const std::string& key,
@@ -300,13 +301,13 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
 }
 
 void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
-                         bool& processing_finished_flag, Stats::Counter& success,
+                         bool should_clear_route_cache, Stats::Counter& success,
                          Stats::Counter& no_body, Stats::Counter& non_json,
                          Http::StreamFilterCallbacks& filter_callback,
-                         bool should_clear_route_cache) {
+                         bool& processing_finished_flag) {
   // In case we have trailers but no body.
   if (!body || body->length() == 0) {
-    handleAllOnMissing(rules, processing_finished_flag, filter_callback, should_clear_route_cache);
+    handleAllOnMissing(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
     no_body.inc();
     return;
   }
@@ -316,7 +317,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
   if (!result.ok()) {
     ENVOY_LOG(debug, result.status().message());
     non_json.inc();
-    handleAllOnError(rules, processing_finished_flag, filter_callback, should_clear_route_cache);
+    handleAllOnError(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
     return;
   }
 
@@ -328,7 +329,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     ENVOY_LOG(
         debug,
         "Apply on_missing for all rules on a valid application/json body but not a json object.");
-    handleAllOnMissing(rules, processing_finished_flag, filter_callback, should_clear_route_cache);
+    handleAllOnMissing(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
     // This JSON body is valid and successfully parsed.
     success.inc();
     return;
@@ -361,22 +362,22 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
   }
   success.inc();
 
-  finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag,
-                          should_clear_route_cache);
+  finalizeDynamicMetadata(filter_callback, should_clear_route_cache, struct_map,
+                          processing_finished_flag);
 }
 
 void Filter::processRequestBody() {
   processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(),
-              request_processing_finished_, config_->stats().rq_success_,
+              true, config_->stats().rq_success_,
               config_->stats().rq_no_body_, config_->stats().rq_invalid_json_body_,
-              *decoder_callbacks_, true);
+              *decoder_callbacks_, request_processing_finished_);
 }
 
 void Filter::processResponseBody() {
   processBody(encoder_callbacks_->encodingBuffer(), config_->responseRules(),
-              response_processing_finished_, config_->stats().resp_success_,
+              false, config_->stats().resp_success_,
               config_->stats().resp_no_body_, config_->stats().resp_invalid_json_body_,
-              *encoder_callbacks_, false);
+              *encoder_callbacks_, response_processing_finished_);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
@@ -390,8 +391,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->requestRules(), request_processing_finished_, *decoder_callbacks_,
-                       true);
+    handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_, request_processing_finished_);
     config_->stats().rq_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -409,8 +409,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->responseRules(), response_processing_finished_, *encoder_callbacks_,
-                       false);
+    handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_, response_processing_finished_);
     config_->stats().resp_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -430,8 +429,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
     if (!decoder_callbacks_->decodingBuffer() ||
         decoder_callbacks_->decodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->requestRules(), request_processing_finished_, *decoder_callbacks_,
-                         true);
+      handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_, request_processing_finished_);
       config_->stats().rq_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
@@ -455,8 +453,8 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 
     if (!encoder_callbacks_->encodingBuffer() ||
         encoder_callbacks_->encodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->responseRules(), response_processing_finished_,
-                         *encoder_callbacks_, false);
+      handleAllOnMissing(config_->responseRules(), false,
+                         *encoder_callbacks_, response_processing_finished_);
       config_->stats().resp_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
