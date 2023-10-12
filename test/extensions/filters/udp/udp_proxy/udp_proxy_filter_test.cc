@@ -60,8 +60,7 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 }
 
 Api::IoCallUint64Result makeError(int sys_errno) {
-  return {0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
-                             Network::IoSocketError::deleteIoError)};
+  return {0, Network::IoSocketError::create(sys_errno)};
 }
 
 class UdpProxyFilterBase : public testing::Test {
@@ -180,9 +179,8 @@ public:
         // Return an EAGAIN result.
         EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
         EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
-            .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-                0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                   Network::IoSocketError::deleteIoError)))));
+            .WillOnce(Return(ByMove(
+                Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError()))));
       }
 
       // Kick off the receive.

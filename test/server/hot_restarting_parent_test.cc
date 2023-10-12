@@ -20,11 +20,20 @@ namespace {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+class MockHotRestartMessageSender : public HotRestartMessageSender {
+public:
+  MOCK_METHOD(void, sendHotRestartMessage, (envoy::HotRestartMessage && msg));
+};
+
 class HotRestartingParentTest : public testing::Test {
 public:
+  Network::Address::InstanceConstSharedPtr ipv4_test_addr_1_ =
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:12345");
+  Network::Address::InstanceConstSharedPtr ipv4_test_addr_2_ =
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:54321");
   NiceMock<MockInstance> server_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  HotRestartingParent::Internal hot_restarting_parent_{&server_, dispatcher_};
+  MockHotRestartMessageSender message_sender_;
+  HotRestartingParent::Internal hot_restarting_parent_{&server_, message_sender_};
 };
 
 TEST_F(HotRestartingParentTest, ShutdownAdmin) {
@@ -311,6 +320,25 @@ MATCHER_P(UdpPacketHandlerPtrIs, expected_handler, "") {
 TEST_F(HotRestartingParentTest, DrainListeners) {
   EXPECT_CALL(server_, drainListeners(UdpPacketHandlerPtrIs(&hot_restarting_parent_)));
   hot_restarting_parent_.drainListeners();
+}
+
+TEST_F(HotRestartingParentTest, UdpPacketIsForwarded) {
+  uint32_t worker_index = 12; // arbitrary index
+  Network::UdpRecvData packet;
+  std::string msg = "hello";
+  packet.addresses_.local_ = ipv4_test_addr_1_;
+  packet.addresses_.peer_ = ipv4_test_addr_2_;
+  packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(msg);
+  packet.receive_time_ = MonotonicTime(std::chrono::microseconds(1234567890));
+  envoy::HotRestartMessage expected_msg;
+  auto* expected_packet = expected_msg.mutable_request()->mutable_forwarded_udp_packet();
+  expected_packet->set_local_addr("udp://127.0.0.1:12345");
+  expected_packet->set_peer_addr("udp://127.0.0.1:54321");
+  expected_packet->set_payload(msg);
+  expected_packet->set_receive_time_epoch_microseconds(1234567890);
+  expected_packet->set_worker_index(worker_index);
+  EXPECT_CALL(message_sender_, sendHotRestartMessage(ProtoEq(expected_msg)));
+  hot_restarting_parent_.handle(worker_index, packet);
 }
 
 } // namespace
