@@ -50,7 +50,7 @@ TEST(SubsetConfigTest, SubsetConfigTest) {
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.subset", factory.name());
 
-  auto lb_config = factory.loadConfig(std::move(config_msg), context.messageValidationVisitor());
+  auto lb_config = factory.loadConfig(*config_msg, context.messageValidationVisitor());
 
   auto thread_aware_lb =
       factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
@@ -100,7 +100,7 @@ TEST(SubsetConfigTest, SubsetConfigTestWithUnknownSubsetLoadBalancingPolicy) {
   EXPECT_EQ("envoy.load_balancing_policies.subset", factory.name());
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory.loadConfig(std::move(config_msg), context.messageValidationVisitor()), EnvoyException,
+      factory.loadConfig(*config_msg, context.messageValidationVisitor()), EnvoyException,
       "cluster: didn't find a registered load balancer factory implementation for subset lb with "
       "names from [envoy.load_balancing_policies.unknown]");
 }

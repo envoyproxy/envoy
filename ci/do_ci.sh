@@ -786,9 +786,11 @@ case $CI_TARGET in
     publish)
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
         PUBLISH_ARGS=(
-            --publish-commitish="$BUILD_SHA"
+            --publish-commitish="$ENVOY_COMMIT"
+            --publish-commit-message
             --publish-assets=/build/release.signed/release.signed.tar.zst)
         if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
             PUBLISH_ARGS+=(--dry-run)
@@ -859,9 +861,6 @@ case $CI_TARGET in
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
-        # The default config expects these files
-        mkdir -p distribution/custom
-        cp -a /build/*/*64 distribution/custom/
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release

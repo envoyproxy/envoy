@@ -1,11 +1,11 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/string_accessor_impl.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
-#include "test/integration/filters/header_to_filter_state.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 
@@ -208,6 +208,17 @@ TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+class TestObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "jwt_selector"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(TestObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 // This test verifies JwtRequirement specified from filter state rules
 TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   // A config with metadata rules.
@@ -228,10 +239,13 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   config_helper_.prependFilter(R"(
   name: header-to-filter-state
   typed_config:
-    "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
-    header_name: jwt_selector
-    state_name: jwt_selector
-    read_only: true
+    "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+    on_request_headers:
+    - object_key: jwt_selector
+      format_string:
+        text_format_source:
+          inline_string: "%REQ(jwt_selector)%"
+      read_only: true
 )");
   initialize();
 
