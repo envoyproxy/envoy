@@ -131,16 +131,24 @@ VclIoHandle::~VclIoHandle() {
 }
 
 Api::IoCallUint64Result VclIoHandle::close() {
-  VCL_LOG("closing sh {:x}", sh_);
-  RELEASE_ASSERT(VCL_SH_VALID(sh_), "sh must be valid");
+  int wrk_index = vclWrkIndexOrRegister();
   int rc = 0;
 
-  int wrk_index = vclWrkIndexOrRegister();
+  VCL_LOG("closing sh {:x}", sh_);
+
+  if (!VCL_SH_VALID(sh_)) {
+    ENVOY_LOG_MISC(info, "[{}] sh {:x} already closed is_listener {} isWrkListener{}", wrk_index,
+                   sh_, is_listener_, isWrkListener());
+    return {static_cast<unsigned long>(rc), Api::IoError::none()};
+  }
 
   if (is_listener_) {
+    ENVOY_LOG_MISC(info, "[{}] destroying listener sh {}", wrk_index, sh_);
     if (wrk_index) {
-      uint32_t sh = wrk_listener_->sh();
-      RELEASE_ASSERT(wrk_index == vppcom_session_worker(sh), "listener close on wrong thread");
+      if (wrk_listener_ != nullptr) {
+        uint32_t sh = wrk_listener_->sh();
+        RELEASE_ASSERT(wrk_index == vppcom_session_worker(sh), "listener close on wrong thread");
+      }
       clearChildWrkListener();
       // sh_ not invalidated yet, waiting for destructor on main to call `vppcom_session_close`
     } else {

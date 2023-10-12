@@ -1018,6 +1018,9 @@ public:
   /**
    * @return the load balancer factory for this cluster if the load balancing type is
    * LOAD_BALANCING_POLICY_CONFIG.
+   * TODO(wbpcode): change the return type to return a reference after
+   * 'envoy_reloadable_features_convert_legacy_lb_config' is removed. The factory should never be
+   * nullptr when the load balancing type is LOAD_BALANCING_POLICY_CONFIG.
    */
   virtual TypedLoadBalancerFactory* loadBalancerFactory() const PURE;
 

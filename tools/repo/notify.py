@@ -8,6 +8,7 @@
 # NOTE: Slack IDs can be found in the user's full profile from within Slack.
 
 import datetime
+import json
 import os
 import sys
 from datetime import datetime as dt
@@ -158,8 +159,9 @@ class RepoNotifier(runner.Runner):
                 stalled_prs.append(message)
 
             has_maintainer = False
-            for assignee in self.get_assignees(pull, MAINTAINERS, FIRST_PASS):
-                has_maintainer = True
+            for assignee in self.get_assignees(pull, {**MAINTAINERS, **FIRST_PASS}):
+                if MAINTAINERS.get(assignee["login"]):
+                    has_maintainer = True
                 maintainers_and_prs[assignee["login"]] = maintainers_and_prs.get(
                     assignee["login"], [])
                 maintainers_and_prs[assignee["login"]].append(message)
@@ -185,13 +187,9 @@ class RepoNotifier(runner.Runner):
             help="Dont post slack messages, just show what would be posted")
         parser.add_argument('--report', action="store_true", help="Print a report of current state")
 
-    def get_assignees(self, pull, primary_assignees, extra_assignees=None):
-        has_primary_assignee = False
+    def get_assignees(self, pull, assignees):
         for assignee in pull["assignees"]:
-            is_assignable = (
-                assignee["login"] in primary_assignees
-                or assignee["login"] in (extra_assignees or []))
-            if is_assignable:
+            if assignee["login"] in assignees:
                 yield assignee
 
     def is_contrib(self, pr):
@@ -229,7 +227,7 @@ class RepoNotifier(runner.Runner):
 
     async def post_to_oncall(self):
         try:
-            unassigned = "\n".join(await self.maintainer_notifications)
+            unassigned = "\n".join(await self.unassigned_prs)
             stalled = "\n".join(await self.stalled_prs)
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
@@ -267,23 +265,24 @@ class RepoNotifier(runner.Runner):
         return await (self.report() if self.should_report else self.notify())
 
     async def report(self):
+        report = dict(maintainers={}, shepherds={}, stalled=[])
         for maintainer, messages in (await self.maintainer_notifications).items():
-            message = "\n".join(messages)
-            self.log.notice(f"Maintainer: {maintainer}\n{message}")
+            report["maintainers"][maintainer] = messages
 
         for shepherd, messages in (await self.shepherd_notifications).items():
-            message = "\n".join(messages)
-            self.log.notice(f"API shepherd: {shepherd}\n{message}")
+            report["shepherds"][shepherd] = messages
 
-        if stalled_pr_info := "\n".join(await self.stalled_prs):
-            self.log.notice(f"Stalled PRS\n{stalled_pr_info}")
+        if stalled_pr_info := await self.stalled_prs:
+            report["stalled"].append(stalled_pr_info)
+
+        print(json.dumps(report))
 
     async def send_message(self, channel, text):
         # TODO(phlax): this is blocking, switch to async slack client
         if self.dry_run:
             self.log.notice(f"Slack message ({channel}):\n{text}")
             return
-        self.slack_client.chat_postMessage(channel=channel, text=message)
+        self.slack_client.chat_postMessage(channel=channel, text=text)
 
     async def _post_to_assignees(self, assignees, messages):
         # TODO(phlax): this is blocking, switch to async slack client
@@ -294,12 +293,12 @@ class RepoNotifier(runner.Runner):
             message = "\n".join(text)
             if self.dry_run:
                 self.log.notice(f"Slack message ({name}):\n{message}")
-                return
+                continue
             # Ship texts off to slack.
             try:
                 response = self.slack_client.conversations_open(users=uid, text="hello")
                 channel_id = response["channel"]["id"]
-                self.slack_client.chat_postText(channel=channel_id, text=message)
+                self.slack_client.chat_postMessage(channel=channel_id, text=message)
             except SlackApiError as e:
                 print(f"Unexpected error {e.response['error']}")
 
