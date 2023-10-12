@@ -32,11 +32,18 @@ parameters:
   # a lot of change - eg protobuf changed, or a primitve proto changed.
   default: 40
 
+- name: runPrechecks
+  displayName: "Run prechecks"
+  type: string
+  default: true
 
 jobs:
 - job: prechecks
   displayName: Precheck
   timeoutInMinutes: ${{ parameters.timeoutPrechecks }}
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runPrechecks }}, 'true'))
   pool:
     vmImage: $(agentUbuntu)
   variables:
