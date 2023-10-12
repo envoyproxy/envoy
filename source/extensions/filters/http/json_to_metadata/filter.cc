@@ -191,9 +191,8 @@ bool Filter::addMetadata(const std::string& meta_namespace, const std::string& k
 }
 
 void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
-                                     bool should_clear_route_cache,
-                                     const StructMap& struct_map, bool& processing_finished_flag
-                                     ) {
+                                     bool should_clear_route_cache, const StructMap& struct_map,
+                                     bool& processing_finished_flag) {
   ASSERT(!processing_finished_flag);
   processing_finished_flag = true;
   if (!struct_map.empty()) {
@@ -367,17 +366,17 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
 }
 
 void Filter::processRequestBody() {
-  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(),
-              true, config_->stats().rq_success_,
-              config_->stats().rq_no_body_, config_->stats().rq_invalid_json_body_,
-              *decoder_callbacks_, request_processing_finished_);
+  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(), true,
+              config_->stats().rq_success_, config_->stats().rq_no_body_,
+              config_->stats().rq_invalid_json_body_, *decoder_callbacks_,
+              request_processing_finished_);
 }
 
 void Filter::processResponseBody() {
-  processBody(encoder_callbacks_->encodingBuffer(), config_->responseRules(),
-              false, config_->stats().resp_success_,
-              config_->stats().resp_no_body_, config_->stats().resp_invalid_json_body_,
-              *encoder_callbacks_, response_processing_finished_);
+  processBody(encoder_callbacks_->encodingBuffer(), config_->responseRules(), false,
+              config_->stats().resp_success_, config_->stats().resp_no_body_,
+              config_->stats().resp_invalid_json_body_, *encoder_callbacks_,
+              response_processing_finished_);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
@@ -391,7 +390,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_, request_processing_finished_);
+    handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_,
+                       request_processing_finished_);
     config_->stats().rq_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -409,7 +409,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_, response_processing_finished_);
+    handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_,
+                       response_processing_finished_);
     config_->stats().resp_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -429,7 +430,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
     if (!decoder_callbacks_->decodingBuffer() ||
         decoder_callbacks_->decodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_, request_processing_finished_);
+      handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_,
+                         request_processing_finished_);
       config_->stats().rq_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
@@ -453,8 +455,8 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 
     if (!encoder_callbacks_->encodingBuffer() ||
         encoder_callbacks_->encodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->responseRules(), false,
-                         *encoder_callbacks_, response_processing_finished_);
+      handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_,
+                         response_processing_finished_);
       config_->stats().resp_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
