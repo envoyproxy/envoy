@@ -6,8 +6,8 @@ import "envoy/config/core/v3/base.proto";
 
 import "xds/annotations/v3/status.proto";
 
+import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.basic_auth.v3";
 option java_outer_classname = "BasicAuthProto";
@@ -36,5 +36,5 @@ message BasicAuth {
   // Username-password pairs used to verify user credentials in the "Authorization" header.
   // The value needs to be the htpasswd format.
   // Reference to https://httpd.apache.org/docs/2.4/programs/htpasswd.html
-  config.core.v3.DataSource htpasswd = 1 [(udpa.annotations.sensitive) = true];
+  config.core.v3.DataSource users = 1 [(udpa.annotations.sensitive) = true];
 }
