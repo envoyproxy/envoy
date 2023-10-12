@@ -9,7 +9,6 @@
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
 #include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
-#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
