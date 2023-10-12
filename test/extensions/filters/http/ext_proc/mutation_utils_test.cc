@@ -621,10 +621,9 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
 }
 
-class CheckFailureTest : public testing::TestWithParam<int> {
-};
+class CheckFailureTest : public testing::TestWithParam<int> {};
 
-INSTANTIATE_TEST_SUITE_P(Params, CheckFailureTest, testing::Values(4,3,2,1,0));
+INSTANTIATE_TEST_SUITE_P(Params, CheckFailureTest, testing::Values(4, 3, 2, 1, 0));
 
 TEST_P(CheckFailureTest, TestApplyMutationsWithCheckFailure) {
   TestScopedRuntime scoped_runtime;
@@ -641,46 +640,46 @@ TEST_P(CheckFailureTest, TestApplyMutationsWithCheckFailure) {
   auto* s = mutation.add_set_headers();
   switch (GetParam()) {
   case 0:
-  s->mutable_header()->set_key("x-check-this-header");
-  s->mutable_header()->set_value("value-to-check");
-  s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
-                           HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
-  break;
+    s->mutable_header()->set_key("x-check-this-header");
+    s->mutable_header()->set_value("value-to-check");
+    s->set_append_action(::envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                             HeaderValueOption_HeaderAppendAction_APPEND_IF_EXISTS_OR_ADD);
+    break;
   case 1:
-  s->mutable_header()->set_key("x-check-this-header");
-  s->mutable_header()->set_value("value-to-check");
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
-                           HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
-  break;
+    s->mutable_header()->set_key("x-check-this-header");
+    s->mutable_header()->set_value("value-to-check");
+    s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                             HeaderValueOption_HeaderAppendAction_ADD_IF_ABSENT);
+    break;
   case 2:
-  s->mutable_header()->set_key("x-check-this-header");
-  s->mutable_header()->set_value("value-to-check");
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
-                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
-  break;
+    s->mutable_header()->set_key("x-check-this-header");
+    s->mutable_header()->set_value("value-to-check");
+    s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                             HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS_OR_ADD);
+    break;
   case 3:
-  headers.addCopy("x-check-this-header", "to be updated");
-  s->mutable_header()->set_key("x-check-this-header");
-  s->mutable_header()->set_value("value-to-check");
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
-                           HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
-  break;
+    headers.addCopy("x-check-this-header", "to be updated");
+    s->mutable_header()->set_key("x-check-this-header");
+    s->mutable_header()->set_value("value-to-check");
+    s->set_append_action(envoy::config::core::v3::HeaderValueOption_HeaderAppendAction::
+                             HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
+    break;
   case 4:
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.send_header_raw_value", "false"},
-        {"envoy.reloadable_features.header_value_option_change_action", "false"} });
-  s->mutable_header()->set_key("x-check-this-header");
-  s->mutable_header()->set_value("value-to-check");
-  s->mutable_append()->set_value(true);
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.send_header_raw_value", "false"},
+         {"envoy.reloadable_features.header_value_option_change_action", "false"}});
+    s->mutable_header()->set_key("x-check-this-header");
+    s->mutable_header()->set_value("value-to-check");
+    s->mutable_append()->set_value(true);
   }
- 
+
   HeaderMutationRules rules;
   rules.mutable_disallow_all()->set_value(true);
   rules.mutable_disallow_is_error()->set_value(true);
   Checker checker(rules);
 
   Envoy::Stats::MockCounter rejections;
-  EXPECT_CALL(rejections, inc()).Times(1); // Expect 1 rejection
+  EXPECT_CALL(rejections, inc()); // Expect 1 rejection
 
   const auto result =
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections);
