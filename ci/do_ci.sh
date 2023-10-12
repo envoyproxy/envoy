@@ -786,9 +786,11 @@ case $CI_TARGET in
     publish)
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
         PUBLISH_ARGS=(
-            --publish-commitish="$BUILD_SHA"
+            --publish-commitish="$ENVOY_COMMIT"
+            --publish-commit-message
             --publish-assets=/build/release.signed/release.signed.tar.zst)
         if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
             PUBLISH_ARGS+=(--dry-run)

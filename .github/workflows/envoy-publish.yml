@@ -55,6 +55,7 @@ jobs:
       version_dev: ${{ needs.env.outputs.version_dev }}
       given_ref: ${{ inputs.ref }}
       repo_ref: ${{ inputs.ref }}
+      sha: ${{ inputs.sha }}
     permissions:
       contents: write
     secrets:

@@ -71,9 +71,27 @@
 namespace Envoy {
 namespace Upstream {
 
+using ClusterProto = envoy::config::cluster::v3::Cluster;
+
 using UpstreamNetworkFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
+
+class LegacyLbPolicyConfigHelper {
+public:
+  struct Result {
+    TypedLoadBalancerFactory* factory;
+    LoadBalancerConfigPtr config;
+  };
+
+  static absl::StatusOr<Result>
+  getTypedLbConfigFromLegacyProtoWithoutSubset(const ClusterProto& cluster,
+                                               ProtobufMessage::ValidationVisitor& visitor);
+
+  static absl::StatusOr<Result>
+  getTypedLbConfigFromLegacyProto(const ClusterProto& cluster,
+                                  ProtobufMessage::ValidationVisitor& visitor);
+};
 
 /**
  * Class for LBPolicies
@@ -878,22 +896,42 @@ public:
   }
   OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
   lbRoundRobinConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbRoundRobinConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbLeastRequestConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
   lbRingHashConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbRingHashConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
   lbMaglevConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbMaglevConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbOriginalDstConfig();
   }
   OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const override {
@@ -1076,7 +1114,7 @@ private:
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
-  const std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
+  std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;

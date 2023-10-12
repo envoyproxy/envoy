@@ -97,6 +97,7 @@ paths:
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/upstream/thread_aware_lb_impl.cc
+    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/load_balancer_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/outlier_detection_impl.cc
@@ -404,3 +405,7 @@ visibility_excludes:
 - source/extensions/config_subscription/grpc/BUILD
 - source/extensions/load_balancing_policies/subset/BUILD
 - source/extensions/load_balancing_policies/ring_hash/BUILD
+- source/extensions/load_balancing_policies/round_robin/
+- source/extensions/load_balancing_policies/least_request/
+- source/extensions/load_balancing_policies/random/
+- source/extensions/load_balancing_policies/cluster_provided/

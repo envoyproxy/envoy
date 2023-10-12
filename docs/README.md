@@ -43,10 +43,9 @@ To do this:
 
 # How the Envoy website and docs are updated
 
-1. The docs are published to [docs/envoy/latest](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy/latest)
-   on every commit to main. This process is handled by Azure Pipelines with the
-  [`publish.sh`](https://github.com/envoyproxy/envoy/blob/main/docs/publish.sh) script.
 
-2. The docs are published to [docs/envoy](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy)
-   in a directory named after every tagged commit in this repo. Thus, on every tagged release there
-   are snapped docs.
+The docs are published dynamically by Netlify on every commit to main. This process is handled by the
+[envoy-website repo](https://github.com/envoyproxy/envoy-website)
+
+For tagged commits the docs are built statically by the [archive repo](https://github.com/envoyproxy/archive),
+which in turn triggers a rebuild of the website.

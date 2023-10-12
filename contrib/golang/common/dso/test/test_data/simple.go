@@ -33,7 +33,7 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 }
 
 //export envoyGoFilterDestroyHttpPluginConfig
-func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
+func envoyGoFilterDestroyHttpPluginConfig(id uint64, needDelay int) {
 	configCache.Delete(id)
 }
 
