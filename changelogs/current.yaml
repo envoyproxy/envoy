@@ -380,6 +380,9 @@ new_features:
   change: |
     Added filters to update the filter state for :ref:`the HTTP requests <config_http_filters_set_filter_state>` and
     :ref:`the TCP connections <config_network_filters_set_filter_state>`.
+- area: geoip
+  change: |
+    Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
 
 deprecated:
 - area: tracing
