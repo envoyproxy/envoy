@@ -36,7 +36,14 @@ public:
 // separate for legacy reasons.
 class StrippedMainBase {
 public:
-  virtual ~StrippedMainBase() {}
+  using CreateInstanceFunction = std::function<std::unique_ptr<Server::Instance>(
+      Init::Manager& init_manager, const Server::Options& options, Event::TimeSystem& time_system,
+      ListenerHooks& hooks, Server::HotRestart& restarter, Stats::StoreRoot& store,
+      Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
+      Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
+      Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+      std::unique_ptr<ProcessContext> process_context,
+      Buffer::WatermarkFactorySharedPtr watermark_factory)>;
 
   static std::string hotRestartVersion(bool hot_restart_enabled);
 
@@ -46,7 +53,8 @@ public:
                    ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                    std::unique_ptr<Server::Platform> platform_impl,
                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                   std::unique_ptr<ProcessContext> process_context);
+                   std::unique_ptr<ProcessContext> process_context,
+                   CreateInstanceFunction createInstance);
 
   void runServer() {
     ASSERT(options_.mode() == Server::Mode::Serve);
@@ -57,12 +65,6 @@ public:
   Server::Instance* server() { return server_.get(); }
 
 protected:
-  virtual std::unique_ptr<Server::Instance>
-  createInstance(Event::TimeSystem& time_system, Thread::BasicLockable& access_log_lock,
-                 Server::ComponentFactory& component_factory,
-                 std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                 std::unique_ptr<ProcessContext>&& process_context) PURE;
-
   std::unique_ptr<Server::Platform> platform_impl_;
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
   // We instantiate this class regardless of ENVOY_GOOGLE_GRPC, to avoid having

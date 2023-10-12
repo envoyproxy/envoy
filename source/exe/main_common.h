@@ -25,21 +25,13 @@ namespace Envoy {
 
 class MainCommonBase : public StrippedMainBase {
 public:
-  using StrippedMainBase::StrippedMainBase;
+  MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
+                 ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
+                 std::unique_ptr<Server::Platform> platform_impl,
+                 std::unique_ptr<Random::RandomGenerator>&& random_generator,
+                 std::unique_ptr<ProcessContext> process_context);
 
   bool run();
-
-  virtual std::unique_ptr<Server::Instance>
-  createInstance(Event::TimeSystem& time_system, Thread::BasicLockable& access_log_lock,
-                 Server::ComponentFactory& component_factory,
-                 std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                 std::unique_ptr<ProcessContext>&& process_context) override {
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    server_ = std::make_unique<Server::InstanceImpl>(
-        *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
-        *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
-        platform_impl_->threadFactory(), platform_impl_->fileSystem(), std::move(process_context));
-  }
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   using AdminRequestFn =
