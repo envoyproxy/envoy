@@ -679,6 +679,9 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
       runtime_.snapshot().getInteger(ConnectionManagerImpl::PrematureResetTotalStreamCountKey, 500);
 
   if (closed_non_internally_destroyed_requests_ < limit) {
+    // Even though the total number of streams have not reached `limit`, check if the number of bad
+    // streams is high enough that even if every subsequent stream is good, the connection
+    // would be closed once the limit is reached, and if so close the connection now.
     if (number_premature_stream_resets_ < .5 * limit) {
       return;
     }
