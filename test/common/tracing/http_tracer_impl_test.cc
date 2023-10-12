@@ -216,6 +216,32 @@ metadata:
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
 
+TEST_F(HttpConnManFinalizerImplTest, NullResponseHeaders) {
+  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
+  absl::optional<uint32_t> response_code;
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+  // No upstream info.
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(nullptr));
+  // No cluster info.
+  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
+
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _)).Times(0);
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName), _)).Times(0);
+
+  expectSetCustomTags({{"{ tag: a, response_header: { name: X-Ax } }", false, ""}});
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
+}
+
 TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
   host_->hostname_ = "my_upstream_cluster";
 
@@ -371,6 +397,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanCustomTags) {
                                                  {":method", "GET"},
                                                  {":scheme", "https"},
                                                  {"x-bb", "b"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"x-request-id", "id"}, {"x-ee", "e"}};
 
   ProtobufWkt::Struct fake_struct;
   std::string yaml = R"EOF(
@@ -408,6 +435,9 @@ ree:
        {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
        {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
        {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
+       {"{ tag: ee-1, response_header: { name: X-Ee, default_value: _e } }", true, "e"},
+       {"{ tag: ee-2, response_header: { name: X-Ee-Not-Found, default_value: e2 } }", true, "e2"},
+       {"{ tag: ee-3, response_header: { name: X-Ee-Not-Found } }", false, ""},
        {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
        {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
        {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
@@ -478,9 +508,10 @@ metadata:
         false, ""}});
 
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
+  ON_CALL(stream_info, getResponseHeaders()).WillByDefault(Return(&response_headers));
 
-  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
-                                            config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers, nullptr,
+                                            stream_info, config);
 }
 
 TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {

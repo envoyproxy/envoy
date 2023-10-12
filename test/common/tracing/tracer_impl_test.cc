@@ -165,6 +165,9 @@ TEST_F(FinalizerImplTest, TestAll) {
   stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
   stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
+  Http::TestResponseHeaderMapImpl response_headers{{"x-request-id", "id"}, {"x-dd", "d"}};
+  ON_CALL(stream_info, getResponseHeaders()).WillByDefault(Return(&response_headers));
+
   {
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
@@ -191,6 +194,9 @@ TEST_F(FinalizerImplTest, TestAll) {
         {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
         {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
         {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
+        {"{ tag: dd-1, response_header: { name: X-Dd, default_value: _d } }", true, "d"},
+        {"{ tag: dd-2, response_header: { name: X-Dd-Not-Found, default_value: d2 } }", true, "d2"},
+        {"{ tag: dd-3, response_header: { name: X-Dd-Not-Found } }", false, ""},
         {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
         {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
         {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
@@ -226,6 +232,9 @@ TEST_F(FinalizerImplTest, TestAll) {
         {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
         {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
         {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
+        {"{ tag: dd-1, response_header: { name: X-Dd, default_value: _d } }", true, "d"},
+        {"{ tag: dd-2, response_header: { name: X-Dd-Not-Found, default_value: d2 } }", true, "d2"},
+        {"{ tag: dd-3, response_header: { name: X-Dd-Not-Found } }", false, ""},
         {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
         {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
         {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},

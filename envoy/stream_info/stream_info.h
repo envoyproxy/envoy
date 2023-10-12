@@ -807,6 +807,16 @@ public:
   virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
 
   /**
+   * @param headers response headers.
+   */
+  virtual void setResponseHeaders(const Http::ResponseHeaderMap& headers) PURE;
+
+  /**
+   * @return response headers.
+   */
+  virtual const Http::ResponseHeaderMap* getResponseHeaders() const PURE;
+
+  /**
    * @param Upstream Connection's ClusterInfo.
    */
   virtual void

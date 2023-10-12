@@ -57,6 +57,40 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   return entry.value_or(default_value_);
 }
 
+ResponseHeaderCustomTag::ResponseHeaderCustomTag(
+    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Header& response_header)
+    : CustomTagBase(tag), name_(Http::LowerCaseString(response_header.name())),
+      default_value_(response_header.default_value()) {}
+
+absl::string_view
+ResponseHeaderCustomTag::getResponseHeaderValue(const CustomTagContext& ctx) const {
+  const auto response_headers = ctx.stream_info.getResponseHeaders();
+  if (!response_headers) {
+    return default_value_;
+  }
+  auto header_val = response_headers->get(name_);
+  if (header_val.empty()) {
+    return default_value_;
+  }
+  return header_val[0]->value().getStringView();
+}
+
+void ResponseHeaderCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const {
+  auto header_val = getResponseHeaderValue(ctx);
+  if (!header_val.empty()) {
+    span.setTag(tag(), header_val);
+  }
+}
+
+void ResponseHeaderCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                                       const CustomTagContext& ctx) const {
+  auto header_val = getResponseHeaderValue(ctx);
+  auto& custom_tags = *entry.mutable_custom_tags();
+  if (!header_val.empty()) {
+    custom_tags[std::string(tag())] = header_val;
+  }
+}
+
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
                                      const envoy::type::tracing::v3::CustomTag::Metadata& metadata)
     : CustomTagBase(tag), kind_(metadata.kind().kind_case()),
@@ -158,6 +192,9 @@ CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag
     return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
+  case envoy::type::tracing::v3::CustomTag::TypeCase::kResponseHeader:
+    return std::make_shared<const Tracing::ResponseHeaderCustomTag>(tag.tag(),
+                                                                    tag.response_header());
   case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
     break; // Panic below.
   }

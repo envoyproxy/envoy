@@ -55,6 +55,21 @@ private:
   const std::string default_value_;
 };
 
+class ResponseHeaderCustomTag : public CustomTagBase {
+public:
+  ResponseHeaderCustomTag(const std::string& tag,
+                          const envoy::type::tracing::v3::CustomTag::Header& response_header);
+  void applySpan(Span& span, const CustomTagContext& ctx) const override;
+  void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                const CustomTagContext& ctx) const override;
+  absl::string_view value(const CustomTagContext&) const override { return default_value_; }
+
+private:
+  absl::string_view getResponseHeaderValue(const CustomTagContext& ctx) const;
+  const Http::LowerCaseString name_;
+  const std::string default_value_;
+};
+
 class MetadataCustomTag : public CustomTagBase {
 public:
   MetadataCustomTag(const std::string& tag,

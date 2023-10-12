@@ -120,6 +120,8 @@ public:
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
   MOCK_METHOD(const Http::RequestHeaderMap*, getRequestHeaders, (), (const));
+  MOCK_METHOD(void, setResponseHeaders, (const Http::ResponseHeaderMap&));
+  MOCK_METHOD(const Http::ResponseHeaderMap*, getResponseHeaders, (), (const));
   MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
   MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
               (const));

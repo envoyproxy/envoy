@@ -485,6 +485,7 @@ void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bo
                                               absl::string_view details) {
   parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
+  parent_.streamInfo().setResponseHeaders(*parent_.filter_manager_callbacks_.responseHeaders());
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
 

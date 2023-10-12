@@ -1060,6 +1060,54 @@ response: {}
   access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
 }
 
+TEST_F(HttpGrpcAccessLogTest, CustomTagTestResponseHeaderDefaultValue) {
+  envoy::type::tracing::v3::CustomTag tag;
+  const auto tag_yaml = R"EOF(
+tag: rstag
+response_header:
+  name: x-aa
+  default_value: a
+  )EOF";
+  TestUtility::loadFromYaml(tag_yaml, tag);
+  *config_.mutable_common_config()->add_custom_tags() = tag;
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_ = SystemTime(1h);
+  stream_info.onRequestComplete();
+
+  expectLog(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.3"
+      port_value: 63443
+  upstream_remote_address:
+    socket_address:
+      address: "10.0.0.1"
+      port_value: 443
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
+  upstream_cluster: "fake_cluster"
+  start_time:
+    seconds: 3600
+  custom_tags:
+    rstag: a
+request: {}
+response: {}
+)EOF");
+  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+}
+
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadata) {
   envoy::type::tracing::v3::CustomTag tag;
   const auto tag_yaml = R"EOF(
