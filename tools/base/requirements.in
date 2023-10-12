@@ -35,7 +35,6 @@ pygithub
 pyreadline
 pyyaml
 setuptools
-slackclient
 slack_sdk
 sphinx>=7
 sphinxcontrib.googleanalytics
