@@ -37,6 +37,13 @@
 #include "library/common/extensions/key_value/platform/platform.pb.h"
 #include "library/common/main_interface.h"
 
+#ifdef ENVOY_GOOGLE_GRPC
+#include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#endif
+
 namespace Envoy {
 namespace Platform {
 
@@ -152,6 +159,13 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
     list->add_patterns()->mutable_safe_regex()->set_regex("sds\\..*");
     list->add_patterns()->mutable_safe_regex()->set_regex(".*\\.ssl_context_update_by_sds");
   }
+
+  Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
+  Config::forceRegisterAdsConfigSubscriptionFactory();
+  Config::forceRegisterGrpcConfigSubscriptionFactory();
+  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
+  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
+  Config::forceRegisterGrpcMuxFactory();
 }
 #endif
 
