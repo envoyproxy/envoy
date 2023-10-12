@@ -239,8 +239,13 @@ removed_config_or_runtime:
 new_features:
 - area: access_log
   change: |
-    Added ``%RESPONSE_FLAGS_LONG%`` substitution string, that will output a pascal case string representing the resonse flags.
-    The output response flags will correspond with ``%RESPONSE_FLAGS%1``, only with a long textual string representation.
+    added %RESPONSE_FLAGS_LONG% substitution string, that will output a pascal case string representing the response flags.
+    The output response flags will correspond with %RESPONSE_FLAGS%, only with a long textual string representation.
+- area: compression
+  change: |
+    added :ref:`remove_accept_encoding_header
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.ResponseDirectionOverrides.remove_accept_encoding_header>`
+    for per-route configuration of this value.
 - area: config
   change: |
     Added the capability to defer broadcasting of certain cluster (CDS, EDS) to
