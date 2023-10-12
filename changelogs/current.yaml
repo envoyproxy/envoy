@@ -205,7 +205,7 @@ new_features:
 - area: compression
   change: |
     added :ref:`remove_accept_encoding_header
-    <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionOverrides.remove_accept_encoding_header>`
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.ResponseDirectionOverrides.remove_accept_encoding_header>`
     for per-route configuration of this value.
 - area: config
   change: |
