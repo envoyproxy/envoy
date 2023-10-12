@@ -802,7 +802,7 @@ void UdpProxyFilter::TunnelingActiveSession::createUpstream() {
 
   conn_pool_factory_ = std::make_unique<TunnelingConnectionPoolFactory>();
   load_balancer_context_ = std::make_unique<UdpLoadBalancerContext>(
-      cluster_.filter_.config_->hashPolicy(), addresses_.peer_);
+      cluster_.filter_.config_->hashPolicy(), addresses_.peer_, &udp_session_info_);
 
   establishUpstreamConnection();
 }
