@@ -195,6 +195,10 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @alyssawilk @mattklein123
 /*/extensions/http/original_ip_detection/xff @alyssawilk @mattklein123
+# set_filter_state extension
+/*/extensions/filters/common/set_filter_state @kyessenov @wbpcode
+/*/extensions/filters/http/set_filter_state @kyessenov @wbpcode
+/*/extensions/filters/network/set_filter_state @kyessenov @wbpcode
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123
 # Formatters
