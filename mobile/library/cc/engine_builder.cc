@@ -42,6 +42,9 @@
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#include "source/extensions/clusters/static/static_cluster.h"
+#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
+#include "source/extensions/health_checkers/http/health_checker_impl.h"
 #endif
 
 namespace Envoy {
@@ -158,6 +161,10 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
     // Allow SDS related stats.
     list->add_patterns()->mutable_safe_regex()->set_regex("sds\\..*");
     list->add_patterns()->mutable_safe_regex()->set_regex(".*\\.ssl_context_update_by_sds");
+
+    Upstream::forceRegisterStaticClusterFactory();
+    Upstream::forceRegisterStrictDnsClusterFactory();
+    Upstream::forceRegisterHttpHealthCheckerFactory();
   }
 
   Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
