@@ -82,13 +82,16 @@ outputs:
 runs:
   using: composite
   steps:
-
-  - if: ${{ inputs.check_mobile_run != 'false' }}
-    id: should_run
-    name: 'Check what to run'
-    run: ./mobile/tools/what_to_run.sh
-    shell: bash
-
+  # Pull request/targets are _never_ trusted.
+  #
+  # For dispatch events, only specified bots are trusted.
+  #
+  # Commits to a branch are always trusted.
+  #
+  # If code is trusted its not allowed to check out any
+  # non-ancestor commit of a stable branch.
+  #
+  # Untrusted code can check out any commit.
   - id: trusted
     name: 'Check if its a trusted run'
     run: |
@@ -109,7 +112,7 @@ runs:
               TRUSTED=
           fi
       fi
-      if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+      if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
           echo "Not trusted pull_request event"
           TRUSTED=
       fi
@@ -118,6 +121,24 @@ runs:
       else
           echo "trusted=false" >> "$GITHUB_OUTPUT"
       fi
+    shell: bash
+
+  # If we are in a trusted CI run then the provided commit _must_ be either the latest for
+  # this branch, or an antecdent.
+  - run: |
+      if ! git merge-base --is-ancestor "${{ inputs.repo_ref }}" HEAD &> /dev/null; then
+      echo "Provided Envoy ref (${{ inputs.repo_ref }}) is not an ancestor of current branch" >&2
+          exit 1
+      fi
+      git checkout "${{ inputs.repo_ref }}"
+    if: ${{ steps.trusted.outputs.trusted == 'true' && inputs.repo_ref }}
+    name: Check provided ref
+    shell: bash
+
+  - if: ${{ inputs.check_mobile_run != 'false' }}
+    id: should_run
+    name: 'Check what to run'
+    run: ./mobile/tools/what_to_run.sh
     shell: bash
 
   - id: context
