@@ -301,20 +301,18 @@ absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message
 }
 
 bool Utility::addInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
-                                       absl::string_view cluster_type, absl::string_view host) {
+                                       absl::string_view cluster_type, absl::string_view uri) {
   // Check if local cluster exists with that name.
   if (cm.getThreadLocalCluster(cluster_name) == nullptr) {
     // Make sure we run this on main thread.
     TRY_ASSERT_MAIN_THREAD {
       envoy::config::cluster::v3::Cluster cluster;
-      const auto host_attributes = Http::Utility::parseAuthority(host);
+      absl::string_view host_port;
+      absl::string_view path;
+      Http::Utility::extractHostPathFromUri(uri, host_port, path);
+      const auto host_attributes = Http::Utility::parseAuthority(host_port);
       const auto host = host_attributes.host_;
-      if (!host_attributes.port_) {
-        ENVOY_LOG_MISC(
-            error, "Failed to add internal cluster with port value missing from host: {}", host);
-        return false;
-      }
-      const auto port = host_attributes.port_.value();
+      const auto port = host_attributes.port_ ? host_attributes.port_.value() : 80;
       MessageUtil::loadFromYaml(fmt::format(R"EOF(
 name: {}
 type: {}

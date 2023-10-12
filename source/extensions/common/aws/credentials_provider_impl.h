@@ -96,7 +96,7 @@ public:
   MetadataCredentialsProviderBase(Api::Api& api, ServerFactoryContextOptRef context,
                                   const FetchMetadataUsingCurl& fetch_metadata_using_curl,
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
-                                  absl::string_view cluster_name, absl::string_view host)
+                                  absl::string_view cluster_name, absl::string_view uri)
       : api_(api), context_(context), fetch_metadata_using_curl_(fetch_metadata_using_curl),
         create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
         cluster_name_(std::string(cluster_name)), cache_duration_(getCacheDuration()),
@@ -105,12 +105,12 @@ public:
             "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials")) {
 
     if (!use_libcurl_ && context_) {
-      context_->mainThreadDispatcher().post([this, host]() {
+      context_->mainThreadDispatcher().post([this, uri]() {
         if (!Utility::addInternalClusterStatic(context_->clusterManager(), cluster_name_, "STATIC",
-                                               host)) {
+                                               uri)) {
           ENVOY_LOG(critical,
                     "Failed to add [STATIC cluster = {} with address = {}] or cluster not found",
-                    cluster_name_, host);
+                    cluster_name_, uri);
           return;
         }
       });
@@ -250,8 +250,7 @@ public:
                               absl::string_view authorization_token = {},
                               absl::string_view cluster_name = {})
       : MetadataCredentialsProviderBase(api, context, fetch_metadata_using_curl,
-                                        create_metadata_fetcher_cb, cluster_name,
-                                        CONTAINER_METADATA_HOST),
+                                        create_metadata_fetcher_cb, cluster_name, credential_uri),
         credential_uri_(credential_uri), authorization_token_(authorization_token) {}
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface

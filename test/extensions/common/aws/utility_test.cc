@@ -381,11 +381,13 @@ TEST(UtilityTest, AddStaticClusterFailure) {
   EXPECT_FALSE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1:80"));
 }
 
-// Verify that missing port value from host will return false.
-TEST(UtilityTest, AddStaticClusterFailureWithMissingPort) {
+// Verify that even with missing port value and any path set in host will still succeed.
+TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
   NiceMock<Upstream::MockClusterManager> cm_;
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_FALSE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1"));
+  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
+  EXPECT_TRUE(
+      Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1/something"));
 }
 
 } // namespace
