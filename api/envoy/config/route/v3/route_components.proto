@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -215,6 +215,14 @@ message VirtualHost {
   // It takes precedence over the route config mirror policy entirely.
   // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
+
+  // [#not-implemented-hide:]
+  // The metadata field can be used to provide additional information
+  // about the virtual host. It can be used for configuration, stats, and logging.
+  // The metadata should go under the filter namespace that will need it.
+  // For instance, if the metadata is intended for the Router filter,
+  // the filter name should be specified as ``envoy.filters.http.router``.
+  core.v3.Metadata metadata = 24;
 }
 
 // A filter-defined action type.
