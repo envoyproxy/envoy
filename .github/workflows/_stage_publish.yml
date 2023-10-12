@@ -28,6 +28,8 @@ on:
         type: string
       given_ref:
         type: string
+      sha:
+        type: string
     secrets:
       ENVOY_CI_SYNC_APP_ID:
       ENVOY_CI_SYNC_APP_KEY:
@@ -52,6 +54,7 @@ jobs:
             bucket: envoy-pr
           env: |
             export ENVOY_PUBLISH_DRY_RUN=1
+            export ENVOY_COMMIT=${{ inputs.sha }}
     uses: ./.github/workflows/_ci.yml
     with:
       target: ${{ matrix.target }}
