@@ -208,8 +208,7 @@ void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTi
         // since 'now' and 'next_expire' are in nanoseconds, the following condition is to check if
         // the difference between them is less than 1 second. If we don't do this, the timer will
         // be enabled with 0 seconds, which will cause the timer to fire immediately. This will
-        // cpu spike. Autoscalers will see this as a spike in traffic and will scale up the pods
-        // to cause unnecessary cost/churn.
+        // cause cpu spike.
         (std ::chrono::duration_cast<std::chrono::seconds>(next_expire - now).count() == 0)) {
       // Erase the expired entry.
       lru_map_.erase(lru_list_.back().config_with_hash_key_);
