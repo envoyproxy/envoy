@@ -525,9 +525,12 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
 
 // Invalid paths are rejected with 400.
 TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
-  setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -539,9 +542,6 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
     data.drain(4);
     return Http::okStatus();
   }));
-#ifdef ENVOY_ENABLE_UHV
-  expectCheckWithDefaultUhv();
-#endif
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(true));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
@@ -573,14 +573,14 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
 // Filters observe normalized paths, not the original path, when path
 // normalization is configured.
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
-  setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;
-  const std::string original_path = "/x/%2E%2e/z";
-  const std::string normalized_path = "/z";
 #ifdef ENVOY_ENABLE_UHV
   expectCheckWithDefaultUhv();
 #endif
+  setup(false, "");
+  const std::string original_path = "/x/%2E%2e/z";
+  const std::string normalized_path = "/z";
 
   auto* filter = new MockStreamFilter();
 
@@ -620,14 +620,14 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
 // The router observes normalized paths, not the original path, when path
 // normalization is configured.
 TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
-  setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;
-  const std::string original_path = "/x/%2E%2e/z";
-  const std::string normalized_path = "/z";
 #ifdef ENVOY_ENABLE_UHV
   expectCheckWithDefaultUhv();
 #endif
+  setup(false, "");
+  const std::string original_path = "/x/%2E%2e/z";
+  const std::string normalized_path = "/z";
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -716,18 +716,17 @@ TEST_F(HttpConnectionManagerImplTest, EscapedSlashesRedirectedAfterOtherNormaliz
 }
 
 TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForwarded) {
-  setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;
   merge_slashes_ = true;
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
-  const std::string original_path = "/x/%2E%2e/z%2f%2Fabc%5C../def";
-  const std::string normalized_path = "/z/def";
-
 #ifdef ENVOY_ENABLE_UHV
   expectCheckWithDefaultUhv();
 #endif
+  setup(false, "");
+  const std::string original_path = "/x/%2E%2e/z%2f%2Fabc%5C../def";
+  const std::string normalized_path = "/z/def";
 
   auto* filter = new MockStreamFilter();
 

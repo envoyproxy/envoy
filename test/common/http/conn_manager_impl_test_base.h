@@ -20,6 +20,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/delegating_route_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -299,6 +300,7 @@ public:
       header_validator_config_;
   Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
       header_validator_config_overrides_;
+  TestScopedRuntime scoped_runtime_;  
 };
 
 class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,

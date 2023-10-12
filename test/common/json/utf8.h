@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "absl/strings/string_view.h"
 
 namespace Envoy {

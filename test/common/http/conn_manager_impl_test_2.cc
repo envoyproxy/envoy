@@ -1,7 +1,6 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/common/http/custom_header_extension.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -3415,10 +3414,10 @@ TEST_F(HttpConnectionManagerImplTest, DirectLocalReplyCausesDisconnect) {
 
 // Header validator rejects header map for HTTP/1.x protocols
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectsHttp1) {
-  setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult(
                            HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
                        ServerHeaderValidator::RequestHeadersTransformationResult::success());
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3461,10 +3460,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectsHttp1) {
 // Header validator rejects header map for HTTP/2 protocols
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
   codec_->protocol_ = Protocol::Http2;
-  setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult(
                            HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
                        ServerHeaderValidator::RequestHeadersTransformationResult::success());
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3490,10 +3489,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
 // Header validator rejects gRPC request
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
   codec_->protocol_ = Protocol::Http2;
-  setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult(
                            HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
                        ServerHeaderValidator::RequestHeadersTransformationResult::success());
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3520,12 +3519,12 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
 
 // Header validator redirects
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
-  setup(false, "");
   expectUhvHeaderCheck(
       HeaderValidator::ValidationResult::success(),
       ServerHeaderValidator::RequestHeadersTransformationResult(
           ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect,
           "bad_header_map"));
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3550,12 +3549,12 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
 // Header validator redirects gRPC request
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
   codec_->protocol_ = Protocol::Http2;
-  setup(false, "");
   expectUhvHeaderCheck(
       HeaderValidator::ValidationResult::success(),
       ServerHeaderValidator::RequestHeadersTransformationResult(
           ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect,
           "bad_header_map"));
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3583,10 +3582,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
 // Header validator rejects trailer map before response has started
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponseHttp1) {
   codec_->protocol_ = Protocol::Http11;
-  setup(false, "");
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
                         HeaderValidator::TransformationResult::success());
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3612,10 +3611,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
 
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponseHttp2) {
   codec_->protocol_ = Protocol::Http2;
-  setup(false, "");
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
                         HeaderValidator::TransformationResult::success(), false);
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3637,10 +3636,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
 
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationBeforeResponse) {
   codec_->protocol_ = Protocol::Http11;
-  setup(false, "");
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
                         HeaderValidator::TransformationResult::success());
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3667,11 +3666,11 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationB
 // Header validator rejects trailer map after response has started
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse) {
   codec_->protocol_ = Protocol::Http2;
-  setup(false, "");
-  setupFilterChain(1, 0, 1);
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
                         HeaderValidator::TransformationResult::success());
+  setup(false, "");
+  setupFilterChain(1, 0, 1);
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
         return FilterHeadersStatus::StopIteration;
@@ -3707,9 +3706,9 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse
 
 // Request completes normally if header validator accepts it
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
-  setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult::success(),
                        ServerHeaderValidator::RequestHeadersTransformationResult::success());
+  setup(false, "");
 
   // Store the basic request encoder during filter chain setup.
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());

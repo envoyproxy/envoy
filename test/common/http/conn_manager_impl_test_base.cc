@@ -287,6 +287,9 @@ void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
 
 void HttpConnectionManagerImplMixin::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -296,10 +299,6 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
     data.drain(4);
     return Http::okStatus();
   }));
-
-#ifdef ENVOY_ENABLE_UHV
-  expectCheckWithDefaultUhv();
-#endif
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -314,6 +313,7 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
 }
 
 void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   header_validator_config_.mutable_uri_path_normalization_options()->set_skip_path_normalization(
       !normalize_path_);
   header_validator_config_.mutable_uri_path_normalization_options()->set_skip_merging_slashes(
@@ -338,6 +338,7 @@ void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
 void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
     HeaderValidator::ValidationResult validation_result,
     ServerHeaderValidator::RequestHeadersTransformationResult transformation_result) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([validation_result, transformation_result]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
@@ -367,6 +368,7 @@ void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
 void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
     HeaderValidator::ValidationResult validation_result,
     HeaderValidator::TransformationResult transformation_result, bool expect_response) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([validation_result, transformation_result, expect_response]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();

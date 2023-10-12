@@ -915,8 +915,9 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefaul
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
       timeSystem())};
+  // TODO(#28841): concider parameterizing test for UHV and non UHV modes
   auto codec = std::make_unique<IntegrationCodecClient>(
-      *dispatcher_, random_, std::move(conn), host_description, downstream_protocol_, true);
+      *dispatcher_, random_, std::move(conn), host_description, false, downstream_protocol_, true);
   EXPECT_TRUE(codec->disconnected());
   EXPECT_EQ("QUIC_NO_ERROR with details: Closed by application with reason: no filter chain found",
             codec->connection()->transportFailureReason());
