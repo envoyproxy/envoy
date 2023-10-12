@@ -26,7 +26,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    name: kotlin_tests_linux
+    name: java_tests_linux
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 90
     container:
@@ -38,7 +38,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Run Kotlin library integration tests'
+    - name: 'Run Java library integration tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
