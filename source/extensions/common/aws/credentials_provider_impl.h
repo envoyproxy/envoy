@@ -94,11 +94,6 @@ public:
 
   Credentials getCredentials() override;
 
-  const std::string& clusterName() const { return cluster_name_; }
-
-  // Handle fetch done.
-  void handleFetchDone();
-
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
 
@@ -111,6 +106,11 @@ protected:
     CredentialsConstSharedPtr credentials_;
   };
 
+  const std::string& clusterName() const { return cluster_name_; }
+
+  // Handle fetch done.
+  void handleFetchDone();
+
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
 
@@ -122,7 +122,7 @@ protected:
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
   // The cluster name to use for internal static cluster pointing towards the credentials provider.
-  std::string cluster_name_;
+  const std::string cluster_name_;
   // The cache duration of the fetched credentials.
   const std::chrono::seconds cache_duration_;
   // The thread local slot for cache.
@@ -131,17 +131,20 @@ protected:
   Envoy::Event::TimerPtr cache_duration_timer_;
   // The Metadata fetcher object.
   MetadataFetcherPtr metadata_fetcher_;
-
+  // Callback function to call on successful metadata fetch.
   OnAsyncFetchCb on_async_fetch_cb_;
+  // To determine if credentials fetching can continue even after metadata fetch failure.
   bool continue_on_async_fetch_failure_ = false;
+  // Reason to log on fetch failure while continue.
   std::string continue_on_async_fetch_failure_reason_ = "";
+  // Last update time to determine expiration.
   SystemTime last_updated_;
+  // Cache credentials when using libcurl.
   Credentials cached_credentials_;
+  // Lock guard.
   Thread::MutexBasicLockable lock_;
-
   // The init target.
   std::unique_ptr<Init::TargetImpl> init_target_;
-
   // Used in logs.
   const std::string debug_name_;
 };
@@ -203,8 +206,8 @@ public:
 
 private:
   SystemTime expiration_time_;
-  std::string credential_uri_;
-  std::string authorization_token_;
+  const std::string credential_uri_;
+  const std::string authorization_token_;
 
   bool needsRefresh() override;
   void refresh() override;
