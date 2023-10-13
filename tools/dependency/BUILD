@@ -72,4 +72,8 @@ genrule(
         ":cve_download",
         "//bazel:all_repository_locations",
     ],
+    exec_properties = {
+        "dockerNetwork": "standard",
+
+    },
 )
