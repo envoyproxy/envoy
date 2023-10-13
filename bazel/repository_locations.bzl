@@ -1459,6 +1459,21 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "MIT",
         license_url = "https://github.com/protocolbuffers/utf8_range/blob/{version}/LICENSE",
     ),
+    com_github_maxmind_libmaxminddb = dict(
+        project_name = "maxmind_libmaxminddb",
+        project_desc = "C library for reading MaxMind DB files",
+        project_url = "https://github.com/maxmind/libmaxminddb",
+        version = "1.7.1",
+        sha256 = "e8414f0dedcecbc1f6c31cb65cd81650952ab0677a4d8c49cab603b3b8fb083e",
+        strip_prefix = "libmaxminddb-{version}",
+        urls = ["https://github.com/maxmind/libmaxminddb/releases/download/{version}/libmaxminddb-{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.geoip_providers.maxmind"],
+        release_date = "2022-09-30",
+        cpe = "cpe:2.3:a:maxmind:libmaxminddb:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/maxmind/libmaxminddb/blob/{version}/LICENSE",
+    ),
 )
 
 def _compiled_protoc_deps(locations, versions):

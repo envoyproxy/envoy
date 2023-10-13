@@ -945,11 +945,21 @@ peerCertificateValidated()
 
 .. code-block:: lua
 
-  if downstreamSslConnection:peerCertificateVaidated() then
-    print("peer certificate is valiedated")
+  if downstreamSslConnection:peerCertificateValidated() then
+    print("peer certificate is validated")
   end
 
 Returns bool whether the peer certificate was validated.
+
+.. warning::
+
+   Client certificate validation is not currently performed upon TLS session resumption. For a
+   resumed TLS session this method will return false, regardless of whether the peer certificate is
+   valid.
+
+   The only known workaround for this issue is to disable TLS session resumption entirely, by
+   setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+   and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
 
 uriSanLocalCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^

@@ -8,7 +8,7 @@ on:
     branches:
     - main
     - release/v*
-  pull_request:
+  pull_request_target:
     paths:
     - '**/requirements*.txt'
     - '**/go.mod'
@@ -29,7 +29,7 @@ jobs:
       check_mobile_run: false
     permissions:
       contents: read
-      statuses: write
+      packages: read
 
   prechecks:
     needs:
@@ -43,8 +43,12 @@ jobs:
           managed: true
     uses: ./.github/workflows/_ci.yml
     name: CI ${{ matrix.target }}
+    permissions:
+      contents: read
+      packages: read
     with:
       target: ${{ matrix.target }}
       rbe: ${{ matrix.rbe }}
+      bazel_extra: '--config=rbe-envoy-engflow'
       managed: ${{ matrix.managed }}
       cache_build_image: ${{ needs.env.outputs.build_image_ubuntu }}
