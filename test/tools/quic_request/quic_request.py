@@ -36,7 +36,7 @@ class Http3Client(QuicConnectionProtocol):
         for header, value in event.headers:
             print(f"{header.decode('utf-8')}: {value.decode('utf-8')}\n", end="")
         print("\n", end="")
-        
+
     def http_event_received(self, event: H3Event) -> None:
         stream_id = event.stream_id
         if stream_id not in self._stream_ids:
@@ -91,13 +91,14 @@ async def main():
     )
     config.load_verify_locations(args.ca_certs)
     parsed_url = urlparse(args.url)
-    async with aioquic.asyncio.client.connect(
-            host=parsed_url.hostname,
-            port=parsed_url.port or 443,
-            configuration=config,
-            create_protocol=Http3Client,
-            wait_connected=True,
-    ) as client:
+    client_resolver = aioquic.asyncio.client.connect(
+        host=parsed_url.hostname,
+        port=parsed_url.port or 443,
+        configuration=config,
+        create_protocol=Http3Client,
+        wait_connected=True,
+    )
+    async with client_resolver as client:
         client = cast(Http3Client, client)
         await client.request(args.url, args.include_headers)
 
