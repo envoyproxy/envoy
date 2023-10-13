@@ -325,7 +325,7 @@ stages:
         echo "linux_arm64 released"
 
 - stage: check
-  dependsOn: ["env", "linux_x64"]
+  dependsOn: ["precheck"]
   jobs:
   - job: bazel
     displayName: "linux_x64"
