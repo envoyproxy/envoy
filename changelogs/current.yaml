@@ -127,6 +127,10 @@ minor_behavior_changes:
 - area: router
   change: |
     Enable environment_variable in router direct response.
+- area: ext_authz
+  change: |
+    Ext_authz supports adding ``x-envoy-auth-failure-mode-allowed`` header optionally when ``failure_mode_allow`` is enable,
+    and runtime flag ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add`` is removed.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
