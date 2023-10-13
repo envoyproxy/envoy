@@ -27,10 +27,6 @@ on:
         type: boolean
         default: false
 
-      start_check_status:
-        type: string
-        default:
-
       repo_ref:
         type: string
         default:
@@ -172,16 +168,6 @@ jobs:
         if [[ -n "${{ steps.env.outputs.repo_ref_pr_number }}" ]]; then
             echo "PR: https://github.com/envoyproxy/envoy/pull/${{ steps.env.outputs.repo_ref_pr_number }}"
         fi
-
-  check:
-    if: ${{ inputs.start_check_status && github.event_name != 'pull_request' }}
-    uses: ./.github/workflows/_workflow-start.yml
-    permissions:
-      contents: read
-      statuses: write
-    with:
-      workflow_name: ${{ inputs.start_check_status }}
-      sha: ${{ inputs.repo_ref_sha }}
 
   cache:
     if: ${{ inputs.prime_build_image }}
