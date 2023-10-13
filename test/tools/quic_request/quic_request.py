@@ -74,7 +74,21 @@ class Http3Client(QuicConnectionProtocol):
         await future
 
 
-async def main():
+async def request(url: str, config, include_headers: bool) -> None:
+    parsed_url = urlparse(url)
+    client_resolver = aioquic.asyncio.client.connect(
+        host=parsed_url.hostname,
+        port=parsed_url.port or 443,
+        configuration=config,
+        create_protocol=Http3Client,
+        wait_connected=True,
+    )
+    async with client_resolver as client:
+        client = cast(Http3Client, client)
+        await client.request(url, include_headers)
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(description="HTTP/3 client")
     parser.add_argument("url", type=str, help="the URL to query (must be HTTPS)")
     parser.add_argument(
@@ -90,18 +104,8 @@ async def main():
         alpn_protocols=H3_ALPN,
     )
     config.load_verify_locations(args.ca_certs)
-    parsed_url = urlparse(args.url)
-    client_resolver = aioquic.asyncio.client.connect(
-        host=parsed_url.hostname,
-        port=parsed_url.port or 443,
-        configuration=config,
-        create_protocol=Http3Client,
-        wait_connected=True,
-    )
-    async with client_resolver as client:
-        client = cast(Http3Client, client)
-        await client.request(args.url, args.include_headers)
+    asyncio.run(request(args.url, config, args.include_headers))
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
