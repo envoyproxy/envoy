@@ -7,13 +7,16 @@ Specifically, tests that:
 TODO(ravenblack): perform the same tests for QUIC connections once they will work as expected.
 """
 
+import abc
+import argparse
 import asyncio
+from functools import cached_property
 import logging
 import os
 import pathlib
 import random
 import sys
-from typing import AsyncIterator
+from typing import AsyncIterator, Awaitable
 import unittest
 from datetime import datetime, timedelta
 from aiohttp import client_exceptions, web, ClientSession
@@ -58,7 +61,11 @@ ENVOY_ADMIN_PORT = 54324
 # the socket path too long.
 SOCKET_PATH = f"@envoy_domain_socket_{os.getpid()}"
 SOCKET_MODE = 0
-ENVOY_BINARY = "./test/integration/hotrestart_main"
+ENVOY_BINARY = ""  # Populated from args
+CA_CERT_PATH = ""  # Populated from args
+CERTIFICATE_PATH = ""  # Populated from args
+CERTIFICATE_KEY_PATH = ""  # Populated from args
+H3_REQUEST_BINARY = ""  # Populated from args
 
 # This log config makes logs interleave with other test output, which
 # is useful since with all the async operations it can be hard to figure
@@ -110,48 +117,102 @@ class Upstream:
         return response
 
 
-async def _http_request(url) -> AsyncIterator[str]:
+class LineGenerator:
+
+    @cached_property
+    def _queue(self) -> asyncio.Queue[str]:
+        return asyncio.Queue()
+
+    @cached_property
+    def _task(self):
+        return asyncio.create_task(self.generator())
+
+    @abc.abstractmethod
+    async def generator(self) -> None:
+        pass
+
+    def __init__(self):
+        self._task
+
+    async def join(self) -> int:
+        await self._task
+        return self._queue.qsize()
+
+    async def line(self) -> str:
+        line = await self._queue.get()
+        self._queue.task_done()
+        return line
+
+
+class Http3RequestLineGenerator(LineGenerator):
+
+    def __init__(self, url):
+        self._url = url
+        super().__init__()
+
+    async def generator(self) -> None:
+        proc = await asyncio.create_subprocess_exec(
+            H3_REQUEST_BINARY,
+            f"--ca-certs={CA_CERT_PATH}",
+            self._url,
+            stdout=asyncio.subprocess.PIPE,
+        )
+        async for line in proc.stdout:
+            await self._queue.put(line)
+        await proc.wait()
+
+
+class HttpRequestLineGenerator(LineGenerator):
+
+    def __init__(self, url):
+        self._url = url
+        super().__init__()
+
+    async def generator(self) -> None:
+        # Separate session per request is against aiohttp idioms, but is
+        # intentional here because the point of the test is verifying
+        # where connections go - reusing a connection would do the wrong thing.
+        async with ClientSession() as session:
+            async with session.get(self._url) as response:
+                async for line in response.content:
+                    await self._queue.put(line)
+
+
+def _full_http3_request(url: str) -> Awaitable[str]:
+
+    async def req() -> str:
+        proc = await asyncio.create_subprocess_exec(
+            H3_REQUEST_BINARY, f"--ca-certs={CA_CERT_PATH}", url, stdout=asyncio.subprocess.PIPE)
+        (stdout, _) = await proc.communicate()
+        await proc.wait()
+        return stdout.decode('utf-8')
+
+    task = asyncio.create_task(req())
+    return task
+
+
+def _full_http_request(url: str) -> Awaitable[str]:
     # Separate session per request is against aiohttp idioms, but is
     # intentional here because the point of the test is verifying
     # where connections go - reusing a connection would do the wrong thing.
-    async with ClientSession() as session:
-        async with session.get(url) as response:
-            async for line in response.content:
-                yield line
+    async def req() -> str:
+        async with ClientSession() as session:
+            async with session.get(url) as response:
+                return await response.text()
+
+    task = asyncio.create_task(req())
+    return task
 
 
-async def _full_http_request(url: str) -> str:
-    # Separate session per request is against aiohttp idioms, but is
-    # intentional here because the point of the test is verifying
-    # where connections go - reusing a connection would do the wrong thing.
-    async with ClientSession() as session:
-        async with session.get(url) as response:
-            return await response.text()
-
-
-def _make_envoy_config_yaml(upstream_port, file_path):
-    file_path.write_text(
-        f"""
-admin:
-  address:
-    socket_address:
-      address: {ENVOY_HOST}
-      port_value: {ENVOY_ADMIN_PORT}
-
-static_resources:
-  listeners:
-  - name: listener_0
-    address:
-      socket_address:
-        address: {ENVOY_HOST}
-        port_value: {ENVOY_PORT}
+def filter_chains(codec_type: str = "AUTO") -> str:
+    return f"""
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
-          codec_type: AUTO
+          codec_type: {codec_type}
           route_config:
             name: local_route
             virtual_hosts:
@@ -166,6 +227,48 @@ static_resources:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+"""
+
+
+def _make_envoy_config_yaml(upstream_port, file_path):
+    file_path.write_text(
+        f"""
+admin:
+  address:
+    socket_address:
+      address: {ENVOY_HOST}
+      port_value: {ENVOY_ADMIN_PORT}
+
+static_resources:
+  listeners:
+  - name: listener_quic
+    address:
+      socket_address:
+        protocol: UDP
+        address: {ENVOY_HOST}
+        port_value: {ENVOY_PORT}
+{filter_chains("HTTP3")}
+      transport_socket:
+        name: "envoy.transport_sockets.quic"
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport"
+          downstream_tls_context:
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: "{CERTIFICATE_PATH}"
+                private_key:
+                  filename: "{CERTIFICATE_KEY_PATH}"
+    udp_listener_config:
+      quic_options: {"{}"}
+      downstream_socket_config:
+        prefer_gro: true
+  - name: listener_http
+    address:
+      socket_address:
+        address: {ENVOY_HOST}
+        port_value: {ENVOY_PORT}
+{filter_chains()}
   clusters:
   - name: some_service
     connect_timeout: 0.25s
@@ -218,7 +321,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "--socket-mode",
             str(SOCKET_MODE),
         ]
-        log.info("starting upstreams")
+        log.info(f"starting upstreams on https://{ENVOY_HOST}:{ENVOY_PORT}/")
         await super().asyncSetUp()
         self.slow_upstream = Upstream()
         await self.slow_upstream.start()
@@ -242,16 +345,18 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "-c",
             self.slow_config_path,
         )
+        log.info(f"cert path = {CERTIFICATE_PATH}")
         log.info("waiting for envoy ready")
         await _wait_for_envoy_epoch(0)
         log.info("making requests")
+        request_url = f"http://{ENVOY_HOST}:{ENVOY_PORT}/"
+        srequest_url = f"https://{ENVOY_HOST}:{ENVOY_PORT}/"
         slow_responses = [
-            _http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/") for i in range(PARALLEL_REQUESTS)
-            # TODO(ravenblack): add http3 slow requests
-        ]
+            HttpRequestLineGenerator(request_url) for i in range(PARALLEL_REQUESTS)
+        ] + [Http3RequestLineGenerator(srequest_url) for i in range(PARALLEL_REQUESTS)]
         log.info("waiting for responses to begin")
         for response in slow_responses:
-            self.assertEqual(await anext(response, None), b"start\n")
+            self.assertEqual(await response.line(), b"start\n")
         base_id = int(self.base_id_path.read_text())
         log.info(f"starting envoy hot restart for base id {base_id}")
         envoy_process_2 = await asyncio.create_subprocess_exec(
@@ -268,11 +373,8 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         log.info("waiting for new envoy instance to begin")
         await _wait_for_envoy_epoch(1)
         log.info("sending request to fast upstream")
-        fast_responses = [
-            _full_http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
-            for i in range(PARALLEL_REQUESTS)
-            # TODO(ravenblack): add http3 requests
-        ]
+        fast_responses = [_full_http_request(request_url) for i in range(PARALLEL_REQUESTS)
+                         ] + [_full_http3_request(srequest_url) for i in range(PARALLEL_REQUESTS)]
         for response in fast_responses:
             self.assertEqual(
                 await response, "fast instance",
@@ -283,22 +385,19 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         log.info("waiting for completion of original slow request")
         t1 = datetime.now()
         for response in slow_responses:
-            self.assertEqual(await anext(response, None), b"end\n")
+            self.assertEqual(await response.line(), b"end\n")
         t2 = datetime.now()
         self.assertGreater(
             (t2 - t1).total_seconds(), 0.5,
             "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior"
         )
         for response in slow_responses:
-            self.assertIsNone(await anext(response, None))
+            self.assertEquals(await response.join(), 0)
         log.info("waiting for parent instance to terminate")
         await envoy_process_1.wait()
         log.info("sending second request to fast upstream")
-        fast_responses = [
-            _full_http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
-            for i in range(PARALLEL_REQUESTS)
-            # TODO(ravenblack): add http3 requests
-        ]
+        fast_responses = [_full_http_request(request_url) for i in range(PARALLEL_REQUESTS)
+                         ] + [_full_http3_request(srequest_url) for i in range(PARALLEL_REQUESTS)]
         for response in fast_responses:
             self.assertEqual(
                 await response, "fast instance",
@@ -309,4 +408,18 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Hot restart handoff test")
+    parser.add_argument("--envoy-binary", type=str, required=True)
+    parser.add_argument("--ca-certs", type=str, required=True)
+    parser.add_argument("--server-key", type=str, required=True)
+    parser.add_argument("--server-cert", type=str, required=True)
+    parser.add_argument("--h3-request", type=str, required=True)
+    # unittest also parses some args, so we strip out the ones we're using
+    # and leave the rest for unittest to consume.
+    (args, sys.argv[1:]) = parser.parse_known_args()
+    ENVOY_BINARY = args.envoy_binary
+    CA_CERT_PATH = args.ca_certs
+    CERTIFICATE_PATH = args.server_cert
+    CERTIFICATE_KEY_PATH = args.server_key
+    H3_REQUEST_BINARY = args.h3_request
     unittest.main()

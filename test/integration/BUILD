@@ -366,7 +366,20 @@ envoy_py_test(
         "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
         "//conditions:default": ["hotrestart_handoff_test.py"],
     }),
-    data = [":hotrestart_main"],
+    args = [
+        "--envoy-binary=$(location :hotrestart_main)",
+        "--ca-certs=$(location //test/config/integration/certs:cacert.pem)",
+        "--server-cert=$(location //test/config/integration/certs:servercert.pem)",
+        "--server-key=$(location //test/config/integration/certs:serverkey.pem)",
+        "--h3-request=$(location //tools/h3_request)",
+    ],
+    data = [
+        ":hotrestart_main",
+        "//test/config/integration/certs:cacert.pem",
+        "//test/config/integration/certs:servercert.pem",
+        "//test/config/integration/certs:serverkey.pem",
+        "//tools/h3_request",
+    ],
     main = select({
         "//bazel:disable_hot_restart_or_admin": "null_test.py",
         "//conditions:default": "hotrestart_handoff_test.py",
