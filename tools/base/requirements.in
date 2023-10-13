@@ -9,7 +9,7 @@ colorama
 coloredlogs
 cryptography>=41.0.1
 dependatool>=0.2.2
-envoy.base.utils>=0.4.14
+envoy.base.utils>=0.4.16
 envoy.code.check>=0.5.8
 envoy.dependency.check>=0.1.10
 envoy.distribution.release>=0.0.9

@@ -30,8 +30,6 @@ jobs:
     permissions:
       contents: read
       packages: read
-      # TODO(phlax): figure out how to remove this
-      statuses: write
 
   prechecks:
     needs:
@@ -45,8 +43,12 @@ jobs:
           managed: true
     uses: ./.github/workflows/_ci.yml
     name: CI ${{ matrix.target }}
+    permissions:
+      contents: read
+      packages: read
     with:
       target: ${{ matrix.target }}
       rbe: ${{ matrix.rbe }}
+      bazel_extra: '--config=rbe-envoy-engflow'
       managed: ${{ matrix.managed }}
       cache_build_image: ${{ needs.env.outputs.build_image_ubuntu }}

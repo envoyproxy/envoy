@@ -199,6 +199,9 @@ bug_fixes:
   change: |
     Fixed a bug that could cause metadata to be decoded after a local reply has been triggered.
     Can be disabled by setting ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` to false.
+- area: docker/publishing
+  change: |
+    Update base images to resolve various glibc vulnerabilities.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

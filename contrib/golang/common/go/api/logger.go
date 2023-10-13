@@ -39,27 +39,27 @@ import (
 // [2023-08-09 03:04:15.985][1390][critical][golang] [contrib/golang/common/log/cgo.cc:27] msg
 
 func LogTrace(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Trace), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(Trace), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }
 
 func LogDebug(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Debug), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(Debug), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }
 
 func LogInfo(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Info), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(Info), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }
 
 func LogWarn(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Warn), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(Warn), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }
 
 func LogError(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Error), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(Error), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }
 
 func LogCritical(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Critical), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(Critical), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }
 
 func LogTracef(format string, v ...any) {
