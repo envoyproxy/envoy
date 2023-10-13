@@ -21,68 +21,52 @@ jobs:
     permissions:
       contents: read
 
-  javatestslinux:
-    if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
+  android_test:
+    name: ${{ matrix.target }}
     needs: env
     permissions:
       contents: read
       packages: read
-    name: java_tests_linux
-    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
-    timeout-minutes: 90
-    steps:
-    - name: Pre-cleanup
-      # Using the defaults in
-      # https://github.com/envoyproxy/toolshed/blob/main/gh-actions/diskspace/action.yml.
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.18
-    - uses: actions/checkout@v4
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Run Kotlin library integration tests'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        CC: /opt/llvm/bin/clang
-        CXX: /opt/llvm/bin/clang++
-      run: |
-        docker run --volume="${PWD}:/source" --workdir="/source/mobile" \
-          -e GITHUB_TOKEN -e CC -e CXX ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
-          ./bazelw test \
-          --build_tests_only \
-          --config=test-android \
-          --config=mobile-remote-ci \
-          --define=signal_trace=disabled \
-          //test/java/...
-
-  kotlintestslinux:
-    if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
-    needs: env
-    permissions:
-      contents: read
-      packages: read
-    # Only kotlin tests are executed since with linux:
-    # https://github.com/envoyproxy/envoy-mobile/issues/1418.
-    name: kotlin_tests_linux
-    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
-    timeout-minutes: 90
-    steps:
-    - name: Pre-cleanup
-      # Using the defaults in
-      # https://github.com/envoyproxy/toolshed/blob/main/gh-actions/diskspace/action.yml.
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.18
-    - uses: actions/checkout@v4
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Run Kotlin library integration tests'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        CC: /opt/llvm/bin/clang
-        CXX: /opt/llvm/bin/clang++
-      run: |
-        docker run --volume="${PWD}:/source" --workdir="/source/mobile" \
-          -e GITHUB_TOKEN -e CC -e CXX ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
-          ./bazelw test \
-          --build_tests_only \
-          --config=test-android \
-          --config=mobile-remote-ci \
-          --define=signal_trace=disabled \
-          //test/kotlin/...
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        # Only kotlin tests are executed since with linux:
+        # https://github.com/envoyproxy/envoy-mobile/issues/1418.
+        - target: kotlin_tests_linux
+          name: Run Kotlin library integration tests
+          diskspace_hack: true
+          timeout-minutes: 90
+          runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+          env: |
+            CC: /opt/llvm/bin/clang
+            CXX: /opt/llvm/bin/clang++
+          command: |
+            ./bazelw test \
+                --build_tests_only \
+                --config=test-android \
+                --config=mobile-remote-ci \
+                --define=signal_trace=disabled \
+                //test/kotlin/...
+        - target: java_tests_linux
+          name: Run Java library tests
+          timeout-minutes: 120
+          runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+          run: |
+            ./bazelw test \
+                --build_tests_only \
+                --config=test-android \
+                --config=mobile-remote-ci \
+                --define=signal_trace=disabled \
+                //test/java/...
+    uses: ./.github/workflows/_mobile_ci.yml
+    with:
+      target: ${{ matrix.target }}
+      name: ${{ matrix.name }}
+      env: ${{ matrix.env }}
+      command: ${{ matrix.command }}
+      build_image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
+      diskspace_hack: ${{ matrix.diskspace_hack == 'true' }}
+      runs-on: ${{ matrix.runs-on }}
+      timeout-minutes: ${{ fromJSON(matrix.timeout-minutes) }}
+      skip: ${{ needs.env.outputs.mobile_android_tests != 'true' }}

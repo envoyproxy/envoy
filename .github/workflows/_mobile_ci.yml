@@ -1,0 +1,93 @@
+name: Envoy CI
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      name:
+        required: true
+        type: string
+      command:
+        required: true
+        type: string
+      build_image:
+        type: string
+      runs-on:
+        required: true
+        type: string
+      timeout-minutes:
+        type: number
+        default: 20
+
+      diskspace_hack:
+        type: boolean
+        default: false
+      skip:
+        type: boolean
+        default: false
+      env:
+        type: string
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.target }}
+  cancel-in-progress: true
+
+jobs:
+  mobile_ci:
+    if: ${{ ! inputs.skip }}
+    runs-on: ${{ inputs.runs-on }}
+    name: ${{ inputs.target }}
+    permissions:
+      contents: read
+      packages: read
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+    - name: Pre-cleanup
+      # Using the defaults in
+      # https://github.com/envoyproxy/toolshed/blob/main/gh-actions/diskspace/action.yml.
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.18
+      if: ${{ inputs.diskpace_hack }}
+    - uses: actions/checkout@v4
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+
+    - name: 'Java setup'
+      if: contains(inputs.runs-on, 'macos')
+      uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+        distribution: zulu
+    - name: 'Install mac dependencies'
+      if: contains(inputs.runs-on, 'macos')
+      run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
+
+    - name: Set Environment Variables
+      run: |
+        read -ra vars <<< {{ inputs.env }}
+        for [[ var in "${vars[@]}" ]]; do
+            IFS=': ' read -ra parts <<< "$var"
+            export "${parts[0]}=${parts[1]}"
+        done
+    - name: ${{ inputs.name }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        if [[ -z "${{ inputs.build_image }}" ]]; then
+            ${{ inputs.command }}
+            exit 0
+        fi
+        docker run \
+            --volume="${PWD}:/source" \
+            --workdir="/source/mobile" \
+            -e GITHUB_TOKEN \
+            -e CC \
+            -e CXX \
+            ${{ inputs.build_image }} \
+                ${{ inputs.command }}
