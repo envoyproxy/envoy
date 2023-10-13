@@ -3052,15 +3052,11 @@ envoy_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_http_client_lib",
     srcs = [
-        "quiche/quic/core/http/quic_client_promised_info.cc",
-        "quiche/quic/core/http/quic_client_push_promise_index.cc",
         "quiche/quic/core/http/quic_spdy_client_session.cc",
         "quiche/quic/core/http/quic_spdy_client_session_base.cc",
         "quiche/quic/core/http/quic_spdy_client_stream.cc",
     ],
     hdrs = [
-        "quiche/quic/core/http/quic_client_promised_info.h",
-        "quiche/quic/core/http/quic_client_push_promise_index.h",
         "quiche/quic/core/http/quic_spdy_client_session.h",
         "quiche/quic/core/http/quic_spdy_client_session_base.h",
         "quiche/quic/core/http/quic_spdy_client_stream.h",
@@ -3070,6 +3066,7 @@ envoy_quic_cc_library(
         ":quic_core_alarm_lib",
         ":quic_core_crypto_encryption_lib",
         ":quic_core_http_server_initiated_spdy_stream_lib",
+        ":quic_core_http_spdy_server_push_utils_header",
         ":quic_core_http_spdy_session_lib",
         ":quic_core_packets_lib",
         ":quic_core_qpack_qpack_streams_lib",
@@ -3079,7 +3076,6 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":spdy_core_framer_lib",
         ":spdy_core_protocol_lib",
-        "@envoy//source/common/quic:spdy_server_push_utils_for_envoy_lib",
     ],
 )
 
