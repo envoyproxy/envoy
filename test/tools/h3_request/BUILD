@@ -10,8 +10,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_py_test_binary(
-    name = "quic_request",
-    srcs = ["quic_request.py"],
+    name = "h3_request",
+    srcs = ["h3_request.py"],
     data = [
         "//test/config/integration/certs",
     ],
