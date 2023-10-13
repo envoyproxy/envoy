@@ -448,9 +448,9 @@ docutils==0.19 \
     #   envoy-docs-sphinx-runner
     #   sphinx
     #   sphinx-rtd-theme
-envoy-base-utils==0.4.15 \
-    --hash=sha256:7c614a4f9765cfe4512bdc00a15fba69b04490c7028a545c6bc41449bc4b2020 \
-    --hash=sha256:b40c9a0375a2f750c384a61c511e50d947802295de30b8138e2a1f23d4d5a377
+envoy-base-utils==0.4.16 \
+    --hash=sha256:b1ad6684dcf525651b01ded26ebb9f8ee5900089c786dd58b7a50ed663dafe3e \
+    --hash=sha256:edaf42b3ae24aa34bb8bbb41b5e2eb1c5b230207cb00ff5a47cf259d31c6c628
     # via
     #   -r requirements.in
     #   envoy-code-check
