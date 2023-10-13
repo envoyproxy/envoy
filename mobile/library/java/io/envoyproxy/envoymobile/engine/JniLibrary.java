@@ -214,10 +214,9 @@ public class JniLibrary {
 
   /**
    * Retrieve the value of all active stats. Note that this function may block for some time.
-   * @param engine,  handle to the engine that owns the counter.
    * @return The list of active stats and their values, or empty string of the operation failed
    */
-  protected static native String dumpStats(long engine);
+  protected static native String dumpStats();
 
   /**
    * Register a platform-provided key-value store implementation.
