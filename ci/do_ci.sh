@@ -857,6 +857,12 @@ case $CI_TARGET in
            "${ENVOY_BINARY_DIR}/schema_validator_tool"
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
+    
+    release.server_only.copy_binary)
+        setup_clang_toolchain
+        echo "bazel release build..."
+        bazel_envoy_binary_build release
+        ;;
 
     release.signed)
         echo "Signing binary packages..."
