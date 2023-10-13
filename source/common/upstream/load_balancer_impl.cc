@@ -1299,9 +1299,10 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
                                                                 const HostsSource&) {
   HostSharedPtr candidate_host = nullptr;
 
-  // We do a full scan if the number of choices is equal to the size.
-  if ((hosts_to_use.size() <= choice_count_) || full_scan_hosts_) {
-    for (auto& sampled_host : hosts_to_use) {
+  // Do full scan if it's required explicitly or the number of choices is equal to or larger than
+  // the hosts size.
+  if ((hosts_to_use.size() <= choice_count_) || enable_full_scan_) {
+    for (const auto& sampled_host : hosts_to_use) {
       if (candidate_host == nullptr) {
         // Make a first choice to start the comparisons.
         candidate_host = sampled_host;
@@ -1317,24 +1318,9 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
     return candidate_host;
   }
 
-  uint32_t hosts_to_use_current_size = hosts_to_use.size();
-  HostVectorSharedPtr hosts(new HostVector(hosts_to_use));
-
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
-    const int rand_idx = random_.random() % hosts_to_use_current_size;
-    const HostSharedPtr& sampled_host = hosts->at(rand_idx);
-
-    // Swap selected host with latest one and skip latest one  on next iteration
-    // so we don't repeat the selection when there are enough hosts.
-    // This will prevent use to choose the same host on our selection since there
-    // is a higher chance of selecting the same host when the number of hosts is
-    // too big.
-    uint32_t last_host_idx = hosts_to_use_current_size - 1;
-    if (hosts_to_use.size() > choice_count_) {
-      --hosts_to_use_current_size;
-
-      hosts->at(rand_idx) = hosts->at(last_host_idx);
-    }
+    const int rand_idx = random_.random() % hosts_to_use.size();
+    const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];
 
     if (candidate_host == nullptr) {
 

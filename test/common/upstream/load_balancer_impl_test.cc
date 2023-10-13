@@ -2787,20 +2787,20 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 
   // Host weight is 1.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
   // Host weight is 100.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
   HostVector empty;
   {
     hostSet().runCallbacks(empty, empty);
-    EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
@@ -2810,7 +2810,7 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
     hostSet().healthy_hosts_.clear();
     hostSet().hosts_.clear();
     hostSet().runCallbacks(empty, remove_hosts);
-    EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
     EXPECT_EQ(nullptr, lb_.chooseHost(nullptr));
   }
 }
@@ -2865,11 +2865,11 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 
   // 0 choices configured should default to P2C.
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 
   // 2 choices configured results in P2C.
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
 
   // Verify correct host chosen in P3C scenario.
   EXPECT_CALL(random_, random())
@@ -2877,8 +2877,8 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
       .WillOnce(Return(0))
       .WillOnce(Return(3))
       .WillOnce(Return(1))
-      .WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_3.chooseHost(nullptr));
+      .WillOnce(Return(2));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
 
   // Verify correct host chosen in P4C scenario.
   EXPECT_CALL(random_, random())
@@ -2887,8 +2887,8 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
       .WillOnce(Return(3))
       .WillOnce(Return(1))
       .WillOnce(Return(1))
-      .WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_4.chooseHost(nullptr));
+      .WillOnce(Return(2));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_4.chooseHost(nullptr));
 
   // When the number of hosts is smaller or equal to the number of choices we don't call
   // random() since we do a full table scan.
@@ -2915,7 +2915,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScan) {
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
   // Enable full table scan on hosts
-  lr_lb_config.mutable_full_scan_hosts()->set_value(true);
+  lr_lb_config.mutable_enable_full_scan()->set_value(true);
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
   lr_lb_config.mutable_choice_count()->set_value(3);
@@ -2928,7 +2928,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScan) {
   LeastRequestLoadBalancer lb_6{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
 
-  // random is called only once everytime and is not to select the host.
+  // random is called only once every time and is not to select the host.
 
   EXPECT_CALL(random_, random()).WillOnce(Return(9999));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));

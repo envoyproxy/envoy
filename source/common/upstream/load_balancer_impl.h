@@ -690,15 +690,13 @@ public:
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), choice_count, 2)
                 : 2),
-
         active_request_bias_runtime_(
             least_request_config.has_value() && least_request_config->has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
                       {least_request_config->active_request_bias(), runtime})
                 : absl::nullopt),
-        full_scan_hosts_(least_request_config.has_value()
-                             ? least_request_config->full_scan_hosts().value()
-                             : false) {
+        enable_full_scan_(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), enable_full_scan, false)) {
     initialize();
   }
 
@@ -713,15 +711,13 @@ public:
             LoadBalancerConfigHelper::localityLbConfigFromProto(least_request_config),
             LoadBalancerConfigHelper::slowStartConfigFromProto(least_request_config), time_source),
         choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, choice_count, 2)),
-
         active_request_bias_runtime_(
             least_request_config.has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
                       {least_request_config.active_request_bias(), runtime})
                 : absl::nullopt),
-        full_scan_hosts_(least_request_config.has_full_scan_hosts()
-                             ? least_request_config.full_scan_hosts().value()
-                             : false) {
+        enable_full_scan_(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, enable_full_scan, false)) {
     initialize();
   }
 
@@ -757,7 +753,7 @@ private:
   double active_request_bias_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
-  const bool full_scan_hosts_;
+  const bool enable_full_scan_;
 };
 
 /**
