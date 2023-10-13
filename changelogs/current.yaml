@@ -183,6 +183,9 @@ bug_fixes:
 - area: redis
   change: |
     Fixed a bug where redis key with % in the key is failing with a validation error.
+- area: tracing
+  change: |
+    Fixed a bug in the Datadog tracer where Datadog's "operation name" field would contain what should be in the "resource name" field.
 - area: http
   change: |
     Close HTTP/2 and HTTP/3 connections that prematurely reset streams. The runtime key
@@ -236,8 +239,13 @@ removed_config_or_runtime:
 new_features:
 - area: access_log
   change: |
-    Added ``%RESPONSE_FLAGS_LONG%`` substitution string, that will output a pascal case string representing the resonse flags.
-    The output response flags will correspond with ``%RESPONSE_FLAGS%1``, only with a long textual string representation.
+    added %RESPONSE_FLAGS_LONG% substitution string, that will output a pascal case string representing the response flags.
+    The output response flags will correspond with %RESPONSE_FLAGS%, only with a long textual string representation.
+- area: compression
+  change: |
+    added :ref:`remove_accept_encoding_header
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.ResponseDirectionOverrides.remove_accept_encoding_header>`
+    for per-route configuration of this value.
 - area: config
   change: |
     Added the capability to defer broadcasting of certain cluster (CDS, EDS) to
@@ -372,6 +380,9 @@ new_features:
   change: |
     Added filters to update the filter state for :ref:`the HTTP requests <config_http_filters_set_filter_state>` and
     :ref:`the TCP connections <config_network_filters_set_filter_state>`.
+- area: geoip
+  change: |
+    Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
 - area: tracing
   change: |
     Added support for exporting spans via HTTP on the OpenTelemetry tracer.

@@ -86,7 +86,12 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   // The OpenTracing implementation ignored the `Tracing::Config` argument,
   // so we will as well.
   datadog::tracing::SpanConfig span_config;
-  span_config.name = operation_name;
+  // The `operation_name` parameter to this function more closely matches
+  // Datadog's concept of "resource name." Datadog's "span name," or "operation
+  // name," instead describes the category of operation being performed, which
+  // here we hard-code.
+  span_config.name = "envoy.proxy";
+  span_config.resource = operation_name;
   span_config.start = estimateTime(stream_info.startTime());
 
   datadog::tracing::Tracer& tracer = *thread_local_tracer.tracer;
