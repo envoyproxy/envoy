@@ -95,7 +95,7 @@ TEST_P(RetryBudgetIntegrationTest, CircuitBreakerRetryBudgets) {
   // However, for H1/H3 the retry in backoff is counted against the active retry count, but not
   // counted against the limit (active + pending requests) so we have:
   // - 1 retry in backoff
-  // - 1 request counted as active (due to H1 specific behavior seen above)
+  // - 1 request counted as active (due to H1/H3 specific behavior seen above)
   // Because our retry budget is 100%, that gives us a retry limit of 1 since the retry in backoff
   // is not counted in active + pending requests So we overflow the retry budget on the second
   // request
