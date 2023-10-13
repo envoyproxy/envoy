@@ -30,20 +30,23 @@ class Http3Client(QuicConnectionProtocol):
         self._http = H3Connection(self._quic)
         self._stream_ids: Dict[int, asyncio.Future[bool]] = {}
 
+    def headers_received(self, event: H3Event) -> None:
+        if not self._include_headers:
+            return
+        for header, value in event.headers:
+            print(f"{header.decode('utf-8')}: {value.decode('utf-8')}\n", end="")
+        print("\n", end="")
+        
     def http_event_received(self, event: H3Event) -> None:
         stream_id = event.stream_id
         if stream_id not in self._stream_ids:
             return
-        if not isinstance(event, (HeadersReceived, DataReceived)):
-            raise Exception(f"unexpected quic event type {event}")
-        if isinstance(event, DataReceived):
-            if self._post_header_newline:
-                print(self._post_header_newline, end="")
-                self._post_header_newline = ""
+        if isinstance(event, HeadersReceived):
+            self.headers_received(event)
+        elif isinstance(event, DataReceived):
             print(event.data.decode("utf-8"), end="")
-        elif self._include_headers:
-            for header, value in event.headers:
-                print(f"{header.decode('utf-8')}: {value.decode('utf-8')}\n", end="")
+        else:
+            raise Exception(f"unexpected quic event type {event}")
         if event.stream_ended:
             self._stream_ids.pop(stream_id).set_result(True)
 
@@ -58,7 +61,6 @@ class Http3Client(QuicConnectionProtocol):
         parsed_url = urlparse(url)
         self._stream_ids[stream_id] = future
         self._include_headers = include_headers
-        self._post_header_newline = "\n" if include_headers else ""
         self._http.send_headers(
             stream_id=stream_id,
             headers=[
