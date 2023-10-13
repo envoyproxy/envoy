@@ -191,7 +191,7 @@ from the authorization server that match the configured
 if set. For every response header that matches, the filter will emit dynamic metadata whose key is the name of the matched header and whose value is the value of the matched header.
 
 Both the HTTP and gRPC external authorization filters support a dynamic metadata field called ``ext_authz_duration`` which records the time it takes to complete an authorization request in milliseconds.
-This field will not be populated if the request does not complete. Additionally, the dynamic metadata field is under the namespace ``envoy.filters.http.ext_authz``.
+This field will not be populated if the request does not complete.
 
 Runtime
 -------
