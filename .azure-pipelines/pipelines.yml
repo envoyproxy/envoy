@@ -336,7 +336,7 @@ stages:
       REPO_FETCH_DEPTH: 1
       REPO_FETCH_TAGS: false
     strategy:
-      maxParallel: 3
+      maxParallel: 10
       matrix:
         api:
           CI_TARGET: "bazel.api"
