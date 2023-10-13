@@ -116,9 +116,13 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   ASSERT_TRUE(maybe_dd_span);
   const datadog::tracing::Span& dd_span = *maybe_dd_span;
 
-  // Verify that the span has the expected service name, operation name, start
-  // time, and sampling decision.
-  EXPECT_EQ("do.thing", dd_span.name());
+  // Verify that the span has the expected service name, operation name,
+  // resource name, start time, and sampling decision.
+  // Note that the `operation_name` we specified above becomes the
+  // `resource_name()` of the resulting Datadog span, while the Datadog span's
+  // `name()` (operation name) is hard-coded to "envoy.proxy."
+  EXPECT_EQ("envoy.proxy", dd_span.name());
+  EXPECT_EQ("do.thing", dd_span.resource_name());
   EXPECT_EQ("envoy", dd_span.service_name());
   ASSERT_TRUE(dd_span.trace_segment().sampling_decision());
   EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_DROP),

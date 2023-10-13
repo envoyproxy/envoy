@@ -9,6 +9,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/upstream/load_balancer_factory_base.h"
+#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
