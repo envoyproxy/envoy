@@ -121,7 +121,7 @@ jobs:
         #  If this is set, then anything before or after in the job should be regarded as
         #  compromised.
         ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
-        token: ${{ (inputs.trusted && secrets.app_id && secrets.app_key) && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
+        token: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
     # If we are in a trusted CI run then the provided commit _must_ be either the latest for
     # this branch, or an antecdent.
