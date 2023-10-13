@@ -241,9 +241,8 @@ absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message
   const auto host = message.headers().getHostValue();
   const auto path = message.headers().getPathValue();
   const auto method = message.headers().getMethodValue();
-  const auto scheme = message.headers().getSchemeValue();
 
-  const std::string url = fmt::format("{}://{}{}", scheme, host, path);
+  const std::string url = fmt::format("http://{}{}", host, path);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, TIMEOUT.count());
   curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);

@@ -57,7 +57,7 @@ public:
   MOCK_METHOD(absl::optional<std::string>, fetch, (Http::RequestMessage&), (const));
 };
 
-class DummyFetchMetadata {
+class DummyMetadataFetcher {
 public:
   absl::optional<std::string> operator()(Http::RequestMessage&) { return absl::nullopt; }
 };

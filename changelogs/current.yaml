@@ -50,10 +50,6 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: aws
-  change: |
-    uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
-    which is deprecated. To revert this behavior set ``envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials`` to true.
 - area: ext_authz
   change: |
     removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
