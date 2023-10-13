@@ -199,6 +199,9 @@ bug_fixes:
   change: |
     Fixed a bug that could cause metadata to be decoded after a local reply has been triggered.
     Can be disabled by setting ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` to false.
+- area: docker/publishing
+  change: |
+    Update base images to resolve various glibc vulnerabilities.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -380,6 +383,9 @@ new_features:
   change: |
     Added filters to update the filter state for :ref:`the HTTP requests <config_http_filters_set_filter_state>` and
     :ref:`the TCP connections <config_network_filters_set_filter_state>`.
+- area: geoip
+  change: |
+    Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
 
 deprecated:
 - area: tracing

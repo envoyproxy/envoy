@@ -35,32 +35,43 @@ jobs:
     with:
       check_mobile_run: false
       prime_build_image: true
-      start_check_status: Verify/examples
       repo_ref: ${{ inputs.ref }}
       repo_ref_sha: ${{ inputs.sha }}
       repo_ref_name: ${{ inputs.head_ref }}
+    permissions:
+      contents: read
+      packages: read
 
+  check:
+    if: ${{ github.event_name != 'pull_request' }}
+    uses: ./.github/workflows/_workflow-start.yml
     permissions:
       contents: read
       statuses: write
+    with:
+      workflow_name: Verify/examples
+      sha: ${{ inputs.sha }}
 
   publish:
     needs:
     - env
+    - check
     uses: ./.github/workflows/_stage_publish.yml
     name: Publish ${{ needs.env.outputs.repo_ref_title }}
     with:
       build_image_ubuntu: ${{ needs.env.outputs.build_image_ubuntu }}
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       version_dev: ${{ needs.env.outputs.version_dev }}
-      given_ref: ${{ inputs.ref }}
       repo_ref: ${{ inputs.ref }}
       sha: ${{ inputs.sha }}
     permissions:
-      contents: write
+      contents: read
+      packages: read
     secrets:
       ENVOY_CI_SYNC_APP_ID: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
       ENVOY_CI_SYNC_APP_KEY: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
+      ENVOY_CI_PUBLISH_APP_ID: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
   verify:
     uses: ./.github/workflows/_stage_verify.yml

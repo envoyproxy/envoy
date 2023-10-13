@@ -19,7 +19,6 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
 
   cctests:
     if: ${{ needs.env.outputs.mobile_cc_tests == 'true' }}

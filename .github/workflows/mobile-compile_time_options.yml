@@ -19,7 +19,6 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
 
   cc_test_no_yaml:
     needs: env
