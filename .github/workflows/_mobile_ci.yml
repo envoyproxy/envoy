@@ -1,4 +1,7 @@
-name: Envoy CI
+name: Envoy mobile CI
+
+permissions:
+  contents: read
 
 on:
   workflow_call:
@@ -29,7 +32,9 @@ on:
         default: false
       env:
         type: string
-
+        default: |
+          CC: /opt/llvm/bin/clang
+          CXX: /opt/llvm/bin/clang++
 
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.target }}

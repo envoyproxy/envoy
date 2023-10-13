@@ -38,9 +38,6 @@ jobs:
           diskspace_hack: true
           timeout-minutes: 90
           runs-on: ${{ needs.env.outputs.agent_ubuntu }}
-          env: |
-            CC: /opt/llvm/bin/clang
-            CXX: /opt/llvm/bin/clang++
           command: |
             ./bazelw test \
                 --build_tests_only \
