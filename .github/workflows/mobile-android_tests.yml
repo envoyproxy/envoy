@@ -45,7 +45,7 @@ jobs:
         cd mobile
         ./bazelw test \
             --build_tests_only \
-            --config test-android \
+            --config=test-android \
             --config=mobile-remote-ci \
             --define=signal_trace=disabled \
             //test/java/...
@@ -77,7 +77,7 @@ jobs:
         cd mobile
         ./bazelw test \
             --build_tests_only \
-            --config test-android \
+            --config=test-android \
             --config=mobile-remote-ci \
             --define=signal_trace=disabled \
             //test/kotlin/...
