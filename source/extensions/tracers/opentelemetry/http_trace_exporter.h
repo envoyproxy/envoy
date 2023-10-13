@@ -37,6 +37,8 @@ public:
 private:
   Upstream::ClusterManager& cluster_manager_;
   envoy::config::core::v3::HttpService http_service_;
+  // Track active HTTP requests to be able to cancel them on destruction.
+  Http::AsyncClientRequestTracker active_requests_;
 };
 
 } // namespace OpenTelemetry

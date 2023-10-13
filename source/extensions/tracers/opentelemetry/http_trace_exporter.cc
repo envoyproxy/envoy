@@ -52,16 +52,22 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   const auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
       DurationUtil::durationToMilliseconds(http_service_.http_uri().timeout())));
 
-  Http::AsyncClient::Request* http_request =
+  Http::AsyncClient::Request* in_flight_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
 
-  return http_request;
+  if (in_flight_request == nullptr) {
+    return false;
+  }
+
+  active_requests_.add(*in_flight_request);
+  return true;
 }
 
-void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request&,
-                                               Http::ResponseMessagePtr&& message) {
-  const auto response_code = message->headers().Status()->value().getStringView();
-  if (response_code != "200") {
+void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request& request,
+                                               Http::ResponseMessagePtr&& http_response) {
+  active_requests_.remove(request);
+  const auto response_code = Http::Utility::getResponseStatus(http_response->headers());
+  if (response_code != enumToInt(Http::Code::OK)) {
     ENVOY_LOG(error,
               "OTLP HTTP exporter received a non-success status code: {} while exporting the OTLP "
               "message",
@@ -69,8 +75,9 @@ void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request&
   }
 }
 
-void OpenTelemetryHttpTraceExporter::onFailure(const Http::AsyncClient::Request&,
+void OpenTelemetryHttpTraceExporter::onFailure(const Http::AsyncClient::Request& request,
                                                Http::AsyncClient::FailureReason reason) {
+  active_requests_.remove(request);
   ENVOY_LOG(debug, "The OTLP export request failed. Reason {}", enumToInt(reason));
 }
 
