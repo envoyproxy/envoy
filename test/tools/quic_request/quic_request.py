@@ -34,17 +34,16 @@ class Http3Client(QuicConnectionProtocol):
         stream_id = event.stream_id
         if stream_id not in self._stream_ids:
             return
-        if isinstance(event, (HeadersReceived, DataReceived)):
-            if isinstance(event, DataReceived):
-                if self._post_header_newline:
-                    print(self._post_header_newline, end="")
-                    self._post_header_newline = ""
-                print(event.data.decode("utf-8"), end="")
-            elif self._include_headers:
-                for header, value in event.headers:
-                    print(f"{header.decode('utf-8')}: {value.decode('utf-8')}\n", end="")
-        else:
+        if not isinstance(event, (HeadersReceived, DataReceived)):
             raise Exception(f"unexpected quic event type {event}")
+        if isinstance(event, DataReceived):
+            if self._post_header_newline:
+                print(self._post_header_newline, end="")
+                self._post_header_newline = ""
+            print(event.data.decode("utf-8"), end="")
+        elif self._include_headers:
+            for header, value in event.headers:
+                print(f"{header.decode('utf-8')}: {value.decode('utf-8')}\n", end="")
         if event.stream_ended:
             self._stream_ids.pop(stream_id).set_result(True)
 
