@@ -1,7 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+
+#include "http_integration.h"
 
 namespace Envoy {
 namespace {
@@ -30,36 +31,41 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRetryBudgets) {
     retry_budget->mutable_budget_percent()->set_value(100);
   });
   config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
-          virtual_host->clear_routes();
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_host->clear_routes();
 
-          auto* route_short_backoff = virtual_host->add_routes();
-          route_short_backoff->mutable_match()->set_path("/route_short_backoff");
-          route_short_backoff->mutable_route()->set_cluster("cluster_0");
-          auto* retry_policy_short = route_short_backoff->mutable_route()->mutable_retry_policy();
-          *retry_policy_short->mutable_retry_on() = "5xx";
-          retry_policy_short->mutable_num_retries()->set_value(10);
+        auto* route_short_backoff = virtual_host->add_routes();
+        route_short_backoff->mutable_match()->set_path("/route_short_backoff");
+        route_short_backoff->mutable_route()->set_cluster("cluster_0");
+        auto* retry_policy_short = route_short_backoff->mutable_route()->mutable_retry_policy();
+        *retry_policy_short->mutable_retry_on() = "5xx";
+        retry_policy_short->mutable_num_retries()->set_value(10);
 
-          auto* route_long_backoff = virtual_host->add_routes();
-          *route_long_backoff = *route_short_backoff;
-          route_long_backoff->mutable_match()->set_path("/route_long_backoff");
-          route_long_backoff->mutable_route()->mutable_retry_policy()->mutable_retry_back_off()->mutable_base_interval()->set_seconds(100);
-        });
+        auto* route_long_backoff = virtual_host->add_routes();
+        *route_long_backoff = *route_short_backoff;
+        route_long_backoff->mutable_match()->set_path("/route_long_backoff");
+        route_long_backoff->mutable_route()
+            ->mutable_retry_policy()
+            ->mutable_retry_back_off()
+            ->mutable_base_interval()
+            ->set_seconds(100);
+      });
   initialize();
 
   Http::TestResponseHeaderMapImpl error_response_headers{{":status", "500"}};
   Http::TestRequestHeaderMapImpl long_backoff_rq_headers{{":method", "GET"},
-                                                          {":path", "/route_long_backoff"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "sni.lyft.com"}};
+                                                         {":path", "/route_long_backoff"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "sni.lyft.com"}};
   Http::TestRequestHeaderMapImpl short_backoff_rq_headers{{":method", "GET"},
                                                           {":path", "/route_short_backoff"},
                                                           {":scheme", "http"},
                                                           {":authority", "sni.lyft.com"}};
 
-  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(), 1);
+  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(),
+  // 1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response1 = codec_client_->makeHeaderOnlyRequest(long_backoff_rq_headers);
@@ -69,8 +75,10 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRetryBudgets) {
   EXPECT_TRUE(upstream_request_->complete());
 
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
-  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(), 0);
-  EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.rq_retry_open")->value(), 1);
+  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(),
+  // 0);
+  EXPECT_EQ(
+      test_server_->gauge("cluster.cluster_0.circuit_breakers.default.rq_retry_open")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_success")->value(), 0);
 
@@ -85,8 +93,10 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRetryBudgets) {
   EXPECT_TRUE(upstream_request_->complete());
 
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 2);
-  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(), 0);
-  EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.rq_retry_open")->value(), 1);
+  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(),
+  // 0);
+  EXPECT_EQ(
+      test_server_->gauge("cluster.cluster_0.circuit_breakers.default.rq_retry_open")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_success")->value(), 0);
 
