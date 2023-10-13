@@ -215,7 +215,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
 - stage: check
-  dependsOn: ["linux_x64"]
+  dependsOn: ["precheck"]
   jobs:
   - job: bazel
     displayName: "linux_x64"
