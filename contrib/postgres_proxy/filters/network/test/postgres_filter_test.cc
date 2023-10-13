@@ -370,7 +370,8 @@ TEST_F(PostgresFilterTest, TerminateSSL) {
   Network::Connection::BytesSentCb cb;
   EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
   Buffer::OwnedImpl buf;
-  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false)).WillOnce(testing::SaveArg<0>(&buf));
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false))
+      .WillOnce(testing::SaveArg<0>(&buf));
   data_.writeBEInt<uint32_t>(8);
   // 1234 in the most significant 16 bits and some code in the least significant 16 bits.
   data_.writeBEInt<uint32_t>(80877103); // SSL code.
