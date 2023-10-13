@@ -12,6 +12,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
+class MockStreamFrameHandler : public StreamFrameHandler {
+public:
+  MockStreamFrameHandler();
+
+  MOCK_METHOD(void, onStreamFrame, (StreamFramePtr frame));
+};
+
 class MockDecoderFilter : public DecoderFilter {
 public:
   MockDecoderFilter();
@@ -86,7 +93,7 @@ class MockPendingResponseCallback : public PendingResponseCallback {
 public:
   MockPendingResponseCallback();
 
-  MOCK_METHOD(void, onDecodingSuccess, (ResponsePtr response, ExtendedOptions options));
+  MOCK_METHOD(void, onDecodingSuccess, (StreamFramePtr response));
   MOCK_METHOD(void, onDecodingFailure, ());
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
   MOCK_METHOD(OptRef<Network::Connection>, connection, ());
@@ -114,8 +121,6 @@ public:
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
-  MOCK_METHOD(absl::optional<ExtendedOptions>, requestOptions, (), (const));
-  MOCK_METHOD(absl::optional<ExtendedOptions>, responseOptions, (), (const));
   MOCK_METHOD(const Network::Connection*, connection, (), (const));
 };
 
@@ -150,13 +155,15 @@ public:
     cb->onBindFailure(reason, "", upstream_host_);
   }
 
-  void callOnDecodingSuccess(uint64_t stream_id, ResponsePtr response, ExtendedOptions options) {
+  void callOnDecodingSuccess(uint64_t stream_id, StreamFramePtr response) {
     auto it = response_callbacks_.find(stream_id);
     auto cb = it->second;
 
-    response_callbacks_.erase(it);
+    if (response->frameFlags().endStream()) {
+      response_callbacks_.erase(it);
+    }
 
-    cb->onDecodingSuccess(std::move(response), options);
+    cb->onDecodingSuccess(std::move(response));
   }
 
   void callOnConnectionClose(uint64_t stream_id, Network::ConnectionEvent event) {
@@ -195,7 +202,9 @@ public:
 
   MOCK_METHOD(void, sendLocalReply, (Status, ResponseUpdateFunction&&));
   MOCK_METHOD(void, continueDecoding, ());
-  MOCK_METHOD(void, upstreamResponse, (ResponsePtr response, ExtendedOptions options));
+  MOCK_METHOD(void, onResponseStart, (StreamResponsePtr response));
+  MOCK_METHOD(void, onResponseFrame, (StreamFramePtr frame));
+  MOCK_METHOD(void, setRequestFramesHandler, (StreamFrameHandler & handler));
   MOCK_METHOD(void, completeDirectly, ());
   MOCK_METHOD(void, bindUpstreamConn, (Upstream::TcpPoolData &&));
   MOCK_METHOD(OptRef<UpstreamManager>, boundUpstreamConn, ());

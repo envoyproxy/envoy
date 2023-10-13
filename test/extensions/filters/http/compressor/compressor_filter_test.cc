@@ -430,6 +430,7 @@ TEST_F(CompressorFilterTest, EmptyResponse) {
 
 // Verify removeAcceptEncoding header.
 TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
+  // Filter true, no response direction overrides. Header is removed.
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter(R"EOF(
@@ -442,9 +443,12 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
   }
 }
 )EOF");
+
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }
+
+  // Filter false, no response direction overrides. Header is present.
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter(R"EOF(
@@ -456,6 +460,169 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
   }
 }
 )EOF");
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_TRUE(headers.has("accept-encoding"));
+    EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
+  }
+
+  // Filter true, response direction overrides present but no override. Header is removed.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "remove_accept_encoding_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()->mutable_response_direction_config();
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_FALSE(headers.has("accept-encoding"));
+  }
+
+  // Filter false, response direction overrides present but no override. Header is present.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()->mutable_response_direction_config();
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_TRUE(headers.has("accept-encoding"));
+    EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
+  }
+
+  // Filter true, per-route override true. Header is removed.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "remove_accept_encoding_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()
+        ->mutable_response_direction_config()
+        ->mutable_remove_accept_encoding_header()
+        ->set_value(true);
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_FALSE(headers.has("accept-encoding"));
+  }
+
+  // Filter true, per-route override false. Header is present.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "remove_accept_encoding_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()
+        ->mutable_response_direction_config()
+        ->mutable_remove_accept_encoding_header()
+        ->set_value(false);
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_TRUE(headers.has("accept-encoding"));
+    EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
+  }
+
+  // Filter false, per-route override true. Header is removed.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()
+        ->mutable_response_direction_config()
+        ->mutable_remove_accept_encoding_header()
+        ->set_value(true);
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_FALSE(headers.has("accept-encoding"));
+  }
+
+  // Filter false, per-route override false. Header is present.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()
+        ->mutable_response_direction_config()
+        ->mutable_remove_accept_encoding_header()
+        ->set_value(false);
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));
     EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));

@@ -8,6 +8,7 @@
 # NOTE: Slack IDs can be found in the user's full profile from within Slack.
 
 import datetime
+import html
 import json
 import os
 import sys
@@ -16,7 +17,7 @@ from functools import cached_property
 
 import aiohttp
 
-from slack_sdk import WebClient
+from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.errors import SlackApiError
 
 from aio.api import github as github
@@ -114,7 +115,7 @@ class RepoNotifier(runner.Runner):
 
     @cached_property
     def slack_client(self):
-        return WebClient(token=self.slack_bot_token)
+        return AsyncWebClient(token=self.slack_bot_token)
 
     @cached_property
     def slack_bot_token(self):
@@ -249,7 +250,7 @@ class RepoNotifier(runner.Runner):
         hours = age.seconds // 3600
         markup = ("*" if age > self.slo_max else "")
         return (
-            f"<{pull['html_url']}|{pull['title']}> has been waiting "
+            f"<{pull['html_url']}|{html.escape(pull['title'])}> has been waiting "
             f"{markup}{days} days {hours} hours{markup}")
 
     async def run(self):
@@ -278,14 +279,12 @@ class RepoNotifier(runner.Runner):
         print(json.dumps(report))
 
     async def send_message(self, channel, text):
-        # TODO(phlax): this is blocking, switch to async slack client
         if self.dry_run:
             self.log.notice(f"Slack message ({channel}):\n{text}")
             return
-        self.slack_client.chat_postMessage(channel=channel, text=text)
+        await self.slack_client.chat_postMessage(channel=channel, text=text)
 
     async def _post_to_assignees(self, assignees, messages):
-        # TODO(phlax): this is blocking, switch to async slack client
         for name, text in messages.items():
             # Only send texts if we have the slack UID
             if not (uid := assignees.get(name)):
@@ -296,9 +295,9 @@ class RepoNotifier(runner.Runner):
                 continue
             # Ship texts off to slack.
             try:
-                response = self.slack_client.conversations_open(users=uid, text="hello")
+                response = await self.slack_client.conversations_open(users=uid, text="hello")
                 channel_id = response["channel"]["id"]
-                self.slack_client.chat_postMessage(channel=channel_id, text=message)
+                await self.slack_client.chat_postMessage(channel=channel_id, text=message)
             except SlackApiError as e:
                 print(f"Unexpected error {e.response['error']}")
 
