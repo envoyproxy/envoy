@@ -70,7 +70,7 @@ jobs:
 
     - name: Set Environment Variables
       run: |
-        read -ra vars <<< {{ inputs.env }}
+        read -ra vars <<< ${{ inputs.env }}
         for [[ var in "${vars[@]}" ]]; do
             IFS=': ' read -ra parts <<< "$var"
             export "${parts[0]}=${parts[1]}"
