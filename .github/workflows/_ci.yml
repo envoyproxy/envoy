@@ -76,6 +76,10 @@ on:
       env:
         type: string
 
+    secrets:
+      app_id:
+      app_key:
+
 concurrency:
   group: |
     ${{ github.actor != 'trigger-release-envoy[bot]'
@@ -96,6 +100,14 @@ jobs:
       with:
         image_tag: ${{ inputs.cache_build_image }}
 
+    - if: ${{ inputs.trusted && secrets.app_id && secrets.app_key }}
+      name: Fetch token for app auth
+      id: appauth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.18
+      with:
+        app_id: ${{ secrets.app_id }}
+        key: ${{ secrets.app_key }}
+
     - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
@@ -104,6 +116,7 @@ jobs:
         #  If this is set, then anything before or after in the job should be regarded as
         #  compromised.
         ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
+        token: ${{ (inputs.trusted && secrets.app_id && secrets.app_key) && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
     # If we are in a trusted CI run then the provided commit _must_ be either the latest for
     # this branch, or an antecdent.
