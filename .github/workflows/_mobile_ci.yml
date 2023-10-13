@@ -75,9 +75,9 @@ jobs:
 
     - name: Set Environment Variables
       run: |
-        if [[ -z "${{ inputs.env }}" ]]; do
+        if [[ -z "${{ inputs.env }}" ]]; then
             exit 0
-        done
+        fi
         read -ra vars <<< ${{ inputs.env }}
         for [[ var in "${vars[@]}" ]]; do
             IFS=': ' read -ra parts <<< "$var"
