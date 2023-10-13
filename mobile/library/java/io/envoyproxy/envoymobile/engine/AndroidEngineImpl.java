@@ -90,6 +90,4 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   public void setProxySettings(String host, int port) { envoyEngine.setProxySettings(host, port); }
-
-  public void setLogLevel(LogLevel log_level) { envoyEngine.setLogLevel(log_level); }
 }

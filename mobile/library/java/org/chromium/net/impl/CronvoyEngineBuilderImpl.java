@@ -65,6 +65,7 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   private String mExperimentalOptions;
   private boolean mNetworkQualityEstimatorEnabled;
   private int mThreadPriority = INVALID_THREAD_PRIORITY;
+  private String mLogLevel = "info";
 
   /**
    * Default config enables SPDY and QUIC, disables SDCH and HTTP cache.
@@ -342,6 +343,13 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   int threadPriority(int defaultThreadPriority) {
     return mThreadPriority == INVALID_THREAD_PRIORITY ? defaultThreadPriority : mThreadPriority;
   }
+
+  public CronvoyEngineBuilderImpl setLogLevel(String logLevel) {
+    mLogLevel = logLevel;
+    return this;
+  }
+
+  public String getLogLevel() { return mLogLevel; }
 
   /**
    * Returns {@link Context} for builder.

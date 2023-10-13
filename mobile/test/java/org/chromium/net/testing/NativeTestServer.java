@@ -82,17 +82,13 @@ public final class NativeTestServer {
 
   public static String getSuccessURL() { return getUrl("/success.txt"); }
 
-  public static String getInternalErrorPath() { return "/internalerror.txt"; }
-
-  public static String getInternalErrorURL() { return getUrl(getInternalErrorPath()); }
+  public static String getInternalErrorURL() { return getUrl("/internalerror.txt"); }
 
   public static String getRedirectURL() { return getUrl("/redirect.html"); }
 
   public static String getMultiRedirectURL() { return getUrl("/multiredirect.html"); }
 
-  public static String getNotFoundPath() { return "/notfound.html"; }
-
-  public static String getNotFoundURL() { return getUrl(getNotFoundPath()); }
+  public static String getNotFoundURL() { return getUrl("/notfound.html"); }
 
   public static int getPort() { return mockWebServerRef.get().getPort(); }
 

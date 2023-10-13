@@ -67,6 +67,7 @@ public class BidirectionalStreamTest {
   @Before
   public void setUp() throws Exception {
     ExperimentalCronetEngine.Builder builder = new ExperimentalCronetEngine.Builder(getContext());
+    CronetTestUtil.getCronetEngineBuilderImpl(builder).setLogLevel("info");
     CronetTestUtil.setMockCertVerifierForTesting(builder);
 
     mCronetEngine = builder.build();

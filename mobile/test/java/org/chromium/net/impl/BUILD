@@ -12,7 +12,6 @@ envoy_mobile_android_test(
         "CancelProofEnvoyStreamTest.java",
         "CronetBidirectionalStateTest.java",
         "CronvoyEngineTest.java",
-        "CronvoyLoggerTest.java",
         "UrlRequestCallbackTester.java",
     ],
     exec_properties = {
