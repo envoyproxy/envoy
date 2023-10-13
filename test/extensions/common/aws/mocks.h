@@ -62,32 +62,6 @@ public:
   absl::optional<std::string> operator()(Http::RequestMessage&) { return absl::nullopt; }
 };
 
-// A mock HTTP upstream with response body.
-class MockUpstream {
-public:
-  /**
-   * Mock upstream which returns a given response body.
-   */
-  MockUpstream(Upstream::MockClusterManager& mock_cm, const std::string& status,
-               const std::string& response_body);
-  /**
-   * Mock upstream which returns a given failure.
-   */
-  MockUpstream(Upstream::MockClusterManager& mock_cm, Http::AsyncClient::FailureReason reason);
-  /**
-   * Mock upstream which returns the given request.
-   */
-  MockUpstream(Upstream::MockClusterManager& mock_cm, Http::MockAsyncClientRequest* request);
-
-  int called_count() const { return called_count_; }
-
-private:
-  Http::MockAsyncClientRequest request_;
-  std::string status_;
-  std::string response_body_;
-  int called_count_{};
-};
-
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

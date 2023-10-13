@@ -9,6 +9,7 @@
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/extensions/filters/http/common/mock.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -16,6 +17,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+using Envoy::Extensions::HttpFilters::Common::MockUpstream;
 using testing::_;
 using testing::InSequence;
 using testing::NiceMock;

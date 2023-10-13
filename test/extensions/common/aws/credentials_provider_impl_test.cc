@@ -1996,12 +1996,12 @@ public:
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createTaskRoleCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
-                 const MetadataCredentialsProviderBase::FetchMetadataUsingCurl&,
+                 const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
-                 const MetadataCredentialsProviderBase::FetchMetadataUsingCurl&,
+                 const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view),
                 (const));
   };

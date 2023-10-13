@@ -45,6 +45,8 @@ constexpr char AWS_EC2_METADATA_DISABLED[] = "AWS_EC2_METADATA_DISABLED";
 
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
 constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
+constexpr char EC2_METADATA_HOST[] = "169.254.169.254:80";
+constexpr char CONTAINER_METADATA_HOST[] = "169.254.170.2:80";
 constexpr char EC2_IMDS_TOKEN_RESOURCE[] = "/latest/api/token";
 constexpr char EC2_IMDS_TOKEN_HEADER[] = "X-aws-ec2-metadata-token";
 constexpr char EC2_IMDS_TOKEN_TTL_HEADER[] = "X-aws-ec2-metadata-token-ttl-seconds";
@@ -82,9 +84,54 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
   }
 }
 
+// TODO(suniltheta): The field context is of type ServerFactoryContextOptRef so that an
+// optional empty value can be set. Especially in aws iam plugin the cluster manager
+// obtained from server factory context object is not fully initialized due to the
+// reasons explained in https://github.com/envoyproxy/envoy/issues/27586 which cannot
+// utilize http async client here to fetch AWS credentials. For time being if context
+// is empty then will use libcurl to fetch the credentials.
+MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
+    Api::Api& api, ServerFactoryContextOptRef context,
+    const CurlMetadataFetcher& fetch_metadata_using_curl,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
+    absl::string_view uri)
+    : api_(api), context_(context), fetch_metadata_using_curl_(fetch_metadata_using_curl),
+      create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
+      cluster_name_(std::string(cluster_name)), cache_duration_(getCacheDuration()),
+      debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") &&
+      context_) {
+    context_->mainThreadDispatcher().post([this, uri]() {
+      if (!Utility::addInternalClusterStatic(context_->clusterManager(), cluster_name_, "STATIC",
+                                             uri)) {
+        ENVOY_LOG(critical,
+                  "Failed to add [STATIC cluster = {} with address = {}] or cluster not found",
+                  cluster_name_, uri);
+        return;
+      }
+    });
+
+    tls_ = ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
+    tls_->set(
+        [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(); });
+
+    cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
+      const Thread::LockGuard lock(lock_);
+      refresh();
+    });
+
+    // Register with init_manager, force the listener to wait for fetching (refresh).
+    init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void { refresh(); });
+    context_->initManager().add(*init_target_);
+  }
+}
+
 Credentials MetadataCredentialsProviderBase::getCredentials() {
   refreshIfNeeded();
-  if (!use_libcurl_ && context_ && tls_) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") &&
+      context_ && tls_) {
     // If server factor context was supplied then we would have thread local slot initialized.
     return *(*tls_)->credentials_.get();
   } else {
@@ -100,7 +147,9 @@ std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {
 }
 
 void MetadataCredentialsProviderBase::handleFetchDone() {
-  if (!use_libcurl_ && context_) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") &&
+      context_) {
     if (init_target_) {
       init_target_->ready();
       init_target_.reset();
@@ -108,6 +157,16 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
     if (cache_duration_timer_ && !cache_duration_timer_->enabled()) {
       cache_duration_timer_->enableTimer(cache_duration_);
     }
+  }
+}
+
+void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
+    CredentialsConstUniquePtr&& creds) {
+  CredentialsConstSharedPtr shared_credentials = std::move(creds);
+  if (tls_) {
+    tls_->runOnAllThreads([shared_credentials](OptRef<ThreadLocalCredentialsCache> obj) {
+      obj->credentials_ = shared_credentials;
+    });
   }
 }
 
@@ -192,6 +251,14 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   last_updated_ = api_.timeSource().systemTime();
 }
 
+InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
+    Api::Api& api, ServerFactoryContextOptRef context,
+    const CurlMetadataFetcher& fetch_metadata_using_curl,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name)
+    : MetadataCredentialsProviderBase(api, context, fetch_metadata_using_curl,
+                                      create_metadata_fetcher_cb, cluster_name, EC2_METADATA_HOST) {
+}
+
 bool InstanceProfileCredentialsProvider::needsRefresh() {
   return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
@@ -209,7 +276,9 @@ void InstanceProfileCredentialsProvider::refresh() {
   token_req_message.headers().setCopy(Http::LowerCaseString(EC2_IMDS_TOKEN_TTL_HEADER),
                                       EC2_IMDS_TOKEN_TTL_DEFAULT_VALUE);
 
-  if (use_libcurl_ || !context_) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") ||
+      !context_) {
     // Using curl to fetch the AWS credentials where we first get the token.
     const auto token_string = fetch_metadata_using_curl_(token_req_message);
     if (token_string) {
@@ -357,7 +426,9 @@ void InstanceProfileCredentialsProvider::extractCredentials(
             session_token.empty() ? "" : "*****");
 
   last_updated_ = api_.timeSource().systemTime();
-  if (!use_libcurl_ && context_) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") &&
+      context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   } else {
@@ -387,6 +458,15 @@ void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
   }
 }
 
+TaskRoleCredentialsProvider::TaskRoleCredentialsProvider(
+    Api::Api& api, ServerFactoryContextOptRef context,
+    const CurlMetadataFetcher& fetch_metadata_using_curl,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view credential_uri,
+    absl::string_view authorization_token = {}, absl::string_view cluster_name = {})
+    : MetadataCredentialsProviderBase(api, context, fetch_metadata_using_curl,
+                                      create_metadata_fetcher_cb, cluster_name, credential_uri),
+      credential_uri_(credential_uri), authorization_token_(authorization_token) {}
+
 bool TaskRoleCredentialsProvider::needsRefresh() {
   const auto now = api_.timeSource().systemTime();
   bool needs_refresh =
@@ -407,7 +487,9 @@ void TaskRoleCredentialsProvider::refresh() {
   message.headers().setHost(host);
   message.headers().setPath(path);
   message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_token_);
-  if (use_libcurl_ || !context_) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") ||
+      !context_) {
     // Using curl to fetch the AWS credentials.
     const auto credential_document = fetch_metadata_using_curl_(message);
     if (!credential_document) {
@@ -466,7 +548,9 @@ void TaskRoleCredentialsProvider::extractCredentials(
   }
 
   last_updated_ = api_.timeSource().systemTime();
-  if (!use_libcurl_ && context_) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") &&
+      context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   } else {
@@ -501,7 +585,7 @@ Credentials CredentialsProviderChain::getCredentials() {
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     Api::Api& api, ServerFactoryContextOptRef context,
-    const MetadataCredentialsProviderBase::FetchMetadataUsingCurl& fetch_metadata_using_curl,
+    const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
     const CredentialsProviderChainFactories& factories) {
   ENVOY_LOG(debug, "Using environment credentials provider");
   add(factories.createEnvironmentCredentialsProvider());

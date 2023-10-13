@@ -314,19 +314,19 @@ bool Utility::addInternalClusterStatic(Upstream::ClusterManager& cm, absl::strin
       const auto host = host_attributes.host_;
       const auto port = host_attributes.port_ ? host_attributes.port_.value() : 80;
       MessageUtil::loadFromYaml(fmt::format(R"EOF(
-name: {}
-type: {}
+name: {cluster_name}
+type: {cluster_type}
 connectTimeout: 5s
 lb_policy: ROUND_ROBIN
 loadAssignment:
-  clusterName: {}
+  clusterName: {cluster_name}
   endpoints:
   - lbEndpoints:
     - endpoint:
         address:
           socketAddress:
-            address: {}
-            portValue: {}
+            address: {host}
+            portValue: {port}
 typed_extension_protocol_options:
   envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
     "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -334,7 +334,9 @@ typed_extension_protocol_options:
       http_protocol_options:
         accept_http_10: true
   )EOF",
-                                            cluster_name, cluster_type, cluster_name, host, port),
+                                            fmt::arg("cluster_name", cluster_name),
+                                            fmt::arg("cluster_type", cluster_type),
+                                            fmt::arg("host", host), fmt::arg("port", port)),
                                 cluster, ProtobufMessage::getNullValidationVisitor());
 
       // TODO(suniltheta): use random number generator here for cluster version.

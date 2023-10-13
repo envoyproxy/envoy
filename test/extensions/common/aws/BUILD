@@ -60,6 +60,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//test/extensions/common/aws:aws_mocks",
+        "//test/extensions/filters/http/common:mock_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",

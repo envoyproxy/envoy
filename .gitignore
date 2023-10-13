@@ -57,4 +57,3 @@ distribution/custom
 examples/websocket/certs
 /contrib/golang/**/test_data/go.sum
 /contrib/golang/**/test_data/*/go.sum
-env/
