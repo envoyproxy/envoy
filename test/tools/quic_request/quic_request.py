@@ -74,7 +74,22 @@ class Http3Client(QuicConnectionProtocol):
         await future
 
 
-async def main(args, config):
+async def main():
+    parser = argparse.ArgumentParser(description="HTTP/3 client")
+    parser.add_argument("url", type=str, help="the URL to query (must be HTTPS)")
+    parser.add_argument(
+        "--ca-certs",
+        type=str,
+        help="load CA certificates from the specified file",
+        default=CA_PATH)
+    parser.add_argument(
+        "--include-headers", action="store_true", help="output the headers before the body")
+    args = parser.parse_args()
+    config = aioquic.quic.configuration.QuicConfiguration(
+        is_client=True,
+        alpn_protocols=H3_ALPN,
+    )
+    config.load_verify_locations(args.ca_certs)
     parsed_url = urlparse(args.url)
     async with aioquic.asyncio.client.connect(
             host=parsed_url.hostname,
@@ -88,19 +103,4 @@ async def main(args, config):
 
 
 if __name__ == '__main__':
-    config = aioquic.quic.configuration.QuicConfiguration(
-        is_client=True,
-        alpn_protocols=H3_ALPN,
-    )
-    parser = argparse.ArgumentParser(description="HTTP/3 client")
-    parser.add_argument("url", type=str, help="the URL to query (must be HTTPS)")
-    parser.add_argument(
-        "--ca-certs",
-        type=str,
-        help="load CA certificates from the specified file",
-        default=CA_PATH)
-    parser.add_argument(
-        "--include-headers", action="store_true", help="output the headers before the body")
-    args = parser.parse_args()
-    config.load_verify_locations(args.ca_certs)
-    asyncio.run(main(args, config))
+    asyncio.run(main())
