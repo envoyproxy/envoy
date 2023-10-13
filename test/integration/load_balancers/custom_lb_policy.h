@@ -59,6 +59,11 @@ private:
 class CustomLbFactory : public Upstream::TypedLoadBalancerFactoryBase<
                             ::test::integration::custom_lb::CustomLbConfig> {
 public:
+  class EmptyLoadBalancerConfig : public Upstream::LoadBalancerConfig {
+  public:
+    EmptyLoadBalancerConfig() = default;
+  };
+
   CustomLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancers.custom_lb") {}
 
   Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig>,
@@ -66,6 +71,11 @@ public:
                                               const Upstream::PrioritySet&, Runtime::Loader&,
                                               Random::RandomGenerator&, TimeSource&) override {
     return std::make_unique<ThreadAwareLbImpl>();
+  }
+
+  Upstream::LoadBalancerConfigPtr loadConfig(const Protobuf::Message&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return std::make_unique<EmptyLoadBalancerConfig>();
   }
 };
 
