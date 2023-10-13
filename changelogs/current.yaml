@@ -380,11 +380,14 @@ new_features:
     to control whether to create separate upstream span for upstream request.
 - area: original_dst
   change: |
-    Added support for the internal listener address recovery using the original destination listener filter.
+    added support for the internal listener address recovery using the original destination listener filter.
 - area: filters
   change: |
     Added filters to update the filter state for :ref:`the HTTP requests <config_http_filters_set_filter_state>` and
     :ref:`the TCP connections <config_network_filters_set_filter_state>`.
+- area: admin_logging
+  change: |
+    added support for glob control of fine-grain loggers in admin /logging interface.
 - area: geoip
   change: |
     Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
