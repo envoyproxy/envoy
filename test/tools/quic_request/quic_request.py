@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import sys
 from typing import AsyncIterator, cast
 from urllib.parse import urlparse
 
@@ -88,7 +89,7 @@ async def request(url: str, config, include_headers: bool) -> None:
         await client.request(url, include_headers)
 
 
-def main() -> None:
+def main(argv) -> None:
     parser = argparse.ArgumentParser(description="HTTP/3 client")
     parser.add_argument("url", type=str, help="the URL to query (must be HTTPS)")
     parser.add_argument(
@@ -98,7 +99,7 @@ def main() -> None:
         default=CA_PATH)
     parser.add_argument(
         "--include-headers", action="store_true", help="output the headers before the body")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     config = aioquic.quic.configuration.QuicConfiguration(
         is_client=True,
         alpn_protocols=H3_ALPN,
@@ -108,4 +109,4 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
