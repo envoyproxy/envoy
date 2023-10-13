@@ -221,6 +221,7 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
 
   // Decode failure.
   {
+    decoder.metadata_.reset();
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
@@ -231,6 +232,8 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
 
   // Waiting for header.
   {
+    decoder.metadata_.reset();
+
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
 
@@ -240,6 +243,8 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
 
   // Waiting for data.
   {
+    decoder.metadata_.reset();
+
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
     buffer.writeBEInt<int64_t>(1);
@@ -251,6 +256,8 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
 
   // Decode request.
   {
+    decoder.metadata_.reset();
+
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
     buffer.writeBEInt<int64_t>(1);
@@ -260,7 +267,7 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
     EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _))
         .WillOnce(Return(ByMove(std::make_unique<RpcRequestImpl>())));
 
-    EXPECT_CALL(callback, onDecodingSuccess(_, _));
+    EXPECT_CALL(callback, onDecodingSuccess(_));
     decoder.decode(buffer);
   }
 }
@@ -278,6 +285,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
 
   // Decode failure.
   {
+    decoder.metadata_.reset();
+
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
@@ -288,6 +297,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
 
   // Waiting for header.
   {
+    decoder.metadata_.reset();
+
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
 
@@ -297,6 +308,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
 
   // Waiting for data.
   {
+    decoder.metadata_.reset();
+
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
     buffer.writeBEInt<int64_t>(1);
@@ -308,6 +321,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
 
   // Decode response.
   {
+    decoder.metadata_.reset();
+
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
     buffer.writeBEInt<int64_t>(1);
@@ -320,7 +335,7 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
     EXPECT_CALL(*raw_serializer, deserializeRpcResponse(_, _))
         .WillOnce(Return(ByMove(std::move(response))));
 
-    EXPECT_CALL(callback, onDecodingSuccess(_, _));
+    EXPECT_CALL(callback, onDecodingSuccess(_));
     decoder.decode(buffer);
   }
 }
@@ -340,7 +355,7 @@ TEST(RequestEncoderTest, RequestEncoderTest) {
     DubboRequest request(createDubboRequst(false));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
-    EXPECT_CALL(callback, onEncodingSuccess(_));
+    EXPECT_CALL(callback, onEncodingSuccess(_, _));
 
     encoder.encode(request, callback);
   }
@@ -350,7 +365,7 @@ TEST(RequestEncoderTest, RequestEncoderTest) {
     DubboRequest request(createDubboRequst(true));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
-    EXPECT_CALL(callback, onEncodingSuccess(_));
+    EXPECT_CALL(callback, onEncodingSuccess(_, _));
 
     encoder.encode(request, callback);
   }
@@ -373,7 +388,7 @@ TEST(ResponseEncoderTest, ResponseEncoderTest) {
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
 
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _));
-    EXPECT_CALL(callback, onEncodingSuccess(_));
+    EXPECT_CALL(callback, onEncodingSuccess(_, _));
 
     encoder.encode(response, callback);
   }

@@ -858,6 +858,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_upstream_integration_test.cc",
     ],
+    shard_count = 4,
     tags = [
         "cpu:3",
     ],

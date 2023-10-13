@@ -775,6 +775,13 @@ envoy.formatter.req_without_query:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+envoy.geoip_providers.maxmind:
+  categories:
+  - envoy.geoip_providers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
 envoy.grpc_credentials.aws_iam:
   categories:
   - envoy.grpc_credentials
@@ -1648,3 +1655,17 @@ envoy.config_mux.sotw_grpc_mux_factory:
   - envoy.config_mux
   security_posture: unknown
   status: stable
+envoy.filters.http.set_filter_state:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.set_filter_state.v3.Config
+envoy.filters.network.set_filter_state:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.set_filter_state.v3.Config
