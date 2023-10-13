@@ -354,7 +354,7 @@ message HeaderValueOption {
     // You can find more detailed information at RFC 7230 section 3.2.2.
     //
     // If the header doesn't exist then this will add the header with
-    // specified key and value. 
+    // specified key and value.
     APPEND_IF_EXISTS_OR_ADD = 0;
 
     // This action will add the header if it doesn't already exist. If the header
