@@ -23,8 +23,13 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
-    ],
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -44,8 +49,13 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
-    ],
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -65,8 +75,13 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
-    ],
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -86,8 +101,13 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
-    ],
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -107,8 +127,13 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
-    ],
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -128,8 +153,13 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
-    ],
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
