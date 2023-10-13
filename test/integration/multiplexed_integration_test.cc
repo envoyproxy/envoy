@@ -2358,14 +2358,14 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersDecodeHeadersEndsR
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
     auto frame = readFrame();
     EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
-    uint32_t stream_index = frame.streamIndex();
+    uint32_t stream_id = frame.streamId();
     // Client stream indexes are multiples of 2 starting at 1
-    if ((stream_index / 2) % 4) {
+    if ((stream_id / 2) % 4) {
       EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus())
-          << " for stream=" << stream_index;
+          << " for stream=" << stream_id;
     } else {
       EXPECT_EQ(Http2Frame::ResponseStatus::InternalServerError, frame.responseStatus())
-          << " for stream=" << stream_index;
+          << " for stream=" << stream_id;
     }
   }
   tcp_client_->close();

@@ -2279,7 +2279,7 @@ void ConnectionManagerImpl::onDeferredRequestProcessing() {
   // Streams are inserted at the head of the list. As such process deferred
   // streams in the reverse order.
   auto reverse_iter = std::prev(streams_.end());
-  bool at_first_element = reverse_iter == streams_.begin();
+  bool at_first_element = false;
   do {
     at_first_element = reverse_iter == streams_.begin();
     // Move the iterator to the previous item in case the `onDeferredRequestProcessing` call removes
@@ -2290,6 +2290,7 @@ void ConnectionManagerImpl::onDeferredRequestProcessing() {
       break;
     }
     reverse_iter = previous_element;
+    // TODO(yanavlasov): see if `rend` can be used.
   } while (!at_first_element);
 }
 

@@ -59,7 +59,7 @@ Http2Frame::ResponseStatus Http2Frame::responseStatus() const {
   return ResponseStatus::Unknown;
 }
 
-uint32_t Http2Frame::streamIndex() const {
+uint32_t Http2Frame::streamId() const {
   if (empty() || size() <= HeaderSize) {
     return 0;
   }

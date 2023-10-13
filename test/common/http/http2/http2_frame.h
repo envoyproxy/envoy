@@ -226,7 +226,7 @@ public:
     return false;
   }
   ResponseStatus responseStatus() const;
-  uint32_t streamIndex() const;
+  uint32_t streamId() const;
 
   // Copy HTTP2 header. The `header` parameter must at least be HeaderSize long.
   // Allocates payload size based on the value in the header.
