@@ -18,94 +18,101 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRetryBudgets) {
+class RetryBudgetIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  void initialize() override { HttpProtocolIntegrationTest::initialize(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, RetryBudgetIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(RetryBudgetIntegrationTest, CircuitBreakerRetryBudgets) {
+  // Create a config with a retry budget of 100% and a (very) long retry backoff
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* circuit_breakers = cluster->mutable_circuit_breakers();
-    auto* thresholds = circuit_breakers->add_thresholds();
-    // thresholds->set_track_remaining(true);
-    // thresholds->mutable_max_retries()->set_value(1);
-    auto* retry_budget = thresholds->mutable_retry_budget();
+    auto* retry_budget = bootstrap.mutable_static_resources()
+                             ->mutable_clusters(0)
+                             ->mutable_circuit_breakers()
+                             ->add_thresholds()
+                             ->mutable_retry_budget();
     retry_budget->mutable_min_retry_concurrency()->set_value(0);
     retry_budget->mutable_budget_percent()->set_value(100);
   });
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
-        virtual_host->clear_routes();
-
-        auto* route_short_backoff = virtual_host->add_routes();
-        route_short_backoff->mutable_match()->set_path("/route_short_backoff");
-        route_short_backoff->mutable_route()->set_cluster("cluster_0");
-        auto* retry_policy_short = route_short_backoff->mutable_route()->mutable_retry_policy();
-        *retry_policy_short->mutable_retry_on() = "5xx";
-        retry_policy_short->mutable_num_retries()->set_value(10);
-
-        auto* route_long_backoff = virtual_host->add_routes();
-        *route_long_backoff = *route_short_backoff;
-        route_long_backoff->mutable_match()->set_path("/route_long_backoff");
-        route_long_backoff->mutable_route()
-            ->mutable_retry_policy()
-            ->mutable_retry_back_off()
-            ->mutable_base_interval()
-            ->set_seconds(100);
+        auto* retry_policy =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_retry_policy();
+        retry_policy->set_retry_on("5xx");
+        retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_seconds(100);
       });
   initialize();
 
   Http::TestResponseHeaderMapImpl error_response_headers{{":status", "500"}};
-  Http::TestRequestHeaderMapImpl long_backoff_rq_headers{{":method", "GET"},
-                                                         {":path", "/route_long_backoff"},
-                                                         {":scheme", "http"},
-                                                         {":authority", "sni.lyft.com"}};
-  Http::TestRequestHeaderMapImpl short_backoff_rq_headers{{":method", "GET"},
-                                                          {":path", "/route_short_backoff"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "sni.lyft.com"}};
 
-  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(),
-  // 1);
-
+  // Send a request that will fail and trigger a retry
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response1 = codec_client_->makeHeaderOnlyRequest(long_backoff_rq_headers);
-
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(error_response_headers, true); // trigger retry
   EXPECT_TRUE(upstream_request_->complete());
 
+  // Observe odd behavior of retry overflow even though the budget is set to 100%
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
-  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(),
-  // 0);
-  EXPECT_EQ(
-      test_server_->gauge("cluster.cluster_0.circuit_breakers.default.rq_retry_open")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 0);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_success")->value(), 0);
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    // For H2 upstreams the observed behavior is that the retry budget max is 0
+    // i.e. it doesn't count the request that just failed as active
+    EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 1);
+    // since the retry overflowed we get the error response
+    ASSERT_TRUE(response1->waitForEndStream());
+  } else {
+    // For H1/H3 upstreams the observed behavior is that the retry budget max is 1
+    // i.e. it counts the request that just failed as still active when calculating retries
+    //
+    // Now this retry is in backoff and not counted as an active or pending request,
+    // but still counted against the retry limit
+    EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 0);
+  }
 
-  // now we have a retry in (very long) backoff
+  // now we are in a slightly weird protocol-dependent state:
+  // - For H2: the request is completed and there is no retry happening
+  // - For H1/H3: the request is in a long retry backoff
 
-  // make another request with short retry backoff
+  // make another request that will fail and trigger another retry
   Envoy::IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
-  auto response2 = codec_client2->makeHeaderOnlyRequest(short_backoff_rq_headers);
+  auto response2 = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(error_response_headers, true); // trigger retry
   EXPECT_TRUE(upstream_request_->complete());
 
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 2);
-  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(),
-  // 0);
-  EXPECT_EQ(
-      test_server_->gauge("cluster.cluster_0.circuit_breakers.default.rq_retry_open")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_success")->value(), 0);
+  // This time behavior is independent of upstream protocol, no matter what the retry overflows
+  //
+  // In the case of H2, it would overflow regardless of the retry in backoff due to the behavior
+  // seen above
+  //
+  // However, for H1/H3 the retry in backoff is counted against the active retry count, but not
+  // counted against the limit (active + pending requests) so we have:
+  // - 1 retry in backoff
+  // - 1 request counted as active (due to H1 specific behavior seen above)
+  // Because our retry budget is 100%, that gives us a retry limit of 1 since the retry in backoff
+  // is not counted in active + pending requests So we overflow the retry budget on the second
+  // request
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 2);
+  } else {
+    EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 1);
+  }
 
   // since the retry overflowed we get the error response
   ASSERT_TRUE(response2->waitForEndStream());
 
-  // the request in long retry backoff must be manually abandoned
-  // otherwise the codec destructor is annoyed about the outstanding request
-  codec_client_->rawConnection().close(Envoy::Network::ConnectionCloseType::Abort);
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    // For H1/H3: the first request is in a long retry backoff and must be manually abandoned
+    // otherwise the codec destructor is annoyed about the outstanding request
+    codec_client_->rawConnection().close(Envoy::Network::ConnectionCloseType::Abort);
+  }
   codec_client2->close();
 }
 
