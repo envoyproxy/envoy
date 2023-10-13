@@ -284,6 +284,17 @@ TEST_F(MetadataFetcherTest, TestDefaultRetryPolicy) {
   fetcher_->fetch(message, parent_span_, receiver);
 }
 
+TEST_F(MetadataFetcherTest, TestFailureToStringConversion) {
+  // Setup
+  setupFetcher();
+  EXPECT_EQ(fetcher_->failureToString(MetadataFetcher::MetadataReceiver::Failure::Network),
+            "Network");
+  EXPECT_EQ(fetcher_->failureToString(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata),
+            "InvalidMetadata");
+  EXPECT_EQ(fetcher_->failureToString(MetadataFetcher::MetadataReceiver::Failure::MissingConfig),
+            "MissingConfig");
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

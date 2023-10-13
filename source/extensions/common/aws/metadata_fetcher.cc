@@ -41,8 +41,9 @@ public:
       return "InvalidMetadata";
     case MetadataFetcher::MetadataReceiver::Failure::MissingConfig:
       return "MissingConfig";
+    default:
+      return "";
     }
-    return "";
   }
 
   void fetch(Http::RequestMessage& message, Tracing::Span& parent_span,
