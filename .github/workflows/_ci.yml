@@ -2,6 +2,9 @@ name: Envoy CI
 
 on:
   workflow_call:
+    secrets:
+      app_id:
+      app_key:
     inputs:
       target:
         required: true
@@ -96,6 +99,20 @@ jobs:
       with:
         image_tag: ${{ inputs.cache_build_image }}
 
+    - name: Check workflow context
+      id: context
+      run: |
+        if [[ "${{ inputs.trusted }}" != "false" && -n "${{ secrets.app_id }}" && -n "${{ secrets.app_key }}" ]]; then
+            echo "use_appauth=true" >> $GITHUB_OUTPUT
+        fi
+    - if: ${{ steps.context.outputs.use_appauth == 'true' }}
+      name: Fetch token for app auth
+      id: appauth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.18
+      with:
+        app_id: ${{ secrets.app_id }}
+        key: ${{ secrets.app_key }}
+
     - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
@@ -104,6 +121,7 @@ jobs:
         #  If this is set, then anything before or after in the job should be regarded as
         #  compromised.
         ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
+        token: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
     # If we are in a trusted CI run then the provided commit _must_ be either the latest for
     # this branch, or an antecdent.
