@@ -110,6 +110,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator_descriptor.pb.h"
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/common/v3/common_descriptor.pb.h"
+#include "envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/random/v3/random_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin_descriptor.pb.h"
@@ -318,6 +319,9 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
               kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_http_original_ip_detection_xff_v3_xff::
           kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_load_balancing_policies_cluster_provided_v3_cluster_provided::
+              kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_load_balancing_policies_common_v3_common::
           kFileDescriptorInfo,
       protobuf::reflection::
