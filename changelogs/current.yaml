@@ -354,5 +354,5 @@ deprecated:
     <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`.
 - area: http ext_proc filter
   change: |
-    Change to hornor HeaderValueOption.change_action. This change can be reverted temporarily by
+    Change to hornor append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>. This change can be reverted temporarily by
     setting the runtime guard ``envoy.reloadable_features.header_value_option_change_action`` to false.
