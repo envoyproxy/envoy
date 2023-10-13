@@ -508,7 +508,7 @@ build:rbe-envoy-engflow --remote_cache=grpcs://morganite.cluster.engflow.com
 build:rbe-envoy-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
 build:rbe-envoy-engflow --bes_backend=grpcs://morganite.cluster.engflow.com/
 build:rbe-envoy-engflow --bes_results_url=https://morganite.cluster.engflow.com/invocation/
-build:rbe-envoy-engflow --credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
+build:rbe-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
 build:rbe-envoy-engflow --grpc_keepalive_time=30s
 build:rbe-envoy-engflow --remote_timeout=3600s
 build:rbe-envoy-engflow --bes_timeout=3600s
