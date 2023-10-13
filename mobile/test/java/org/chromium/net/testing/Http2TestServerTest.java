@@ -91,10 +91,10 @@ public class Http2TestServerTest {
 
     Response response = sendRequest(requestScenario);
 
+    assertThat(response.getEnvoyError()).isNull();
     assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
     assertThat(response.getBodyAsString()).contains(":scheme: https");
     assertThat(response.getHeaders().value("x-envoy-upstream-alpn")).containsExactly("h2");
-    assertThat(response.getEnvoyError()).isNull();
   }
 
   @Test
