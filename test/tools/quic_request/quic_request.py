@@ -89,7 +89,7 @@ async def request(url: str, config, include_headers: bool) -> None:
         await client.request(url, include_headers)
 
 
-def main(argv) -> None:
+async def main(argv) -> None:
     parser = argparse.ArgumentParser(description="HTTP/3 client")
     parser.add_argument("url", type=str, help="the URL to query (must be HTTPS)")
     parser.add_argument(
@@ -105,8 +105,8 @@ def main(argv) -> None:
         alpn_protocols=H3_ALPN,
     )
     config.load_verify_locations(args.ca_certs)
-    asyncio.run(request(args.url, config, args.include_headers))
+    await request(args.url, config, args.include_headers)
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    sys.exit(asyncio.run(main(sys.argv[1:])))
