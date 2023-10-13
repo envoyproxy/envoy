@@ -1054,7 +1054,9 @@ message ScopedRoutes {
         // .. note::
         //
         //   If the header appears multiple times only the first value is used.
-        string name = 1 [(validate.rules).string = {min_len: 1}];
+        string name = 1 [
+          (validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+        ];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').
         // Default: empty string. This causes the entirety of the header field to be extracted.
