@@ -1,5 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
+#include "http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
@@ -15,6 +16,88 @@ INSTANTIATE_TEST_SUITE_P(
     Protocols, CircuitBreakersIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRetryBudgets) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    auto* thresholds = circuit_breakers->add_thresholds();
+    // thresholds->set_track_remaining(true);
+    // thresholds->mutable_max_retries()->set_value(1);
+    auto* retry_budget = thresholds->mutable_retry_budget();
+    retry_budget->mutable_min_retry_concurrency()->set_value(0);
+    retry_budget->mutable_budget_percent()->set_value(100);
+  });
+  config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          virtual_host->clear_routes();
+
+          auto* route_short_backoff = virtual_host->add_routes();
+          route_short_backoff->mutable_match()->set_path("/route_short_backoff");
+          route_short_backoff->mutable_route()->set_cluster("cluster_0");
+          auto* retry_policy_short = route_short_backoff->mutable_route()->mutable_retry_policy();
+          *retry_policy_short->mutable_retry_on() = "5xx";
+          retry_policy_short->mutable_num_retries()->set_value(10);
+
+          auto* route_long_backoff = virtual_host->add_routes();
+          *route_long_backoff = *route_short_backoff;
+          route_long_backoff->mutable_match()->set_path("/route_long_backoff");
+          route_long_backoff->mutable_route()->mutable_retry_policy()->mutable_retry_back_off()->mutable_base_interval()->set_seconds(100);
+        });
+  initialize();
+
+  Http::TestResponseHeaderMapImpl error_response_headers{{":status", "500"}};
+  Http::TestRequestHeaderMapImpl long_backoff_rq_headers{{":method", "GET"},
+                                                          {":path", "/route_long_backoff"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "sni.lyft.com"}};
+  Http::TestRequestHeaderMapImpl short_backoff_rq_headers{{":method", "GET"},
+                                                          {":path", "/route_short_backoff"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "sni.lyft.com"}};
+
+  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(), 1);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(long_backoff_rq_headers);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(error_response_headers, true); // trigger retry
+  EXPECT_TRUE(upstream_request_->complete());
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
+  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(), 0);
+  EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.rq_retry_open")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 0);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_success")->value(), 0);
+
+  // now we have a retry in (very long) backoff
+
+  // make another request with short retry backoff
+  Envoy::IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+  auto response2 = codec_client2->makeHeaderOnlyRequest(short_backoff_rq_headers);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(error_response_headers, true); // trigger retry
+  EXPECT_TRUE(upstream_request_->complete());
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 2);
+  // EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.remaining_retries")->value(), 0);
+  EXPECT_EQ(test_server_->gauge("cluster.cluster_0.circuit_breakers.default.rq_retry_open")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_retry_success")->value(), 0);
+
+  // since the retry overflowed we get the error response
+  ASSERT_TRUE(response2->waitForEndStream());
+
+  // the request in long retry backoff must be manually abandoned
+  // otherwise the codec destructor is annoyed about the outstanding request
+  codec_client_->rawConnection().close(Envoy::Network::ConnectionCloseType::Abort);
+  codec_client2->close();
+}
 
 // This test checks that triggered max requests circuit breaker
 // doesn't force outlier detectors to eject an upstream host.
