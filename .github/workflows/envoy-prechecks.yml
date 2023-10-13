@@ -30,8 +30,6 @@ jobs:
     permissions:
       contents: read
       packages: read
-      # TODO(phlax): figure out how to remove this
-      statuses: write
 
   prechecks:
     needs:
