@@ -62,7 +62,7 @@ FilterConfig::FilterConfig(
       vh_rate_limits_(config.vh_rate_limits()),
       rate_limited_grpc_status_(
           config.rate_limited_as_resource_exhausted()
-              ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
+              ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
               : absl::nullopt) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
