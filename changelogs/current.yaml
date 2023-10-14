@@ -204,6 +204,9 @@ bug_fixes:
 - area: docker/publishing
   change: |
     Update base images to resolve various glibc vulnerabilities.
+- area: xds
+  change: |
+    Fix a bug where the nonce was not reset after reconnecting to the xDS server, when using State-of-the-World.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
