@@ -126,8 +126,8 @@ message LocalRateLimit {
   // be consumed. Default is true.
   google.protobuf.BoolValue always_consume_default_token_bucket = 14;
 
-  // Specifies whether a `RESOURCE_EXHAUSTED` gRPC code must be returned instead
-  // of the default `UNAVAILABLE` gRPC code for a rate limited gRPC call. The
+  // Specifies whether a ``RESOURCE_EXHAUSTED`` gRPC code must be returned instead
+  // of the default ``UNAVAILABLE`` gRPC code for a rate limited gRPC call. The
   // HTTP code will be 200 for a gRPC response.
   bool rate_limited_as_resource_exhausted = 15;
 }
