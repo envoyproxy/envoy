@@ -127,7 +127,7 @@ protected:
     if (cluster.cluster().info()->name() == "ads_cluster") {
       // For the ADS cluster, set up the expectation that the postThreadLocalClusterUpdate call
       // below will invoke the ADS mux's start() method.
-      EXPECT_CALL(dynamic_cast<Config::MockGrpcMux&>(*adsMux()), start()).Times(1);
+      EXPECT_CALL(dynamic_cast<Config::MockGrpcMux&>(*adsMux()), start());
     }
 
     // The ClusterManagerImpl::postThreadLocalClusterUpdate method calls ads_mux_->start() if the
