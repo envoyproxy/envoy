@@ -32,7 +32,6 @@ stat_prefix: test
 TEST(Factory, RouteSpecificFilterConfig) {
   const std::string config_yaml = R"(
 stat_prefix: test
-rate_limited_as_resource_exhausted: true
 token_bucket:
   max_tokens: 1
   tokens_per_fill: 1

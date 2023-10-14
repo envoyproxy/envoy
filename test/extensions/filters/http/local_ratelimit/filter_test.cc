@@ -198,8 +198,8 @@ TEST_F(FilterTest, RequestRateLimited) {
         EXPECT_EQ("123", response_headers.get(Http::LowerCaseString("test-resp-req-id"))[0]
                              ->value()
                              .getStringView());
-
-        EXPECT_EQ(grpc_status, absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted));
+        EXPECT_EQ(grpc_status,
+                  absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted));
         EXPECT_EQ(details, "local_rate_limited");
       }));
 
