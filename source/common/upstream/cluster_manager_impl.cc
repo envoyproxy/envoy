@@ -1287,7 +1287,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     }
   });
 
-  // By this time, the main thread has received the cluster initialization update, so we can start the ADS mux if the ADS mux is dependent on this cluster's initialization.
+  // By this time, the main thread has received the cluster initialization update, so we can start
+  // the ADS mux if the ADS mux is dependent on this cluster's initialization.
   if (cm_cluster.requiredForAds()) {
     ads_mux_->start();
   }
