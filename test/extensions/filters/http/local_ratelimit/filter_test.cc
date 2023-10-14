@@ -47,6 +47,39 @@ request_headers_to_add_when_not_enforced:
 local_rate_limit_per_downstream_connection: {}
 enable_x_ratelimit_headers: {}
   )";
+static const std::string config_yaml_resource_exhausted = R"(
+stat_prefix: test
+rate_limited_as_resource_exhausted: true
+token_bucket:
+  max_tokens: {}
+  tokens_per_fill: 1
+  fill_interval: 1000s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+response_headers_to_add:
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    header:
+      key: x-test-rate-limit
+      value: 'true'
+  - header:
+      key: test-resp-req-id
+      value: '%REQ(test-req-id)%'
+request_headers_to_add_when_not_enforced:
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    header:
+      key: x-local-ratelimited
+      value: 'true'
+local_rate_limit_per_downstream_connection: {}
+enable_x_ratelimit_headers: {}
+  )";
 // '{}' used in the yaml config above are position dependent placeholders used for substitutions.
 // Different test cases toggle functionality based on these positional placeholder variables
 // For instance, fmt::format(config_yaml, "1", "false") substitutes '1' and 'false' for 'max_tokens'
@@ -145,7 +178,7 @@ TEST_F(FilterTest, RequestOkPerConnection) {
 }
 
 TEST_F(FilterTest, RequestRateLimited) {
-  setup(fmt::format(fmt::runtime(config_yaml), "1", "false", "\"OFF\""));
+  setup(fmt::format(fmt::runtime(config_yaml_resource_exhausted), "1", "false", "\"OFF\""));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
@@ -166,7 +199,7 @@ TEST_F(FilterTest, RequestRateLimited) {
                              ->value()
                              .getStringView());
 
-        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(grpc_status, absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted));
         EXPECT_EQ(details, "local_rate_limited");
       }));
 
