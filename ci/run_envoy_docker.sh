@@ -95,13 +95,13 @@ VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
     -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
 
-if ! is_windows && [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
+if ! is_windows && [[ -n "$ENVOY_DOCKER_IN_DOCKER" || -n "$ENVOY_SHARED_TMP_DIR" ]]; then
     # Create a "shared" directory that has the same path in/outside the container
     # This allows the host docker engine to see artefacts using a temporary path created inside the container,
     # at the same path.
     # For example, a directory created with `mktemp -d --tmpdir /tmp/bazel-shared` can be mounted as a volume
     # from within the build container.
-    SHARED_TMP_DIR=/tmp/bazel-shared
+    SHARED_TMP_DIR="${ENVOY_SHARED_TMP_DIR:-/tmp/bazel-shared}"
     mkdir -p "${SHARED_TMP_DIR}"
     chmod +rwx "${SHARED_TMP_DIR}"
     VOLUMES+=(-v "${SHARED_TMP_DIR}":"${SHARED_TMP_DIR}")
@@ -110,7 +110,6 @@ fi
 if [[ -n "${ENVOY_DOCKER_PULL}" ]]; then
     time docker pull "${ENVOY_BUILD_IMAGE}"
 fi
-
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm \
@@ -133,10 +132,9 @@ docker run --rm \
        -e DOCKERHUB_PASSWORD \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
-       -e BAZEL_NO_CACHE_TEST_RESULTS \
        -e BAZEL_REMOTE_INSTANCE \
-       -e GOOGLE_BES_PROJECT_ID \
        -e GCP_SERVICE_ACCOUNT_KEY \
+       -e GCP_SERVICE_ACCOUNT_KEY_PATH \
        -e NUM_CPUS \
        -e ENVOY_BRANCH \
        -e ENVOY_RBE \
