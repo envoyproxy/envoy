@@ -1568,7 +1568,6 @@ void ClusterImplBase::initialize(std::function<void()> callback) {
 }
 
 void ClusterImplBase::onPreInitComplete() {
-  std::cerr << "==> AAB ClusterImplBase::onPreInitComplete" << std::endl;
   // Protect against multiple calls.
   if (initialization_started_) {
     return;

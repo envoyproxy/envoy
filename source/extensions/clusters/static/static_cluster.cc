@@ -32,7 +32,6 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
 }
 
 void StaticClusterImpl::startPreInit() {
-  std::cerr << "==> AAB StaticClusterImpl::startPreInit()" << std::endl;
   // At this point see if we have a health checker. If so, mark all the hosts unhealthy and
   // then fire update callbacks to start the health checking process.
   const auto& health_checker_flag =
