@@ -83,17 +83,6 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "mobile_quiche_bug_tracker_impl_lib",
-    hdrs = [
-        "mobile_quiche_bug_tracker_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_mobile_quiche_logging_lib",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
     name = "quic_base_impl_lib",
     external_deps = [
         "abseil_base",
