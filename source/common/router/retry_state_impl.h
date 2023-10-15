@@ -104,7 +104,7 @@ private:
                  Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  TimeSource& time_source, Upstream::ResourcePriority priority,
                  bool auto_configured_for_http3);
-                 
+
   enum class RetryBackoffState { NotInBackoff, Exponential, RateLimited };
 
   void enableBackoffTimer();

@@ -90,8 +90,8 @@ public:
         max_connections_per_host_(max_connections_per_host),
         retries_(budget_percent, min_retry_concurrency, max_retries, runtime,
                  runtime_key + "retry_budget.", runtime_key + "max_retries",
-                 cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_,
-                 pending_requests_, retries_in_backoff_) {}
+                 cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_, pending_requests_,
+                 retries_in_backoff_) {}
 
   // Upstream::ResourceManager
   ResourceLimit& connections() override { return connections_; }
@@ -116,8 +116,8 @@ private:
           budget_percent_(budget_percent), min_retry_concurrency_(min_retry_concurrency),
           budget_percent_key_(retry_budget_runtime_key + "budget_percent"),
           min_retry_concurrency_key_(retry_budget_runtime_key + "min_retry_concurrency"),
-          requests_(requests), pending_requests_(pending_requests), retries_in_backoff_(retries_in_backoff),
-          remaining_(remaining) {}
+          requests_(requests), pending_requests_(pending_requests),
+          retries_in_backoff_(retries_in_backoff), remaining_(remaining) {}
 
     // Envoy::ResourceLimit
     bool canCreate() override {
@@ -141,9 +141,7 @@ private:
       max_retry_resource_.decBy(amount);
       clearRemainingGauge();
     }
-    uint64_t max() override {
-      return maxWithAdditionalActive(0);
-    }
+    uint64_t max() override { return maxWithAdditionalActive(0); }
     uint64_t count() const override { return max_retry_resource_.count(); }
 
   private:
@@ -167,7 +165,8 @@ private:
         return max_retry_resource_.max();
       }
 
-      const uint64_t active = requests_.count() + pending_requests_.count() + retries_in_backoff_.count() + additional_active;
+      const uint64_t active = requests_.count() + pending_requests_.count() +
+                              retries_in_backoff_.count() + additional_active;
       const double budget_percent = runtime_.snapshot().getDouble(
           budget_percent_key_, budget_percent_ ? *budget_percent_ : 20.0);
       const uint32_t min_retry_concurrency = runtime_.snapshot().getInteger(

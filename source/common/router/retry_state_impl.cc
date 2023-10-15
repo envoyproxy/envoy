@@ -176,9 +176,10 @@ void RetryStateImpl::enableBackoffTimer() {
         cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.dec();
         break;
       case RetryBackoffState::NotInBackoff:
-        IS_ENVOY_BUG("Retry backoff timer fired while backoff state was RetryBackoffState::NotInBackoff")
+        IS_ENVOY_BUG(
+            "Retry backoff timer fired while backoff state was RetryBackoffState::NotInBackoff")
       }
-      
+
       cluster_.resourceManager(priority_).retriesInBackoff().dec();
       backoff_state_ = RetryBackoffState::NotInBackoff;
       backoff_callback_();
@@ -290,7 +291,7 @@ void RetryStateImpl::resetRetry() {
       cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.dec();
       cluster_.resourceManager(priority_).retriesInBackoff().dec();
       break;
-    default: ;
+    default:;
     }
     backoff_state_ = RetryBackoffState::NotInBackoff;
   }
