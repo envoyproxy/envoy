@@ -62,7 +62,7 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
   // If we haven't already traversed the route configs, do so now.
   if (route_configs_.empty()) {
     route_configs_ =
-        Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
+        Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(encoder_callbacks_);
   }
 
   for (const auto* route_config : route_configs_) {
