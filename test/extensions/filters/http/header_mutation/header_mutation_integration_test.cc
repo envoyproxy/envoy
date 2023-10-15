@@ -20,11 +20,11 @@ enum RouteLevel {
 };
 using RouteLevelFlag = std::bitset<3>;
 
-RouteLevelFlag kPerRouteLevel = {1 << RouteLevel::PerRoute};
-RouteLevelFlag kVirtualHostLevel = {1 << RouteLevel::VirtualHost};
-RouteLevelFlag kRouteTableLevel = {1 << RouteLevel::RouteTable};
-RouteLevelFlag kAllRoutesLevel = {1 << RouteLevel::PerRoute | 1 << RouteLevel::VirtualHost |
-                                  1 << RouteLevel::RouteTable};
+RouteLevelFlag PerRouteLevel = {1 << RouteLevel::PerRoute};
+RouteLevelFlag VirtualHostLevel = {1 << RouteLevel::VirtualHost};
+RouteLevelFlag RouteTableLevel = {1 << RouteLevel::RouteTable};
+RouteLevelFlag AllRoutesLevel = {1 << RouteLevel::PerRoute | 1 << RouteLevel::VirtualHost |
+                                 1 << RouteLevel::RouteTable};
 
 class HeaderMutationIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
@@ -296,7 +296,7 @@ void TestResponseHeaderMutation(IntegrationStreamDecoder* response, RouteLevelFl
 }
 
 TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
-  initializeFilter(kAllRoutesLevel);
+  initializeFilter(AllRoutesLevel);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setPath("/default/route");
@@ -332,7 +332,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
                 ->value()
                 .getStringView());
 
-  TestResponseHeaderMutation(response.get(), kAllRoutesLevel);
+  TestResponseHeaderMutation(response.get(), AllRoutesLevel);
 
   EXPECT_EQ("upstream-global-flag-header-value",
             response->headers()
@@ -348,7 +348,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
 }
 
 TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRoute) {
-  initializeFilter(kPerRouteLevel);
+  initializeFilter(PerRouteLevel);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setPath("/default/route");
@@ -377,7 +377,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRoute) {
                 .get(Http::LowerCaseString("downstream-global-flag-header"))[0]
                 ->value()
                 .getStringView());
-  TestResponseHeaderMutation(response.get(), kPerRouteLevel);
+  TestResponseHeaderMutation(response.get(), PerRouteLevel);
 
   EXPECT_EQ("upstream-global-flag-header-value",
             response->headers()
@@ -393,7 +393,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRoute) {
 }
 
 TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerVirtualHost) {
-  initializeFilter(kVirtualHostLevel);
+  initializeFilter(VirtualHostLevel);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setPath("/default/route");
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -421,7 +421,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerVirtualHost) {
                 ->value()
                 .getStringView());
 
-  TestResponseHeaderMutation(response.get(), kVirtualHostLevel);
+  TestResponseHeaderMutation(response.get(), VirtualHostLevel);
 
   EXPECT_EQ("upstream-global-flag-header-value",
             response->headers()
@@ -437,7 +437,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerVirtualHost) {
 }
 
 TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRouteTable) {
-  initializeFilter(kRouteTableLevel);
+  initializeFilter(RouteTableLevel);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setPath("/default/route");
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -465,7 +465,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRouteTable) {
                 ->value()
                 .getStringView());
 
-  TestResponseHeaderMutation(response.get(), kRouteTableLevel);
+  TestResponseHeaderMutation(response.get(), RouteTableLevel);
 
   EXPECT_EQ("upstream-global-flag-header-value",
             response->headers()
@@ -481,7 +481,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRouteTable) {
 }
 
 TEST_P(HeaderMutationIntegrationTest, TestDisableDownstreamHeaderMutation) {
-  initializeFilter(kAllRoutesLevel);
+  initializeFilter(AllRoutesLevel);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setPath("/disable/filter/route");
