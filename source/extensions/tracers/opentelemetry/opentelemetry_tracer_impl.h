@@ -36,7 +36,7 @@ public:
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const StreamInfo::StreamInfo& stream_info,
                              const std::string& operation_name,
-                             const Tracing::Decision tracing_decision) override;
+                             Tracing::Decision tracing_decision) override;
 
 private:
   class TlsTracer : public ThreadLocal::ThreadLocalObject {
