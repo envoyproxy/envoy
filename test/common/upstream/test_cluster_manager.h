@@ -177,13 +177,13 @@ public:
 class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
   static std::unique_ptr<TestClusterManagerImpl>
-  create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-         Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-         const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-         ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-         Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-         Server::Instance& server) {
+  createAndInit(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                ClusterManagerFactory& factory, Stats::Store& stats, ThreadLocal::Instance& tls,
+                Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+                Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context,
+                Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+                Router::Context& router_context, Server::Instance& server) {
     auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
         bootstrap, factory, stats, tls, runtime, local_info, log_manager, main_thread_dispatcher,
         admin, validation_context, api, http_context, grpc_context, router_context, server)};
