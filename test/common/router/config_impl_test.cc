@@ -10808,6 +10808,7 @@ virtual_hosts:
 
   const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
   EXPECT_FALSE(route1->filterDisabled("test.filter"));
+  EXPECT_EQ(route1->filterDisabled("unknown.filter"), absl::nullopt);
 
   const auto route2 = config.route(genHeaders("host1", "/route2", "GET"), 0);
   EXPECT_TRUE(route2->filterDisabled("test.filter"));

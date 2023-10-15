@@ -140,7 +140,7 @@ public:
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
     return nullptr;
   }
-  bool filterDisabled(absl::string_view) const override { return false; }
+  absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   void traversePerFilterConfig(
       const std::string&,
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
@@ -254,7 +254,7 @@ public:
     }
     return HeaderParser::defaultParser();
   }
-  bool filterDisabled(absl::string_view config_name) const;
+  absl::optional<bool> filterDisabled(absl::string_view config_name) const;
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -791,7 +791,7 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
-  bool filterDisabled(absl::string_view config_name) const override;
+  absl::optional<bool> filterDisabled(absl::string_view config_name) const override;
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const override {
     auto* config = per_filter_configs_.get(name);
@@ -924,7 +924,7 @@ public:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
     const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
-    bool filterDisabled(absl::string_view config_name) const override {
+    absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
       return parent_->filterDisabled(config_name);
     }
     const RouteSpecificFilterConfig*
@@ -1013,7 +1013,7 @@ public:
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override;
 
-    bool filterDisabled(absl::string_view config_name) const override {
+    absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
       absl::optional<bool> result = per_filter_configs_.disabled(config_name);
       if (result.has_value()) {
         return result.value();
@@ -1559,8 +1559,8 @@ public:
   const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const {
     return per_filter_configs_.get(name);
   }
-  bool filterDisabled(absl::string_view config_name) const {
-    return per_filter_configs_.disabled(config_name).value_or(false);
+  absl::optional<bool> filterDisabled(absl::string_view config_name) const {
+    return per_filter_configs_.disabled(config_name);
   }
 
   // Router::CommonConfig

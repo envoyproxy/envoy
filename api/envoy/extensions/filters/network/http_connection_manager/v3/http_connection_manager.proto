@@ -1169,8 +1169,8 @@ message HttpFilter {
   bool is_optional = 6;
 
   // [#not-implemented-hide:]
-  // If true, the filter is disabled by default and must be explicitly enabled by explicitly setting per
-  // filter configuration in the route configuration.
+  // If true, the filter is disabled by default and must be explicitly enabled by explicitly setting
+  // per filter configuration in the route configuration.
   //
   // A disabled filter will be treated as enabled in following cases:
   //
@@ -1180,7 +1180,7 @@ message HttpFilter {
   //    :ref:`disabled of FilterConfig <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>`
   //    is set to false.
   //
-  // Terminal filters (e.g. ``envoy.filters.http.router``) should never be marked as disabled by default.
+  // Terminal filters (e.g. ``envoy.filters.http.router``) could not be marked as disabled.
   bool disabled = 7;
 }
 

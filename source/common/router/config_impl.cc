@@ -1367,7 +1367,7 @@ void RouteEntryImplBase::validateClusters(
   }
 }
 
-bool RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
+absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
   absl::optional<bool> result = per_filter_configs_.disabled(config_name);
   if (result.has_value()) {
     return result.value();
@@ -1731,7 +1731,7 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
 
-bool CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
+absl::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
   absl::optional<bool> result = per_filter_configs_.disabled(config_name);
   if (result.has_value()) {
     return result.value();
