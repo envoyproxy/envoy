@@ -17,31 +17,32 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
+	"net/http"
 	"os"
 
-	extproc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 var logger *zap.SugaredLogger = nil
 
 func main() {
-	var help bool
+	var doHelp bool
 	var debug bool
 	var port int
-	var err error
 
-	flag.IntVar(&port, "p", -1, "Listen port")
+	flag.BoolVar(&doHelp, "h", false, "Print help message")
 	flag.BoolVar(&debug, "d", false, "Enable debug logging")
-	flag.BoolVar(&help, "h", false, "Print help")
+	flag.IntVar(&port, "p", -1, "TCP listen port")
 	flag.Parse()
-	if !flag.Parsed() || help || port < 0 {
+
+	if !flag.Parsed() || doHelp || port < 0 {
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
 
+	var err error
 	var zapLogger *zap.Logger
 	if debug {
 		zapLogger, err = zap.NewDevelopment()
@@ -53,17 +54,13 @@ func main() {
 	}
 	logger = zapLogger.Sugar()
 
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		logger.Fatalf("Can't listen on socket: %s", err)
-		os.Exit(3)
+	// This extra stuff lets us support HTTP/2 without
+	// TLS using the "h2c" extension.
+	handler := createHandler()
+	h2Server := http2.Server{}
+	server := http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: h2c.NewHandler(handler, &h2Server),
 	}
-
-	server := grpc.NewServer()
-	service := processorService{}
-	extproc.RegisterExternalProcessorServer(server, &service)
-
-	logger.Infof("Listening on %s", listener.Addr())
-
-	server.Serve(listener)
+	server.ListenAndServe()
 }

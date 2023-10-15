@@ -6,14 +6,14 @@ services:
       dockerfile: ../shared/envoy/Dockerfile
       target: envoy-ext_authz
       args:
-        ENVOY_CONFIG: config/http-service.yaml
+        ENVOY_CONFIG: config/envoy.yaml
     depends_on:
       upstream-service:
         condition: service_healthy
     environment:
     - FRONT_ENVOY_YAML
     ports:
-    - "${PORT_PROXY:-8000}:8000"
+    - "${PORT_PROXY:-10000}:10000"
 
   ext_authz-http-service:
     build:
@@ -33,23 +33,9 @@ services:
     volumes:
     - ./users.json:/etc/users.json
 
-  ext_authz-opa-service:
-    build:
-      context: .
-      dockerfile: Dockerfile-opa
-    volumes:
-    - ./config/opa-service/policy.rego:/etc/policy.rego
-    command:
-    - run
-    - --server
-    - --log-format=json-pretty
-    - --set=plugins.envoy_ext_authz_grpc.addr=:9002
-    - --set=decision_logs.console=true
-    - /etc/policy.rego
-
   upstream-service:
     build:
-      context: ../shared/python
-      target: aiohttp-service
+      context: ../shared/golang/Dockerfile
+      target: golan-target-service
     volumes:
-    - ./upstream/service/service.py:/code/service.py
+    - ./upstream/service/main.go:/code/main.go

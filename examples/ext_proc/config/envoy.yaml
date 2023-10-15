@@ -1,9 +1,10 @@
 static_resources:
   listeners:
-  - address:
+  - name: http
+    address:
       socket_address:
-        address: 0.0.0.0
-        port_value: 8000
+        address: 127.0.0.1
+        port_value: 10000
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -14,7 +15,7 @@ static_resources:
           route_config:
             name: local_route
             virtual_hosts:
-            - name: upstream
+            - name: local_service
               domains:
               - "*"
               routes:
@@ -23,26 +24,25 @@ static_resources:
                 route:
                   cluster: upstream-service
           http_filters:
-          - name: envoy.filters.http.ext_authz
+          - name: envoy.filters.http.ext_proc
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-              transport_api_version: V3
-              http_service:
-                server_uri:
-                  uri: ext_authz
-                  cluster: ext_authz-http-service
-                  timeout: 0.250s
-                authorization_response:
-                  allowed_upstream_headers:
-                    patterns:
-                    - exact: x-current-user
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+              allow_mode_override: true
+              message_timeout:
+                seconds: 2
+              grpc_service:
+                timeout:
+                  seconds: 600
+                envoy_grpc:
+                  cluster_name: processor
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
   - name: upstream-service
-    type: STRICT_DNS
+    connect_timeout: 0.25s
+    type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: upstream-service
@@ -51,18 +51,26 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: upstream-service
-                port_value: 8080
+                address: 127.0.0.1
+                port_value: 10001
 
-  - name: ext_authz-http-service
-    type: STRICT_DNS
+  - name: processor
+    connect_timeout: 0.25s
+    type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: ext_authz-http-service
+      cluster_name: processor
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: ext_authz-http-service
-                port_value: 9002
+                address: 127.0.0.1
+                port_value: 10002
+
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
