@@ -38,11 +38,21 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
   // Only the most specific route config is used.
   // TODO(wbpcode): It's possible to traverse all the route configs to merge the header mutations
   // in the future.
-  route_config_ =
-      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
+  // route_config_ =
+  //     Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
 
-  if (route_config_ != nullptr) {
-    route_config_->mutations().mutateRequestHeaders(headers, decoder_callbacks_->streamInfo());
+  // if (route_config_ != nullptr) {
+  //   route_config_->mutations().mutateRequestHeaders(headers, decoder_callbacks_->streamInfo());
+  // }
+
+  decoder_callbacks_->traversePerFilterConfig(
+      [this](const Router::RouteSpecificFilterConfig& config) {
+        const auto* typed_cfg = dynamic_cast<const PerRouteHeaderMutation*>(&config);
+        route_configs_.push_back(typed_cfg);
+      });
+
+  for (const auto* route_config : route_configs_) {
+    route_config->mutations().mutateRequestHeaders(headers, decoder_callbacks_->streamInfo());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -72,6 +82,19 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
   if (route_config_ != nullptr) {
     route_config_->mutations().mutateResponseHeaders(request_headers, headers,
                                                      encoder_callbacks_->streamInfo());
+  }
+
+  if (route_configs_.empty()) {
+    encoder_callbacks_->traversePerFilterConfig(
+        [this](const Router::RouteSpecificFilterConfig& config) {
+          const auto* typed_cfg = dynamic_cast<const PerRouteHeaderMutation*>(&config);
+          route_configs_.push_back(typed_cfg);
+        });
+  }
+
+  for (const auto* route_config : route_configs_) {
+    route_config->mutations().mutateResponseHeaders(request_headers, headers,
+                                                    encoder_callbacks_->streamInfo());
   }
 
   return Http::FilterHeadersStatus::Continue;
