@@ -29,7 +29,7 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
               allow_mode_override: true
               message_timeout:
-                seconds: 2
+                seconds: "2s"
               grpc_service:
                 timeout:
                   seconds: 600
