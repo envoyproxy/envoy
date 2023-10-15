@@ -160,6 +160,9 @@ bug_fixes:
 - area: redis
   change: |
     Fixed a bug where redis key with ``%`` in the key is failing with a validation error.
+- area: access_log
+  change: |
+    Fixed a bug where the filter state set by upstream filter is not emitted in the grpc access logs.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
