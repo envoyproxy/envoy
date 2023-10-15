@@ -74,7 +74,6 @@ public:
 
 private:
   HeaderMutationConfigSharedPtr config_{};
-  const PerRouteHeaderMutation* route_config_{};
   std::vector<const PerRouteHeaderMutation*> route_configs_{};
 };
 

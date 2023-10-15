@@ -62,18 +62,6 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
 
   config_->mutations().mutateResponseHeaders(request_headers, headers,
                                              encoder_callbacks_->streamInfo());
-
-  if (route_config_ == nullptr) {
-    // If we haven't already resolved the route config, do so now.
-    route_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteHeaderMutation>(
-        encoder_callbacks_);
-  }
-
-  if (route_config_ != nullptr) {
-    route_config_->mutations().mutateResponseHeaders(request_headers, headers,
-                                                     encoder_callbacks_->streamInfo());
-  }
-
   if (route_configs_.empty()) {
     encoder_callbacks_->traversePerFilterConfig(
         [this](const Router::RouteSpecificFilterConfig& config) {

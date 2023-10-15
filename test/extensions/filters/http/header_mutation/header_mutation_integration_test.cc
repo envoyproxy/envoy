@@ -497,6 +497,10 @@ TEST_P(HeaderMutationIntegrationTest, TestDisableDownstreamHeaderMutation) {
                 .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Http::LowerCaseString("downstream-request-per-route-flag-header"))
+                .size(),
+            0);
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
