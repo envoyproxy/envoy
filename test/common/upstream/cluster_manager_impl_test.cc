@@ -152,6 +152,28 @@ public:
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
 
+  void createWithBasicStaticCluster() {
+    const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+    create(parseBootstrapFromV3Yaml(yaml));
+  }
+
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
     std::string yaml = R"EOF(
   static_resources:
@@ -4293,7 +4315,7 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesDestroyedOnUpdate) {
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
@@ -4310,7 +4332,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
 }
 
 TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
@@ -4326,17 +4348,17 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
 }
 
 TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:11002")));
+      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:11001")));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
-        EXPECT_EQ("127.0.0.1:11002", host->address()->asStringView());
+        EXPECT_EQ("127.0.0.1:11001", host->address()->asStringView());
         return to_create;
       }));
   EXPECT_CALL(*to_create, addIdleCallback(_));
@@ -4355,7 +4377,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   Http::ConnectionPool::MockInstance* to_create =
@@ -4372,7 +4394,6 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
-  createWithLocalClusterUpdate();
   NiceMock<MockLoadBalancerContext> context1;
   NiceMock<MockLoadBalancerContext> context2;
 
@@ -4416,7 +4437,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   Http::ConnectionPool::MockInstance* to_create =
@@ -4432,7 +4453,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
 }
 
 TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   Http::ConnectionPool::MockInstance* pool_mock = new Http::ConnectionPool::MockInstance();
