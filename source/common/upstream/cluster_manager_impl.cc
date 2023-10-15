@@ -345,29 +345,32 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   // Initialize the XdsResourceDelegate extension, if set on the bootstrap config.
-  if (bootstrap_.has_xds_delegate_extension()) {
+  if (bootstrap.has_xds_delegate_extension()) {
     auto& factory = Config::Utility::getAndCheckFactory<Config::XdsResourcesDelegateFactory>(
-        bootstrap_.xds_delegate_extension());
+        bootstrap.xds_delegate_extension());
     xds_resources_delegate_ = factory.createXdsResourcesDelegate(
-        bootstrap_.xds_delegate_extension().typed_config(),
-        validation_context_.dynamicValidationVisitor(), api, dispatcher_);
+        bootstrap.xds_delegate_extension().typed_config(),
+        validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
   }
 
   if (bootstrap_.has_xds_config_tracker_extension()) {
     auto& tracer_factory = Config::Utility::getAndCheckFactory<Config::XdsConfigTrackerFactory>(
-        bootstrap_.xds_config_tracker_extension());
+        bootstrap.xds_config_tracker_extension());
     xds_config_tracker_ = tracer_factory.createXdsConfigTracker(
-        bootstrap_.xds_config_tracker_extension().typed_config(),
-        validation_context_.dynamicValidationVisitor(), api, dispatcher_);
+        bootstrap.xds_config_tracker_extension().typed_config(),
+        validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
   }
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
-      local_info_, dispatcher_, *this, validation_context_.dynamicValidationVisitor(), api, server_,
-      makeOptRefFromPtr(xds_resources_delegate_.get()),
+      local_info_, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(),
+      api, server, makeOptRefFromPtr(xds_resources_delegate_.get()),
       makeOptRefFromPtr(xds_config_tracker_.get()));
 }
 
 void ClusterManagerImpl::init() {
+  ASSERT(!initialized_);
+  initialized_ = true;
+
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS which
   // load endpoint definition from file are primary and

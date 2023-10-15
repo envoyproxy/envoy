@@ -247,7 +247,8 @@ class ClusterManagerImpl : public ClusterManager,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
   // Initialize the ClusterManagerImpl instance.
-  // This method *must* be called prior to invoking any other methods on the class.
+  // This method *must* be called prior to invoking any other methods on the class and *must* only
+  // be called once.
   //
   // The initialization is separated from the constructor because lots of work, including ADS
   // initialization, is done in this method. If the contents of this method are invoked during
@@ -931,6 +932,7 @@ private:
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
   std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
 
+  std::atomic<bool> initialized_{};
   std::atomic<bool> shutdown_{};
 };
 

@@ -236,6 +236,8 @@ protected:
 // it with the right values at the right times.
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
+  using TestClusterManagerImpl::TestClusterManagerImpl;
+
   MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                   ClusterManagerFactory& factory, Stats::Store& stats,
                                   ThreadLocal::Instance& tls, Runtime::Loader& runtime,
