@@ -156,8 +156,9 @@ void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_a
   }
 }
 
-void QuicFilterManagerConnectionImpl::onWriteEventDone() {
-  // Apply delay close policy if there is any.
+void QuicFilterManagerConnectionImpl::onWriteEventDone() { maybeApplyDelayedClose(); }
+
+void QuicFilterManagerConnectionImpl::maybeApplyDelayedClose() {
   if (!hasDataToWrite() && inDelayedClose() &&
       delayed_close_state_ != DelayedCloseState::CloseAfterFlushAndWait) {
     closeConnectionImmediately();

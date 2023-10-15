@@ -217,6 +217,11 @@ func (f *filter) decodeData(buffer api.BufferInstance, endStream bool) api.Statu
 	f.req_body_length += uint64(buffer.Len())
 	if buffer.Len() != 0 {
 		data := buffer.String()
+		if string(buffer.Bytes()) != data {
+			return f.sendLocalReply(fmt.Sprintf("data in bytes: %s vs data in string: %s",
+				string(buffer.Bytes()), data))
+		}
+
 		buffer.SetString(strings.ToUpper(data))
 		buffer.AppendString("_append")
 		buffer.PrependString("prepend_")

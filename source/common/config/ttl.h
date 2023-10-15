@@ -44,7 +44,7 @@ public:
     TtlManager& parent_;
   };
 
-  ScopedTtlUpdate scopedTtlUpdate() { return ScopedTtlUpdate(*this); }
+  ScopedTtlUpdate scopedTtlUpdate() { return {*this}; }
 
   void add(std::chrono::milliseconds ttl, const std::string& name);
 

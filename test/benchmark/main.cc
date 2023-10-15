@@ -26,14 +26,14 @@ int main(int argc, char** argv) {
   bool contains_help_flag = false;
 
   // Checking if any of the command-line arguments contains `--help`
-  for (int i = 1; i < argc; ++i) {
+  for (int i = 1; i < argc; ++i) { // NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
     if (strcmp(argv[i], "--help") == 0) {
       contains_help_flag = true;
       break;
     }
   }
 
-  if (contains_help_flag) {
+  if (contains_help_flag) { // NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
     // if the `--help` flag isn't considered separately, it runs "benchmark --help"
     // (Google Benchmark Help) and the help output doesn't contains details about
     // custom defined flags like `--skip_expensive_benchmarks`, `--runtime_feature`, etc

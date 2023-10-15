@@ -258,7 +258,7 @@ ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
   // is because many tests will not populate rejected_stats_.
   ASSERT(symbol_table_.toString(StatNameManagedStorage("Hello.world", symbol_table_).statName()) ==
          "Hello.world");
-  rejected_stats_.free(symbol_table_);
+  rejected_stats_.free(symbol_table_); // NOLINT(clang-analyzer-unix.Malloc)
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
@@ -803,8 +803,7 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Uni
                                                    const StatNameTagVector& stat_name_tags,
                                                    SymbolTable& symbol_table)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
-      current_active_(0), used_(false), created_thread_id_(std::this_thread::get_id()),
-      symbol_table_(symbol_table) {
+      used_(false), created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
@@ -836,8 +835,7 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
       unit_(unit), thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, unit, supported_buckets),
-      cumulative_statistics_(cumulative_histogram_, unit, supported_buckets), merged_(false),
-      id_(id) {}
+      cumulative_statistics_(cumulative_histogram_, unit, supported_buckets), id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   thread_local_store_.releaseHistogramCrossThread(id_);

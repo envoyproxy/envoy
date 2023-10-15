@@ -863,74 +863,6 @@ ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
   return {stat_names, scope};
 }
 
-// Implements the FactoryContext interface required by network filters.
-class FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
-public:
-  // Create from a TransportSocketFactoryContext using parent stats_scope and runtime
-  // other contexts taken from TransportSocketFactoryContext.
-  FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
-                     Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.serverFactoryContext().admin()),
-        server_scope_(c.serverFactoryContext().serverScope()), stats_scope_(stats_scope),
-        cluster_manager_(c.clusterManager()), local_info_(c.serverFactoryContext().localInfo()),
-        dispatcher_(c.serverFactoryContext().mainThreadDispatcher()), runtime_(runtime),
-        singleton_manager_(c.serverFactoryContext().singletonManager()),
-        tls_(c.serverFactoryContext().threadLocal()), api_(c.serverFactoryContext().api()),
-        options_(c.serverFactoryContext().options()),
-        message_validation_visitor_(c.messageValidationVisitor()) {}
-
-  Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
-  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
-  const Server::Options& options() override { return options_; }
-  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
-  Envoy::Runtime::Loader& runtime() override { return runtime_; }
-  Stats::Scope& scope() override { return stats_scope_; }
-  Stats::Scope& serverScope() override { return server_scope_; }
-  Singleton::Manager& singletonManager() override { return singleton_manager_; }
-  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
-  OptRef<Server::Admin> admin() override { return admin_; }
-  TimeSource& timeSource() override { return api().timeSource(); }
-  ProtobufMessage::ValidationContext& messageValidationContext() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  AccessLog::AccessLogManager& accessLogManager() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return message_validation_visitor_;
-  }
-
-  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  Init::Manager& initManager() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  Api::Api& api() override { return api_; }
-
-private:
-  OptRef<Server::Admin> admin_;
-  Stats::Scope& server_scope_;
-  Stats::Scope& stats_scope_;
-  Upstream::ClusterManager& cluster_manager_;
-  const LocalInfo::LocalInfo& local_info_;
-  Event::Dispatcher& dispatcher_;
-  Envoy::Runtime::Loader& runtime_;
-  Singleton::Manager& singleton_manager_;
-  ThreadLocal::SlotAllocator& tls_;
-  Api::Api& api_;
-  const Server::Options& options_;
-  ProtobufMessage::ValidationVisitor& message_validation_visitor_;
-};
-
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
               std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options,
@@ -956,6 +888,73 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
            : absl::nullopt),
       config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
       config.has_http2_protocol_options(), validation_visitor);
+}
+
+absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
+LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
+    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+
+  LoadBalancerConfigPtr lb_config;
+  TypedLoadBalancerFactory* lb_factory = nullptr;
+
+  switch (cluster.lb_policy()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case ClusterProto::ROUND_ROBIN:
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.round_robin");
+    break;
+  case ClusterProto::LEAST_REQUEST:
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.least_request");
+    break;
+  case ClusterProto::RANDOM:
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.random");
+    break;
+  case ClusterProto::RING_HASH:
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.ring_hash");
+    break;
+  case ClusterProto::MAGLEV:
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.maglev");
+    break;
+  case ClusterProto::CLUSTER_PROVIDED:
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.cluster_provided");
+    break;
+  case ClusterProto::LOAD_BALANCING_POLICY_CONFIG:
+    // 'LOAD_BALANCING_POLICY_CONFIG' should be handled by the 'configureLbPolicies'
+    // function and should not reach here.
+    PANIC("getTypedLbConfigFromLegacyProtoWithoutSubset: should not reach here");
+    break;
+  }
+
+  if (lb_factory == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("No load balancer factory found for LB type: {}",
+                    ClusterProto::LbPolicy_Name(cluster.lb_policy())));
+  }
+
+  ASSERT(lb_factory != nullptr);
+  return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
+}
+
+absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
+LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
+    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+
+  // Handle the lb subset config case first.
+  if (cluster.has_lb_subset_config()) {
+    auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.subset");
+    if (lb_factory != nullptr) {
+      return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
+    }
+    return absl::InvalidArgumentError("No subset load balancer factory found");
+  }
+
+  return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
 }
 
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
@@ -1066,8 +1065,6 @@ ClusterInfoImpl::ClusterInfoImpl(
               server_context)),
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
-      factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
@@ -1098,8 +1095,34 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
-  if (config.has_load_balancing_policy()) {
+  if (config.has_load_balancing_policy() ||
+      config.lb_policy() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
     configureLbPolicies(config, server_context);
+  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.convert_legacy_lb_config")) {
+    auto lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
+        config, server_context.messageValidationVisitor());
+
+    if (!lb_pair.ok()) {
+      throw EnvoyException(std::string(lb_pair.status().message()));
+    }
+
+    load_balancer_config_ = std::move(lb_pair->config);
+    load_balancer_factory_ = lb_pair->factory;
+    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
+
+    RELEASE_ASSERT(
+        load_balancer_factory_,
+        fmt::format(
+            "No load balancer factory found from legacy LB configuration (type: {}, subset: {}).",
+            envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy()),
+            config.has_lb_subset_config()));
+
+    // Clear unnecessary legacy config because all legacy config is wrapped in load_balancer_config_
+    // except the original_dst_lb_config.
+    lb_subset_ = nullptr;
+    if (config.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+      lb_policy_config_ = nullptr;
+    }
   } else {
     switch (config.lb_policy()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
@@ -1128,7 +1151,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       lb_type_ = LoadBalancerType::ClusterProvided;
       break;
     case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
-      configureLbPolicies(config, server_context);
+      // 'LOAD_BALANCING_POLICY_CONFIG' should be handled by the 'configureLbPolicies'
+      // function in previous branch and should not reach here.
+      PANIC("Should not reach here");
       break;
     }
     }
@@ -1288,7 +1313,7 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
                                              context.messageValidationVisitor(), *proto_message);
 
       load_balancer_config_ =
-          factory->loadConfig(std::move(proto_message), context.messageValidationVisitor());
+          factory->loadConfig(*proto_message, context.messageValidationVisitor());
 
       load_balancer_factory_ = factory;
       break;

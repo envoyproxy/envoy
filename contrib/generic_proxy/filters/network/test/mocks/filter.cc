@@ -13,6 +13,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
+MockStreamFrameHandler::MockStreamFrameHandler() = default;
+
 MockStreamFilterConfig::MockStreamFilterConfig() {
   ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([]() {
     return std::make_unique<ProtobufWkt::Struct>();

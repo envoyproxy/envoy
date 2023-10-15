@@ -126,6 +126,38 @@ LegacyChildLoadBalancerCreatorImpl::createLoadBalancer(
   return {nullptr, nullptr};
 }
 
+SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
+    const SubsetLoadbalancingPolicyProto& subset_config,
+    ProtobufMessage::ValidationVisitor& visitor)
+    : subset_info_(subset_config) {
+
+  absl::InlinedVector<absl::string_view, 4> missing_policies;
+
+  for (const auto& policy : subset_config.subset_lb_policy().policies()) {
+    auto* factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(
+        policy.typed_extension_config(), /*is_optional=*/true);
+
+    if (factory != nullptr) {
+      // Load and validate the configuration.
+      auto sub_lb_proto_message = factory->createEmptyConfigProto();
+      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
+                                             visitor, *sub_lb_proto_message);
+
+      sub_load_balancer_config_ = factory->loadConfig(*sub_lb_proto_message, visitor);
+      sub_load_balancer_factory_ = factory;
+      break;
+    }
+
+    missing_policies.push_back(policy.typed_extension_config().name());
+  }
+
+  if (sub_load_balancer_factory_ == nullptr) {
+    throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
+                                     "implementation for subset lb with names from [{}]",
+                                     absl::StrJoin(missing_policies, ", ")));
+  }
+}
+
 SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
                                        ChildLoadBalancerCreatorPtr child_lb,
                                        const PrioritySet& priority_set,

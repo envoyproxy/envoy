@@ -17,6 +17,8 @@ struct HttpProtocolTestParams {
   bool use_universal_header_validator;
 };
 
+absl::string_view http2ImplementationToString(Http2Impl impl);
+
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
 //
 // Usage:
@@ -68,10 +70,11 @@ public:
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTest()
-      : HttpIntegrationTest(
-            GetParam().downstream_protocol, GetParam().version,
-            ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
-                                          Http::CodecType::HTTP3)),
+      : HttpProtocolIntegrationTest(ConfigHelper::httpProxyConfig(
+            /*downstream_is_quic=*/GetParam().downstream_protocol == Http::CodecType::HTTP3)) {}
+
+  HttpProtocolIntegrationTest(const std::string config)
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
         use_universal_header_validator_(GetParam().use_universal_header_validator) {
     setupHttp1ImplOverrides(GetParam().http1_implementation);
     setupHttp2ImplOverrides(GetParam().http2_implementation);

@@ -311,10 +311,8 @@ envoy.filters.http.dynamic_forward_proxy:
 envoy.filters.http.ext_authz:
   categories:
   - envoy.filters.http
-  - envoy.filters.http.upstream
   security_posture: robust_to_untrusted_downstream
   status: stable
-  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
   - envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
@@ -579,7 +577,7 @@ envoy.filters.listener.proxy_protocol:
 envoy.filters.listener.tls_inspector:
   categories:
   - envoy.filters.listener
-  security_posture: robust_to_untrusted_downstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
@@ -749,6 +747,13 @@ envoy.filters.udp_listener.udp_proxy:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+envoy.filters.udp.session.http_capsule:
+  categories:
+  - envoy.filters.udp.session
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig
 envoy.formatter.cel:
   categories:
   - envoy.formatter
@@ -770,6 +775,13 @@ envoy.formatter.req_without_query:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+envoy.geoip_providers.maxmind:
+  categories:
+  - envoy.geoip_providers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
 envoy.grpc_credentials.aws_iam:
   categories:
   - envoy.grpc_credentials
@@ -1357,42 +1369,42 @@ envoy.matching.inputs.request_headers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.type.matcher.v3.HttpRequestHeaderMatchInput
 envoy.matching.inputs.request_trailers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.type.matcher.v3.HttpRequestTrailerMatchInput
 envoy.matching.inputs.response_headers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.type.matcher.v3.HttpResponseHeaderMatchInput
 envoy.matching.inputs.response_trailers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.type.matcher.v3.HttpResponseTrailerMatchInput
 envoy.matching.inputs.query_params:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
 envoy.matching.inputs.cel_data_input:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - xds.type.matcher.v3.HttpAttributesCelMatchInput
 envoy.matching.inputs.destination_ip:
@@ -1400,7 +1412,7 @@ envoy.matching.inputs.destination_ip:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
 envoy.matching.inputs.destination_port:
@@ -1408,7 +1420,7 @@ envoy.matching.inputs.destination_port:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
 envoy.matching.inputs.source_ip:
@@ -1416,7 +1428,7 @@ envoy.matching.inputs.source_ip:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
 envoy.matching.inputs.source_port:
@@ -1424,7 +1436,7 @@ envoy.matching.inputs.source_port:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.SourcePortInput
 envoy.matching.inputs.direct_source_ip:
@@ -1432,7 +1444,7 @@ envoy.matching.inputs.direct_source_ip:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.DirectSourceIPInput
 envoy.matching.inputs.source_type:
@@ -1440,7 +1452,7 @@ envoy.matching.inputs.source_type:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.SourceTypeInput
 envoy.matching.inputs.server_name:
@@ -1448,28 +1460,28 @@ envoy.matching.inputs.server_name:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
 envoy.matching.inputs.transport_protocol:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.TransportProtocolInput
 envoy.matching.inputs.application_protocol:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
 envoy.matching.inputs.filter_state:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
 envoy.matching.inputs.uri_san:
@@ -1477,7 +1489,7 @@ envoy.matching.inputs.uri_san:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.ssl.v3.UriSanInput
 envoy.matching.inputs.dns_san:
@@ -1485,7 +1497,7 @@ envoy.matching.inputs.dns_san:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.ssl.v3.DnsSanInput
 envoy.matching.inputs.subject:
@@ -1493,7 +1505,7 @@ envoy.matching.inputs.subject:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.ssl.v3.SubjectInput
 envoy.matching.custom_matchers.trie_matcher:
@@ -1501,7 +1513,7 @@ envoy.matching.custom_matchers.trie_matcher:
   - envoy.matching.http.custom_matchers
   - envoy.matching.network.custom_matchers
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - xds.type.matcher.v3.IPMatcher
 envoy.load_balancing_policies.least_request:
@@ -1571,7 +1583,7 @@ envoy.matching.actions.format_string:
   categories:
   - envoy.matching.action
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.config.core.v3.SubstitutionFormatString
 envoy.http.custom_response.redirect_policy:
@@ -1643,3 +1655,17 @@ envoy.config_mux.sotw_grpc_mux_factory:
   - envoy.config_mux
   security_posture: unknown
   status: stable
+envoy.filters.http.set_filter_state:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.set_filter_state.v3.Config
+envoy.filters.network.set_filter_state:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.set_filter_state.v3.Config

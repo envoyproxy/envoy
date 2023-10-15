@@ -4,7 +4,6 @@
 #include "test/mocks/server/factory_context.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
-using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
 
 namespace Envoy {

@@ -82,10 +82,10 @@ InstanceImpl::InstanceImpl(
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
     Buffer::WatermarkFactorySharedPtr watermark_factory)
-    : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
-      options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             options.ignoreUnknownDynamicFields()),
+    : init_manager_(init_manager), live_(false), options_(options),
+      validation_context_(options_.allowUnknownStaticFields(),
+                          !options.rejectUnknownDynamicFields(),
+                          options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
@@ -98,7 +98,6 @@ InstanceImpl::InstanceImpl(
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
-      terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
@@ -803,12 +802,12 @@ void InstanceImpl::onRuntimeReady() {
     });
   }
 
-  // If there is no global limit to the number of active connections, warn on startup.
-  // TODO (tonya11en): Move this functionality into the overload manager.
-  if (!runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
+  // TODO (nezdolik): Fully deprecate this runtime key in the next release.
+  if (runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
-              "there is no configured limit to the number of allowed active connections. Set a "
-              "limit via the runtime key {}",
+              "Usage of the deprecated runtime key {}, consider switching to "
+              "`envoy.resource_monitors.downstream_connections` instead."
+              "This runtime key will be removed in future.",
               Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
@@ -893,6 +892,14 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+
+  // If there is no global limit to the number of active connections, warn on startup.
+  if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
+    ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
+                    "connections. Configure a "
+                    "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
+  }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that

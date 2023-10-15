@@ -85,7 +85,7 @@ public:
     return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
   }
   void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions>) override {}
-  DrainManager& drainManager() override { PANIC("not implemented"); }
+  DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool) override {}
   HotRestart& hotRestart() override { PANIC("not implemented"); }
@@ -166,19 +166,21 @@ private:
   ThreadLocal::InstanceImpl thread_local_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
+  // ssl_context_manager_ must come before dispatcher_, since ClusterInfo
+  // references SslSocketFactory and is deleted on the main thread via the dispatcher.
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
   std::unique_ptr<Runtime::Loader> runtime_;
   Random::RandomGeneratorImpl random_generator_;
-  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
-  MutexTracer* mutex_tracer_;
+  MutexTracer* mutex_tracer_{nullptr};
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
@@ -186,6 +188,7 @@ private:
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Server::DrainManagerPtr drain_manager_;
 };
 
 } // namespace Server

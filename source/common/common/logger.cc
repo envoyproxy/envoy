@@ -209,9 +209,11 @@ void Context::changeAllLogLevels(spdlog::level::level_enum level) {
     Registry::setLogLevel(level);
   } else {
     // Level setting with Fine-Grain Logger.
-    FINE_GRAIN_LOG(info, "change all log levels: level='{}'",
-                   spdlog::level::level_string_views[level]);
-    getFineGrainLogContext().setAllFineGrainLoggers(level);
+    FINE_GRAIN_LOG(
+        info,
+        "change all log levels and default verbosity level for fine grain loggers: level='{}'",
+        spdlog::level::level_string_views[level]);
+    getFineGrainLogContext().updateVerbosityDefaultLevel(level);
   }
 }
 

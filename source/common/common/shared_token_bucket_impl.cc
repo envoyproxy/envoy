@@ -11,7 +11,7 @@ const char SharedTokenBucketImpl::ResetCheckSyncPoint[] = "post_reset_check";
 
 SharedTokenBucketImpl::SharedTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
                                              double fill_rate)
-    : impl_(max_tokens, time_source, fill_rate), reset_once_(false) {}
+    : impl_(max_tokens, time_source, fill_rate) {}
 
 uint64_t SharedTokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
   Thread::LockGuard lock(mutex_);

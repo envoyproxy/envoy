@@ -106,7 +106,7 @@ public:
 private:
   Ssl::HandshakeCallbacks* handshake_callbacks_;
 
-  Ssl::SocketState state_;
+  Ssl::SocketState state_{Ssl::SocketState::PreHandshake};
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
 };
 
