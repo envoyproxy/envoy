@@ -35,16 +35,6 @@ HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config)
 Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   config_->mutations().mutateRequestHeaders(headers, decoder_callbacks_->streamInfo());
 
-  // Only the most specific route config is used.
-  // TODO(wbpcode): It's possible to traverse all the route configs to merge the header mutations
-  // in the future.
-  // route_config_ =
-  //     Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
-
-  // if (route_config_ != nullptr) {
-  //   route_config_->mutations().mutateRequestHeaders(headers, decoder_callbacks_->streamInfo());
-  // }
-
   decoder_callbacks_->traversePerFilterConfig(
       [this](const Router::RouteSpecificFilterConfig& config) {
         const auto* typed_cfg = dynamic_cast<const PerRouteHeaderMutation*>(&config);
