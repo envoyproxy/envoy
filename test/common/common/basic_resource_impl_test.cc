@@ -11,6 +11,26 @@ using testing::Return;
 
 namespace Envoy {
 
+class BasicResourceImplTest : public testing::Test {
+protected:
+  NiceMock<Runtime::MockLoader> runtime_;
+};
+
+TEST_F(BasicResourceImplTest, IncDecCount) {
+  BasicResourceImpl br;
+
+  EXPECT_EQ(br.count(), 0);
+  br.inc();
+  EXPECT_EQ(br.count(), 1);
+  br.inc();
+  br.inc();
+  EXPECT_EQ(br.count(), 3);
+  br.dec();
+  EXPECT_EQ(br.count(), 2);
+  br.decBy(2);
+  EXPECT_EQ(br.count(), 0);
+}
+
 class BasicResourceLimitImplTest : public testing::Test {
 protected:
   NiceMock<Runtime::MockLoader> runtime_;
@@ -30,21 +50,6 @@ TEST_F(BasicResourceLimitImplTest, VerifySetClearMax) {
   EXPECT_EQ(br.max(), 321);
   br.resetMax();
   EXPECT_EQ(br.max(), std::numeric_limits<uint64_t>::max());
-}
-
-TEST_F(BasicResourceLimitImplTest, IncDecCount) {
-  BasicResourceLimitImpl br;
-
-  EXPECT_EQ(br.count(), 0);
-  br.inc();
-  EXPECT_EQ(br.count(), 1);
-  br.inc();
-  br.inc();
-  EXPECT_EQ(br.count(), 3);
-  br.dec();
-  EXPECT_EQ(br.count(), 2);
-  br.decBy(2);
-  EXPECT_EQ(br.count(), 0);
 }
 
 TEST_F(BasicResourceLimitImplTest, CanCreate) {

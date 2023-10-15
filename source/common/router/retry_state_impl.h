@@ -104,6 +104,8 @@ private:
                  Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  TimeSource& time_source, Upstream::ResourcePriority priority,
                  bool auto_configured_for_http3);
+                 
+  enum class RetryBackoffState { NotInBackoff, Exponential, RateLimited };
 
   void enableBackoffTimer();
   void resetRetry();
@@ -139,6 +141,7 @@ private:
   uint32_t retries_remaining_{};
   uint32_t host_selection_max_attempts_;
   Upstream::ResourcePriority priority_;
+  RetryBackoffState backoff_state_;
   const bool auto_configured_for_http3_{};
 };
 

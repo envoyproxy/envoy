@@ -11,16 +11,11 @@
 namespace Envoy {
 
 /**
- * A handle for use by any resource managers.
+ * A counted resource for use by any resource manager.
  */
-class ResourceLimit {
+class Resource {
 public:
-  virtual ~ResourceLimit() = default;
-
-  /**
-   * @return true if the resource can be created.
-   */
-  virtual bool canCreate() PURE;
+  virtual ~Resource() = default;
 
   /**
    * Increment the resource count.
@@ -38,14 +33,25 @@ public:
   virtual void decBy(uint64_t amount) PURE;
 
   /**
-   * @return the current maximum allowed number of this resource.
-   */
-  virtual uint64_t max() PURE;
-
-  /**
    * @return the current resource count.
    */
   virtual uint64_t count() const PURE;
+};
+
+/**
+ * A counted resource with a limit for use by any resource manager.
+ */
+class ResourceLimit : public virtual Resource {
+public:
+  /**
+   * @return true if the resource can be created.
+   */
+  virtual bool canCreate() PURE;
+
+  /**
+   * @return the current maximum allowed number of this resource.
+   */
+  virtual uint64_t max() PURE;
 };
 
 using ResourceLimitOptRef = absl::optional<std::reference_wrapper<ResourceLimit>>;

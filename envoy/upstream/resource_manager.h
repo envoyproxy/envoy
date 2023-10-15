@@ -63,6 +63,11 @@ public:
   virtual ResourceLimit& retries() PURE;
 
   /**
+   * @return Resource& retries in backoff.
+   */
+  virtual Resource& retriesInBackoff() PURE;
+
+  /**
    * @return ResourceLimit& active connection pools.
    */
   virtual ResourceLimit& connectionPools() PURE;

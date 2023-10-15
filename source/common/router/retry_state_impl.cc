@@ -166,11 +166,29 @@ RetryStateImpl::~RetryStateImpl() { resetRetry(); }
 
 void RetryStateImpl::enableBackoffTimer() {
   if (!retry_timer_) {
-    retry_timer_ = dispatcher_.createTimer([this]() -> void { backoff_callback_(); });
+    retry_timer_ = dispatcher_.createTimer([this]() -> void {
+      ASSERT(backoff_callback_ != nullptr);
+      switch (backoff_state_) {
+      case RetryBackoffState::RateLimited:
+        cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.dec();
+        break;
+      case RetryBackoffState::Exponential:
+        cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.dec();
+        break;
+      case RetryBackoffState::NotInBackoff:
+        IS_ENVOY_BUG("Retry backoff timer fired while backoff state was RetryBackoffState::NotInBackoff")
+      }
+      
+      cluster_.resourceManager(priority_).retriesInBackoff().dec();
+      backoff_state_ = RetryBackoffState::NotInBackoff;
+      backoff_callback_();
+    });
   }
 
+  cluster_.resourceManager(priority_).retriesInBackoff().inc();
   if (ratelimited_backoff_strategy_ != nullptr) {
     // If we have a backoff strategy based on rate limit feedback from the response we use it.
+    backoff_state_ = RetryBackoffState::RateLimited;
     retry_timer_->enableTimer(
         std::chrono::milliseconds(ratelimited_backoff_strategy_->nextBackOffMs()));
 
@@ -179,12 +197,14 @@ void RetryStateImpl::enableBackoffTimer() {
     ratelimited_backoff_strategy_.reset();
 
     cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_.inc();
-
+    cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.inc();
   } else {
     // Otherwise we use a fully jittered exponential backoff algorithm.
+    backoff_state_ = RetryBackoffState::Exponential;
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 
     cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.inc();
+    cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.inc();
   }
 }
 
@@ -257,10 +277,26 @@ RetryStateImpl::parseResetInterval(const Http::ResponseHeaderMap& response_heade
 void RetryStateImpl::resetRetry() {
   if (backoff_callback_ != nullptr) {
     cluster_.resourceManager(priority_).retries().dec();
+    cluster_.trafficStats()->upstream_rq_retry_active_.dec();
     backoff_callback_ = nullptr;
+
+    // Need to handle resources/stats if the retry is cancelled while in backoff.
+    switch (backoff_state_) {
+    case RetryBackoffState::RateLimited:
+      cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.dec();
+      cluster_.resourceManager(priority_).retriesInBackoff().dec();
+      break;
+    case RetryBackoffState::Exponential:
+      cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.dec();
+      cluster_.resourceManager(priority_).retriesInBackoff().dec();
+      break;
+    default: ;
+    }
+    backoff_state_ = RetryBackoffState::NotInBackoff;
   }
   if (next_loop_callback_ != nullptr) {
     cluster_.resourceManager(priority_).retries().dec();
+    cluster_.trafficStats()->upstream_rq_retry_active_.dec();
     next_loop_callback_ = nullptr;
   }
 }
@@ -317,6 +353,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
 
   ASSERT(!backoff_callback_ && !next_loop_callback_);
   cluster_.resourceManager(priority_).retries().inc();
+  cluster_.trafficStats()->upstream_rq_retry_active_.inc();
   cluster_.trafficStats()->upstream_rq_retry_.inc();
   if (vcluster_) {
     vcluster_->stats().upstream_rq_retry_.inc();

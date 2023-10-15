@@ -33,7 +33,7 @@ namespace {
 
 class RouterRetryStateImplTest : public testing::Test {
 public:
-  enum TestResourceType { Connection, Request, PendingRequest, Retry };
+  enum TestResourceType { Connection, Request, PendingRequest, Retry, RetryInBackoff };
 
   RouterRetryStateImplTest()
       : callback_([this]() -> void { callback_ready_.ready(); }),
@@ -78,6 +78,12 @@ public:
         cluster_.resourceManager(Upstream::ResourcePriority::Default).retries().inc();
         resource_manager_cleanup_tasks_.emplace_back([this]() {
           cluster_.resourceManager(Upstream::ResourcePriority::Default).retries().dec();
+        });
+        break;
+      case TestResourceType::RetryInBackoff:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).retriesInBackoff().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).retriesInBackoff().dec();
         });
         break;
       case TestResourceType::Connection:
@@ -240,9 +246,22 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   EXPECT_EQ(RetryStatus::Yes,
             state_->shouldRetryReset(remote_refused_stream_reset_, RetryState::Http3Used::Yes,
                                      reset_callback_));
+
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+
   EXPECT_CALL(callback_ready_, ready());
   retry_schedulable_callback_->invokeCallback();
   EXPECT_TRUE(retry_disable_http3_);
+
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(remote_refused_stream_reset_, RetryState::Http3Used::No,
@@ -254,6 +273,14 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_.value());
+
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailureWithoutTcpFallback) {
@@ -1009,7 +1036,13 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
       RetryStatus::Yes,
       state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Unknown, reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
   retry_timer_->invokeCallback();
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
 
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(40), _));
@@ -1017,6 +1050,9 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
       RetryStatus::Yes,
       state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Unknown, reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
@@ -1037,8 +1073,12 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Yes,
                                                        reset_callback_));
   EXPECT_CALL(callback_ready_, ready());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
   retry_schedulable_callback_->invokeCallback();
   EXPECT_FALSE(retry_disable_http3_);
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
 
   // Connect failure over HTTP/3 should be retried only with timed backoff if the cluster is
   // configured with explicit h3 pool.
@@ -1058,6 +1098,11 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
 
   EXPECT_EQ(5UL, cluster_.trafficStats()->upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(4UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_.value());
   EXPECT_EQ(5UL, virtual_cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_success_.value());
   EXPECT_EQ(5UL, route_stats_context_.stats().upstream_rq_retry_.value());
@@ -1270,7 +1315,13 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers_reset_1, request_headers,
                                                          header_callback_));
   EXPECT_CALL(callback_ready_, ready());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
   retry_timer_->invokeCallback();
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
 
   // reset header not present -> exponential backoff used
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
@@ -1300,7 +1351,9 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
       RetryStatus::NoRetryLimitExceeded,
       state_->shouldRetryHeaders(response_headers_reset_2, request_headers, header_callback_));
 
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(2UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
   EXPECT_EQ(2UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.value());
 }
 
@@ -1313,7 +1366,7 @@ TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {
   EXPECT_EQ(2, state_->hostSelectionMaxAttempts());
 }
 
-TEST_F(RouterRetryStateImplTest, Cancel) {
+TEST_F(RouterRetryStateImplTest, CancelDuringExponentialRetryBackoff) {
   // Cover the case where we start a retry, and then we get destructed. This is how the router
   // uses the implementation in the cancel case.
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"}};
@@ -1324,6 +1377,143 @@ TEST_F(RouterRetryStateImplTest, Cancel) {
   EXPECT_EQ(
       RetryStatus::Yes,
       state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Unknown, reset_callback_));
+  
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
+
+  state_.reset();
+
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
+}
+
+TEST_F(RouterRetryStateImplTest, CancelDuringRatelimitedRetryBackoff) {
+  // Cover the case where we start a retry, and then we get destructed. This is how the router
+  // uses the implementation in the cancel case.
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::RetryPolicy::ResetHeader> reset_headers;
+  auto* reset_header = reset_headers.Add();
+  reset_header->set_name("Retry-After");
+  reset_header->set_format(envoy::config::route::v3::RetryPolicy::SECONDS);
+
+  policy_.num_retries_ = 4;
+  policy_.reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestResponseHeaderMapImpl response_headers_reset_1{{":status", "500"},
+                                                           {"retry-after", "2"}};
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(
+      RetryStatus::Yes,
+      state_->shouldRetryHeaders(response_headers_reset_1, request_headers, header_callback_));
+  
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
+
+  state_.reset();
+
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
+}
+
+TEST_F(RouterRetryStateImplTest, CancelWhileWaitingForImmediateRetry) {
+  // Cover the case where we start a retry, and then we get destructed. This is how the router
+  // uses the implementation in the cancel case.
+  Http::TestRequestHeaderMapImpl request_headers{
+    {"x-envoy-retry-on", "refused-stream,http3-post-connect-failure"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  // Post-connect failure over HTTP/3 should be retried immediately with HTTP/3 disabled if the
+  // cluster is configured with auto pool.
+  EXPECT_CALL(cluster_, features())
+      .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP3 |
+                             Upstream::ClusterInfo::Features::USE_ALPN));
+
+  expectSchedulableCallback();
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryReset(remote_refused_stream_reset_, RetryState::Http3Used::Yes,
+                                     reset_callback_));
+  
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
+
+  state_.reset();
+
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
+}
+
+TEST_F(RouterRetryStateImplTest, CancelDuringActiveRetry) {
+  // Cover the case where we start a retry, and then we get destructed. This is how the router
+  // uses the implementation in the cancel case.
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(
+      RetryStatus::Yes,
+      state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Unknown, reset_callback_));
+
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+  
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
+
+  state_.reset();
+
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
+}
+
+TEST_F(RouterRetryStateImplTest, CancelWithNoActiveRetries) {
+  // Cover the case where we start a retry, and then we get destructed. This is how the router
+  // uses the implementation in the cancel case.
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+  
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
+
+  state_.reset();
+
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
 }
 
 TEST_F(RouterRetryStateImplTest, ZeroMaxRetriesHeader) {
@@ -1403,6 +1593,50 @@ TEST_F(RouterRetryStateImplTest, BudgetNoAvailableRetries) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
   EXPECT_EQ(RetryStatus::NoOverflow,
             state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, BudgetCountRetriesBeforeCreation) {
+  // Expect all retries acceptable from resource manager. Override the max_retries CB via a retry
+  // budget that will allow all retries. This will verify that the proposed retry is counted
+  // towards the budget before it is created.
+  cluster_.resetResourceManagerWithRetryBudget(
+      0 /* cx */, 0 /* rq_pending */, 20 /* rq */, 5 /* rq_retry */, 0 /* conn_pool */,
+      100 /* budget_percent */, 0 /* min_retry_concurrency */);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, BudgetCountRetriesInBackoff) {
+  // Expect all retries acceptable from resource manager. Override the max_retries CB via a retry
+  // budget. This will verify that retries in backoff are counted towards the budget.
+  cluster_.resetResourceManagerWithRetryBudget(
+      0 /* cx */, 0 /* rq_pending */, 20 /* rq */, 5 /* rq_retry */, 0 /* conn_pool */,
+      50 /* budget_percent */, 0 /* min_retry_concurrency */);
+  // limit = floor((2 + 1) * 0.5) = 1
+  // limit (with 1 more proposed) = floor((2 + 1 + 1) * 0.5) = 2
+  // count = 1
+  incrOutstandingResource(TestResourceType::Request, 2);
+  incrOutstandingResource(TestResourceType::RetryInBackoff, 1);
+  incrOutstandingResource(TestResourceType::Retry, 1);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
+  EXPECT_EQ(2UL, cluster_.resource_manager_->retriesInBackoff().count());
 }
 
 TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
