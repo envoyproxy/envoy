@@ -326,7 +326,7 @@ TEST_F(GrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
     grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
 
-    // Unpausing will initate a new request, with the same resources, version,
+    // Unpausing will initiate a new request, with the same resources, version,
     // but empty nonce.
     expectSendMessage(type_url, {"x", "y"}, "3000", true, "");
   }
