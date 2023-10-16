@@ -388,7 +388,7 @@ new_features:
 - area: http
   change: |
     Added :ref:`disabled
-    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HttpFilter.disabled>`
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`
     flag to disable a filter in the filter chain by default. This filter could be enabled explicitly by setting
     valid per filter config in the route configuration.
 - area: admin_logging
