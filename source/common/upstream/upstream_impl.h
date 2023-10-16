@@ -980,7 +980,7 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  bool perEndpointStats() const override { return per_endpoint_stats_; }
+  bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
 
   UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;

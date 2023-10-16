@@ -20,7 +20,7 @@ public:
                                           bool warming = false) {
     clusters_.emplace_back(std::make_unique<NiceMock<MockClusterMockPrioritySet>>());
     clusters_.back()->info_->name_ = name;
-    ON_CALL(*clusters_.back()->info_, perEndpointStats()).WillByDefault(Return(true));
+    ON_CALL(*clusters_.back()->info_, perEndpointStatsEnabled()).WillByDefault(Return(true));
     ON_CALL(*clusters_.back()->info_, observabilityName())
         .WillByDefault(ReturnRef(clusters_.back()->info_->name_));
     static Stats::TagVector empty_tags;

@@ -580,8 +580,8 @@ TEST_F(PerEndpointMetricsTest, FixedTags) {
 TEST_F(PerEndpointMetricsTest, Enabled) {
   auto& disabled = makeCluster("disabled", 1);
   auto& enabled = makeCluster("enabled", 1);
-  EXPECT_CALL(*disabled.info_, perEndpointStats()).WillOnce(Return(false));
-  EXPECT_CALL(*enabled.info_, perEndpointStats()).WillOnce(Return(true));
+  EXPECT_CALL(*disabled.info_, perEndpointStatsEnabled()).WillOnce(Return(false));
+  EXPECT_CALL(*enabled.info_, perEndpointStatsEnabled()).WillOnce(Return(true));
 
   auto [counters, gauges] = run();
 

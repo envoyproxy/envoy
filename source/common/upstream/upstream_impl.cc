@@ -1092,7 +1092,8 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   // Both LoadStatsReporter and per_endpoint_stats need to `latch()` the counters, so if both are
   // configured they will interfere with each other and both get incorrect values.
-  if (perEndpointStats() && server_context.bootstrap().cluster_manager().has_load_stats_config()) {
+  if (perEndpointStatsEnabled() &&
+      server_context.bootstrap().cluster_manager().has_load_stats_config()) {
     throw EnvoyException("Only one of cluster per_endpoint_stats and cluster manager "
                          "load_stats_config can be specified");
   }

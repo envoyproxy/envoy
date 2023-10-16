@@ -202,7 +202,7 @@ void HostUtility::forEachHostMetric(
     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
     const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb) {
   for (const auto& [unused_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
-    if (cluster_ref.get().info()->perEndpointStats()) {
+    if (cluster_ref.get().info()->perEndpointStatsEnabled()) {
       const std::string cluster_name =
           Stats::Utility::sanitizeStatsName(cluster_ref.get().info()->observabilityName());
 

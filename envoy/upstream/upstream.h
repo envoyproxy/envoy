@@ -1175,7 +1175,7 @@ public:
   /**
    * @return true if this cluster should produce per-endpoint stats.
    */
-  virtual bool perEndpointStats() const PURE;
+  virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
