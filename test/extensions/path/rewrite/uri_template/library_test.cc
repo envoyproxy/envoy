@@ -71,7 +71,7 @@ TEST(RewriteTest, BasicUsage) {
   EXPECT_EQ(rewriter->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 }
 
-TEST(RewriteTest, DoubleEqualAtEnd) {
+TEST(RewriteTest, DoubleEqualAtEndOfPath) {
   const std::string yaml_string = R"EOF(
       name: envoy.path.rewrite.uri_template.uri_template_rewriter
       typed_config:
