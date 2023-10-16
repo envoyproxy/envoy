@@ -38,9 +38,15 @@ def random_loopback_host():
 # reason we want to keep it as low as possible without causing flaky failure.
 #
 # Ideally this would be adjusted (3x) for tsan and coverage runs, but making that
-# possible for python is outside the scope of this test.
+# possible for python is outside the scope of this test, so we're stuck using the
+# 3x value for all tests.
 STARTUP_TOLERANCE_SECONDS = 10
+
+# We send multiple requests in parallel and require them all to function correctly
+# - this makes it so if something is flaky we're more likely to encounter it, and
+# also tests that there's not an "only one" success situation.
 PARALLEL_REQUESTS = 5
+
 UPSTREAM_SLOW_PORT = 54321
 UPSTREAM_FAST_PORT = 54322
 UPSTREAM_HOST = random_loopback_host()
