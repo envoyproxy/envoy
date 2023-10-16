@@ -278,14 +278,6 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
         {":status", "200"},
     };
 
-    EXPECT_CALL(*decoder_callbacks.route_, traversePerFilterConfig(_, _))
-        .WillOnce(Invoke([&](const std::string&,
-                             std::function<void(const Router::RouteSpecificFilterConfig&)>) {}));
-
-    EXPECT_CALL(*encoder_callbacks.route_, traversePerFilterConfig(_, _))
-        .WillOnce(Invoke([&](const std::string&,
-                             std::function<void(const Router::RouteSpecificFilterConfig&)>) {}));
-
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, true));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(response_headers, true));
 
