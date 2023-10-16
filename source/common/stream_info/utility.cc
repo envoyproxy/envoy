@@ -314,7 +314,7 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
   case ProxyStatusError::TlsProtocolError:
     return TLS_PROTOCOL_ERROR;
   case ProxyStatusError::TlsCertificateError:
-    return TLS_CERTIFICATE_ERORR;
+    return TLS_CERTIFICATE_ERROR;
   case ProxyStatusError::TlsAlertReceived:
     return TLS_ALERT_RECEIVED;
   case ProxyStatusError::HttpRequestError:

@@ -15,12 +15,25 @@ static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
 static constexpr uint32_t RetryCount = 1;
 
-std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
-                 Api::Api& api) {
+std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty, Api::Api& api,
+                 uint64_t max_size) {
   std::string data;
   absl::StatusOr<std::string> file_or_error;
   switch (source.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename:
+    if (max_size > 0) {
+      if (!api.fileSystem().fileExists(source.filename())) {
+        throw EnvoyException(fmt::format("file {} does not exist", source.filename()));
+      }
+      const ssize_t size = api.fileSystem().fileSize(source.filename());
+      if (size < 0) {
+        throw EnvoyException(absl::StrCat("cannot determine size of file ", source.filename()));
+      }
+      if (static_cast<uint64_t>(size) > max_size) {
+        throw EnvoyException(fmt::format("file {} size is {} bytes; maximum is {}",
+                                         source.filename(), size, max_size));
+      }
+    }
     file_or_error = api.fileSystem().fileReadToEnd(source.filename());
     THROW_IF_STATUS_NOT_OK(file_or_error, throw);
     data = file_or_error.value();

@@ -3,10 +3,12 @@ syntax = "proto3";
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
@@ -27,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -60,6 +62,104 @@ message UdpProxyConfig {
       // instantiated. See the supported filters for further documentation.
       google.protobuf.Any typed_config = 2;
     }
+  }
+
+  // Configuration for tunneling UDP over other transports or application layers.
+  // Tunneling is currently supported over HTTP/2.
+  // [#next-free-field: 10]
+  message UdpTunnelingConfig {
+    // Configuration for UDP datagrams buffering.
+    message BufferOptions {
+      // If set, the filter will only buffer datagrams up to the requested limit, and will drop
+      // new UDP datagrams if the buffer contains the max_buffered_datagrams value at the time
+      // of a new datagram arrival. If not set, the default value is 1024 datagrams.
+      google.protobuf.UInt32Value max_buffered_datagrams = 1;
+
+      // If set, the filter will only buffer datagrams up to the requested total buffered bytes limit,
+      // and will drop new UDP datagrams if the buffer contains the max_buffered_datagrams value
+      // at the time of a new datagram arrival. If not set, the default value is 16,384 (16KB).
+      google.protobuf.UInt64Value max_buffered_bytes = 2;
+    }
+
+    message RetryOptions {
+      // The maximum number of unsuccessful connection attempts that will be made before giving up.
+      // If the parameter is not specified, 1 connection attempt will be made.
+      google.protobuf.UInt32Value max_connect_attempts = 1;
+    }
+
+    // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+    // This field evaluates command operators if set, otherwise returns hostname as is.
+    //
+    // Example: dynamically set hostname using filter state
+    //
+    // .. code-block:: yaml
+    //
+    //    tunneling_config:
+    //      proxy_host: "%FILTER_STATE(proxy.host.key:PLAIN)%"
+    //
+    string proxy_host = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Optional port value to add to the HTTP request URI.
+    // This value can be overridden per-session by setting the required port value for
+    // the filter state key ``udp.connect.proxy_port``.
+    google.protobuf.UInt32Value proxy_port = 2;
+
+    // The target host to send in the synthesized CONNECT headers to the upstream proxy.
+    // This field evaluates command operators if set, otherwise returns hostname as is.
+    //
+    // Example: dynamically set target host using filter state
+    //
+    // .. code-block:: yaml
+    //
+    //    tunneling_config:
+    //      target_host: "%FILTER_STATE(target.host.key:PLAIN)%"
+    //
+    string target_host = 3 [(validate.rules).string = {min_len: 1}];
+
+    // The default target port to send in the CONNECT headers to the upstream proxy.
+    // This value can be overridden per-session by setting the required port value for
+    // the filter state key ``udp.connect.target_port``.
+    uint32 default_target_port = 4 [(validate.rules).uint32 = {lte: 65535 gt: 0}];
+
+    // Use POST method instead of CONNECT method to tunnel the UDP stream.
+    //
+    // .. note::
+    //   If use_post is set, the upstream stream does not comply with the connect-udp RFC, and
+    //   instead it will be a POST request. the path used in the headers will be set from the
+    //   post_path field, and the headers will not contain the target host and target port, as
+    //   required by the connect-udp protocol. This flag should be used carefully.
+    //
+    bool use_post = 5;
+
+    // The path used with POST method. Default path is ``/``. If post path is specified and
+    // use_post field isn't true, it will be rejected.
+    string post_path = 6;
+
+    // Optional retry options, in case connecting to the upstream failed.
+    RetryOptions retry_options = 7;
+
+    // Additional request headers to upstream proxy. Neither ``:-prefixed`` pseudo-headers
+    // nor the Host: header can be overridden. Values of the added headers evaluates command
+    // operators if they are set in the value template.
+    //
+    // Example: dynamically set a header with the local port
+    //
+    // .. code-block:: yaml
+    //
+    //    headers_to_add:
+    //    - header:
+    //        key: original_dst_port
+    //        value: "%DOWNSTREAM_LOCAL_PORT%"
+    //
+    repeated config.core.v3.HeaderValueOption headers_to_add = 8
+        [(validate.rules).repeated = {max_items: 1000}];
+
+    // If configured, the filter will buffer datagrams in case that it is waiting for the upstream to be
+    // ready, whether if it is during the connection process or due to upstream buffer watermarks.
+    // If this field is not configured, there will be no buffering and downstream datagrams that arrive
+    // while the upstream is not ready will be dropped. In case this field is set but the options
+    // are not configured, the default values will be applied as described in the ``BufferOptions``.
+    BufferOptions buffer_options = 9;
   }
 
   // The stat prefix used when emitting UDP proxy filter stats.
@@ -129,4 +229,8 @@ message UdpProxyConfig {
   // Only one of use_per_packet_load_balancing or session_filters can be used.
   // [#extension-category: envoy.filters.udp.session]
   repeated SessionFilter session_filters = 11;
+
+  // If set, this configures UDP tunneling. See `Proxying UDP in HTTP <https://www.rfc-editor.org/rfc/rfc9298.html>`_.
+  // More information can be found in the UDP Proxy and HTTP upgrade documentation.
+  UdpTunnelingConfig tunneling_config = 12;
 }

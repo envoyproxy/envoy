@@ -119,7 +119,7 @@ To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main
 the BAZEL_BUILD_EXTRA_OPTIONS environment variable
 
 ```bash
-./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_cache=http://127.0.0.1:28080' ./ci/do_ci.sh bazel.release"
+./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_cache=http://127.0.0.1:28080' ./ci/do_ci.sh release"
 ```
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:

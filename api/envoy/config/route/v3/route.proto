@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
@@ -151,6 +151,14 @@ message RouteConfiguration {
   // :ref:`FilterConfig<envoy_v3_api_msg_config.route.v3.FilterConfig>`
   // message to specify additional options.]
   map<string, google.protobuf.Any> typed_per_filter_config = 16;
+
+  // [#not-implemented-hide:]
+  // The metadata field can be used to provide additional information
+  // about the route configuration. It can be used for configuration, stats, and logging.
+  // The metadata should go under the filter namespace that will need it.
+  // For instance, if the metadata is intended for the Router filter,
+  // the filter name should be specified as ``envoy.filters.http.router``.
+  core.v3.Metadata metadata = 17;
 }
 
 message Vhds {

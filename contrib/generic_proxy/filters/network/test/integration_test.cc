@@ -66,25 +66,13 @@ public:
   using TestReadFilterSharedPtr = std::shared_ptr<TestReadFilter>;
 
   struct TestRequestEncoderCallback : public RequestEncoderCallback {
-    void onEncodingSuccess(Buffer::Instance& buffer) override {
-      buffer_.move(buffer);
-      complete_ = true;
-      request_bytes_ = buffer_.length();
-    }
-    bool complete_{};
-    size_t request_bytes_{};
+    void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
     Buffer::OwnedImpl buffer_;
   };
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
 
   struct TestResponseEncoderCallback : public ResponseEncoderCallback {
-    void onEncodingSuccess(Buffer::Instance& buffer) override {
-      buffer_.move(buffer);
-      complete_ = true;
-      response_bytes_ = buffer_.length();
-    }
-    bool complete_{};
-    size_t response_bytes_{};
+    void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
     Buffer::OwnedImpl buffer_;
   };
   using TestResponseEncoderCallbackSharedPtr = std::shared_ptr<TestResponseEncoderCallback>;
@@ -92,10 +80,31 @@ public:
   struct TestResponseDecoderCallback : public ResponseDecoderCallback {
     TestResponseDecoderCallback(IntegrationTest& parent) : parent_(parent) {}
 
-    void onDecodingSuccess(ResponsePtr response, ExtendedOptions) override {
-      response_ = std::move(response);
-      complete_ = true;
-      parent_.integration_->dispatcher_->exit();
+    struct SingleResponse {
+      bool end_stream_{};
+      ResponsePtr response_;
+      std::list<StreamFramePtr> response_frames_;
+    };
+
+    void onDecodingSuccess(StreamFramePtr response_frame) override {
+      auto& response = responses_[response_frame->frameFlags().streamFlags().streamId()];
+
+      ASSERT(!response.end_stream_);
+      response.end_stream_ = response_frame->frameFlags().endStream();
+
+      if (response.response_ != nullptr) {
+        response.response_frames_.push_back(std::move(response_frame));
+      } else {
+        ASSERT(response.response_frames_.empty());
+        StreamFramePtrHelper<Response> helper(std::move(response_frame));
+        ASSERT(helper.typed_frame_ != nullptr);
+        response.response_ = std::move(helper.typed_frame_);
+      }
+
+      // Exit dispatcher if we have received all the expected response frames.
+      if (responses_[waiting_for_stream_id_].end_stream_) {
+        parent_.integration_->dispatcher_->exit();
+      }
     }
     void onDecodingFailure() override {}
     void writeToConnection(Buffer::Instance&) override {}
@@ -106,8 +115,8 @@ public:
       return {};
     }
 
-    bool complete_{};
-    ResponsePtr response_;
+    uint64_t waiting_for_stream_id_{};
+    std::map<uint64_t, SingleResponse> responses_;
     IntegrationTest& parent_;
   };
   using TestResponseDecoderCallbackSharedPtr = std::shared_ptr<TestResponseDecoderCallback>;
@@ -195,11 +204,12 @@ public:
   }
 
   // Send downstream request.
-  void sendRequestForTest(Request& request) {
+  void sendRequestForTest(StreamFrame& request) {
     request_encoder_->encode(request, *request_encoder_callback_);
-    RELEASE_ASSERT(request_encoder_callback_->complete_, "Encoding should complete Immediately");
     client_connection_->write(request_encoder_callback_->buffer_, false);
     client_connection_->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
+    // Clear buffer for next encoding.
+    request_encoder_callback_->buffer_.drain(request_encoder_callback_->buffer_.length());
   }
 
   // Waiting upstream connection to be created.
@@ -208,39 +218,46 @@ public:
   }
 
   // Waiting for upstream request data.
-  void waitForUpstreamRequestForTest(uint64_t num_bytes, std::string* data) {
-    auto result = upstream_connection_->waitForData(num_bytes, data);
+  void
+  waitForUpstreamRequestForTest(const std::function<bool(const std::string&)>& data_validator) {
+    auto result = upstream_connection_->waitForData(data_validator, nullptr);
     RELEASE_ASSERT(result, result.failure_message());
     // Clear data for next test.
     upstream_connection_->clearData();
   }
 
   // Send upstream response.
-  void sendResponseForTest(const Response& response) {
+  void sendResponseForTest(const StreamFrame& response) {
     response_encoder_->encode(response, *response_encoder_callback_);
-    RELEASE_ASSERT(response_encoder_callback_->complete_, "Encoding should complete Immediately");
 
     auto result =
         upstream_connection_->write(response_encoder_callback_->buffer_.toString(), false);
+    // Clear buffer for next encoding.
+    response_encoder_callback_->buffer_.drain(response_encoder_callback_->buffer_.length());
     RELEASE_ASSERT(result, result.failure_message());
   }
 
   // Waiting for downstream response.
-  AssertionResult waitDownstreamResponseForTest(std::chrono::milliseconds timeout) {
+  AssertionResult waitDownstreamResponseForTest(std::chrono::milliseconds timeout,
+                                                uint64_t stream_id) {
     bool timer_fired = false;
-    if (!response_decoder_callback_->complete_) {
+    if (!response_decoder_callback_->responses_[stream_id].end_stream_) {
       Envoy::Event::TimerPtr timer(
           integration_->dispatcher_->createTimer([this, &timer_fired]() -> void {
             timer_fired = true;
             integration_->dispatcher_->exit();
           }));
       timer->enableTimer(timeout);
+      response_decoder_callback_->waiting_for_stream_id_ = stream_id;
       integration_->dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
       if (timer_fired) {
         return AssertionFailure() << "Timed out waiting for response";
       }
+      if (timer->enabled()) {
+        timer->disableTimer();
+      }
     }
-    if (!response_decoder_callback_->complete_) {
+    if (!response_decoder_callback_->responses_[stream_id].end_stream_) {
       return AssertionFailure() << "No response or response not complete";
     }
     return AssertionSuccess();
@@ -307,11 +324,12 @@ TEST_P(IntegrationTest, RequestRouteNotFound) {
 
   sendRequestForTest(request);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200)),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
                  "unexpected timeout");
 
-  EXPECT_NE(response_decoder_callback_->response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->response_->status().message(), "route_not_found");
+  EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().message(),
+            "route_not_found");
 
   cleanup();
 }
@@ -334,7 +352,9 @@ TEST_P(IntegrationTest, RequestAndResponse) {
   sendRequestForTest(request);
 
   waitForUpstreamConnectionForTest();
-  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
+  const std::function<bool(const std::string&)> data_validator =
+      [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
+  waitForUpstreamRequestForTest(data_validator);
 
   FakeStreamCodecFactory::FakeResponse response;
   response.protocol_ = "fake_fake_fake";
@@ -343,12 +363,12 @@ TEST_P(IntegrationTest, RequestAndResponse) {
 
   sendResponseForTest(response);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200)),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
                  "unexpected timeout");
 
-  EXPECT_NE(response_decoder_callback_->response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->response_->status().code(), StatusCode::kOk);
-  EXPECT_EQ(response_decoder_callback_->response_->getByKey("zzzz"), "xxxx");
+  EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->getByKey("zzzz"), "xxxx");
 
   cleanup();
 }
@@ -375,7 +395,9 @@ TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
   sendRequestForTest(request_1);
 
   waitForUpstreamConnectionForTest();
-  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
+  const std::function<bool(const std::string&)> data_validator =
+      [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
+  waitForUpstreamRequestForTest(data_validator);
 
   FakeStreamCodecFactory::FakeRequest request_2;
   request_2.host_ = "service_name_0";
@@ -411,26 +433,34 @@ TEST_P(IntegrationTest, MultipleRequests) {
   request_1.method_ = "hello";
   request_1.path_ = "/path_or_anything";
   request_1.protocol_ = "fake_fake_fake";
-  request_1.data_ = {{"version", "v1"}, {"stream_id", "1"}};
+  request_1.data_ = {{"version", "v1"}, {"stream_id", "1"}, {"frame", "1_header"}};
 
   sendRequestForTest(request_1);
 
   waitForUpstreamConnectionForTest();
-  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
+  const std::function<bool(const std::string&)> data_validator_1 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:1_header") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_1);
 
   FakeStreamCodecFactory::FakeRequest request_2;
   request_2.host_ = "service_name_0";
   request_2.method_ = "hello";
   request_2.path_ = "/path_or_anything";
   request_2.protocol_ = "fake_fake_fake";
-  request_2.data_ = {{"version", "v1"}, {"stream_id", "2"}};
+  request_2.data_ = {{"version", "v1"}, {"stream_id", "2"}, {"frame", "2_header"}};
 
   // Reset request encoder callback.
   request_encoder_callback_ = std::make_shared<TestRequestEncoderCallback>();
 
   // Send the second request with the different stream id and expect the connection to be alive.
   sendRequestForTest(request_2);
-  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
+  const std::function<bool(const std::string&)> data_validator_2 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:2_header") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_2);
 
   FakeStreamCodecFactory::FakeResponse response_2;
   response_2.protocol_ = "fake_fake_fake";
@@ -440,15 +470,13 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
   sendResponseForTest(response_2);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200)),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
                  "unexpected timeout");
 
-  EXPECT_NE(response_decoder_callback_->response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->response_->status().code(), StatusCode::kOk);
-  EXPECT_EQ(response_decoder_callback_->response_->getByKey("zzzz"), "xxxx");
-  EXPECT_EQ(response_decoder_callback_->response_->getByKey("stream_id"), "2");
-
-  response_decoder_callback_->complete_ = false;
+  EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->getByKey("zzzz"), "xxxx");
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->getByKey("stream_id"), "2");
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
@@ -458,13 +486,152 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
   sendResponseForTest(response_1);
 
-  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200)),
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
                  "unexpected timeout");
 
-  EXPECT_NE(response_decoder_callback_->response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->response_->status().code(), StatusCode::kOk);
-  EXPECT_EQ(response_decoder_callback_->response_->getByKey("zzzz"), "yyyy");
-  EXPECT_EQ(response_decoder_callback_->response_->getByKey("stream_id"), "1");
+  EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->getByKey("zzzz"), "yyyy");
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->getByKey("stream_id"), "1");
+
+  cleanup();
+}
+
+TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  codec_factory_config.protocol_options_ = ProtocolOptions{true};
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
+  codec_factory->protocol_options_ = ProtocolOptions{true};
+
+  initialize(defaultConfig(), std::move(codec_factory));
+
+  EXPECT_TRUE(makeClientConnectionForTest());
+
+  FakeStreamCodecFactory::FakeRequest request_1;
+  request_1.host_ = "service_name_0";
+  request_1.method_ = "hello";
+  request_1.path_ = "/path_or_anything";
+  request_1.protocol_ = "fake_fake_fake";
+  request_1.data_ = {
+      {"version", "v1"}, {"stream_id", "1"}, {"end_stream", "false"}, {"frame", "1_header"}};
+
+  FakeStreamCodecFactory::FakeRequest request_1_frame_1;
+  request_1_frame_1.data_ = {{"stream_id", "1"}, {"end_stream", "false"}, {"frame", "1_frame_1"}};
+
+  FakeStreamCodecFactory::FakeRequest request_1_frame_2;
+  request_1_frame_2.data_ = {{"stream_id", "1"}, {"end_stream", "true"}, {"frame", "1_frame_2"}};
+
+  FakeStreamCodecFactory::FakeRequest request_2;
+  request_2.host_ = "service_name_0";
+  request_2.method_ = "hello";
+  request_2.path_ = "/path_or_anything";
+  request_2.protocol_ = "fake_fake_fake";
+  request_2.data_ = {
+      {"version", "v1"}, {"stream_id", "2"}, {"end_stream", "false"}, {"frame", "2_header"}};
+
+  FakeStreamCodecFactory::FakeRequest request_2_frame_1;
+  request_2_frame_1.data_ = {{"stream_id", "2"}, {"end_stream", "false"}, {"frame", "2_frame_1"}};
+
+  FakeStreamCodecFactory::FakeRequest request_2_frame_2;
+  request_2_frame_2.data_ = {{"stream_id", "2"}, {"end_stream", "true"}, {"frame", "2_frame_2"}};
+
+  // We handle frame one by one to make sure the order is correct.
+
+  sendRequestForTest(request_1);
+  waitForUpstreamConnectionForTest();
+
+  // First frame of request 1.
+  const std::function<bool(const std::string&)> data_validator_1 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:1_header") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_1);
+
+  // Second frame of request 1.
+  sendRequestForTest(request_1_frame_1);
+  const std::function<bool(const std::string&)> data_validator_1_frame_1 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:1_frame_1") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_1_frame_1);
+
+  // First frame of request 2.
+  sendRequestForTest(request_2);
+  const std::function<bool(const std::string&)> data_validator_2 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:2_header") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_2);
+
+  // Second frame of request 2.
+  sendRequestForTest(request_2_frame_1);
+  const std::function<bool(const std::string&)> data_validator_2_frame_1 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:2_frame_1") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_2_frame_1);
+
+  // Third frame of request 1.
+  sendRequestForTest(request_1_frame_2);
+  const std::function<bool(const std::string&)> data_validator_1_frame_2 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:1_frame_2") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_1_frame_2);
+
+  // Third frame of request 2.
+  sendRequestForTest(request_2_frame_2);
+  const std::function<bool(const std::string&)> data_validator_2_frame_2 =
+      [](const std::string& data) -> bool {
+    return data.find("frame:2_frame_2") != std::string::npos;
+  };
+  waitForUpstreamRequestForTest(data_validator_2_frame_2);
+
+  FakeStreamCodecFactory::FakeResponse response_2;
+  response_2.protocol_ = "fake_fake_fake";
+  response_2.status_ = Status();
+  response_2.data_["zzzz"] = "xxxx";
+  response_2.data_["stream_id"] = "2";
+  response_2.data_["end_stream"] = "false";
+
+  FakeStreamCodecFactory::FakeResponse response_2_frame_1;
+  response_2_frame_1.data_["stream_id"] = "2";
+  response_2_frame_1.data_["end_stream"] = "true";
+
+  sendResponseForTest(response_2);
+  sendResponseForTest(response_2_frame_1);
+
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
+                 "unexpected timeout");
+
+  EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->getByKey("zzzz"), "xxxx");
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->getByKey("stream_id"), "2");
+
+  FakeStreamCodecFactory::FakeResponse response_1;
+  response_1.protocol_ = "fake_fake_fake";
+  response_1.status_ = Status();
+  response_1.data_["zzzz"] = "yyyy";
+  response_1.data_["stream_id"] = "1";
+  response_1.data_["end_stream"] = "false";
+
+  FakeStreamCodecFactory::FakeResponse response_1_frame_1;
+  response_1_frame_1.data_["stream_id"] = "1";
+  response_1_frame_1.data_["end_stream"] = "true";
+
+  sendResponseForTest(response_1);
+  sendResponseForTest(response_1_frame_1);
+
+  RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
+                 "unexpected timeout");
+
+  EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->getByKey("zzzz"), "yyyy");
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->getByKey("stream_id"), "1");
 
   cleanup();
 }
