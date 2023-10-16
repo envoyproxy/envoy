@@ -127,6 +127,11 @@ minor_behavior_changes:
 - area: router
   change: |
     Enable environment_variable in router direct response.
+- area: access_log
+  change: |
+    When emitting grpc logs, only downstream filter state was used. Now, both downstream and upstream filter states will be tried
+    to find the keys configured in
+    :ref:`filter_state_objects_to_log <extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.filter_state_objects_to_log>`.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -205,9 +210,6 @@ bug_fixes:
   change: |
     Update base images to resolve various glibc vulnerabilities.
         Fixed a bug where redis key with ``%`` in the key is failing with a validation error.
-- area: access_log
-  change: |
-    Fixed a bug where the filter state set by upstream filter is not emitted in the grpc access logs.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
