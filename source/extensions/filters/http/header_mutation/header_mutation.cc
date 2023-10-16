@@ -35,7 +35,7 @@ HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config)
 Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   config_->mutations().mutateRequestHeaders(headers, decoder_callbacks_->streamInfo());
 
-  // Traverse through all route configs to retrieve all avilable header mutations.
+  // Traverse through all route configs to retrieve all available header mutations.
   route_configs_ = Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
 
   for (const auto* route_config : route_configs_) {
