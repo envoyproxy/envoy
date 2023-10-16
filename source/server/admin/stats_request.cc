@@ -10,8 +10,10 @@ namespace Envoy {
 namespace Server {
 
 StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
-                           const Upstream::ClusterManager& cm, UrlHandlerFn url_handler_fn)
-    : params_(params), stats_(stats), cm_(cm), url_handler_fn_(url_handler_fn) {
+                           const Upstream::ClusterManager& cluster_manager,
+                           UrlHandlerFn url_handler_fn)
+    : params_(params), stats_(stats), cluster_manager_(cluster_manager),
+      url_handler_fn_(url_handler_fn) {
   switch (params_.type_) {
   case StatsType::TextReadouts:
   case StatsType::All:
@@ -203,7 +205,7 @@ void StatsRequest::renderPerHostMetrics(Buffer::Instance& response) {
     }
   };
 
-  Upstream::HostUtility::forEachHostMetric(cm_, render, render);
+  Upstream::HostUtility::forEachHostMetric(cluster_manager_, render, render);
 }
 
 template <class SharedStatType>

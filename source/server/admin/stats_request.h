@@ -39,7 +39,8 @@ public:
 
   static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
 
-  StatsRequest(Stats::Store& stats, const StatsParams& params, const Upstream::ClusterManager& cm,
+  StatsRequest(Stats::Store& stats, const StatsParams& params,
+               const Upstream::ClusterManager& cluster_manager,
                UrlHandlerFn url_handler_fn = nullptr);
 
   // Admin::Request
@@ -112,7 +113,7 @@ private:
   uint64_t phase_stat_count_{0};
   absl::string_view phase_string_{"text readouts"};
   Buffer::OwnedImpl response_;
-  const Upstream::ClusterManager& cm_;
+  const Upstream::ClusterManager& cluster_manager_;
   UrlHandlerFn url_handler_fn_;
   uint64_t chunk_size_{DefaultChunkSize};
 };

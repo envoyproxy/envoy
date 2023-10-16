@@ -108,9 +108,9 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
 }
 
 Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
-                                            const Upstream::ClusterManager& cm,
+                                            const Upstream::ClusterManager& cluster_manager,
                                             StatsRequest::UrlHandlerFn url_handler_fn) {
-  return std::make_unique<StatsRequest>(stats, params, cm, url_handler_fn);
+  return std::make_unique<StatsRequest>(stats, params, cluster_manager, url_handler_fn);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap&,
