@@ -14,6 +14,7 @@ envoy_py_test_binary(
     srcs = ["h3_request.py"],
     data = [
         "//test/config/integration/certs",
+        "@boringssl//:src/include/openssl/err.h",
     ],
     deps = [
         requirement("aioquic"),
