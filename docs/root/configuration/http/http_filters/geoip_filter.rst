@@ -19,7 +19,7 @@ Configuration
 
 Geolocation Providers
 ---------------------
-Currently only `Maxmind <https://www.maxmind.com/en/geoip2-services-and-databases>` geolocation provider is supported.
+Currently only `Maxmind <https://www.maxmind.com/en/geoip2-services-and-databases>`_ geolocation provider is supported.
 This provider should be configured with the type URL ``type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig``.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
@@ -66,8 +66,8 @@ comes from the owning HTTP connection manager.
    ``rq_total``, Counter, Total number of requests for which geolocation filter was invoked.
 
 Besides Geolocation filter level statisctics, there is statistics emitted by the :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
-per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`,
-`isp_db <https://www.maxmind.com/en/geoip2-isp-database>`, `anon_db <https://dev.maxmind.com/geoip/docs/databases/anonymous-ip>`.
+per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,
+`isp_db <https://www.maxmind.com/en/geoip2-isp-database>`_, `anon_db <https://dev.maxmind.com/geoip/docs/databases/anonymous-ip>`_.
 
 .. csv-table::
    :header: Name, Type, Description
