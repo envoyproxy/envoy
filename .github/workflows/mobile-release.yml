@@ -15,7 +15,6 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
 
   android_release_artifacts:
     if: >-

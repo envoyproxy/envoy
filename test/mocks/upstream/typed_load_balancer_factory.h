@@ -11,6 +11,11 @@ namespace Envoy {
 namespace Upstream {
 class MockTypedLoadBalancerFactory : public TypedLoadBalancerFactory {
 public:
+  class EmptyLoadBalancerConfig : public LoadBalancerConfig {
+  public:
+    EmptyLoadBalancerConfig() = default;
+  };
+
   MockTypedLoadBalancerFactory();
   ~MockTypedLoadBalancerFactory() override;
 
@@ -21,9 +26,9 @@ public:
                const PrioritySet& priority_set, Runtime::Loader& runtime,
                Random::RandomGenerator& random, TimeSource& time_source));
 
-  LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+  LoadBalancerConfigPtr loadConfig(const Protobuf::Message&,
                                    ProtobufMessage::ValidationVisitor&) override {
-    return std::make_unique<LoadBalancerConfigWrapper>(std::move(config));
+    return std::make_unique<EmptyLoadBalancerConfig>();
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

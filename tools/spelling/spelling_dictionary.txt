@@ -39,6 +39,7 @@ GiB
 IPTOS
 OTEL
 Repick
+Reserializer
 SION
 TRA
 Websockets
@@ -74,7 +75,9 @@ FIXME
 HEXDIG
 HEXDIGIT
 HPE
+Kwasi
 LRU
+Mensah
 NAK
 OWS
 Preconnecting
@@ -770,6 +773,7 @@ gateway
 gcov
 genrule
 geolocation
+geo
 geoip
 Geoip
 getaddrinfo
@@ -854,6 +858,7 @@ iovecs
 ips
 iptables
 ish
+isp
 istio
 istream
 istringstream
@@ -916,6 +921,8 @@ matcher
 matchers
 maxage
 maxbuffer
+Maxmind
+maxmind
 megamiss
 mem
 memcmp
@@ -937,6 +944,7 @@ misconfigured
 mixin
 mkdir
 mmap
+mmdb
 mmsg
 mmsghdr
 mongo
@@ -1294,6 +1302,7 @@ subtypes
 subzone
 suf
 superclass
+superroot
 superset
 svc
 symlink
