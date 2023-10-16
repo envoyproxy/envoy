@@ -240,6 +240,12 @@ removed_config_or_runtime:
     substituted it with :ref:`outlier_detection.successful_active_health_check_uneject_host
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
     outlier detection configuration flag.
+- area: ext_authz
+  change: |
+    Removed ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add``
+    runtime option and substituted it with :ref:`failure_mode_allow_header_add
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow_header_add>`
+    configuration flag.
 
 new_features:
 - area: access_log
