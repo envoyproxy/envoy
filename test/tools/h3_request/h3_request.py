@@ -63,8 +63,8 @@ class Http3Client(QuicConnectionProtocol):
         for http_event in self._http.handle_event(event):
             self.http_event_received(http_event)
 
-    async def request(self, url: str, include_headers: bool = False) -> AsyncIterator[str]:
-        """Issue an http/3 get request, and yield response line by line."""
+    async def request(self, url: str, include_headers: bool = False) -> None:
+        """Issue an http/3 get request, print response pieces as the packets arrive."""
         stream_id: int = self._quic.get_next_available_stream_id()
         future: asyncio.Future[bool] = self._loop.create_future()
         parsed_url = urlparse(url)
