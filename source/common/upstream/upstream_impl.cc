@@ -444,10 +444,11 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   switch (health_status) {
   case envoy::config::core::v3::UNHEALTHY:
     FALLTHRU;
-  case envoy::config::core::v3::DRAINING:
-    FALLTHRU;
   case envoy::config::core::v3::TIMEOUT:
     HostImpl::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+    break;
+  case envoy::config::core::v3::DRAINING:
+    HostImpl::healthFlagSet(Host::HealthFlag::DRAINING_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DEGRADED:
     HostImpl::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
@@ -1417,7 +1418,8 @@ namespace {
 
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-         host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+         host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) ||
+         host.healthFlagGet(Host::HealthFlag::DRAINING_EDS_HEALTH);
 }
 
 } // namespace

@@ -72,6 +72,14 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Host& host, std::strin
     }
     break;
   }
+
+  case Host::HealthFlag::DRAINING_EDS_HEALTH: {
+    if (host.healthFlagGet(Host::HealthFlag::DRAINING_EDS_HEALTH)) {
+      health_status += "/draining_eds_health";
+    }
+    break;
+  }
+
   }
 }
 
