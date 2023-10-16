@@ -39,11 +39,14 @@ public:
     setByKey(key, val);
   }
   void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
-
   absl::string_view host() const override { return inner_metadata_->request().serviceName(); }
   absl::string_view path() const override { return inner_metadata_->request().serviceName(); }
-
   absl::string_view method() const override { return inner_metadata_->request().methodName(); }
+
+  // StreamFrame
+  FrameFlags frameFlags() const override { return stream_frame_flags_; }
+
+  FrameFlags stream_frame_flags_;
 
   Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
 };
@@ -69,8 +72,12 @@ public:
   void setByKey(absl::string_view, absl::string_view) override{};
   void setByReferenceKey(absl::string_view, absl::string_view) override {}
   void setByReference(absl::string_view, absl::string_view) override {}
-
   Status status() const override { return status_; }
+
+  // StreamFrame
+  FrameFlags frameFlags() const override { return stream_frame_flags_; }
+
+  FrameFlags stream_frame_flags_;
 
   Status status_;
   Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
@@ -121,10 +128,13 @@ public:
       }
 
       ASSERT(decode_status == Common::Dubbo::DecodeStatus::Success);
-      ExtendedOptions extended_options{metadata_->requestId(), metadata_->context().isTwoWay(),
-                                       false, metadata_->context().heartbeat()};
-      callback_->onDecodingSuccess(std::make_unique<MessageType>(std::move(metadata_)),
-                                   extended_options);
+
+      auto message = std::make_unique<MessageType>(metadata_);
+      message->stream_frame_flags_ = {{static_cast<uint64_t>(metadata_->requestId()),
+                                       !metadata_->context().isTwoWay(), false,
+                                       metadata_->context().heartbeat()},
+                                      true};
+      callback_->onDecodingSuccess(std::move(message));
       metadata_.reset();
     } catch (const EnvoyException& error) {
       ENVOY_LOG(warn, "Dubbo codec: decoding error: {}", error.what());
@@ -145,13 +155,13 @@ class DubboRequestEncoder : public RequestEncoder, public DubboCodecBase {
 public:
   using DubboCodecBase::DubboCodecBase;
 
-  void encode(const Request& request, RequestEncoderCallback& callback) override {
+  void encode(const StreamFrame& request, RequestEncoderCallback& callback) override {
     ASSERT(dynamic_cast<const DubboRequest*>(&request) != nullptr);
     const auto* typed_request = static_cast<const DubboRequest*>(&request);
 
     Buffer::OwnedImpl buffer;
     codec_->encode(buffer, *typed_request->inner_metadata_);
-    callback.onEncodingSuccess(buffer);
+    callback.onEncodingSuccess(buffer, true);
   }
 };
 
@@ -159,13 +169,13 @@ class DubboResponseEncoder : public ResponseEncoder, public DubboCodecBase {
 public:
   using DubboCodecBase::DubboCodecBase;
 
-  void encode(const Response& response, ResponseEncoderCallback& callback) override {
+  void encode(const StreamFrame& response, ResponseEncoderCallback& callback) override {
     ASSERT(dynamic_cast<const DubboResponse*>(&response) != nullptr);
     const auto* typed_response = static_cast<const DubboResponse*>(&response);
 
     Buffer::OwnedImpl buffer;
     codec_->encode(buffer, *typed_response->inner_metadata_);
-    callback.onEncodingSuccess(buffer);
+    callback.onEncodingSuccess(buffer, true);
   }
 };
 

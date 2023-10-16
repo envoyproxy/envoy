@@ -12,6 +12,7 @@ def _release_version_for(version):
 def envoy_pkg_distros(
         name,
         envoy_bin = ":envoy-binary",
+        envoy_contrib_bin = ":envoy-contrib-binary",
         version = None,
         maintainer = None,
         config = "//configs:envoyproxy_io_proxy.yaml"):
@@ -31,10 +32,19 @@ def envoy_pkg_distros(
         renames = {envoy_bin: "/usr/bin/envoy"},
     )
 
+    pkg_files(
+        name = "envoy-contrib-bin-files",
+        srcs = [envoy_contrib_bin],
+        attributes = pkg_attributes(mode = "0755"),
+        renames = {envoy_contrib_bin: "/usr/bin/envoy"},
+    )
+
     # build debs
     envoy_pkg_debs(
         name = "debs",
         version = version,
+        bin_files = ":envoy-bin-files",
+        contrib_bin_files = ":envoy-contrib-bin-files",
         release_version = _release_version_for(version),
         maintainer = maintainer,
     )
@@ -43,9 +53,7 @@ def envoy_pkg_distros(
     pkg_tar(
         name = "distro_packages",
         extension = "tar",
-        deps = [
-            ":debs",
-        ],
+        deps = [":debs"],
     )
 
     # sign the packages

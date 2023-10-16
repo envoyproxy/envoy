@@ -49,21 +49,19 @@ public:
     ON_CALL(mock_filter_callback_, streamInfo()).WillByDefault(ReturnRef(mock_stream_info_));
   }
 
-  void setup(ExtendedOptions request_options = ExtendedOptions{}) {
+  void setup(FrameFlags frame_flags = FrameFlags{}) {
     auto parameter = GetParam();
     protocol_options_ = ProtocolOptions{parameter.bind_upstream};
     bound_already_ = parameter.bound_already;
     with_tracing_ = parameter.with_tracing;
 
-    request_options_ = request_options;
-
     ON_CALL(mock_codec_factory_, protocolOptions()).WillByDefault(Return(protocol_options_));
-    ON_CALL(mock_filter_callback_, requestOptions()).WillByDefault(Return(request_options_));
 
     filter_ = std::make_shared<Router::RouterFilter>(factory_context_);
     filter_->setDecoderFilterCallbacks(mock_filter_callback_);
 
     request_ = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+    request_->stream_frame_flags_ = frame_flags;
   }
 
   void cleanUp() {
@@ -172,12 +170,13 @@ public:
 
   void notifyPoolReady() {
     if (!protocol_options_.bindUpstreamConnection()) {
-      EXPECT_CALL(mock_upstream_connection_, write(_, _));
+      EXPECT_CALL(mock_upstream_connection_, write(_, _)).Times(testing::AtLeast(1));
       factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
           mock_upstream_connection_);
     } else {
       ASSERT(!mock_filter_callback_.upstream_manager_.upstream_callbacks_.empty());
-      EXPECT_CALL(mock_filter_callback_.upstream_manager_.upstream_conn_, write(_, _));
+      EXPECT_CALL(mock_filter_callback_.upstream_manager_.upstream_conn_, write(_, _))
+          .Times(testing::AtLeast(1));
       mock_filter_callback_.upstream_manager_.callOnBindSuccess(0);
     }
   }
@@ -193,7 +192,7 @@ public:
     }
   }
 
-  void notifyDecodingSuccess(ResponsePtr&& response, ExtendedOptions response_options) {
+  void notifyDecodingSuccess(StreamFramePtr&& response) {
     if (!protocol_options_.bindUpstreamConnection()) {
       ASSERT(!filter_->upstreamRequestsForTest().empty());
 
@@ -202,7 +201,7 @@ public:
       EXPECT_CALL(*mock_response_decoder_, decode(BufferStringEqual("test_1")))
           .WillOnce(Invoke([&](Buffer::Instance& buffer) {
             buffer.drain(buffer.length());
-            upstream_request->onDecodingSuccess(std::move(response), response_options);
+            upstream_request->onDecodingSuccess(std::move(response));
           }));
 
       Buffer::OwnedImpl test_buffer;
@@ -211,8 +210,7 @@ public:
       upstream_request->upstream_manager_->onUpstreamData(test_buffer, false);
     } else {
       ASSERT(!mock_filter_callback_.upstream_manager_.response_callbacks_.empty());
-      mock_filter_callback_.upstream_manager_.callOnDecodingSuccess(0, std::move(response),
-                                                                    response_options);
+      mock_filter_callback_.upstream_manager_.callOnDecodingSuccess(0, std::move(response));
     }
   }
 
@@ -329,7 +327,6 @@ public:
   ProtocolOptions protocol_options_;
   bool bound_already_{};
 
-  ExtendedOptions request_options_;
   std::unique_ptr<FakeStreamCodecFactory::FakeRequest> request_;
 
   NiceMock<Tracing::MockConfig> tracing_config_;
@@ -521,7 +518,7 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeout) {
 }
 
 TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndExpectNoResponse) {
-  setup(ExtendedOptions{{}, false, false, false});
+  setup(FrameFlags(StreamFlags(0, true, false, false), true));
   kickOffNewUpstreamRequest();
 
   EXPECT_CALL(mock_filter_callback_, completeDirectly()).WillOnce(Invoke([this]() -> void {
@@ -529,11 +526,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndExpectNoResponse) {
   }));
 
   EXPECT_CALL(*mock_request_encoder_, encode(_, _))
-      .WillOnce(Invoke([&](const Request&, RequestEncoderCallback& callback) -> void {
+      .WillOnce(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
         // Expect no response.
-        callback.onEncodingSuccess(buffer);
+        callback.onEncodingSuccess(buffer, true);
       }));
 
   if (with_tracing_) {
@@ -556,11 +553,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeRespons
   expectSetResponseCallback(upstream_request);
 
   EXPECT_CALL(*mock_request_encoder_, encode(_, _))
-      .WillOnce(Invoke([&](const Request&, RequestEncoderCallback& callback) -> void {
+      .WillOnce(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
         // Expect response.
-        callback.onEncodingSuccess(buffer);
+        callback.onEncodingSuccess(buffer, true);
       }));
 
   notifyPoolReady();
@@ -586,11 +583,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeR
   expectSetResponseCallback(upstream_request);
 
   EXPECT_CALL(*mock_request_encoder_, encode(_, _))
-      .WillOnce(Invoke([&](const Request&, RequestEncoderCallback& callback) -> void {
+      .WillOnce(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
         // Expect response.
-        callback.onEncodingSuccess(buffer);
+        callback.onEncodingSuccess(buffer, true);
       }));
 
   notifyPoolReady();
@@ -616,11 +613,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButStreamDestroyBeforeResponse)
   expectSetResponseCallback(upstream_request);
 
   EXPECT_CALL(*mock_request_encoder_, encode(_, _))
-      .WillOnce(Invoke([&](const Request&, RequestEncoderCallback& callback) -> void {
+      .WillOnce(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
         // Expect response.
-        callback.onEncodingSuccess(buffer);
+        callback.onEncodingSuccess(buffer, true);
       }));
 
   notifyPoolReady();
@@ -643,11 +640,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
   expectSetResponseCallback(upstream_request);
 
   EXPECT_CALL(*mock_request_encoder_, encode(_, _))
-      .WillOnce(Invoke([&](const Request&, RequestEncoderCallback& callback) -> void {
+      .WillOnce(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
         // Expect response.
-        callback.onEncodingSuccess(buffer);
+        callback.onEncodingSuccess(buffer, true);
       }));
 
   if (with_tracing_) {
@@ -664,14 +661,90 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
     EXPECT_CALL(*child_span_, finishSpan());
   }
 
-  EXPECT_CALL(mock_filter_callback_, upstreamResponse(_, _))
-      .WillOnce(Invoke([this](ResponsePtr, ExtendedOptions) {
-        // When the response is sent to callback, the upstream request should be removed.
-        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
+    // When the response is sent to callback, the upstream request should be removed.
+    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  }));
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  notifyDecodingSuccess(std::move(response));
+}
+
+TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) {
+  // There are multiple frames in the request.
+  setup(FrameFlags(StreamFlags(0, false, false, true), /*end_stream*/ false));
+  kickOffNewUpstreamRequest();
+
+  auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+
+  expectSetResponseCallback(upstream_request);
+
+  if (with_tracing_) {
+    // Inject tracing context.
+    EXPECT_CALL(*child_span_, injectContext(_, _));
+  }
+
+  auto frame_1 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, true), false);
+
+  // This only store the frame and does nothing else because the pool is not ready yet.
+  filter_->onStreamFrame(std::move(frame_1));
+
+  EXPECT_CALL(*mock_request_encoder_, encode(_, _))
+      .Times(2)
+      .WillRepeatedly(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
+        Buffer::OwnedImpl buffer;
+        buffer.add("hello");
+        // Expect response.
+        callback.onEncodingSuccess(buffer, false);
+      }));
+
+  // This will trigger two frames to be sent.
+  notifyPoolReady();
+  EXPECT_NE(upstream_request->upstream_conn_, nullptr);
+
+  EXPECT_CALL(*mock_request_encoder_, encode(_, _))
+      .WillOnce(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
+        Buffer::OwnedImpl buffer;
+        buffer.add("hello");
+        // Expect response.
+        callback.onEncodingSuccess(buffer, true);
+      }));
+
+  // End stream is set to true by default.
+  auto frame_2 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  // This will trigger the last frame to be sent directly because connection is ready and other
+  // frames are already sent.
+  filter_->onStreamFrame(std::move(frame_2));
+
+  if (with_tracing_) {
+    EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(*child_span_, finishSpan());
+  }
+
+  EXPECT_CALL(mock_filter_callback_, onResponseStart(_));
+  EXPECT_CALL(mock_filter_callback_, onResponseFrame(_))
+      .Times(2)
+      .WillRepeatedly(Invoke([this](StreamFramePtr frame) {
+        // When the entire response is sent to callback, the upstream request should be removed.
+        if (frame->frameFlags().endStream()) {
+          EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+        } else {
+          EXPECT_EQ(1, filter_->upstreamRequestsForTest().size());
+        }
       }));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  notifyDecodingSuccess(std::move(response), ExtendedOptions());
+  response->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, false), false);
+  notifyDecodingSuccess(std::move(response));
+
+  auto response_frame_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  response_frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, false, false), false);
+  notifyDecodingSuccess(std::move(response_frame_1));
+
+  // End stream is set to true by default.
+  auto response_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  notifyDecodingSuccess(std::move(response_frame_2));
 }
 
 TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithDrainCloseSetInResponse) {
@@ -685,11 +758,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithDrainCloseSetInR
   expectSetResponseCallback(upstream_request);
 
   EXPECT_CALL(*mock_request_encoder_, encode(_, _))
-      .WillOnce(Invoke([&](const Request&, RequestEncoderCallback& callback) -> void {
+      .WillOnce(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
         // Expect response.
-        callback.onEncodingSuccess(buffer);
+        callback.onEncodingSuccess(buffer, true);
       }));
 
   if (with_tracing_) {
@@ -701,16 +774,16 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithDrainCloseSetInR
 
   EXPECT_NE(upstream_request->upstream_conn_, nullptr);
 
-  EXPECT_CALL(mock_filter_callback_, upstreamResponse(_, _))
-      .WillOnce(Invoke([this](ResponsePtr, ExtendedOptions) {
-        // When the response is sent to callback, the upstream request should be removed.
-        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
-      }));
+  EXPECT_CALL(mock_filter_callback_, onResponseStart(_)).WillOnce(Invoke([this](ResponsePtr) {
+    // When the response is sent to callback, the upstream request should be removed.
+    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  }));
 
   EXPECT_CALL(mock_upstream_connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  notifyDecodingSuccess(std::move(response), ExtendedOptions({}, false, true, false));
+  response->stream_frame_flags_ = FrameFlags(StreamFlags(0, false, true, false), true);
+  notifyDecodingSuccess(std::move(response));
 }
 
 TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
@@ -722,11 +795,11 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
   expectSetResponseCallback(upstream_request);
 
   EXPECT_CALL(*mock_request_encoder_, encode(_, _))
-      .WillOnce(Invoke([&](const Request&, RequestEncoderCallback& callback) -> void {
+      .WillOnce(Invoke([&](const StreamFrame&, RequestEncoderCallback& callback) -> void {
         Buffer::OwnedImpl buffer;
         buffer.add("hello");
         // Expect response.
-        callback.onEncodingSuccess(buffer);
+        callback.onEncodingSuccess(buffer, true);
       }));
 
   notifyPoolReady();

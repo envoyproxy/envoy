@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["hash_policy_impl.cc"],
     hdrs = ["hash_policy_impl.h"],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/udp:hash_policy_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
@@ -58,10 +59,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":udp_proxy_filter_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/formatter:substitution_format_string_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )

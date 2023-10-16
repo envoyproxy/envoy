@@ -27,7 +27,6 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         "//source/common/memory:stats_lib",
-        "//source/common/quic:spdy_server_push_utils_for_envoy_lib",
         "//source/common/quic/platform:quiche_flags_impl_lib",
         "//test/common/buffer:utility_lib",
         "//test/common/stats:stat_test_utility_lib",

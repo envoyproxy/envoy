@@ -29,7 +29,7 @@ TEST(LeastRequestConfigTest, ValidateFail) {
   EXPECT_EQ("envoy.load_balancing_policies.least_request", factory.name());
 
   auto lb_config =
-      factory.loadConfig(factory.createEmptyConfigProto(), context.messageValidationVisitor());
+      factory.loadConfig(*factory.createEmptyConfigProto(), context.messageValidationVisitor());
   auto thread_aware_lb =
       factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
                      context.api_.random_, context.time_system_);

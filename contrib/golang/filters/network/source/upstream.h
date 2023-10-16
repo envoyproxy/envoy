@@ -36,8 +36,7 @@ class UpstreamConn : public Tcp::ConnectionPool::Callbacks,
                      Logger::Loggable<Logger::Id::golang> {
 public:
   UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_lib,
-               unsigned long long int goConnID, // NOLINT(readability-identifier-naming)
-               Event::Dispatcher* dispatcher = nullptr);
+               unsigned long long int go_conn_id, Event::Dispatcher* dispatcher = nullptr);
   ~UpstreamConn() override {
     if (handler_) {
       handler_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
@@ -96,7 +95,7 @@ private:
   }
 
   Dso::NetworkFilterDsoPtr dynamic_lib_{nullptr};
-  unsigned long long int goConnID_{0}; // NOLINT(readability-identifier-naming)
+  unsigned long long int go_conn_id_{0};
   UpstreamConnWrapper* wrapper_{nullptr};
   Event::Dispatcher* dispatcher_{nullptr};
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_{nullptr};

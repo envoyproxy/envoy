@@ -143,16 +143,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_server_push_utils_for_envoy_lib",
-    srcs = ["spdy_server_push_utils_for_envoy.cc"],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "@com_github_google_quiche//:quic_core_http_spdy_server_push_utils_header",
-    ],
-)
-
-envoy_cc_library(
     name = "envoy_quic_stream_lib",
     hdrs = ["envoy_quic_stream.h"],
     tags = ["nofips"],
