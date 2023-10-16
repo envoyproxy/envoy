@@ -114,6 +114,9 @@ envoy_quiche_platform_impl_cc_library(
         "abseil_node_hash_map",
         "abseil_node_hash_set",
     ],
+    deps = [
+        "//source/common/common:utility_lib",
+    ],
     tags = ["nofips"],
 )
 
