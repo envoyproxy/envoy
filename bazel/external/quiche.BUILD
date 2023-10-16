@@ -4682,8 +4682,7 @@ envoy_cc_library(
         "@platforms//os:ios": [
             "@envoy//source/common/quic/platform/mobile:mobile_quiche_bug_tracker_impl_lib",
         ],
-        #"//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
-        "//conditions:default": ["@envoy//source/common/quic/platform/mobile:mobile_quiche_bug_tracker_impl_lib"],
+        "//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
     }),
 )
 
@@ -4704,8 +4703,7 @@ envoy_cc_library(
         "@platforms//os:ios": [
             ":quiche_common_mobile_quiche_logging_lib",
         ],
-        #"//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
-        "//conditions:default": [":quiche_common_mobile_quiche_logging_lib"],
+        "//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
     }),
 )
 
