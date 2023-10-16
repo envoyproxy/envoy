@@ -1168,7 +1168,6 @@ message HttpFilter {
   // Otherwise, clients that do not support this filter must reject the config.
   bool is_optional = 6;
 
-  // [#not-implemented-hide:]
   // If true, the filter is disabled by default and must be explicitly enabled by explicitly setting
   // per filter configuration in the route configuration.
   //
