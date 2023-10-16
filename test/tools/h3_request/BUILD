@@ -13,8 +13,11 @@ envoy_py_test_binary(
     name = "h3_request",
     srcs = ["h3_request.py"],
     data = [
-        "//test/config/integration/certs",
+        "//test/config/integration/certs:cacert.pem",
     ],
+    env = {
+        "TEST_CACERT": "$(location //test/config/integration/certs:cacert.pem)",
+    },
     deps = [
         requirement("aioquic"),
     ],

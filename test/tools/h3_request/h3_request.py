@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import os
 import sys
 from functools import cached_property
 from typing import AsyncIterator, cast
@@ -16,8 +17,6 @@ from aioquic.h3.events import (
 )
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import QuicEvent
-
-CA_PATH = "test/config/integration/certs/cacert.pem"
 
 
 class Http3Client(QuicConnectionProtocol):
@@ -105,7 +104,7 @@ async def main(argv) -> None:
         "--ca-certs",
         type=str,
         help="load CA certificates from the specified file",
-        default=CA_PATH)
+        default=os.environ["TEST_CACERT"])
     parser.add_argument(
         "--include-headers", action="store_true", help="output the headers before the body")
     args = parser.parse_args(argv)
