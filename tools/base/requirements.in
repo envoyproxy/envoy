@@ -21,7 +21,6 @@ envoy.gpg.sign>=0.2.0
 flake8>=6
 frozendict>=2.3.7
 gitpython
-google-cloud-storage
 gsutil
 jinja2
 multidict>=6.0.2
