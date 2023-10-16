@@ -39,11 +39,7 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
   if (!Network::Socket::applyOptions(options, *this,
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-    PANIC("ListenSocket: Setting socket options failed");
-#else
-    throw SocketOptionException("ListenSocket: Setting socket options failed");
-#endif
+    throwExceptionOrPanic(SocketOptionException, "ListenSocket: Setting socket options failed");
   }
 }
 

@@ -105,11 +105,7 @@ std::string XdsResourceIdentifier::encodeUrl(const xds::core::v3::ResourceLocato
 namespace {
 
 void throwDecodeExceptionOrPanic(std::string message) {
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-  PANIC(message);
-#else
-  throw XdsResourceIdentifier::DecodeException(message);
-#endif
+  throwExceptionOrPanic(XdsResourceIdentifier::DecodeException, message);
 }
 
 void decodePath(absl::string_view path, std::string* resource_type, std::string& id) {

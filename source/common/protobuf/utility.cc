@@ -126,22 +126,14 @@ void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_nam
                                                     const Protobuf::Message& message) {
   std::string error =
       fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString());
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-  PANIC(error);
-#else
-  throw MissingFieldException(error);
-#endif
+  throwExceptionOrPanic(MissingFieldException, error);
 }
 
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
   std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
                                   message.DebugString());
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-  PANIC(error);
-#else
-  throw ProtoValidationException(error);
-#endif
+  throwExceptionOrPanic(ProtoValidationException, error);
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
@@ -736,12 +728,7 @@ absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
 void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
   const auto result = validateDurationNoThrow(duration, max_seconds_value);
   if (!result.ok()) {
-    std::string error = std::string(result.message());
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-    PANIC(error);
-#else
-    throw DurationUtil::OutOfRangeException(error);
-#endif
+    throwExceptionOrPanic(DurationUtil::OutOfRangeException, std::string(result.message()));
   }
 }
 

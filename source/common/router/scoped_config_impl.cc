@@ -19,11 +19,7 @@ bool ScopeKey::operator==(const ScopeKey& other) const {
 }
 
 void throwProtoValidationExceptionOrPanic(std::string message) {
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-  PANIC(message);
-#else
-  throw ProtoValidationException(message);
-#endif
+  throwExceptionOrPanic(ProtoValidationException, message);
 }
 
 HeaderValueExtractorImpl::HeaderValueExtractorImpl(

@@ -408,12 +408,7 @@ std::string StringUtil::removeTokens(absl::string_view source, absl::string_view
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   // The maximum size required for an unsigned 64-bit integer is 21 chars (including null).
   if (buffer_size < 21) {
-    std::string message = "itoa buffer too small";
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-    PANIC(message);
-#else
-    throw std::invalid_argument(message);
-#endif
+    throwExceptionOrPanic(std::invalid_argument, "itoa buffer too small");
   }
 
   char* current = out;

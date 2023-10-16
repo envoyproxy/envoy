@@ -34,11 +34,7 @@ std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
 }
 
 void throwMalformedArgExceptionOrPanic(std::string message) {
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-  PANIC(message);
-#else
-  throw MalformedArgvException(message);
-#endif
+  throwExceptionOrPanic(MalformedArgvException, message);
 }
 
 } // namespace

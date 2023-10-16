@@ -20,12 +20,8 @@ void onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecatio
   if (soft_deprecation) {
     ENVOY_LOG_MISC(warn, "Deprecated field: {}", absl::StrCat(description, deprecation_error));
   } else {
-    std::string message = absl::StrCat(description, deprecation_error);
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-    PANIC(message);
-#else
-    throw DeprecatedProtoFieldException(message);
-#endif
+    throwExceptionOrPanic(DeprecatedProtoFieldException,
+                          absl::StrCat(description, deprecation_error));
   }
 }
 } // namespace
@@ -80,12 +76,8 @@ void WarningValidationVisitorImpl::onWorkInProgress(absl::string_view descriptio
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
-  std::string message = absl::StrCat("Protobuf message (", description, ") has unknown fields");
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-  PANIC(message);
-#else
-  throw UnknownProtoFieldException(message);
-#endif
+  throwExceptionOrPanic(UnknownProtoFieldException,
+                        absl::StrCat("Protobuf message (", description, ") has unknown fields"));
 }
 
 void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,

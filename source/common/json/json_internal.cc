@@ -26,14 +26,6 @@ namespace Nlohmann {
 
 namespace {
 
-#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
-#define throwBaseExceptionOrPanic(error)                                                           \
-  { PANIC(error); }
-#else
-#define throwBaseExceptionOrPanic(error)                                                           \
-  { throw Exception(error); }
-#endif
-
 /**
  * Internal representation of Object.
  */
@@ -142,9 +134,11 @@ private:
   bool isType(Type type) const { return type == type_; }
   void checkType(Type type) const {
     if (!isType(type)) {
-      throwBaseExceptionOrPanic(fmt::format(
-          "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
-          line_number_start_, typeAsString(type), typeAsString(type_)));
+      throwExceptionOrPanic(
+          Exception,
+          fmt::format(
+              "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
+              line_number_start_, typeAsString(type), typeAsString(type_)));
     }
   }
 
@@ -197,8 +191,9 @@ public:
   }
   bool number_unsigned(uint64_t value) override {
     if (value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
-      throwBaseExceptionOrPanic(fmt::format(
-          "JSON value from line {} is larger than int64_t (not supported)", line_number_));
+      throwExceptionOrPanic(
+          Exception, fmt::format("JSON value from line {} is larger than int64_t (not supported)",
+                                 line_number_));
     }
     return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
   }
@@ -420,8 +415,9 @@ bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Boolean)) {
-    throwBaseExceptionOrPanic(fmt::format("key '{}' missing or not a boolean from lines {}-{}",
-                                          name, line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not a boolean from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
   return value_itr->second->booleanValue();
 }
@@ -439,8 +435,9 @@ double Field::getDouble(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Double)) {
-    throwBaseExceptionOrPanic(fmt::format("key '{}' missing or not a double from lines {}-{}", name,
-                                          line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not a double from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
   return value_itr->second->doubleValue();
 }
@@ -458,8 +455,9 @@ int64_t Field::getInteger(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Integer)) {
-    throwBaseExceptionOrPanic(fmt::format("key '{}' missing or not an integer from lines {}-{}",
-                                          name, line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not an integer from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
   return value_itr->second->integerValue();
 }
@@ -476,7 +474,7 @@ int64_t Field::getInteger(const std::string& name, int64_t default_value) const 
 ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) const {
   auto result = getObjectNoThrow(name, allow_empty);
   if (!result.ok()) {
-    throwBaseExceptionOrPanic(std::string(result.status().message()));
+    throwExceptionOrPanic(Exception, std::string(result.status().message()));
   }
 
   return result.value();
@@ -509,8 +507,9 @@ std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name,
     if (allow_empty && value_itr == value_.object_value_.end()) {
       return {};
     }
-    throwBaseExceptionOrPanic(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
-                                          line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not an array from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
 
   std::vector<FieldSharedPtr> array_value = value_itr->second->arrayValue();
@@ -521,8 +520,9 @@ std::string Field::getString(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::String)) {
-    throwBaseExceptionOrPanic(fmt::format("key '{}' missing or not a string from lines {}-{}", name,
-                                          line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not a string from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
   return value_itr->second->stringValue();
 }
@@ -544,16 +544,18 @@ std::vector<std::string> Field::getStringArray(const std::string& name, bool all
     if (allow_empty && value_itr == value_.object_value_.end()) {
       return string_array;
     }
-    throwBaseExceptionOrPanic(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
-                                          line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not an array from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
 
   std::vector<FieldSharedPtr> array = value_itr->second->arrayValue();
   string_array.reserve(array.size());
   for (const auto& element : array) {
     if (!element->isType(Type::String)) {
-      throwBaseExceptionOrPanic(fmt::format(
-          "JSON array '{}' from line {} does not contain all strings", name, line_number_start_));
+      throwExceptionOrPanic(Exception,
+                            fmt::format("JSON array '{}' from line {} does not contain all strings",
+                                        name, line_number_start_));
     }
     string_array.push_back(element->stringValue());
   }
@@ -577,7 +579,8 @@ bool Field::empty() const {
   } else if (isType(Type::Array)) {
     return value_.array_value_.empty();
   } else {
-    throwBaseExceptionOrPanic(
+    throwExceptionOrPanic(
+        Exception,
         fmt::format("Json does not support empty() on types other than array and object"));
   }
 }
@@ -599,7 +602,7 @@ void Field::iterate(const ObjectCallback& callback) const {
 }
 
 void Field::validateSchema(const std::string&) const {
-  throwBaseExceptionOrPanic("not implemented");
+  throwExceptionOrPanic(Exception, "not implemented");
 }
 
 bool ObjectHandler::start_object(std::size_t) {
@@ -734,7 +737,7 @@ absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   auto result = loadFromStringNoThrow(json);
   if (!result.ok()) {
-    throwBaseExceptionOrPanic(std::string(result.status().message()));
+    throwExceptionOrPanic(Exception, std::string(result.status().message()));
   }
 
   return result.value();
@@ -763,7 +766,7 @@ FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_
   case ProtobufWkt::Value::kStructValue:
     return loadFromProtobufStructInternal(protobuf_value.struct_value());
   default:
-    throwBaseExceptionOrPanic("Protobuf value case not implemented");
+    throwExceptionOrPanic(Exception, "Protobuf value case not implemented");
   }
 }
 
