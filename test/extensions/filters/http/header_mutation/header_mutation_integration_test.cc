@@ -23,8 +23,7 @@ using RouteLevelFlag = std::bitset<3>;
 RouteLevelFlag PerRouteLevel = {1 << RouteLevel::PerRoute};
 RouteLevelFlag VirtualHostLevel = {1 << RouteLevel::VirtualHost};
 RouteLevelFlag RouteTableLevel = {1 << RouteLevel::RouteTable};
-RouteLevelFlag AllRoutesLevel = {1 << RouteLevel::PerRoute | 1 << RouteLevel::VirtualHost |
-                                 1 << RouteLevel::RouteTable};
+RouteLevelFlag AllRoutesLevel = {PerRouteLevel | VirtualHostLevel | RouteTableLevel};
 
 class HeaderMutationIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
