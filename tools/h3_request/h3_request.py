@@ -101,10 +101,7 @@ async def main(argv) -> None:
     parser = argparse.ArgumentParser(description="HTTP/3 client")
     parser.add_argument("url", type=str, help="the URL to query (must be HTTPS)")
     parser.add_argument(
-        "--ca-certs",
-        type=str,
-        help="load CA certificates from the specified file",
-        default=os.environ["TEST_CACERT"])
+        "--ca-certs", type=str, nargs="+", help="load CA certificates from the specified file")
     parser.add_argument(
         "--include-headers", action="store_true", help="output the headers before the body")
     args = parser.parse_args(argv)
@@ -112,7 +109,8 @@ async def main(argv) -> None:
         is_client=True,
         alpn_protocols=H3_ALPN,
     )
-    config.load_verify_locations(args.ca_certs)
+    for cert in args.ca_certs or []:
+        config.load_verify_locations(cert)
     await request(args.url, config, args.include_headers)
 
 
