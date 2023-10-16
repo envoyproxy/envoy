@@ -44,8 +44,8 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
 
   {
 
-    EXPECT_CALL(options, filterDisabled("filter_0")).WillOnce(Return(true));
-    EXPECT_CALL(options, filterDisabled("filter_1")).WillOnce(Return(false));
+    EXPECT_CALL(options, filterDisabled("filter_0")).WillOnce(Return(absl::make_optional(true)));
+    EXPECT_CALL(options, filterDisabled("filter_1")).WillOnce(Return(absl::make_optional(false)));
     EXPECT_CALL(options, filterDisabled("filter_2")).WillOnce(Return(absl::nullopt));
 
     // 'filter_1' and 'filter_2' should be added.
@@ -78,8 +78,8 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabledAndDe
 
   {
 
-    EXPECT_CALL(options, filterDisabled("filter_0")).WillOnce(Return(true));
-    EXPECT_CALL(options, filterDisabled("filter_1")).WillOnce(Return(false));
+    EXPECT_CALL(options, filterDisabled("filter_0")).WillOnce(Return(absl::make_optional(true)));
+    EXPECT_CALL(options, filterDisabled("filter_1")).WillOnce(Return(absl::make_optional(false)));
     EXPECT_CALL(options, filterDisabled("filter_2")).WillOnce(Return(absl::nullopt));
 
     // Only filter_1 should be added.
