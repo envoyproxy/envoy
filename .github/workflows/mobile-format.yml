@@ -19,7 +19,6 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
 
   formatall:
     if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
