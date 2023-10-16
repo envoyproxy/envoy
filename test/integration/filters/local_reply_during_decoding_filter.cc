@@ -15,7 +15,11 @@ class LocalReplyDuringDecode : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "local-reply-during-decode";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_headers, bool) override {
+    auto result = request_headers.get(Http::LowerCaseString("skip-local-reply"));
+    if (!result.empty() && result[0]->value() == "true") {
+      return Http::FilterHeadersStatus::Continue;
+    }
     decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
                                        "");
     return Http::FilterHeadersStatus::StopIteration;
