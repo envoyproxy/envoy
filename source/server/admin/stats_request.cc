@@ -185,11 +185,22 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
 
 template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-    std::string name;
-    if (!params_.shouldShowMetric(*stat, &name)) {
+    if (!params_.shouldShowMetricWithoutFilter(*stat)) {
       return true;
     }
 
+    // Capture the name if we did not early-exit due to used_only -- we'll use
+    // the name for both filtering and for capturing the stat in the map.
+    // stat->name() takes a symbol table lock and builds a string, so we only
+    // want to call it once.
+    //
+    // This duplicates logic in shouldShowMetric in `StatsParams`, but
+    // differs in that Prometheus only uses stat->name() for filtering, not
+    // rendering, so it only grab the name if there's a filter.
+    std::string name = stat->name();
+    if (params_.re2_filter_ != nullptr && !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
+      return true;
+    }
     stat_map_[name] = stat;
     return true;
   };

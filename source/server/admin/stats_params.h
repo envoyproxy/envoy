@@ -81,8 +81,19 @@ struct StatsParams {
    *   will contain the metric name. This improves performance because computing the name is
    *   somewhat expensive, and in some cases it isn't needed.
    */
-  template <class StatType>
-  bool shouldShowMetric(const StatType& metric, std::string* name_out = nullptr) const {
+  template <class StatType> bool shouldShowMetric(const StatType& metric) const {
+    if (!shouldShowMetricWithoutFilter(metric)) {
+      return false;
+    }
+
+    if (re2_filter_ != nullptr && !re2::RE2::PartialMatch(metric.name(), *re2_filter_)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  template <class StatType> bool shouldShowMetricWithoutFilter(const StatType& metric) const {
     if (used_only_ && !metric.used()) {
       return false;
     }
@@ -93,25 +104,6 @@ struct StatsParams {
       return false;
     }
 
-    // Performance note: computing the name is expensive.
-    //
-    // In the prometheus case, this is only necessary if doing regex filtering and a regex is
-    // defined (and the function parameter will be nullptr).
-    //
-    // In the non-prometheus case, the name is needed if the metric should be shown, so compute it
-    // once and use it for both regex filtering and in emitting the stat (consumed by caller by
-    // setting `name_out` to non-nullptr).
-    //
-    // For per-endpoint metrics, the name is precomputed and returned as a reference, so storing
-    // it in a std::string causes an extra allocation.
-    if (name_out != nullptr) {
-      *name_out = metric.name();
-    }
-
-    if (re2_filter_ != nullptr &&
-        !re2::RE2::PartialMatch((name_out != nullptr) ? *name_out : metric.name(), *re2_filter_)) {
-      return false;
-    }
     return true;
   }
 };
