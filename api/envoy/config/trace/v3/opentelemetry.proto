@@ -5,6 +5,7 @@ package envoy.config.trace.v3;
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_service.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
@@ -22,12 +23,14 @@ message OpenTelemetryConfig {
   // Note that the tracer drops traces if the server does not read data fast enough.
   // This field can be left empty to disable reporting traces to the gRPC service.
   // Only one of ``grpc_service``, ``http_service`` may be used.
-  core.v3.GrpcService grpc_service = 1;
+  core.v3.GrpcService grpc_service = 1
+      [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
 
   // The upstream HTTP cluster that will receive OTLP traces.
   // This field can be left empty to disable reporting traces to the HTTP service.
   // Only one of ``grpc_service``, ``http_service`` may be used.
-  core.v3.HttpService http_service = 3;
+  core.v3.HttpService http_service = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
 
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
   // If it is not provided, it will default to "unknown_service:envoy".
