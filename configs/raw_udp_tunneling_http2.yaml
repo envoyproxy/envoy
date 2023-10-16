@@ -1,0 +1,72 @@
+# This configuration takes incoming data on port 10000 and encapsulates it in a CONNECT
+# request which is sent upstream port 10001.
+# It can be used to test UDP tunneling as described in
+# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
+
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9903
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: UDP
+        address: 127.0.0.1
+        port_value: 10000
+    listener_filters:
+    - name: envoy.filters.udp_listener.udp_proxy
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+        stat_prefix: foo
+        matcher:
+          on_no_match:
+            action:
+              name: route
+              typed_config:
+                '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                cluster: cluster_0
+        session_filters:
+        - name: envoy.filters.udp.session.http_capsule
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig
+        tunneling_config:
+          # note: proxy_host supports string substitution, for example setting "%FILTER_STATE(proxy.host.key:PLAIN)%"
+          # will take the target host value from the session's filter state.
+          proxy_host: proxy.host.com
+          # note: target_host supports string substitution, for example setting "%FILTER_STATE(target.host.key:PLAIN)%"
+          # will take the target host value from the session's filter state.
+          target_host: target.host.com
+          # note: The target port value can be overridden per-session by setting the required port value for
+          # the filter state key ``udp.connect.target_port``.
+          default_target_port: 443
+          retry_options:
+            max_connect_attempts: 2
+          buffer_options:
+            max_buffered_datagrams: 1024
+            max_buffered_bytes: 16384
+          headers_to_add:
+          - header:
+              key: original_dst_port
+              value: "%DOWNSTREAM_LOCAL_PORT%"
+
+  clusters:
+  - name: cluster_0
+    connect_timeout: 5s
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10001

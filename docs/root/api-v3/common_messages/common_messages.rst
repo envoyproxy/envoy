@@ -38,3 +38,4 @@ Common messages
   ../config/core/v3/socket_option.proto
   ../config/core/v3/substitution_format_string.proto
   ../config/core/v3/udp_socket_config.proto
+  ../extensions/filters/common/set_filter_state/v3/value.proto
