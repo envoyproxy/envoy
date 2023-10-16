@@ -14,6 +14,7 @@ from aioquic.h3.events import (
     H3Event,
     HeadersReceived,
 )
+from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import QuicEvent
 
 CA_PATH = "test/config/integration/certs/cacert.pem"
@@ -83,7 +84,7 @@ class Http3Client(QuicConnectionProtocol):
         await future
 
 
-async def request(url: str, config, include_headers: bool) -> None:
+async def request(url: str, config: QuicConfiguration, include_headers: bool) -> None:
     parsed_url = urlparse(url)
     client_resolver = aioquic.asyncio.client.connect(
         host=parsed_url.hostname,
@@ -108,7 +109,7 @@ async def main(argv) -> None:
     parser.add_argument(
         "--include-headers", action="store_true", help="output the headers before the body")
     args = parser.parse_args(argv)
-    config = aioquic.quic.configuration.QuicConfiguration(
+    config = QuicConfiguration(
         is_client=True,
         alpn_protocols=H3_ALPN,
     )
