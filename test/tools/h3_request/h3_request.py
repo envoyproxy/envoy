@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import aioquic
 from aioquic.asyncio.protocol import QuicConnectionProtocol
 from aioquic.h3.connection import H3_ALPN, H3Connection
+from aioquic.h3.exceptions import H3Error
 from aioquic.h3.events import (
     DataReceived,
     H3Event,
@@ -54,7 +55,7 @@ class Http3Client(QuicConnectionProtocol):
         elif isinstance(event, DataReceived):
             print(event.data.decode("utf-8"), end="")
         else:
-            raise Exception(f"unexpected quic event type {event}")
+            raise H3Error(f"unexpected quic event type {event}")
         if event.stream_ended:
             self._stream_ids.pop(stream_id).set_result(True)
 
