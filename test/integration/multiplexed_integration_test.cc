@@ -2493,6 +2493,37 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
                                  kRequestsSentPerIOCycle);
 }
 
+// Validate that deferring request with invalid headers works correctly
+TEST_P(Http2FrameIntegrationTest, DeferredBadHeaderRequests) {
+  config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count", "20");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_http3_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+        hcm.mutable_http_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+      });
+  const int kRequestsSentPerIOCycle = 30;
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  beginSession();
+
+  std::string buffer;
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                           {{"bad_header", "0\x7Fxzy"}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+  tcp_client_->waitForDisconnect();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(Http2FrameIntegrationTest::testParams()),
                          frameIntegrationTestParamToString);
