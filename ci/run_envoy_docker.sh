@@ -18,10 +18,6 @@ export GOPROXY="${GOPROXY:-${go_proxy:-}}"
 
 if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
-  # Container networking is unreliable in the most recently built images, pin Windows to a known
-  # good container. This can create a mismatch between the host environment, and the toolchain
-  # environment.
-  ENVOY_BUILD_SHA=41c5a05d708972d703661b702a63ef5060125c33
   # TODO(sunjayBhatia): Currently ENVOY_DOCKER_OPTIONS is ignored on Windows because
   # CI sets it to a Linux-specific value. Undo this once https://github.com/envoyproxy/envoy/issues/13272
   # is resolved.
