@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import sys
+from functools import cached_property
 from typing import AsyncIterator, cast
 from urllib.parse import urlparse
 
@@ -26,17 +27,23 @@ class Http3Client(QuicConnectionProtocol):
     which is a far more complete implementation.
     """
 
+    @cached_property
+    def _http(self) -> H3Connection:
+        return H3Connection(self._quic)
+
+    @cached_property
+    def _stream_ids(self) -> dict[int, asyncio.Future[bool]]:
+        return {}
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._http = H3Connection(self._quic)
-        self._stream_ids: Dict[int, asyncio.Future[bool]] = {}
 
     def headers_received(self, event: H3Event) -> None:
         if not self._include_headers:
             return
         for header, value in event.headers:
             print(f"{header.decode('utf-8')}: {value.decode('utf-8')}\n", end="")
-        print("\n", end="")
+        print("")  # One blank newline after headers.
 
     def http_event_received(self, event: H3Event) -> None:
         stream_id = event.stream_id
