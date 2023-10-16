@@ -681,8 +681,8 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
  *
  * @param callbacks The stream filter callbacks to check for route configs.
  *
- * @return The all available per route config. The lifetime of returned
- * pointers is the same as the matched route.
+ * @return The all available per route config. The returned pointers are guaranteed to be non-null
+ * and their lifetime is the same as the matched route.
  */
 template <class ConfigType>
 std::vector<const ConfigType*> getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
