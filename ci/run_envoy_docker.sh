@@ -19,10 +19,7 @@ export GOPROXY="${go_proxy:-}"
 
 if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
-  # Container networking is unreliable in the most recently built images, pin Windows to a known
-  # good container. This can create a mismatch between the host environment, and the toolchain
-  # environment.
-  ENVOY_BUILD_SHA=41c5a05d708972d703661b702a63ef5060125c33
+  BUILD_SHA="$(echo "${BUILD_SHA}" | cut -d- -f2)"
   # TODO(sunjayBhatia): Currently ENVOY_DOCKER_OPTIONS is ignored on Windows because
   # CI sets it to a Linux-specific value. Undo this once https://github.com/envoyproxy/envoy/issues/13272
   # is resolved.
@@ -64,11 +61,12 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
-          && curl -fsSL https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add - \
-          && echo \"deb https://apt.kitware.com/ubuntu/ focal main\" >> /etc/apt/sources.list \
-          && apt-get -qq update -y \
-          && apt-get -qq install --no-install-recommends cmake ninja-build \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
+fi
+
+if is_windows; then
+    # remove cmake prefix
+    ENVOY_BUILD_SHA="$(echo "$ENVOY_BUILD_SHA" | cut -d- -f2)"
 fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
@@ -109,7 +107,6 @@ fi
 if [[ -n "${ENVOY_DOCKER_PULL}" ]]; then
     time docker pull "${ENVOY_BUILD_IMAGE}"
 fi
-
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm \
