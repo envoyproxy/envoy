@@ -309,13 +309,8 @@ Network::IoResult TsiSocket::repeatProtectAndWrite(Buffer::Instance& buffer, boo
 Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (!handshake_complete_) {
     Network::PostIoAction action = doHandshake();
-    // Envoy ALTS implements asynchronous tsi_handshaker_next() interface
-    // which returns immediately after scheduling a handshake request to
-    // the handshake service. The handshake response will be handled by a
-    // dedicated thread in a separate API within which handshake_complete_
-    // will be set to true if the handshake completes.
     ASSERT(!handshake_complete_);
-    return {action, 0, action == Network::PostIoAction::Close ? true : false};
+    return {action, 0, false};
   } else {
     ASSERT(frame_protector_);
     // Check if we need to flush outstanding handshake bytes.

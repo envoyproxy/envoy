@@ -62,7 +62,7 @@ AltsProxy::~AltsProxy() {
 }
 
 absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
-  // Prepare the StartClientHandshakeReq message. Ignore the target name field:
+  // Prepare the StartClientHandshakeReq message. Ignore the target name field,
   // it should never be populated for Envoy's use of ALTS.
   HandshakerReq request;
   StartClientHandshakeReq* client_start = request.mutable_client_start();
