@@ -53,6 +53,6 @@ message ExecuteFilterAction {
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
   // Dynamic configuration of filter obtained via extension configuration discovery
-  // service .
+  // service.
   DynamicConfig dynamic_config = 2;
 }

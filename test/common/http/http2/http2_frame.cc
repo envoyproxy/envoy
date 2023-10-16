@@ -51,10 +51,20 @@ Http2Frame::ResponseStatus Http2Frame::responseStatus() const {
     return ResponseStatus::Ok;
   case StaticHeaderIndex::Status404:
     return ResponseStatus::NotFound;
+  case StaticHeaderIndex::Status500:
+    return ResponseStatus::InternalServerError;
   default:
     break;
   }
   return ResponseStatus::Unknown;
+}
+
+uint32_t Http2Frame::streamId() const {
+  if (empty() || size() <= HeaderSize) {
+    return 0;
+  }
+  return (uint32_t(data_[5]) << 24) + (uint32_t(data_[6]) << 16) + (uint32_t(data_[7]) << 8) +
+         uint32_t(data_[8]);
 }
 
 void Http2Frame::buildHeader(Type type, uint32_t payload_size, uint8_t flags, uint32_t stream_id) {
@@ -341,7 +351,11 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
                     makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  if (path.empty() || path == "/") {
+    frame.appendStaticHeader(StaticHeaderIndex::Path);
+  } else {
+    frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  }
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.adjustPayloadSize();
   return frame;
@@ -365,7 +379,11 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
                     makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(StaticHeaderIndex::MethodPost);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  if (path.empty() || path == "/") {
+    frame.appendStaticHeader(StaticHeaderIndex::Path);
+  } else {
+    frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  }
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.adjustPayloadSize();
   return frame;

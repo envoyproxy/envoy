@@ -17,12 +17,22 @@ message HotRestartMessage {
     }
     message Terminate {
     }
+    // A separate socket is established for forwarding undeliverable quic udp packets
+    // from the parent instance to the child instance.
+    message ForwardedUdpPacket {
+      string local_addr = 1;
+      string peer_addr = 2;
+      uint64 receive_time_epoch_microseconds = 3;
+      bytes payload = 4;
+      uint32 worker_index = 5;
+    }
     oneof request {
       PassListenSocket pass_listen_socket = 1;
       ShutdownAdmin shutdown_admin = 2;
       Stats stats = 3;
       DrainListeners drain_listeners = 4;
       Terminate terminate = 5;
+      ForwardedUdpPacket forwarded_udp_packet = 6;
     }
   }
 
