@@ -11,7 +11,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-
 envoy_quiche_platform_impl_cc_library(
     name = "mobile_quiche_bug_tracker_impl_lib",
     hdrs = [
