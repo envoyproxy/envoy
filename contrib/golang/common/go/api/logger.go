@@ -38,28 +38,36 @@ import (
 // The default log format is:
 // [2023-08-09 03:04:15.985][1390][critical][golang] [contrib/golang/common/log/cgo.cc:27] msg
 
+func (c *commonCApiImpl) Log(level LogType, message string) {
+	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(&message), C.int(len(message)))
+}
+
+func (c *commonCApiImpl) LogLevel() LogType {
+	return LogType(C.envoyGoFilterLogLevel())
+}
+
 func LogTrace(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Trace), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
+	cAPI.Log(Trace, message)
 }
 
 func LogDebug(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Debug), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
+	cAPI.Log(Debug, message)
 }
 
 func LogInfo(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Info), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
+	cAPI.Log(Info, message)
 }
 
 func LogWarn(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Warn), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
+	cAPI.Log(Warn, message)
 }
 
 func LogError(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Error), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
+	cAPI.Log(Error, message)
 }
 
 func LogCritical(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Critical), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
+	cAPI.Log(Critical, message)
 }
 
 func LogTracef(format string, v ...any) {
@@ -87,5 +95,5 @@ func LogCriticalf(format string, v ...any) {
 }
 
 func GetLogLevel() LogType {
-	return LogType(C.envoyGoFilterLogLevel())
+	return cAPI.LogLevel()
 }
