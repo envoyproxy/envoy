@@ -168,7 +168,7 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
 }
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& operation_name,
-                                   SystemTime start_time, const Tracing::Decision tracing_decision,
+                                   SystemTime start_time, Tracing::Decision tracing_decision,
                                    bool downstream_span) {
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
   Span new_span(config, operation_name, start_time, time_source_, *this, downstream_span);

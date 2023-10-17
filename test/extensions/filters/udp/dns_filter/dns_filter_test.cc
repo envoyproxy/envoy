@@ -645,7 +645,7 @@ TEST_F(DnsFilterTest, RepeatedTypeAQuerySuccess) {
   for (size_t i = 0; i < loopCount; i++) {
 
     // Generate a changing, non-zero query ID for each lookup
-    const uint16_t query_id = (random_.random() + i) & 0xFFFF;
+    const uint16_t query_id = (random_.random() + i) % 0xFFFF + 1;
     const std::string query =
         Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN, query_id);
     ASSERT_FALSE(query.empty());

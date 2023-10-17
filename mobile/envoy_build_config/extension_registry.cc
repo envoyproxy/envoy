@@ -208,6 +208,7 @@ void ExtensionRegistry::registerFactories() {
   Network::forceRegisterUdpDefaultWriterFactoryFactory();
   Server::forceRegisterConnectionHandlerFactoryImpl();
   Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
+  Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
   Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
   Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();

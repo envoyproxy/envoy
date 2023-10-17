@@ -192,13 +192,18 @@ bug_fixes:
     ``overload.premature_reset_min_stream_lifetime_seconds`` determines the interval where received stream
     reset is considered premature (with 1 second default). The runtime key ``overload.premature_reset_total_stream_count``,
     with the default value of 500, determines the number of requests received from a connection before the check for premature
-    resets is applied. The connection is disconnected if more than 50% of resets are premature.
+    resets is applied. The connection is disconnected if more than 50% of resets are premature, or if
+    the number of suspect streams is already large enough to guarantee that more than 50% of the streams will be suspect
+    upon reaching the total stream threshold (even if all the remaining streams are considered benign).
     Setting the runtime key ``envoy.restart_features.send_goaway_for_premature_rst_streams`` to ``false`` completely disables
     this check.
 - area: http
   change: |
     Fixed a bug that could cause metadata to be decoded after a local reply has been triggered.
     Can be disabled by setting ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` to false.
+- area: docker/publishing
+  change: |
+    Update base images to resolve various glibc vulnerabilities.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -235,6 +240,12 @@ removed_config_or_runtime:
     substituted it with :ref:`outlier_detection.successful_active_health_check_uneject_host
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
     outlier detection configuration flag.
+- area: ext_authz
+  change: |
+    Removed ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add``
+    runtime option and substituted it with :ref:`failure_mode_allow_header_add
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow_header_add>`
+    configuration flag.
 
 new_features:
 - area: access_log
@@ -375,14 +386,21 @@ new_features:
     to control whether to create separate upstream span for upstream request.
 - area: original_dst
   change: |
-    Added support for the internal listener address recovery using the original destination listener filter.
+    added support for the internal listener address recovery using the original destination listener filter.
 - area: filters
   change: |
     Added filters to update the filter state for :ref:`the HTTP requests <config_http_filters_set_filter_state>` and
     :ref:`the TCP connections <config_network_filters_set_filter_state>`.
+- area: admin_logging
+  change: |
+    added support for glob control of fine-grain loggers in admin /logging interface.
 - area: geoip
   change: |
     Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
+- area: router
+  change: |
+    Added ``metadata`` support for :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.metadata>` and
+    :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.metadata>`.
 - area: tracing
   change: |
     Added support for exporting spans via HTTP on the OpenTelemetry tracer.

@@ -40,7 +40,7 @@ public:
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,
-                             SystemTime start_time, const Tracing::Decision tracing_decision,
+                             SystemTime start_time, Tracing::Decision tracing_decision,
                              bool downstream_span = true);
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,

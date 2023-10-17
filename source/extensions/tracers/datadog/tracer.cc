@@ -77,7 +77,7 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const std::string& operation_name,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::Decision tracing_decision) {
   ThreadLocalTracer& thread_local_tracer = **thread_local_slot_;
   if (!thread_local_tracer.tracer) {
     return std::make_unique<Tracing::NullSpan>();

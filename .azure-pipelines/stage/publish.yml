@@ -123,10 +123,6 @@ jobs:
               eq(${{ parameters.publishDockerhub }}, 'true'))
         displayName: "Publish Dockerhub description and README"
         env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
           DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
           DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
@@ -277,6 +273,16 @@ jobs:
   pool:
     vmImage: $(agentUbuntu)
   steps:
+  - task: DownloadSecureFile@1
+    name: WorkflowTriggerKey
+    displayName: 'Download workflow trigger key'
+    inputs:
+      secureFile: '${{ parameters.authGithubWorkflow }}'
+  - bash: |
+      set -e
+      KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
+      echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
+    name: key
   - template: ../ci.yml
     parameters:
       ciTarget: verify.trigger
@@ -310,13 +316,3 @@ jobs:
           mkdir -p $(Build.StagingDirectory)/release.signed
           mv release.signed.tar.zst $(Build.StagingDirectory)/release.signed
         displayName: Fetch signed release
-      - task: DownloadSecureFile@1
-        name: WorkflowTriggerKey
-        displayName: 'Download workflow trigger key'
-        inputs:
-          secureFile: '${{ parameters.authGithubWorkflow }}'
-      - bash: |
-          set -e
-          KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
-          echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
-        name: key
