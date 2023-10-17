@@ -43,6 +43,12 @@ struct NullCommonConfig : public Router::CommonConfig {
   bool usesVhds() const override { return false; }
   bool mostSpecificHeaderMutationsWins() const override { return false; }
   uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return Router::DefaultRouteMetadataPack::get().proto_metadata_;
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return Router::DefaultRouteMetadataPack::get().typed_metadata_;
+  }
 
   static const std::list<LowerCaseString> internal_only_headers_;
 };
@@ -64,6 +70,13 @@ struct NullVirtualHost : public Router::VirtualHost {
   void traversePerFilterConfig(
       const std::string&,
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return Router::DefaultRouteMetadataPack::get().proto_metadata_;
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return Router::DefaultRouteMetadataPack::get().typed_metadata_;
+  }
+
   static const NullRateLimitPolicy rate_limit_policy_;
   static const NullCommonConfig route_configuration_;
 };
@@ -212,8 +225,7 @@ struct NullRouteImpl : public Router::Route {
                 const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
                     hash_policy = {},
                 const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy = {})
-      : route_entry_(cluster_name, singleton_manager, timeout, hash_policy, retry_policy),
-        typed_metadata_({}) {}
+      : route_entry_(cluster_name, singleton_manager, timeout, hash_policy, retry_policy) {}
 
   // Router::Route
   const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -227,14 +239,16 @@ struct NullRouteImpl : public Router::Route {
   void traversePerFilterConfig(
       const std::string&,
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
-  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return Router::DefaultRouteMetadataPack::get().proto_metadata_;
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return Router::DefaultRouteMetadataPack::get().typed_metadata_;
+  }
   bool filterDisabled(absl::string_view) const override { return false; }
   const std::string& routeName() const override { return EMPTY_STRING; }
 
   RouteEntryImpl route_entry_;
-  const envoy::config::core::v3::Metadata metadata_;
-  const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory> typed_metadata_;
 };
 
 } // namespace Http

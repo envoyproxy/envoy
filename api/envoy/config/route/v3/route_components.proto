@@ -216,7 +216,6 @@ message VirtualHost {
   // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
 
-  // [#not-implemented-hide:]
   // The metadata field can be used to provide additional information
   // about the virtual host. It can be used for configuration, stats, and logging.
   // The metadata should go under the filter namespace that will need it.
