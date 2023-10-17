@@ -543,8 +543,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                                        route.response_headers_to_remove());
   }
   if (route.has_metadata()) {
-    metadata_ = std::make_unique<envoy::config::core::v3::Metadata>(route.metadata());
-    typed_metadata_ = std::make_unique<RouteTypedMetadata>(route.metadata());
+    metadata_ = std::make_unique<RouteMetadataPack>(route.metadata());
   }
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -1386,6 +1385,15 @@ void RouteEntryImplBase::traversePerFilterConfig(
   }
 }
 
+const envoy::config::core::v3::Metadata& RouteEntryImplBase::metadata() const {
+  return metadata_ != nullptr ? metadata_->proto_metadata_
+                              : DefaultRouteMetadataPack::get().proto_metadata_;
+}
+const Envoy::Config::TypedMetadata& RouteEntryImplBase::typedMetadata() const {
+  return metadata_ != nullptr ? metadata_->typed_metadata_
+                              : DefaultRouteMetadataPack::get().typed_metadata_;
+}
+
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase* parent, const std::string& runtime_key,
     Server::Configuration::ServerFactoryContext& factory_context,
@@ -1713,6 +1721,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   if (virtual_host.has_cors()) {
     cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
   }
+
+  if (virtual_host.has_metadata()) {
+    metadata_ = std::make_unique<RouteMetadataPack>(virtual_host.metadata());
+  }
 }
 
 CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
@@ -1757,6 +1769,15 @@ void CommonVirtualHostImpl::traversePerFilterConfig(
       maybe_vhost_config != nullptr) {
     cb(*maybe_vhost_config);
   }
+}
+
+const envoy::config::core::v3::Metadata& CommonVirtualHostImpl::metadata() const {
+  return metadata_ != nullptr ? metadata_->proto_metadata_
+                              : DefaultRouteMetadataPack::get().proto_metadata_;
+}
+const Envoy::Config::TypedMetadata& CommonVirtualHostImpl::typedMetadata() const {
+  return metadata_ != nullptr ? metadata_->typed_metadata_
+                              : DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 VirtualHostImpl::VirtualHostImpl(
@@ -2084,6 +2105,10 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
     response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                        config.response_headers_to_remove());
   }
+
+  if (config.has_metadata()) {
+    metadata_ = std::make_unique<RouteMetadataPack>(config.metadata());
+  }
 }
 
 ClusterSpecifierPluginSharedPtr
@@ -2094,6 +2119,15 @@ CommonConfigImpl::clusterSpecifierPlugin(absl::string_view provider) const {
         fmt::format("Unknown cluster specifier plugin name: {} is used in the route", provider));
   }
   return iter->second;
+}
+
+const envoy::config::core::v3::Metadata& CommonConfigImpl::metadata() const {
+  return metadata_ != nullptr ? metadata_->proto_metadata_
+                              : DefaultRouteMetadataPack::get().proto_metadata_;
+}
+const Envoy::Config::TypedMetadata& CommonConfigImpl::typedMetadata() const {
+  return metadata_ != nullptr ? metadata_->typed_metadata_
+                              : DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
@@ -2115,6 +2149,13 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
                                       const StreamInfo::StreamInfo& stream_info,
                                       uint64_t random_value) const {
   return route_matcher_->route(cb, headers, stream_info, random_value);
+}
+
+const envoy::config::core::v3::Metadata& NullConfigImpl::metadata() const {
+  return DefaultRouteMetadataPack::get().proto_metadata_;
+}
+const Envoy::Config::TypedMetadata& NullConfigImpl::typedMetadata() const {
+  return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
 RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
