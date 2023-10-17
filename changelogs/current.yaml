@@ -1,10 +1,17 @@
-date: October 17, 2023
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-- area: tracing
-  change: |
-    Fixed a bug in the Datadog tracer where Datadog's "operation name" field would contain what should be in the "resource name" field.
-- area: http
-  change: |
-    Fixed a bug where processing of deferred streams with the value of ``http.max_requests_per_io_cycle`` more than 1,
-    can cause a crash.
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+new_features:
+
+deprecated:
