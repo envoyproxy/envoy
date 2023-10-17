@@ -21,7 +21,6 @@ envoy.gpg.sign>=0.2.0
 flake8>=6
 frozendict>=2.3.7
 gitpython
-google-cloud-storage
 gsutil
 jinja2
 multidict>=6.0.2
@@ -42,3 +41,10 @@ thrift
 verboselogs
 yapf
 yarl>=1.7.2
+
+# Remove when https://github.com/sphinx-doc/sphinx/issues/11567 is finally resolved
+sphinxcontrib-applehelp==1.0.4
+sphinxcontrib-devhelp==1.0.2
+sphinxcontrib-htmlhelp==2.0.1
+sphinxcontrib-qthelp==1.0.3
+sphinxcontrib-serializinghtml==1.1.5

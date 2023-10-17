@@ -119,14 +119,6 @@ bazel () {
 export _bazel
 export -f bazel
 
-if [[ -n "$BAZEL_NO_CACHE_TEST_RESULTS" ]]; then
-    VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
-    # Use uncached test results for non-release commits to a branch.
-    if [[ $VERSION_DEV == "dev" ]]; then
-        BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
-    fi
-fi
-
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
 BAZEL_GLOBAL_OPTIONS=(
