@@ -46,6 +46,7 @@ protected:
     scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     // This enables a built-in automatic upstream server.
     autonomous_upstream_ = true;
+    autonomous_allow_incomplete_streams_ = true;
     proto_config_.set_allow_mode_override(true);
     proto_config_.mutable_message_timeout()->set_seconds(2);
     proto_config_.set_failure_mode_allow(true);
