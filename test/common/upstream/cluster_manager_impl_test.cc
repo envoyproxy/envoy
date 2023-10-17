@@ -3942,10 +3942,15 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
 // Also tests that if hosts are added/removed between mergeable updates, delivery will
 // happen and the scheduled update will be cancelled.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
-  createWithLocalClusterUpdate();
-
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 1st add of the 2 static localhost endpoints.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
         // 1st removal.
@@ -3981,6 +3986,8 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
       .Times(2)
       .WillRepeatedly(
           Invoke([](const auto& hosts_removed) { EXPECT_EQ(1, hosts_removed.size()); }));
+
+  createWithLocalClusterUpdate();
 
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
@@ -4079,10 +4086,15 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
 
 // Tests that mergeable updates outside of a window get applied immediately.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
-  createWithLocalClusterUpdate();
-
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 2 static host endpoints on Bootstrap's cluster.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
         // HC update, immediately delivered.
@@ -4090,6 +4102,8 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
       }));
+
+  createWithLocalClusterUpdate();
 
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
@@ -4115,6 +4129,14 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
 
 // Tests that mergeable updates inside of a window are not applied immediately.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }));
+
   createWithLocalClusterUpdate();
 
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
@@ -4143,10 +4165,15 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
 // Tests that mergeable updates outside of a window get applied immediately when
 // merging is disabled, and that the counters are correct.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindowDisabled) {
-  createWithLocalClusterUpdate(false);
-
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 2 static host endpoints on Bootstrap's cluster.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
         // HC update, immediately delivered.
@@ -4154,6 +4181,8 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindowDisabled) {
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
       }));
+
+  createWithLocalClusterUpdate(false);
 
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
@@ -4176,32 +4205,39 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindowDisabled) {
 }
 
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesDestroyedOnUpdate) {
-  // We create the default cluster, although for this test we won't use it since
-  // we can only update dynamic clusters.
-  createWithLocalClusterUpdate();
-
   // Ensure we see the right set of added/removed hosts on every call, for the
   // dynamically added/updated cluster.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
-        // 1st add, when the cluster is added.
+        // 1st add, which adds 2 localhost static hosts at ports 11001 and 11002.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 2nd add, when the dynamic `new_cluster` is added with static host 127.0.0.1:12001.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(1, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
       }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
-        // 1st removal.
+        // 1st removal of the dynamic `new_cluster`.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(1, hosts_removed.size());
       }));
 
   EXPECT_CALL(local_hosts_removed_, post(_)).WillOnce(Invoke([](const auto& hosts_removed) {
-    // 1st removal.
+    // 1st removal of the dynamic `new_cluster`.
     EXPECT_EQ(1, hosts_removed.size());
   }));
+
+  // We create the default cluster, although for this test we won't use it since
+  // we can only update dynamic clusters.
+  createWithLocalClusterUpdate();
 
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
 
