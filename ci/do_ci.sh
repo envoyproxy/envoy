@@ -525,6 +525,10 @@ case $CI_TARGET in
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
+        # Run pip requirements tests
+        echo "Check pip requirements ..."
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/base:requirements_test
         ;;
 
     dev)

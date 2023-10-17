@@ -152,7 +152,6 @@ message RouteConfiguration {
   // message to specify additional options.]
   map<string, google.protobuf.Any> typed_per_filter_config = 16;
 
-  // [#not-implemented-hide:]
   // The metadata field can be used to provide additional information
   // about the route configuration. It can be used for configuration, stats, and logging.
   // The metadata should go under the filter namespace that will need it.
