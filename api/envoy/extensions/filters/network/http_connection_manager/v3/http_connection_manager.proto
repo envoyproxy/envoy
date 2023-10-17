@@ -1170,10 +1170,10 @@ message HttpFilter {
   // Otherwise, clients that do not support this filter must reject the config.
   bool is_optional = 6;
 
-  // If true, the filter is disabled by default and must be explicitly enabled by explicitly setting
+  // If true, the filter is disabled by default and must be explicitly enabled by setting
   // per filter configuration in the route configuration.
   //
-  // A disabled filter will be treated as enabled in following cases:
+  // A disabled filter will be treated as enabled in the following cases:
   //
   // 1. Valid per filter configuration is configured in the ``typed_per_filter_config`` of route config.
   // 2. :ref:`FilterConfig <envoy_v3_api_msg_config.route.v3.FilterConfig>` is configured in the
@@ -1181,7 +1181,7 @@ message HttpFilter {
   //    :ref:`disabled of FilterConfig <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>`
   //    is set to false.
   //
-  // Terminal filters (e.g. ``envoy.filters.http.router``) could not be marked as disabled.
+  // Terminal filters (e.g. ``envoy.filters.http.router``) cannot be marked as disabled.
   bool disabled = 7;
 }
 
