@@ -329,7 +329,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
-  const auto& cm_config = bootstrap_.cluster_manager();
+  const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
@@ -353,7 +353,7 @@ ClusterManagerImpl::ClusterManagerImpl(
         validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
   }
 
-  if (bootstrap_.has_xds_config_tracker_extension()) {
+  if (bootstrap.has_xds_config_tracker_extension()) {
     auto& tracer_factory = Config::Utility::getAndCheckFactory<Config::XdsConfigTrackerFactory>(
         bootstrap.xds_config_tracker_extension());
     xds_config_tracker_ = tracer_factory.createXdsConfigTracker(
@@ -362,8 +362,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
-      local_info_, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(),
-      api, server, makeOptRefFromPtr(xds_resources_delegate_.get()),
+      local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
+      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
       makeOptRefFromPtr(xds_config_tracker_.get()));
 }
 
