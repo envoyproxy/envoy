@@ -397,6 +397,10 @@ new_features:
 - area: geoip
   change: |
     Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
+- area: router
+  change: |
+    Added ``metadata`` support for :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.metadata>` and
+    :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.metadata>`.
 
 deprecated:
 - area: tracing

@@ -6694,6 +6694,8 @@ TEST(NullConfigImplTest, All) {
   EXPECT_FALSE(config.usesVhds());
   EXPECT_FALSE(config.mostSpecificHeaderMutationsWins());
   EXPECT_EQ(0Ul, config.maxDirectResponseBodySizeBytes());
+  config.metadata();
+  config.typedMetadata();
 }
 
 class BadHttpRouteConfigurationsTest : public testing::Test, public ConfigImplTestBase {};
@@ -7718,9 +7720,11 @@ virtual_hosts:
 TEST_F(RouteConfigurationV2, RouteConfigGetters) {
   const std::string yaml = R"EOF(
 name: foo
+metadata: { filter_metadata: { com.bar.foo: { baz: test_config_value }, baz: {name: config_bluh} } }
 virtual_hosts:
   - name: bar
     domains: ["*"]
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_vh_value }, baz: {name: vh_bluh} } }
     routes:
       - match:
           safe_regex:
@@ -7760,6 +7764,26 @@ virtual_hosts:
 
   EXPECT_EQ("bar", symbol_table_->toString(route_entry->virtualHost().statName()));
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
+
+  // Get metadata of virtual host.
+  const auto& vh_metadata = route_entry->virtualHost().metadata();
+  const auto& vh_typed_metadata = route_entry->virtualHost().typedMetadata();
+
+  EXPECT_EQ(
+      "test_vh_value",
+      Envoy::Config::Metadata::metadataValue(&vh_metadata, "com.bar.foo", "baz").string_value());
+  EXPECT_NE(nullptr, vh_typed_metadata.get<Baz>(baz_factory.name()));
+  EXPECT_EQ("vh_bluh", vh_typed_metadata.get<Baz>(baz_factory.name())->name);
+
+  // Get metadata of route configuration.
+  const auto& config_metadata = route_entry->virtualHost().routeConfig().metadata();
+  const auto& config_typed_metadata = route_entry->virtualHost().routeConfig().typedMetadata();
+
+  EXPECT_EQ("test_config_value",
+            Envoy::Config::Metadata::metadataValue(&config_metadata, "com.bar.foo", "baz")
+                .string_value());
+  EXPECT_NE(nullptr, config_typed_metadata.get<Baz>(baz_factory.name()));
+  EXPECT_EQ("config_bluh", config_typed_metadata.get<Baz>(baz_factory.name())->name);
 }
 
 TEST_F(RouteConfigurationV2, RouteTracingConfig) {
