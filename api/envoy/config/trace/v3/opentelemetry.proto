@@ -29,6 +29,12 @@ message OpenTelemetryConfig {
   // The upstream HTTP cluster that will receive OTLP traces.
   // This field can be left empty to disable reporting traces to the HTTP service.
   // Only one of ``grpc_service``, ``http_service`` may be used.
+  //
+  // Note: The ``request_headers_to_add`` property in the OTLP HTTP exporter service
+  // does not support the :ref:`format specifier <config_access_log_format>` as used for
+  // :ref:`HTTP access logging <config_access_log>`.
+  // The values configured are added as HTTP headers on the OTLP export request
+  // without any formatting applied.
   core.v3.HttpService http_service = 3
       [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
 
