@@ -41,7 +41,7 @@ typed_config:
                                  true);
 
     config_helper_.prependFilter(R"EOF(
-name: donwstream-header-mutation-disabled-by-default
+name: downstream-header-mutation-disabled-by-default
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
   mutations:
@@ -141,7 +141,7 @@ typed_config:
             per_route_config.PackFrom(filter_config);
             // Try enable the filter that is disabled by default.
             route->mutable_typed_per_filter_config()->insert(
-                {"donwstream-header-mutation-disabled-by-default", per_route_config});
+                {"downstream-header-mutation-disabled-by-default", per_route_config});
           }
 
           {
