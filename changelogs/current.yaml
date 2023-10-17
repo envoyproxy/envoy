@@ -400,7 +400,7 @@ new_features:
 - area: composite filter
   change: |
     added :ref:`ExtensionConfiguration discovery service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>` support for
-    :ref:`composite filter <config_http_filters_composite>`.    
+    :ref:`composite filter <config_http_filters_composite>`.
 - area: router
   change: |
     Added ``metadata`` support for :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.metadata>` and
