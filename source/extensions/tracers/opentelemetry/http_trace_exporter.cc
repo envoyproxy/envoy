@@ -3,6 +3,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
@@ -16,7 +17,14 @@ namespace OpenTelemetry {
 OpenTelemetryHttpTraceExporter::OpenTelemetryHttpTraceExporter(
     Upstream::ClusterManager& cluster_manager,
     const envoy::config::core::v3::HttpService& http_service)
-    : cluster_manager_(cluster_manager), http_service_(http_service) {}
+    : cluster_manager_(cluster_manager), http_service_(http_service) {
+
+  // Prepare and store headers to be used later on each export request
+  for (const auto& header_value_option : http_service_.request_headers_to_add()) {
+    parsed_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
+                                      header_value_option.header().value()});
+  }
+}
 
 bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& request) {
   std::string request_body;
@@ -43,9 +51,8 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
   // Add all custom headers to the request.
-  for (const auto& header_value_option : http_service_.request_headers_to_add()) {
-    message->headers().setCopy(Http::LowerCaseString(header_value_option.header().key()),
-                               header_value_option.header().value());
+  for (const auto& header_pair : parsed_headers_to_add_) {
+    message->headers().setReference(header_pair.first, header_pair.second);
   }
   message->body().add(request_body);
 

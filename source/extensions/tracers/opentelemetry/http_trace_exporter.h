@@ -39,6 +39,7 @@ private:
   envoy::config::core::v3::HttpService http_service_;
   // Track active HTTP requests to be able to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
+  std::vector<std::pair<const Http::LowerCaseString, const std::string>> parsed_headers_to_add_;
 };
 
 } // namespace OpenTelemetry
