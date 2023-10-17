@@ -204,7 +204,7 @@ aioquic==0.9.21 \
     --hash=sha256:c627ed67f008cc020e67e20872c844c60c2dcc45d73e6f1d035c399c2953a974 \
     --hash=sha256:efbf4de92df68d11a42909b4750430a61380d32e2b5d5da1525f6e482a09f60c \
     --hash=sha256:f6d9f6f1f778875fc8bd06b387b5916f48f610a698eee31385688ab8ba696fcf
-    # via -r requirements.in
+    # via -r tools/base/requirements.in
 aiosignal==1.3.1 \
     --hash=sha256:54cd96e15e1649b75d6c87526a6ff0b6c1b0dd3459f43d9ca11d48c339b68cfc \
     --hash=sha256:f8376fb07dd1e86a584e4fcdec80b36b7f81aac666ebc724e2c090300dd83b17
@@ -473,9 +473,9 @@ docutils==0.19 \
     #   envoy-docs-sphinx-runner
     #   sphinx
     #   sphinx-rtd-theme
-envoy-base-utils==0.4.16 \
-    --hash=sha256:b1ad6684dcf525651b01ded26ebb9f8ee5900089c786dd58b7a50ed663dafe3e \
-    --hash=sha256:edaf42b3ae24aa34bb8bbb41b5e2eb1c5b230207cb00ff5a47cf259d31c6c628
+envoy-base-utils==0.4.21 \
+    --hash=sha256:37e79232261a2b741ce75a7f25344ca3254a0fbbd40954a4e5367d0673559ad7 \
+    --hash=sha256:b41a143edac4bf8a09d6f2f222740e82f78fed000e736e5f3029c2d807c02445
     # via
     #   -r tools/base/requirements.in
     #   envoy-code-check
