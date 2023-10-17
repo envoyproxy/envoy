@@ -307,16 +307,32 @@ modify different aspects of the server:
 
   Enable/disable logging levels for different loggers.
 
-  - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
-  - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
+  If the default component logger is used, the logger name should be exactlly the component name.
+
+  - To change the logging level across all loggers, set the query parameter as ``level=<desired_level>``.
+  - To change a particular logger's level, set the query parameter like so, ``<logger_name>=<desired_level>``.
   - To change multiple logging levels at once, set the query parameter as ``paths=<logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>``.
-  - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
+  - To list the loggers, send a POST request to the ``/logging`` endpoint without a query parameter.
 
-  .. note::
+  If ``--enable-fine-grain-logging`` is set, the logger is represented by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``),
+  so the logger list will show a list of file paths, and the specific path should be used as ``<logger_name>`` to change the log level.
 
-    Generally only used during development. With ``--enable-fine-grain-logging`` being set, the logger is represented
-    by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``), so the logger list
-    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level.
+  We also added the file basename, glob ``*`` and ``?`` support for fine-grain loggers. For example, we have the following active loggers with trace level.
+
+  .. code-block:: text
+
+    source/server/admin/admin_filter.cc: 0
+    source/common/event/dispatcher_impl.cc: 0
+    source/common/network/tcp_listener_impl.cc: 0
+    source/common/network/udp_listener_impl.cc: 0
+
+  - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
+  - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
+  - ``/logging?paths=source/common*:warning`` will make the level of ``source/common/event/dispatcher_impl.cc:``, ``source/common/network/tcp_listener_impl.cc`` be warning.
+    Other unmatched loggers will be the default trace, e.g., `admin_filter.cc`, even it was updated to info from the previous post update.
+  - ``/logging?paths=???_listener_impl:info`` will make the level of ``source/common/network/tcp_listener_impl.cc``, ``source/common/network/udp_listener_impl.cc`` be info.
+  - ``/logging?paths=???_listener_impl:info,tcp_listener_impl:warning``, the level of ``source/common/network/tcp_listener_impl.cc`` will be info, since the first match will take effect.
+  - ``/logging?level=info`` will change the default verbosity level to info. All the unmatched loggers in the following update will be this default level.
 
 .. http:get:: /memory
 

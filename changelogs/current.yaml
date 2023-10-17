@@ -192,7 +192,9 @@ bug_fixes:
     ``overload.premature_reset_min_stream_lifetime_seconds`` determines the interval where received stream
     reset is considered premature (with 1 second default). The runtime key ``overload.premature_reset_total_stream_count``,
     with the default value of 500, determines the number of requests received from a connection before the check for premature
-    resets is applied. The connection is disconnected if more than 50% of resets are premature.
+    resets is applied. The connection is disconnected if more than 50% of resets are premature, or if
+    the number of suspect streams is already large enough to guarantee that more than 50% of the streams will be suspect
+    upon reaching the total stream threshold (even if all the remaining streams are considered benign).
     Setting the runtime key ``envoy.restart_features.send_goaway_for_premature_rst_streams`` to ``false`` completely disables
     this check.
 - area: http
@@ -238,6 +240,12 @@ removed_config_or_runtime:
     substituted it with :ref:`outlier_detection.successful_active_health_check_uneject_host
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
     outlier detection configuration flag.
+- area: ext_authz
+  change: |
+    Removed ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add``
+    runtime option and substituted it with :ref:`failure_mode_allow_header_add
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow_header_add>`
+    configuration flag.
 
 new_features:
 - area: access_log
@@ -340,6 +348,11 @@ new_features:
   change: |
     Added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: udp_proxy
+  change: |
+    added :ref:`dynamic_forward_proxy <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig>`
+    UDP session filter that can be used to have dynamic forward proxy UDP flows, when used in conjunction with another session filter
+    that sets required filter state values.
 - area: zookeeper
   change: |
     Added support for emitting per opcode request bytes metrics via :ref:`enable_per_opcode_request_bytes_metrics
@@ -378,17 +391,24 @@ new_features:
     to control whether to create separate upstream span for upstream request.
 - area: original_dst
   change: |
-    Added support for the internal listener address recovery using the original destination listener filter.
+    added support for the internal listener address recovery using the original destination listener filter.
 - area: filters
   change: |
     Added filters to update the filter state for :ref:`the HTTP requests <config_http_filters_set_filter_state>` and
     :ref:`the TCP connections <config_network_filters_set_filter_state>`.
+- area: admin_logging
+  change: |
+    added support for glob control of fine-grain loggers in admin /logging interface.
 - area: geoip
   change: |
     Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
 - area: admin
   change: |
     Added a new ``skip_exit`` query parameter to ``/drain_listeners`` to skip exiting after the drain period.
+- area: router
+  change: |
+    Added ``metadata`` support for :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.metadata>` and
+    :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.metadata>`.
 
 deprecated:
 - area: tracing

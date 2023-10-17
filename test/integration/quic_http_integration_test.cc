@@ -36,7 +36,6 @@
 #include "test/test_common/utility.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
-#include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
@@ -221,7 +220,7 @@ public:
             (host.empty() ? transport_socket_factory_->clientContextConfig()->serverNameIndication()
                           : host),
             static_cast<uint16_t>(port), false},
-        transport_socket_factory_->getCryptoConfig(), &push_promise_index_, *dispatcher_,
+        transport_socket_factory_->getCryptoConfig(), *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
@@ -392,7 +391,6 @@ public:
   }
 
 protected:
-  quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;

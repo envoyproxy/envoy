@@ -26,7 +26,7 @@ And then you can analyze the outputted heap profile with pprof:
 
 .. code-block:: bash
 
-    $ pprof -http:localhost:9999 /heap/output/envoy.heap
+    $ pprof -http localhost:9999 /heap/output/envoy.heap
 
 .. note::
     If you dump the heap profile in the production environment and analyze it in the local environment, please ensure
