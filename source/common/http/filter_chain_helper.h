@@ -99,7 +99,7 @@ private:
     // flag here as alternative.
     if (last_filter_in_current_config && disabled_by_default) {
       return absl::InvalidArgumentError(fmt::format(
-          "Error: the last (terminal) filter ({}) in the chain could not be disabled by default.",
+          "Error: the last (terminal) filter ({}) in the chain cannot be disabled by default.",
           proto_config.name()));
     }
 
