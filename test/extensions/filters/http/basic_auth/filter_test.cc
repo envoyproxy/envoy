@@ -15,9 +15,9 @@ namespace BasicAuth {
 class FilterTest : public testing::Test {
 public:
   FilterTest() {
-    std::vector<User> users;
-    users.push_back({"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}); // user1:test1
-    users.push_back({"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}); // user2:test2
+    UserMap users;
+    users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
+    users.insert({"user2", {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}}); // user2:test2
     config_ = std::make_shared<FilterConfig>(users, "stats", *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -65,7 +65,7 @@ TEST_F(FilterTest, InvalidPassword) {
   // user1:test2
   Http::TestRequestHeaderMapImpl request_headers_user1{{"Authorization", "Basic dXNlcjE6dGVzdDI="}};
 
-    EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
                            std::function<void(Http::ResponseHeaderMap & headers)>,
                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -82,7 +82,7 @@ TEST_F(FilterTest, InvalidPassword) {
 TEST_F(FilterTest, NoAuthHeader) {
   Http::TestRequestHeaderMapImpl request_headers_user1;
 
-    EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
                            std::function<void(Http::ResponseHeaderMap & headers)>,
                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status,

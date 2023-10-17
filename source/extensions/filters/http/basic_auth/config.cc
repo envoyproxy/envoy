@@ -12,8 +12,8 @@ using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
 
 namespace {
 
-std::vector<User> readHtpasswd(std::string htpasswd) {
-  std::vector<User> users;
+UserMap readHtpasswd(std::string htpasswd) {
+  UserMap users;
   std::istringstream htpsswd_ss(htpasswd);
   std::string line;
 
@@ -36,7 +36,7 @@ std::vector<User> readHtpasswd(std::string htpasswd) {
           throw EnvoyException("invalid SHA hash length");
         }
 
-        users.push_back({name, hash});
+        users.insert({name, {name, hash}});
         continue;
       }
     }

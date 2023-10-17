@@ -28,20 +28,20 @@ std::string computeSHA1(const std::string& password) {
 
 } // namespace
 
-FilterConfig::FilterConfig(std::vector<User> users, const std::string& stats_prefix,
-                           Stats::Scope& scope)
+FilterConfig::FilterConfig(UserMap users, const std::string& stats_prefix, Stats::Scope& scope)
     : users_(users), stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
 
 bool FilterConfig::validateUser(const std::string& username, const std::string& password) {
-  for (auto user : users_) {
-    if (user.name == username) {
-      std::string hashedPassword = computeSHA1(password);
-      if (hashedPassword == user.hash) {
-        return true;
-      }
-      return false;
-    }
+  const auto user = users_.find(username);
+  if (user == users_.end()) {
+    return false;
   }
+
+  std::string hashedPassword = computeSHA1(password);
+  if (hashedPassword == user->second.hash) {
+    return true;
+  }
+
   return false;
 }
 

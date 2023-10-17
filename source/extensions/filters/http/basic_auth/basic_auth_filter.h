@@ -1,5 +1,7 @@
 #pragma once
 
+#include "absl/container/flat_hash_map.h"
+
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
@@ -34,12 +36,14 @@ struct User {
   std::string hash;
 };
 
+using UserMap = absl::flat_hash_map<std::string, User>; // username, User
+
 /**
  * Configuration for the Basic Auth filter.
  */
 class FilterConfig {
 public:
-  FilterConfig(std::vector<User> users, const std::string& stats_prefix, Stats::Scope& scope);
+  FilterConfig(UserMap users, const std::string& stats_prefix, Stats::Scope& scope);
   BasicAuthStats& stats() { return stats_; }
   bool validateUser(const std::string& username, const std::string& password);
 
@@ -48,7 +52,7 @@ private:
     return BasicAuthStats{ALL_BASIC_AUTH_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  std::vector<User> users_;
+  UserMap users_;
   BasicAuthStats stats_;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -73,3 +77,4 @@ private:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
