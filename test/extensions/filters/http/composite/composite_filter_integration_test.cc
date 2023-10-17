@@ -204,10 +204,11 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
 TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
   prependCompositeDynamicFilter("composite-dynamic");
   initialize();
-  test_server_->waitForCounterGe("extension_config_discovery.http_filter.set-response-code.config_reload", 1);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
-  
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   {
