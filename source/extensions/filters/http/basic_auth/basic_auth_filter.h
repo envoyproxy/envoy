@@ -1,11 +1,11 @@
 #pragma once
 
-#include "absl/container/flat_hash_map.h"
-
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -77,4 +77,3 @@ private:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-

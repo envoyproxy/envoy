@@ -100,4 +100,3 @@ TEST_F(FilterTest, NoAuthHeader) {
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-

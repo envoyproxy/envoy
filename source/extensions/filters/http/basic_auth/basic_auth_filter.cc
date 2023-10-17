@@ -3,8 +3,8 @@
 #include <openssl/sha.h>
 
 #include "source/common/common/base64.h"
-#include "source/common/http/headers.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Extensions {
