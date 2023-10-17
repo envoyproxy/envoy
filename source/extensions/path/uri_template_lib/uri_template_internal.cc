@@ -41,7 +41,8 @@ constexpr unsigned long kPatternMatchingMinVariableNameLen = 1;
 constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        "%"             // pct-encoded
                                        "!$&'()+,;"     // sub-delims excluding *=
-                                       ":@";
+                                       ":@"
+                                       "="; // user included "=" allowed
 
 // Default operator used for the variable when none specified.
 constexpr Operator kDefaultVariableOperator = Operator::PathGlob;
