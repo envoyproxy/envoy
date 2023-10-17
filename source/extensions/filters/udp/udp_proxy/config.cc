@@ -1,9 +1,68 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 
+#include "source/common/formatter/substitution_format_string.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
+
+constexpr uint32_t DefaultMaxConnectAttempts = 1;
+constexpr uint32_t DefaultMaxBufferedDatagrams = 1024;
+constexpr uint64_t DefaultMaxBufferedBytes = 16384;
+
+TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
+                                         Server::Configuration::FactoryContext& context)
+    : header_parser_(Envoy::Router::HeaderParser::configure(config.headers_to_add())),
+      proxy_port_(), target_port_(config.default_target_port()), use_post_(config.use_post()),
+      post_path_(config.post_path()),
+      max_connect_attempts_(config.has_retry_options()
+                                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_options(),
+                                                                  max_connect_attempts,
+                                                                  DefaultMaxConnectAttempts)
+                                : DefaultMaxConnectAttempts),
+      buffer_enabled_(config.has_buffer_options()),
+      max_buffered_datagrams_(config.has_buffer_options()
+                                  ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.buffer_options(),
+                                                                    max_buffered_datagrams,
+                                                                    DefaultMaxBufferedDatagrams)
+                                  : DefaultMaxBufferedDatagrams),
+      max_buffered_bytes_(config.has_buffer_options()
+                              ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.buffer_options(),
+                                                                max_buffered_bytes,
+                                                                DefaultMaxBufferedBytes)
+                              : DefaultMaxBufferedBytes) {
+  if (!post_path_.empty() && !use_post_) {
+    throw EnvoyException("Can't set a post path when POST method isn't used");
+  }
+
+  if (post_path_.empty()) {
+    post_path_ = "/";
+  } else if (post_path_.rfind("/", 0) != 0) {
+    throw EnvoyException("Path must start with '/'");
+  }
+
+  envoy::config::core::v3::SubstitutionFormatString proxy_substitution_format_config;
+  proxy_substitution_format_config.mutable_text_format_source()->set_inline_string(
+      config.proxy_host());
+  proxy_host_formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+      proxy_substitution_format_config, context);
+
+  if (config.has_proxy_port()) {
+    uint32_t port = config.proxy_port().value();
+    if (port == 0 || port > 65535) {
+      throw EnvoyException("Port value not in range");
+    }
+
+    proxy_port_ = port;
+  }
+
+  envoy::config::core::v3::SubstitutionFormatString target_substitution_format_config;
+  target_substitution_format_config.mutable_text_format_source()->set_inline_string(
+      config.target_host());
+  target_host_formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+      target_substitution_format_config, context);
+}
 
 UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
     Server::Configuration::ListenerFactoryContext& context,
@@ -15,8 +74,12 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
       stats_(generateStats(config.stat_prefix(), context.scope())),
       // Default prefer_gro to true for upstream client traffic.
-      upstream_socket_config_(config.upstream_socket_config(), true),
-      random_(context.api().randomGenerator()) {
+      upstream_socket_config_(config.upstream_socket_config(), true) {
+  if (use_per_packet_load_balancing_ && config.has_tunneling_config()) {
+    throw EnvoyException(
+        "Only one of use_per_packet_load_balancing or tunneling_config can be used.");
+  }
+
   if (use_per_packet_load_balancing_ && !config.session_filters().empty()) {
     throw EnvoyException(
         "Only one of use_per_packet_load_balancing or session_filters can be used.");
@@ -42,6 +105,10 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
 
   if (!config.hash_policies().empty()) {
     hash_policy_ = std::make_unique<HashPolicyImpl>(config.hash_policies());
+  }
+
+  if (config.has_tunneling_config()) {
+    tunneling_config_ = std::make_unique<TunnelingConfigImpl>(config.tunneling_config(), context);
   }
 
   for (const auto& filter : config.session_filters()) {

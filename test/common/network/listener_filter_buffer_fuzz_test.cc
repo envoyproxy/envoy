@@ -62,17 +62,15 @@ public:
         // If the available is 0, then emulate an `EAGAIN`.
         if (append_data_size == 0) {
           EXPECT_CALL(io_handle_, recv)
-              .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-                  0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                     IoSocketError::deleteIoError)))));
+              .WillOnce(Return(
+                  ByMove(Api::IoCallUint64Result(0, IoSocketError::getIoSocketEagainError()))));
         } else {
           available_data_.insert(available_data_.end(), append_data_size, insert_value);
           EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
             EXPECT_EQ(MSG_PEEK, flags);
             auto copy_size = std::min(length, available_data_.size());
             ::memcpy(buffer, available_data_.data(), copy_size);
-            return Api::IoCallUint64Result(copy_size,
-                                           Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+            return Api::IoCallUint64Result(copy_size, Api::IoError::none());
           });
           drained_size_ = 0;
         }
@@ -89,8 +87,7 @@ public:
             EXPECT_EQ(drain_size, length);
             ::memcpy(buffer, available_data_.data(), drain_size);
             available_data_ = available_data_.substr(drain_size);
-            return Api::IoCallUint64Result(drain_size,
-                                           Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+            return Api::IoCallUint64Result(drain_size, Api::IoError::none());
           });
         }
         drained_size_ += drain_size;

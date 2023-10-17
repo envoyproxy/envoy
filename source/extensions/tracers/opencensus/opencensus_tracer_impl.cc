@@ -377,7 +377,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const std::string& operation_name,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::Decision tracing_decision) {
   return std::make_unique<Span>(config, oc_config_, trace_context, operation_name,
                                 stream_info.startTime(), tracing_decision);
 }

@@ -421,8 +421,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       if (cluster_) {
         config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
       }
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add")) {
+      if (config_->failureModeAllowHeaderAdd()) {
         request_headers_->addReferenceKey(
             Filters::Common::ExtAuthz::Headers::get().EnvoyAuthFailureModeAllowed, "true");
       }

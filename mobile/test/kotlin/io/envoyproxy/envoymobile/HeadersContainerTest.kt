@@ -13,13 +13,17 @@ class HeadersContainerest {
 
   @Test
   fun `instantiation with mutable list of values is case-insensitive, preserves casing and processes in alphabetical order`() {
-    val container = HeadersContainer(mapOf("a" to mutableListOf<String>("456"), "A" to mutableListOf<String>("123")))
+    val container =
+      HeadersContainer(
+        mapOf("a" to mutableListOf<String>("456"), "A" to mutableListOf<String>("123"))
+      )
     assertThat(container.caseSensitiveHeaders()).isEqualTo(mapOf("A" to listOf("123", "456")))
   }
 
   @Test
   fun `creation with immutable list of values is case-insensitive, preserves casing and processes in alphabetical order`() {
-    val container = HeadersContainer.create(mapOf("a" to listOf<String>("456"), "A" to listOf<String>("123")))
+    val container =
+      HeadersContainer.create(mapOf("a" to listOf<String>("456"), "A" to listOf<String>("123")))
     assertThat(container.caseSensitiveHeaders()).isEqualTo(mapOf("A" to listOf("123", "456")))
   }
 
@@ -46,7 +50,7 @@ class HeadersContainerest {
     val container = HeadersContainer(mapOf())
     container.set("x-foo", mutableListOf("abc"))
 
-    assertThat( container.value("x-foo")).isEqualTo(listOf("abc"))
+    assertThat(container.value("x-foo")).isEqualTo(listOf("abc"))
   }
 
   @Test

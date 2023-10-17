@@ -60,6 +60,7 @@ public:
                const std::string& stats_prefix, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
+        failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
 
@@ -133,6 +134,8 @@ public:
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
+  bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
+
   bool clearRouteCache() const { return clear_route_cache_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
@@ -205,6 +208,7 @@ private:
 
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
+  const bool failure_mode_allow_header_add_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;

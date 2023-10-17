@@ -8,9 +8,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 import org.junit.Assert.fail
 
-/**
- * Gets the stats in the form of `Map<String, String>`.
- */
+/** Gets the stats in the form of `Map<String, String>`. */
 fun Engine.getStats(): Map<String, String> {
   // `dumpStats()` produces the following format:
   // key1: value1
@@ -18,25 +16,28 @@ fun Engine.getStats(): Map<String, String> {
   // key3: value3
   // ...
   val lines = dumpStats().split("\n")
-  return lines.mapNotNull {
-    val keyValue = it.split(": ")
-    if (keyValue.size == 2) {
-      Pair(keyValue[0], keyValue[1])
-    } else {
-      null
+  return lines
+    .mapNotNull {
+      val keyValue = it.split(": ")
+      if (keyValue.size == 2) {
+        Pair(keyValue[0], keyValue[1])
+      } else {
+        null
+      }
     }
-  }.toMap()
+    .toMap()
 }
 
 /**
- * Waits for 5 seconds (default) until the stat of the given [name] is greater
- * than equal the specified [expectedValue].
+ * Waits for 5 seconds (default) until the stat of the given [name] is greater than equal the
+ * specified [expectedValue].
  *
- * @throws java.lang.AssertionError throw when the the operation timed out
- * waiting for the stat value to be greater than the [expectedValue].
+ * @throws java.lang.AssertionError throw when the the operation timed out waiting for the stat
+ *   value to be greater than the [expectedValue].
  */
 fun Engine.waitForStatGe(
-  name: String, expectedValue: Long,
+  name: String,
+  expectedValue: Long,
   timeout: Duration = 5.seconds,
 ) {
   val waitTime = Instant.now().plusMillis(timeout.toLong(DurationUnit.MILLISECONDS))
@@ -49,4 +50,3 @@ fun Engine.waitForStatGe(
     currentValue = getStats()[name]
   }
 }
-

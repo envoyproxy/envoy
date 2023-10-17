@@ -113,6 +113,15 @@ TEST_F(TcpConnPoolTest, Http3Config) {
                          &lb_context_, callbacks_, downstream_stream_info_));
 }
 
+TEST(DisableTunnelingObjectFactory, CreateFromBytes) {
+  auto* factory = Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+      TcpProxy::DisableTunnelingFilterStateKey);
+  ASSERT_NE(nullptr, factory);
+  auto object = factory->createFromBytes("true");
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(true, dynamic_cast<const StreamInfo::BoolAccessor*>(object.get())->value());
+}
+
 } // namespace Generic
 } // namespace Tcp
 } // namespace Upstreams
