@@ -1,10 +1,10 @@
 """Tests the behavior of connection handoff between instances during hot restart.
 
 Specifically, tests that:
-1. A tcp connection opened before hot restart begins continues to function during drain.
-2. A tcp connection opened after hot restart begins while the old instance is still running
-   goes to the new instance.
-TODO(ravenblack): perform the same tests for quic connections once they will work as expected.
+1. TCP connections opened before hot restart begins continue to function during drain.
+2. TCP connections opened after hot restart begins while the old instance is still running
+   go to the new instance.
+TODO(ravenblack): perform the same tests for QUIC connections once they will work as expected.
 """
 
 import asyncio
@@ -38,8 +38,15 @@ def random_loopback_host():
 # reason we want to keep it as low as possible without causing flaky failure.
 #
 # Ideally this would be adjusted (3x) for tsan and coverage runs, but making that
-# possible for python is outside the scope of this test.
+# possible for python is outside the scope of this test, so we're stuck using the
+# 3x value for all tests.
 STARTUP_TOLERANCE_SECONDS = 10
+
+# We send multiple requests in parallel and require them all to function correctly
+# - this makes it so if something is flaky we're more likely to encounter it, and
+# also tests that there's not an "only one" success situation.
+PARALLEL_REQUESTS = 5
+
 UPSTREAM_SLOW_PORT = 54321
 UPSTREAM_FAST_PORT = 54322
 UPSTREAM_HOST = random_loopback_host()
@@ -234,10 +241,14 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         )
         log.info("waiting for envoy ready")
         await _wait_for_envoy_epoch(0)
-        log.info("making request")
-        slow_response = _http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
-        log.info("waiting for response to begin")
-        self.assertEqual(await anext(slow_response, None), b"start\n")
+        log.info("making requests")
+        slow_responses = [
+            _http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/") for i in range(PARALLEL_REQUESTS)
+            # TODO(ravenblack): add http3 slow requests
+        ]
+        log.info("waiting for responses to begin")
+        for response in slow_responses:
+            self.assertEqual(await anext(response, None), b"start\n")
         base_id = int(self.base_id_path.read_text())
         log.info(f"starting envoy hot restart for base id {base_id}")
         envoy_process_2 = await asyncio.create_subprocess_exec(
@@ -254,25 +265,43 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         log.info("waiting for new envoy instance to begin")
         await _wait_for_envoy_epoch(1)
         log.info("sending request to fast upstream")
-        fast_response = await _full_http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
-        self.assertEqual(
-            fast_response, "fast instance",
-            "new requests after hot restart begins should go to new cluster")
+        fast_responses = [
+            _full_http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
+            for i in range(PARALLEL_REQUESTS)
+            # TODO(ravenblack): add http3 requests
+        ]
+        for response in fast_responses:
+            self.assertEqual(
+                await response, "fast instance",
+                "new requests after hot restart begins should go to new cluster")
+
         # Now wait for the slow request to complete, and make sure it still gets the
         # response from the old instance.
         log.info("waiting for completion of original slow request")
         t1 = datetime.now()
-        self.assertEqual(await anext(slow_response, None), b"end\n")
+        for response in slow_responses:
+            self.assertEqual(await anext(response, None), b"end\n")
         t2 = datetime.now()
         self.assertGreater(
             (t2 - t1).total_seconds(), 0.5,
             "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior"
         )
-        self.assertIsNone(await anext(slow_response, None))
-        log.info("shutting everything down")
-        envoy_process_1.terminate()
-        envoy_process_2.terminate()
+        for response in slow_responses:
+            self.assertIsNone(await anext(response, None))
+        log.info("waiting for parent instance to terminate")
         await envoy_process_1.wait()
+        log.info("sending second request to fast upstream")
+        fast_responses = [
+            _full_http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
+            for i in range(PARALLEL_REQUESTS)
+            # TODO(ravenblack): add http3 requests
+        ]
+        for response in fast_responses:
+            self.assertEqual(
+                await response, "fast instance",
+                "new requests after old instance terminates should go to new cluster")
+        log.info("shutting child instance down")
+        envoy_process_2.terminate()
         await envoy_process_2.wait()
 
 

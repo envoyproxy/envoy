@@ -81,9 +81,6 @@ envoy_mobile_kt_library(
             "RequestHeadersBuilderCompressionUtil.kt",
         ],
         "@envoy",
-    ) + envoy_select_enable_http3(
-        ["EngineBuilderHTTP3Util.kt"],
-        "@envoy",
     ),
     visibility = ["//visibility:public"],
     deps = [

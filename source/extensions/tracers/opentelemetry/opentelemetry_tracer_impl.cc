@@ -49,7 +49,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const std::string& operation_name,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::Decision tracing_decision) {
   // Get tracer from TLS and start span.
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   SpanContextExtractor extractor(trace_context);
