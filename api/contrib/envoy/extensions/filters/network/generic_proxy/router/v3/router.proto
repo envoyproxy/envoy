@@ -29,6 +29,7 @@ message Router {
   // all requests from the same downstream connection.
   //
   // And if this options is true, one of the following requirements must be met:
+  //
   // 1. The request must be handled one by one. That is, the next request can not be sent to the
   //    upstream until the previous request is finished.
   // 2. Unique request id must be provided for each request and response. The request id must be
