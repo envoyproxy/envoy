@@ -117,7 +117,7 @@ http_filters:
                                   scoped_routes_config_provider_manager_, tracer_manager_,
                                   filter_config_provider_manager_),
       EnvoyException,
-      "Error: the last (terminal) filter (envoy.filters.http.router) in the chain could not be "
+      "Error: the last (terminal) filter (envoy.filters.http.router) in the chain cannot be "
       "disabled by default.");
 }
 
