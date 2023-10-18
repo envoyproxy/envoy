@@ -1,7 +1,6 @@
-date: Pending
+date: October 18, 2023
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: jwt
   change: |
     Changed behavior of the JWT extraction, passing entire token for validation, instead cut him in the non-Base64 character.
@@ -40,7 +39,6 @@ behavior_changes:
     Previously, zone-aware routing would not route fairly in this case.
     To revert the entire change, set the runtime flag ``envoy.reloadable_features.locality_routing_use_new_routing_logic``
     to ``false`` to get the old behavior and well-tested codepaths, undoing both changes.
-
 - area: UHV
   change: |
     Introduced runtime flag ``envoy.reloadable_features.enable_universal_header_validator`` for toggling Universal Header Validator
@@ -56,7 +54,6 @@ behavior_changes:
     By default this limit is disabled.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: ext_authz
   change: |
     Removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
@@ -137,7 +134,6 @@ minor_behavior_changes:
     to find the keys configured in filter_state_objects_to_log.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: connection limit
   change: |
     Fixed a use-after-free bug in the connection limit filter.
@@ -217,7 +213,6 @@ bug_fixes:
     Fix a bug where the nonce was not reset after reconnecting to the xDS server, when using State-of-the-World.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: listener
   change: |
     Removed ``envoy.reloadable_features.enable_update_listener_socket_options`` runtime flag and legacy code paths.
