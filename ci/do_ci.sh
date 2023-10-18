@@ -525,10 +525,11 @@ case $CI_TARGET in
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
+        # Disable this pending resolution to https://github.com/envoyproxy/envoy/issues/30286
         # Run pip requirements tests
-        echo "Check pip requirements ..."
-        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/base:requirements_test
+        # echo "Check pip requirements ..."
+        # bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       //tools/base:requirements_test
         ;;
 
     dev)
