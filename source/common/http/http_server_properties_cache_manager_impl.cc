@@ -61,7 +61,7 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
            entry : options.prepopulated_entries()) {
     const HttpServerPropertiesCacheImpl::Origin origin = {"https", entry.hostname(), entry.port()};
     std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocol = {
-        {"h3", entry.hostname(), entry.port(),
+        {"h3", "", entry.port(),
          dispatcher.timeSource().monotonicTime() + std::chrono::hours(168)}};
     OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> existing_protocols =
         new_cache->findAlternatives(origin);

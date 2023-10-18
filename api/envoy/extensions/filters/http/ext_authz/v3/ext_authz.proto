@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -62,6 +62,12 @@ message ExtAuthz {
   // Note that errors can be ``always`` tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
+
+  // When ``failure_mode_allow`` and ``failure_mode_allow_header_add`` are both set to true,
+  // ``x-envoy-auth-failure-mode-allowed: true`` will be added to request headers if the communication
+  // with the authorization service has failed, or if the authorization service has returned a
+  // HTTP 5xx error.
+  bool failure_mode_allow_header_add = 19;
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization

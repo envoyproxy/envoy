@@ -136,16 +136,20 @@ using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig
 class UdpLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   UdpLoadBalancerContext(const Udp::HashPolicy* hash_policy,
-                         const Network::Address::InstanceConstSharedPtr& peer_address) {
+                         const Network::Address::InstanceConstSharedPtr& peer_address,
+                         const StreamInfo::StreamInfo* stream_info)
+      : stream_info_(stream_info) {
     if (hash_policy) {
       hash_ = hash_policy->generateHash(*peer_address);
     }
   }
 
   absl::optional<uint64_t> computeHashKey() override { return hash_; }
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_; }
 
 private:
   absl::optional<uint64_t> hash_;
+  const StreamInfo::StreamInfo* stream_info_;
 };
 
 /**
@@ -761,7 +765,8 @@ private:
     }
 
     Upstream::HostConstSharedPtr
-    chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address) const;
+    chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address,
+               const StreamInfo::StreamInfo* stream_info) const;
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;

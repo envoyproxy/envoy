@@ -127,6 +127,10 @@ minor_behavior_changes:
 - area: router
   change: |
     Enable environment_variable in router direct response.
+- area: access_log
+  change: |
+    When emitting grpc logs, only downstream filter state was used. Now, both downstream and upstream filter states will be tried
+    to find the keys configured in filter_state_objects_to_log.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -204,6 +208,9 @@ bug_fixes:
 - area: docker/publishing
   change: |
     Update base images to resolve various glibc vulnerabilities.
+- area: xds
+  change: |
+    Fix a bug where the nonce was not reset after reconnecting to the xDS server, when using State-of-the-World.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -240,6 +247,12 @@ removed_config_or_runtime:
     substituted it with :ref:`outlier_detection.successful_active_health_check_uneject_host
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
     outlier detection configuration flag.
+- area: ext_authz
+  change: |
+    Removed ``envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add``
+    runtime option and substituted it with :ref:`failure_mode_allow_header_add
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow_header_add>`
+    configuration flag.
 
 new_features:
 - area: access_log
@@ -342,6 +355,11 @@ new_features:
   change: |
     Added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: udp_proxy
+  change: |
+    added :ref:`dynamic_forward_proxy <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig>`
+    UDP session filter that can be used to have dynamic forward proxy UDP flows, when used in conjunction with another session filter
+    that sets required filter state values.
 - area: zookeeper
   change: |
     Added support for emitting per opcode request bytes metrics via :ref:`enable_per_opcode_request_bytes_metrics
@@ -391,6 +409,16 @@ new_features:
 - area: geoip
   change: |
     Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
+- area: admin
+  change: |
+    Added a new ``skip_exit`` query parameter to ``/drain_listeners`` to skip exiting after the drain period.
+- area: router
+  change: |
+    Added ``metadata`` support for :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.metadata>` and
+    :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.metadata>`.
+- area: tracing
+  change: |
+    Added support for exporting spans via HTTP on the OpenTelemetry tracer.
 - area: tracing
   change: |
     Added support for configuring resource detectors on the OpenTelemetry tracer.

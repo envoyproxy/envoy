@@ -2284,6 +2284,43 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequests) {
   tcp_client_->close();
 }
 
+// Validate the request completion during processing of deferred list works.
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
+  const int kRequestsSentPerIOCycle = 20;
+  // The local-reply-during-decode will call sendLocalReply, completing them
+  // when processing headers. This will cause the ConnectionManagerImpl::ActiveRequest
+  // object to be removed from the streams_ list during the onDeferredRequestProcessing call.
+  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  // Process more than 1 deferred request at a time to validate the removal of elements from
+  // the list does not break reverse iteration.
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "3");
+  beginSession();
+
+  std::string buffer;
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto request =
+        Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                    {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a",
+                                          Http2Frame::DataFlags::EndStream);
+    absl::StrAppend(&buffer, std::string(data));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  // The local-reply-during-decode filter sends 500 status to the client
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto frame = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+    EXPECT_EQ(Http2Frame::ResponseStatus::InternalServerError, frame.responseStatus());
+  }
+  tcp_client_->close();
+}
+
 TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailers) {
   const int kRequestsSentPerIOCycle = 20;
   autonomous_upstream_ = true;
@@ -2319,6 +2356,59 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailers) {
     auto frame = readFrame();
     EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
     EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+  }
+  tcp_client_->close();
+}
+
+// Validate the request completion during processing of headers in the deferred requests,
+// is ok, when deferred data and trailers are also present.
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersDecodeHeadersEndsRequest) {
+  const int kRequestsSentPerIOCycle = 20;
+  autonomous_upstream_ = true;
+  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "6");
+  beginSession();
+
+  std::string buffer;
+  // Make every 4th request to be reset by the local-reply-during-decode filter, this will give a
+  // good distribution of removed requests from the deferred sequence.
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                               {{"response_data_blocks", "0"},
+                                                {"no_trailers", "1"},
+                                                {"skip-local-reply", i % 4 ? "true" : "false"}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a");
+    absl::StrAppend(&buffer, std::string(data));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto trailers = Http2Frame::makeEmptyHeadersFrame(
+        Http2Frame::makeClientStreamId(i),
+        static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+            Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+    trailers.appendHeaderWithoutIndexing({"k", "v"});
+    trailers.adjustPayloadSize();
+    absl::StrAppend(&buffer, std::string(trailers));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto frame = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+    uint32_t stream_id = frame.streamId();
+    // Client stream indexes are multiples of 2 starting at 1
+    if ((stream_id / 2) % 4) {
+      EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus())
+          << " for stream=" << stream_id;
+    } else {
+      EXPECT_EQ(Http2Frame::ResponseStatus::InternalServerError, frame.responseStatus())
+          << " for stream=" << stream_id;
+    }
   }
   tcp_client_->close();
 }
