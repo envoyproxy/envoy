@@ -936,8 +936,8 @@ private:
   std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
 
   bool initialized_{};
+  bool ads_mux_initialized_{};
   std::atomic<bool> shutdown_{};
-  std::atomic<bool> ads_mux_initialized_{};
 };
 
 } // namespace Upstream
