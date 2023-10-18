@@ -30,10 +30,8 @@ TEST(EnvironmentResourceDetectorTest, EnvVariableNotPresent) {
       EnvironmentResourceDetectorConfig config;
 
   auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
-  Resource resource = detector->detect();
-
-  EXPECT_EQ(resource.schemaUrl_, "");
-  EXPECT_TRUE(resource.attributes_.empty());
+  EXPECT_THROW_WITH_MESSAGE(detector->detect(), EnvoyException,
+                            "Environment variable doesn't exist: OTEL_RESOURCE_ATTRIBUTES");
 }
 
 // Test detector when env variable is present but contains an empty value
@@ -45,10 +43,12 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
       EnvironmentResourceDetectorConfig config;
 
   auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
-  Resource resource = detector->detect();
 
-  EXPECT_EQ(resource.schemaUrl_, "");
-  EXPECT_TRUE(resource.attributes_.empty());
+  EXPECT_THROW_WITH_MESSAGE(detector->detect(), EnvoyException,
+                            "The OpenTelemetry environment resource detector is configured but the "
+                            "'OTEL_RESOURCE_ATTRIBUTES'"
+                            " environment variable is empty.");
+
   TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 }
 
@@ -92,13 +92,11 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributesWrongFo
       EnvironmentResourceDetectorConfig config;
 
   auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
-  Resource resource = detector->detect();
 
-  EXPECT_EQ(resource.schemaUrl_, "");
-  EXPECT_EQ(1, resource.attributes_.size());
-
-  EXPECT_EQ(resource.attributes_.begin()->first, resource.attributes_.begin()->first);
-  EXPECT_EQ(resource.attributes_.begin()->second, resource.attributes_.begin()->second);
+  EXPECT_THROW_WITH_MESSAGE(detector->detect(), EnvoyException,
+                            "The OpenTelemetry environment resource detector is configured but the "
+                            "'OTEL_RESOURCE_ATTRIBUTES'"
+                            " environment variable has an invalid format.");
 
   TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 }

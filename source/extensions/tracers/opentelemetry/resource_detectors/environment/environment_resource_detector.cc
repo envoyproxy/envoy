@@ -29,21 +29,22 @@ Resource EnvironmentResourceDetector::detect() {
   resource.schemaUrl_ = "";
   std::string attributes_str = "";
 
-  TRY_NEEDS_AUDIT {
-    attributes_str = Config::DataSource::read(ds, true, context_.serverFactoryContext().api());
-  }
-  END_TRY catch (const EnvoyException& e) {
-    ENVOY_LOG(warn, "Failed to detect resource attributes from the environment: {}.", e.what());
-  }
+  attributes_str = Config::DataSource::read(ds, true, context_.serverFactoryContext().api());
 
   if (attributes_str.empty()) {
-    return resource;
+    throw EnvoyException(
+        fmt::format("The OpenTelemetry environment resource detector is configured but the '{}'"
+                    " environment variable is empty.",
+                    kOtelResourceAttributesEnv));
   }
 
   for (const auto& pair : StringUtil::splitToken(attributes_str, ",")) {
     const auto keyValue = StringUtil::splitToken(pair, "=");
     if (keyValue.size() != 2) {
-      continue;
+      throw EnvoyException(
+          fmt::format("The OpenTelemetry environment resource detector is configured but the '{}'"
+                      " environment variable has an invalid format.",
+                      kOtelResourceAttributesEnv));
     }
 
     const std::string key = std::string(keyValue[0]);
