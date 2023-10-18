@@ -117,7 +117,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
-        java-version: '8'
+        java-version: '11'
         java-package: jdk
         architecture: x64
         distribution: zulu
@@ -170,7 +170,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
-        java-version: '8'
+        java-version: '11'
         java-package: jdk
         architecture: x64
         distribution: zulu
@@ -223,7 +223,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
-        java-version: '8'
+        java-version: '11'
         java-package: jdk
         architecture: x64
         distribution: zulu
