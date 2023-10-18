@@ -11,7 +11,6 @@
 
 namespace Envoy {
 namespace Server {
-namespace {
 
 inline envoy::config::listener::v3::Listener parseListenerFromV3Yaml(const std::string& yaml) {
   envoy::config::listener::v3::Listener listener;
@@ -19,6 +18,14 @@ inline envoy::config::listener::v3::Listener parseListenerFromV3Yaml(const std::
   return listener;
 }
 
-} // namespace
+inline std::string testDomainSocketName() {
+#ifdef WIN32
+  auto pid = GetProcessId();
+#else
+  auto pid = getpid();
+#endif
+  return absl::StrCat("@envoy_domain_socket_", pid);
+}
+
 } // namespace Server
 } // namespace Envoy
