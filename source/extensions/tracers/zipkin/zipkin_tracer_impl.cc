@@ -113,7 +113,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info, const std::string&,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
   SpanContextExtractor extractor(trace_context);
