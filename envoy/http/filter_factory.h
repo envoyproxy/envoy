@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -51,13 +52,14 @@ public:
    *
    * @param config_name the config name of the filter.
    * @return whether the filter should be disabled or enabled based on the config name.
+   *         nullopt if no decision can be made explicitly for the filter.
    */
-  virtual bool filterDisabled(absl::string_view config_name) const PURE;
+  virtual absl::optional<bool> filterDisabled(absl::string_view config_name) const PURE;
 };
 
 class EmptyFilterChainOptions : public FilterChainOptions {
 public:
-  bool filterDisabled(absl::string_view) const override { return false; }
+  absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
 };
 
 /**

@@ -403,6 +403,12 @@ new_features:
   change: |
     Added filters to update the filter state for :ref:`the HTTP requests <config_http_filters_set_filter_state>` and
     :ref:`the TCP connections <config_network_filters_set_filter_state>`.
+- area: http
+  change: |
+    Added :ref:`disabled
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`
+    flag to disable a filter in the filter chain by default. The filter can be enabled explicitly by setting
+    valid per filter config in the route configuration.
 - area: admin_logging
   change: |
     added support for glob control of fine-grain loggers in admin /logging interface.

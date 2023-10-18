@@ -10940,19 +10940,20 @@ virtual_hosts:
   const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
-  EXPECT_FALSE(route1->filterDisabled("test.filter"));
+  EXPECT_FALSE(route1->filterDisabled("test.filter").value());
+  EXPECT_EQ(route1->filterDisabled("unknown.filter"), absl::nullopt);
 
   const auto route2 = config.route(genHeaders("host1", "/route2", "GET"), 0);
-  EXPECT_TRUE(route2->filterDisabled("test.filter"));
+  EXPECT_TRUE(route2->filterDisabled("test.filter").value());
 
   const auto route3 = config.route(genHeaders("host2", "/route3", "GET"), 0);
-  EXPECT_TRUE(route3->filterDisabled("test.filter"));
+  EXPECT_TRUE(route3->filterDisabled("test.filter").value());
 
   const auto route4 = config.route(genHeaders("host2", "/route4", "GET"), 0);
-  EXPECT_FALSE(route4->filterDisabled("test.filter"));
+  EXPECT_FALSE(route4->filterDisabled("test.filter").value());
 
   const auto route5 = config.route(genHeaders("host3", "/route5", "GET"), 0);
-  EXPECT_TRUE(route5->filterDisabled("test.filter"));
+  EXPECT_TRUE(route5->filterDisabled("test.filter").value());
 }
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
