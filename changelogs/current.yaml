@@ -257,11 +257,11 @@ removed_config_or_runtime:
 new_features:
 - area: access_log
   change: |
-    added %RESPONSE_FLAGS_LONG% substitution string, that will output a pascal case string representing the response flags.
-    The output response flags will correspond with %RESPONSE_FLAGS%, only with a long textual string representation.
+    Added ``%RESPONSE_FLAGS_LONG%`` substitution string, that will output a pascal case string representing the response flags.
+    The output response flags will correspond with ``%RESPONSE_FLAGS%``, only with a long textual string representation.
 - area: compression
   change: |
-    added :ref:`remove_accept_encoding_header
+    Added :ref:`remove_accept_encoding_header
     <envoy_v3_api_field_extensions.filters.http.compressor.v3.ResponseDirectionOverrides.remove_accept_encoding_header>`
     for per-route configuration of this value.
 - area: config
@@ -274,7 +274,7 @@ new_features:
     <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.enable_deferred_cluster_creation>`.
 - area: extension_discovery_service
   change: |
-    added ECDS support for :ref:`downstream network filters <envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
+    Added ECDS support for :ref:`downstream network filters <envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
 - area: ext_proc
   change: |
     Added
@@ -297,7 +297,7 @@ new_features:
     Added metric ``listener.listener_stat.network_extension_config_missing`` to track closed connections due to missing config.
 - area: lua
   change: |
-    added :ref:`downstreamRemoteAddress() <config_http_filters_lua_stream_info_downstream_remote_address>`
+    Added :ref:`downstreamRemoteAddress() <config_http_filters_lua_stream_info_downstream_remote_address>`
     method to the Stream info object API.
 - area: quic
   change: |
@@ -381,7 +381,7 @@ new_features:
 - area: upstream
   change: |
     Added the ability to specify a custom upstream local address selector using
-    :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
+    :ref:`local_address_selector <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
 - area: redis
   change: |
     Added new configuration field :ref:`read_command_policy
