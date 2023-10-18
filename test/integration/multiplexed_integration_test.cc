@@ -2471,7 +2471,7 @@ TEST_P(Http2FrameIntegrationTest, ResettingDeferredRequestsTriggersPrematureRese
 TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   // Use large number of requests to ensure close is detected while there are
   // still some deferred streams.
-  const int kRequestsSentPerIOCycle = 1000;
+  const int kRequestsSentPerIOCycle = 20000;
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   // Ensure premature reset detection does not get in the way
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count", "1001");
@@ -2479,8 +2479,7 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
 
   std::string buffer;
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
-    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "a", "/",
-                                           {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "a", "/");
     absl::StrAppend(&buffer, std::string(request));
   }
 

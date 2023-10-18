@@ -692,7 +692,7 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
     }
   }
 
-  if (drain_state_ == DrainState::NotDraining) {
+  if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
     stats_.named_.downstream_rq_too_many_premature_resets_.inc();
     doConnectionClose(Network::ConnectionCloseType::Abort, absl::nullopt,
                       "too_many_premature_resets");
