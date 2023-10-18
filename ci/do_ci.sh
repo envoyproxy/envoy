@@ -825,6 +825,12 @@ case $CI_TARGET in
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 
+    release.server_only.binary)
+        setup_clang_toolchain
+        echo "bazel release build..."
+        bazel_envoy_binary_build release
+        ;;
+
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
