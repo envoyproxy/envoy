@@ -11,6 +11,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/hot_restart.h"
 #include "test/server/hot_restart_udp_forwarding_test_helper.h"
+#include "test/server/utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -66,13 +67,14 @@ public:
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_ = std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0);
+    hot_restart_ = std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0);
     hot_restart_->drainParentListeners();
 
     // We close both sockets, both ends, totaling 4.
     EXPECT_CALL(os_sys_calls_, close(_)).Times(4);
   }
 
+  std::string socket_addr_ = testDomainSocketName();
   // test_addresses_ must be initialized before os_sys_calls_ sets us mocking, as
   // parseInternetAddress uses several os system calls.
   TestAddresses test_addresses_;
@@ -123,7 +125,7 @@ TEST_P(DomainSocketErrorTest, DomainSocketAlreadyInUse) {
   });
   EXPECT_CALL(os_sys_calls_, close(_)).Times(GetParam());
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0),
+  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0),
                Server::HotRestartDomainSocketInUseException);
 }
 
@@ -139,7 +141,7 @@ TEST_P(DomainSocketErrorTest, DomainSocketError) {
   });
   EXPECT_CALL(os_sys_calls_, close(_)).Times(GetParam());
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0), EnvoyException);
+  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0), EnvoyException);
 }
 
 class HotRestartUdpForwardingContextTest : public HotRestartImplTest {
