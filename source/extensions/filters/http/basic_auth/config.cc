@@ -8,8 +8,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BasicAuth {
 
-using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
-
 namespace {
 
 UserMap readHtpasswd(std::string htpasswd) {
@@ -50,8 +48,8 @@ UserMap readHtpasswd(std::string htpasswd) {
 } // namespace
 
 Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::basic_auth::v3::BasicAuth& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const BasicAuth& proto_config, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
   auto htpasswd = Config::DataSource::read(proto_config.users(), false, context.api());
   auto users = readHtpasswd(htpasswd);
   FilterConfigSharedPtr config =
@@ -67,3 +65,4 @@ REGISTER_FACTORY(BasicAuthFilterFactory, Server::Configuration::NamedHttpFilterC
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+

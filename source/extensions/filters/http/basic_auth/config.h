@@ -10,18 +10,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BasicAuth {
 
-class BasicAuthFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::basic_auth::v3::BasicAuth> {
+using envoy::extensions::filters::http::basic_auth::v3::BasicAuth
+
+    class BasicAuthFilterFactory : public Common::FactoryBase<BasicAuth> {
 public:
   BasicAuthFilterFactory() : FactoryBase("envoy.filters.http.basic_auth") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::basic_auth::v3::BasicAuth& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const BasicAuth& config, const std::string& stats_prefix,
+                                    Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace BasicAuth
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
