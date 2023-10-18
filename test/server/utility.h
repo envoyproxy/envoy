@@ -20,7 +20,7 @@ inline envoy::config::listener::v3::Listener parseListenerFromV3Yaml(const std::
 
 inline std::string testDomainSocketName() {
 #ifdef WIN32
-  auto pid = GetProcessId();
+  auto pid = GetCurrentProcessId();
 #else
   auto pid = getpid();
 #endif
