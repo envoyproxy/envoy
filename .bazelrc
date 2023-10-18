@@ -355,7 +355,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:94e5d873c145ae86f205117e76276161c9af4806@sha256:8d3763e19d5b71fdc95666d75073ce4581e566ce28ca09106607b6a3ef7ba902
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:fdd65c6270a8507a18d5acd6cf19a18cb695e4fa@sha256:3c8a3ce6f90dcfb5d09dc8f79bb01404d3526d420061f9a176e0a8e91e1e573e
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -515,7 +515,7 @@ build:rbe-envoy-engflow --grpc_keepalive_time=30s
 build:rbe-envoy-engflow --remote_timeout=3600s
 build:rbe-envoy-engflow --bes_timeout=3600s
 build:rbe-envoy-engflow --bes_upload_mode=fully_async
-build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:94e5d873c145ae86f205117e76276161c9af4806@sha256:8d3763e19d5b71fdc95666d75073ce4581e566ce28ca09106607b6a3ef7ba902
+build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:fdd65c6270a8507a18d5acd6cf19a18cb695e4fa@sha256:3c8a3ce6f90dcfb5d09dc8f79bb01404d3526d420061f9a176e0a8e91e1e573e
 
 #############################################################################
 # debug: Various Bazel debugging flags
