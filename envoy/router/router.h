@@ -677,6 +677,18 @@ public:
   virtual void traversePerFilterConfig(
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
+   * this virtual host.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this virtual host.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 };
 
 /**
@@ -1313,6 +1325,18 @@ public:
    * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
    */
   virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
+   * this route configuration.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this route configuration.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 };
 
 /**

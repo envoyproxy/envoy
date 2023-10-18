@@ -94,6 +94,8 @@ private:
   void drainRequests();
   void setRetryTimer();
   void sendDiscoveryRequest(absl::string_view type_url);
+  // Clears the nonces of all subscribed types in this gRPC mux.
+  void clearNonce();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,

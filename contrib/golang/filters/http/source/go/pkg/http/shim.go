@@ -242,6 +242,11 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	f := req.httpFilter
 	f.OnDestroy(v)
 
+	// Break circular references between httpRequest and StreamFilter,
+	// since Finalizers don't work with circular references,
+	// otherwise, it will leads to memory leaking.
+	req.httpFilter = nil
+
 	Requests.DeleteReq(r)
 }
 
