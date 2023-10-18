@@ -93,7 +93,7 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEvictionBusyLoop) {
   EXPECT_EQ(client_cache_.getCache(config_with_hash_key_1).get(), foo_client.get());
 
   // Verifying that though the time to expire for second entry ~0.8 sec, it is considered as expired
-  // to avoid the busy loop which could happen if we timer is enabled with 0(0.8 rouded off to 0)
+  // to avoid the busy loop which could happen if we timer is enabled with 0(0.8 rounded off to 0)
   // duration.
   EXPECT_EQ(client_cache_.timer_enabled_with_0_duration_count_, 0);
   grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(2));
