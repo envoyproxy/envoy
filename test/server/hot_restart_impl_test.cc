@@ -17,7 +17,6 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
-#include "utility.h"
 #include "gtest/gtest.h"
 
 using testing::_;
