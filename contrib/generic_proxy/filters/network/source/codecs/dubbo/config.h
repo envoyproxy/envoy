@@ -42,6 +42,7 @@ public:
   absl::string_view host() const override { return inner_metadata_->request().serviceName(); }
   absl::string_view path() const override { return inner_metadata_->request().serviceName(); }
   absl::string_view method() const override { return inner_metadata_->request().methodName(); }
+  void removeByKey(absl::string_view key) override;
 
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
