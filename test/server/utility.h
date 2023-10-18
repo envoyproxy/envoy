@@ -24,6 +24,11 @@ inline std::string testDomainSocketName() {
 #else
   auto pid = getpid();
 #endif
+  // It seems like we should use a test tmpdir path for this socket, but unix
+  // domain socket length limits prohibit that, so instead we append the
+  // process ID to a name in the abstract namespace.
+  // Using a tmpdir in /tmp could be another option but would introduce
+  // cleanup requirements that are avoided by using the abstract namespace.
   return absl::StrCat("@envoy_domain_socket_", pid);
 }
 
