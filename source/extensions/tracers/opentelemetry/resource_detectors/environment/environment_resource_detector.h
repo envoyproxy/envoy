@@ -29,8 +29,7 @@ public:
 private:
   const envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig config_;
-  Server::Configuration::TracerFactoryContext&
-      context_; // TODO, is keeping a reference ok (ownership)?
+  Server::Configuration::TracerFactoryContext& context_;
 };
 
 } // namespace OpenTelemetry
