@@ -161,7 +161,6 @@ envoy_cc_test(
     srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
     deps = [
         ":hot_restart_udp_forwarding_test_helper",
-        ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
@@ -176,7 +175,6 @@ envoy_cc_test(
     srcs = envoy_select_hot_restart(["hot_restarting_child_test.cc"]),
     deps = [
         ":hot_restart_udp_forwarding_test_helper",
-        ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
@@ -191,7 +189,6 @@ envoy_cc_test(
     name = "hot_restarting_parent_test",
     srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
     deps = [
-        ":utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_child",

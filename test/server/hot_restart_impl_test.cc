@@ -11,7 +11,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/hot_restart.h"
 #include "test/server/hot_restart_udp_forwarding_test_helper.h"
-#include "test/server/utility.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -74,7 +74,8 @@ public:
     EXPECT_CALL(os_sys_calls_, close(_)).Times(4);
   }
 
-  std::string socket_addr_ = testDomainSocketName();
+  std::string socket_addr_ =
+      absl::StrCat(TestEnvironment::unixDomainSocketDirectory(), "/envoy_domain_socket");
   // test_addresses_ must be initialized before os_sys_calls_ sets us mocking, as
   // parseInternetAddress uses several os system calls.
   TestAddresses test_addresses_;
