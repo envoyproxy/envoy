@@ -134,7 +134,7 @@ public:
 
   // Return true if the cluster must be ready-for-use before ADS (Aggregated Discovery Service) can
   // be initialized; will only occur if ADS is configured to use the cluster via EnvoyGrpc.
-  virtual bool requiredForAds() PURE;
+  virtual bool requiredForAds() const PURE;
 };
 
 /**
@@ -246,15 +246,19 @@ class ClusterManagerImpl : public ClusterManager,
                            public MissingClusterNotifier,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
-  // Initialize the ClusterManagerImpl instance.
+  // Initializes the ClusterManagerImpl instance based on the given Bootstrap config.
+  //
   // This method *must* be called prior to invoking any other methods on the class and *must* only
-  // be called once.
+  // be called once. This method should be called immediately after ClusterManagerImpl construction
+  // and from the same thread in which the ClusterManagerImpl was constructed.
   //
   // The initialization is separated from the constructor because lots of work, including ADS
   // initialization, is done in this method. If the contents of this method are invoked during
   // construction, a derived class cannot override any of the virtual methods and have them invoked
   // instead, since the base class's methods are used when in a base class constructor.
-  void init();
+  //
+  // This method may throw an exception.
+  void init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -760,7 +764,7 @@ private:
       ASSERT(!added_or_updated_);
       added_or_updated_ = true;
     }
-    bool requiredForAds() override { return required_for_ads_; }
+    bool requiredForAds() const override { return required_for_ads_; }
 
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
@@ -883,7 +887,6 @@ private:
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
-  const envoy::config::bootstrap::v3::Bootstrap& bootstrap_;
   const Server::Instance& server_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
@@ -932,8 +935,9 @@ private:
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
   std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
 
-  std::atomic<bool> initialized_{};
+  bool initialized_{};
   std::atomic<bool> shutdown_{};
+  std::atomic<bool> ads_mux_initialized_{};
 };
 
 } // namespace Upstream

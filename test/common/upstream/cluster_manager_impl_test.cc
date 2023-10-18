@@ -124,16 +124,27 @@ public:
 protected:
   void postThreadLocalClusterUpdate(ClusterManagerCluster& cluster,
                                     ThreadLocalClusterUpdateParams&& params) override {
+    int expected_start_call_count = 0;
     if (cluster.cluster().info()->name() == "ads_cluster") {
-      // For the ADS cluster, set up the expectation that the postThreadLocalClusterUpdate call
-      // below will invoke the ADS mux's start() method.
-      EXPECT_CALL(dynamic_cast<Config::MockGrpcMux&>(*adsMux()), start());
+      // For the ADS cluster, we expect that the postThreadLocalClusterUpdate call below will
+      // invoke the ADS mux's start() method. Subsequent calls to postThreadLocalClusterUpdate()
+      // should not invoke the ADS mux's start() method.
+      if (!post_tls_update_for_ads_cluster_called_) {
+        expected_start_call_count = 1;
+      }
+      post_tls_update_for_ads_cluster_called_ = true;
     }
+
+    EXPECT_CALL(dynamic_cast<Config::MockGrpcMux&>(*adsMux()), start())
+        .Times(expected_start_call_count);
 
     // The ClusterManagerImpl::postThreadLocalClusterUpdate method calls ads_mux_->start() if the
     // cluster is used in ADS for EnvoyGrpc.
     TestClusterManagerImpl::postThreadLocalClusterUpdate(cluster, std::move(params));
   }
+
+private:
+  bool post_tls_update_for_ads_cluster_called_ = false;
 };
 
 class ClusterManagerImplTest : public testing::Test {
@@ -215,7 +226,7 @@ public:
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
         router_context_, server_);
-    cluster_manager_->init();
+    cluster_manager_->init(bootstrap);
   }
 
   void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
@@ -223,7 +234,7 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
-    cluster_manager_->init();
+    cluster_manager_->init(bootstrap);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -699,6 +710,89 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   )EOF";
 
   createWithUpdateOverrideClusterManager(parseBootstrapFromV3Yaml(yaml));
+}
+
+TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
+  MockGrpcMuxFactory factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  const std::string yaml = R"EOF(
+  dynamic_resources:
+    ads_config:
+      transport_api_version: V3
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  createWithUpdateOverrideClusterManager(parseBootstrapFromV3Yaml(yaml));
+
+  const std::string update_static_ads_cluster_yaml = R"EOF(
+    name: ads_cluster
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: ads_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 12001
+  )EOF";
+
+  // The static ads_cluster should not be updated by the ClusterManager (only dynamic clusters can
+  // be added or updated outside of the Bootstrap config).
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(
+      parseClusterFromV3Yaml(update_static_ads_cluster_yaml), "version2"));
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(1, factory_.stats_
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
+
+  const std::string new_cluster_yaml = R"EOF(
+    name: new_cluster
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: new_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 12001
+  )EOF";
+
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(new_cluster_yaml), "version1"));
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(2, factory_.stats_
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
@@ -4672,7 +4766,7 @@ public:
     ASSERT(!added_or_updated_);
     added_or_updated_ = true;
   }
-  bool requiredForAds() override { return required_for_ads_; }
+  bool requiredForAds() const override { return required_for_ads_; }
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
   bool added_or_updated_{};
