@@ -1,5 +1,7 @@
 #include "source/common/grpc/async_client_manager_impl.h"
 
+#include <chrono>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -8,7 +10,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
-#include <chrono>
 
 #ifdef ENVOY_GOOGLE_GRPC
 #include "source/common/grpc/google_async_client_impl.h"
