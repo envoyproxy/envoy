@@ -406,6 +406,9 @@ new_features:
 - area: geoip
   change: |
     Added support for :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`.
+- area: admin
+  change: |
+    Added a new ``skip_exit`` query parameter to ``/drain_listeners`` to skip exiting after the drain period.
 - area: router
   change: |
     Added ``metadata`` support for :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.metadata>` and
