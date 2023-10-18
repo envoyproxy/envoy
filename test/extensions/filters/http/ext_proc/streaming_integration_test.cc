@@ -36,6 +36,7 @@ class StreamingIntegrationTest : public HttpIntegrationTest,
 
 protected:
   StreamingIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
+  ~StreamingIntegrationTest() { TearDown(); }
 
   void TearDown() override {
     cleanupUpstreamAndDownstream();
@@ -44,6 +45,7 @@ protected:
 
   void initializeConfig() {
     scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
+    skip_tag_extraction_rule_check_ = true;
     // This enables a built-in automatic upstream server.
     autonomous_upstream_ = true;
     autonomous_allow_incomplete_streams_ = true;
