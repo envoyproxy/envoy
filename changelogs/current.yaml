@@ -127,6 +127,10 @@ minor_behavior_changes:
 - area: router
   change: |
     Enable environment_variable in router direct response.
+- area: access_log
+  change: |
+    When emitting grpc logs, only downstream filter state was used. Now, both downstream and upstream filter states will be tried
+    to find the keys configured in filter_state_objects_to_log.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
