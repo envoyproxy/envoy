@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: access_log
+  change: |
+    When emitting grpc logs, only downstream filter state was used. Now, both downstream and upstream filter states will be tried
+    to find the keys configured in filter_state_objects_to_log.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
