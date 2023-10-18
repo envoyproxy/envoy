@@ -17,33 +17,14 @@
 
 package api
 
-/*
-// ref https://github.com/golang/go/issues/25832
-
-#cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
-#cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
-
-#include <stdlib.h>
-#include <string.h>
-
-#include "api.h"
-
-*/
-import "C"
-import (
-	"fmt"
-	"unsafe"
-)
-
-// The default log format is:
-// [2023-08-09 03:04:15.985][1390][critical][golang] [contrib/golang/common/log/cgo.cc:27] msg
+import "fmt"
 
 func (c *commonCApiImpl) Log(level LogType, message string) {
-	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(&message), C.int(len(message)))
+	panic("To implement")
 }
 
 func (c *commonCApiImpl) LogLevel() LogType {
-	return LogType(C.envoyGoFilterLogLevel())
+	panic("To implement")
 }
 
 func LogTrace(message string) {
