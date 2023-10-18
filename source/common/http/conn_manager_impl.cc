@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <list>
 #include <memory>
 #include <string>
@@ -2243,6 +2244,8 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
   if (end_stream) {
     return true;
   }
+  // Filter manager will return early from decodeData and decodeTrailers if
+  // request has completed.
   if (deferred_data_ != nullptr) {
     end_stream = state_.deferred_end_stream_ && request_trailers_ == nullptr;
     filter_manager_.decodeData(*deferred_data_, end_stream);
@@ -2272,19 +2275,26 @@ bool ConnectionManagerImpl::shouldDeferRequestProxyingToNextIoCycle() {
 }
 
 void ConnectionManagerImpl::onDeferredRequestProcessing() {
+  if (streams_.empty()) {
+    return;
+  }
   requests_during_dispatch_count_ = 1; // 1 stream is always let through
   // Streams are inserted at the head of the list. As such process deferred
-  // streams at the back of the list first.
-  for (auto reverse_iter = streams_.rbegin(); reverse_iter != streams_.rend();) {
-    auto& stream_ptr = *reverse_iter;
-    // Move the iterator to the next item in case the `onDeferredRequestProcessing` call removes the
-    // stream from the list.
-    ++reverse_iter;
-    bool was_deferred = stream_ptr->onDeferredRequestProcessing();
+  // streams in the reverse order.
+  auto reverse_iter = std::prev(streams_.end());
+  bool at_first_element = false;
+  do {
+    at_first_element = reverse_iter == streams_.begin();
+    // Move the iterator to the previous item in case the `onDeferredRequestProcessing` call removes
+    // the stream from the list.
+    auto previous_element = std::prev(reverse_iter);
+    bool was_deferred = (*reverse_iter)->onDeferredRequestProcessing();
     if (was_deferred && shouldDeferRequestProxyingToNextIoCycle()) {
       break;
     }
-  }
+    reverse_iter = previous_element;
+    // TODO(yanavlasov): see if `rend` can be used.
+  } while (!at_first_element);
 }
 
 } // namespace Http

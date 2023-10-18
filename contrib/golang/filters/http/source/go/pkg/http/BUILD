@@ -34,6 +34,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/golang/common/go/api",
+        "//contrib/golang/common/go/api_impl",
         "//contrib/golang/common/go/utils",
         "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//types/known/anypb",

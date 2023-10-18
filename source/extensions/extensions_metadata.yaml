@@ -754,6 +754,13 @@ envoy.filters.udp.session.http_capsule:
   status: alpha
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig
+envoy.filters.udp.session.dynamic_forward_proxy:
+  categories:
+  - envoy.filters.udp.session
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig
 envoy.formatter.cel:
   categories:
   - envoy.formatter

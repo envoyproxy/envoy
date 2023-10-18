@@ -42,6 +42,10 @@
 namespace Envoy {
 namespace Router {
 
+using RouteMetadataPack = Envoy::Config::MetadataPack<HttpRouteTypedMetadataFactory>;
+using RouteMetadataPackPtr = Envoy::Config::MetadataPackPtr<HttpRouteTypedMetadataFactory>;
+using DefaultRouteMetadataPack = ConstSingleton<RouteMetadataPack>;
+
 /**
  * Original port from the authority header.
  */
@@ -288,6 +292,8 @@ public:
   void traversePerFilterConfig(
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+  const envoy::config::core::v3::Metadata& metadata() const override;
+  const Envoy::Config::TypedMetadata& typedMetadata() const override;
 
 private:
   struct StatNameProvider {
@@ -344,6 +350,7 @@ private:
   std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
+  RouteMetadataPackPtr metadata_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const bool include_attempt_count_in_request_ : 1;
@@ -748,22 +755,8 @@ public:
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
-  using DefaultMetadata = ConstSingleton<envoy::config::core::v3::Metadata>;
-  const envoy::config::core::v3::Metadata& metadata() const override {
-    if (metadata_ != nullptr) {
-      return *metadata_;
-    }
-    return DefaultMetadata::get();
-  }
-  using RouteTypedMetadata = Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory>;
-  const Envoy::Config::TypedMetadata& typedMetadata() const override {
-    if (typed_metadata_ != nullptr) {
-      return *typed_metadata_;
-    }
-    static const RouteTypedMetadata* defaultTypedMetadata =
-        new RouteTypedMetadata(DefaultMetadata::get());
-    return *defaultTypedMetadata;
-  }
+  const envoy::config::core::v3::Metadata& metadata() const override;
+  const Envoy::Config::TypedMetadata& typedMetadata() const override;
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCountInRequest() const override {
     return vhost_->includeAttemptCountInRequest();
@@ -1204,8 +1197,7 @@ private:
   TlsContextMatchCriteriaConstPtr tls_context_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
-  std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
-  std::unique_ptr<const RouteTypedMetadata> typed_metadata_;
+  RouteMetadataPackPtr metadata_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
@@ -1580,6 +1572,8 @@ public:
   bool ignorePathParametersInPathMatching() const {
     return ignore_path_parameters_in_path_matching_;
   }
+  const envoy::config::core::v3::Metadata& metadata() const override;
+  const Envoy::Config::TypedMetadata& typedMetadata() const override;
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -1591,6 +1585,7 @@ private:
   // Cluster specifier plugins/providers.
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
   PerFilterConfigs per_filter_configs_;
+  RouteMetadataPackPtr metadata_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_direct_response_body_size_bytes_;
   const bool uses_vhds_ : 1;
@@ -1638,6 +1633,12 @@ public:
   bool ignorePathParametersInPathMatching() const {
     return shared_config_->ignorePathParametersInPathMatching();
   }
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return shared_config_->metadata();
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return shared_config_->typedMetadata();
+  }
 
 private:
   CommonConfigSharedPtr shared_config_;
@@ -1668,6 +1669,8 @@ public:
   bool usesVhds() const override { return false; }
   bool mostSpecificHeaderMutationsWins() const override { return false; }
   uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
+  const envoy::config::core::v3::Metadata& metadata() const override;
+  const Envoy::Config::TypedMetadata& typedMetadata() const override;
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
