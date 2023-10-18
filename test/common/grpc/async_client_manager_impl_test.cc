@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -41,6 +42,12 @@ public:
                                      Event::Dispatcher::RunType::NonBlock);
     }
   }
+  void waitForMilliSeconds(int ms) {
+    for (int i = 0; i < ms; i++) {
+      time_system_.advanceTimeAndRun(std::chrono::milliseconds(1), *dispatcher_,
+                                     Event::Dispatcher::RunType::NonBlock);
+    }
+  }
 
 protected:
   Event::SimulatedTimeSystem time_system_;
@@ -63,6 +70,35 @@ TEST_F(RawAsyncClientCacheTest, CacheEviction) {
   EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), foo_client.get());
   waitForSeconds(51);
   EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), nullptr);
+}
+
+TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEvictionBusyLoop) {
+  envoy::config::core::v3::GrpcService grpc_service;
+  RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
+  // two entries are added to the cache
+  for (int i = 1; i <= 2; i++) {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    client_cache_.setCache(config_with_hash_key, foo_client);
+  }
+
+  // waiting for 49.2 secs to make sure that for the entry which is not accessed, time to expire is
+  // less than 1 second, ~0.8 secs
+  waitForMilliSeconds(49200);
+
+  // Access first cache entry to so that evictEntriesAndResetEvictionTimer() gets called.
+  // Since we are getting first entry, access time of first entry will be updated to current time.
+  grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(1));
+  GrpcServiceConfigWithHashKey config_with_hash_key_1(grpc_service);
+  EXPECT_EQ(client_cache_.getCache(config_with_hash_key_1).get(), foo_client.get());
+
+  // Verifying that though the time to expire for second entry ~0.8 sec, it is considered as expired
+  // to avoid the busy loop which could happen if we timer is enabled with 0(0.8 rouded off to 0)
+  // duration.
+  EXPECT_EQ(client_cache_.timer_enabled_with_0_duration_count_, 0);
+  grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(2));
+  GrpcServiceConfigWithHashKey config_with_hash_key_2(grpc_service);
+  EXPECT_EQ(client_cache_.getCache(config_with_hash_key_2).get(), nullptr);
 }
 
 TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {

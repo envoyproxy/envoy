@@ -66,6 +66,7 @@ public:
                   const RawAsyncClientSharedPtr& client);
 
     RawAsyncClientSharedPtr getCache(const GrpcServiceConfigWithHashKey& config_with_hash_key);
+    int32_t timer_enabled_with_0_duration_count_ = 0;
 
   private:
     void evictEntriesAndResetEvictionTimer();

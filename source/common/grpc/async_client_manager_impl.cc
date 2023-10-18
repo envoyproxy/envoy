@@ -8,6 +8,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
+#include <chrono>
 
 #ifdef ENVOY_GOOGLE_GRPC
 #include "source/common/grpc/google_async_client_impl.h"
@@ -204,18 +205,22 @@ void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTi
   // Evict all the entries that have expired.
   while (!lru_list_.empty()) {
     MonotonicTime next_expire = lru_list_.back().accessed_time_ + EntryTimeoutInterval;
+    std::chrono::milliseconds time_to_next_expire_sec =
+        std::chrono::duration_cast<std::chrono::seconds>(next_expire - now);
     if ((now >= next_expire) ||
-        // since 'now' and 'next_expire' are in nanoseconds, the following condition is to check if
-        // the difference between them is less than 1 second. If we don't do this, the timer will
-        // be enabled with 0 seconds, which will cause the timer to fire immediately. This will
-        // cause cpu spike.
-        (std ::chrono::duration_cast<std::chrono::seconds>(next_expire - now).count() == 0)) {
+        // since 'now' and 'next_expire' are in nanoseconds, the following condition is to
+        // check if the difference between them is less than 1 second. If we don't do this, the
+        // timer will be enabled with 0 seconds, which will cause the timer to fire immediately.
+        // This will cause cpu spike.
+        (time_to_next_expire_sec.count() == 0)) {
       // Erase the expired entry.
       lru_map_.erase(lru_list_.back().config_with_hash_key_);
       lru_list_.pop_back();
     } else {
-      cache_eviction_timer_->enableTimer(
-          std::chrono::duration_cast<std::chrono::seconds>(next_expire - now));
+      if (time_to_next_expire_sec.count() == 0) {
+        timer_enabled_with_0_duration_count_++;
+      }
+      cache_eviction_timer_->enableTimer(time_to_next_expire_sec);
       return;
     }
   }
