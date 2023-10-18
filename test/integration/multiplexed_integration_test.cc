@@ -2488,8 +2488,9 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   // Drop the downstream connection
   tcp_client_->close();
   // Test that Envoy can clean-up deferred streams
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset",
-                                 kRequestsSentPerIOCycle);
+  // Make the timeout longer to accommodate non optimized builds
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", kRequestsSentPerIOCycle,
+                                 TestUtility::DefaultTimeout * 3);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
