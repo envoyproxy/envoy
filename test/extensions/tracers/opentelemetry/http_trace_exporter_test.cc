@@ -105,7 +105,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   EXPECT_TRUE(trace_exporter_->log(export_trace_service_request));
 
   Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "202"}}}));
   // onBeforeFinalizeUpstreamSpan is a noop — included for coverage
   Tracing::NullSpan null_span;
   callback->onBeforeFinalizeUpstreamSpan(null_span, nullptr);
