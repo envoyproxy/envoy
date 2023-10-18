@@ -421,7 +421,6 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.send_header_raw_value", "false"},
-      {"envoy.reloadable_features.header_value_option_change_action", "true"},
   });
   Http::TestResponseHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
@@ -470,10 +469,7 @@ TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
 
 TEST(MutationUtils, TestAppendActionAddIfAbsent) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.send_header_raw_value", "false"},
-      {"envoy.reloadable_features.header_value_option_change_action", "true"},
-  });
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
   };
@@ -522,10 +518,7 @@ TEST(MutationUtils, TestAppendActionAddIfAbsent) {
 
 TEST(MutationUtils, TestAppendActionOverwriteOrAdd) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.send_header_raw_value", "false"},
-      {"envoy.reloadable_features.header_value_option_change_action", "true"},
-  });
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
   };
@@ -577,7 +570,6 @@ TEST(MutationUtils, TestAppendActionOverwriteIfExists) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.send_header_raw_value", "false"},
-      {"envoy.reloadable_features.header_value_option_change_action", "true"},
   });
   Http::TestRequestHeaderMapImpl headers{
       {"Set-Cookie", "Value123"},
@@ -629,7 +621,6 @@ TEST_P(CheckFailureTest, TestApplyMutationsWithCheckFailure) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.send_header_raw_value", "false"},
-      {"envoy.reloadable_features.header_value_option_change_action", "true"},
   });
 
   Http::TestRequestHeaderMapImpl headers{
@@ -665,9 +656,9 @@ TEST_P(CheckFailureTest, TestApplyMutationsWithCheckFailure) {
                              HeaderValueOption_HeaderAppendAction_OVERWRITE_IF_EXISTS);
     break;
   case 4:
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.send_header_raw_value", "false"},
-         {"envoy.reloadable_features.header_value_option_change_action", "false"}});
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.send_header_raw_value", "false"},
+    });
     s->mutable_header()->set_key("x-check-this-header");
     s->mutable_header()->set_value("value-to-check");
     s->mutable_append()->set_value(true);
