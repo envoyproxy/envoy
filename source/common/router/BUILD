@@ -280,6 +280,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "router.h",
+        "router_filter_interface.h",
         "upstream_request.h",
     ],
     deps = [
