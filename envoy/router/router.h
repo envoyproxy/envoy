@@ -1205,9 +1205,10 @@ public:
    * Check if the filter is disabled for this route.
    * @param config_name supplies the name of the filter config in the HTTP filter chain. This name
    * may be different from the filter extension qualified name.
-   * @return true if the filter is disabled for this route, false otherwise.
+   * @return true if the filter is disabled for this route, false if the filter is enabled.
+   *         nullopt if no decision can be made explicitly for the filter.
    */
-  virtual bool filterDisabled(absl::string_view config_name) const PURE;
+  virtual absl::optional<bool> filterDisabled(absl::string_view config_name) const PURE;
 
   /**
    * This is a helper to get the route's per-filter config if it exists, up along the config

@@ -2764,7 +2764,6 @@ envoy_cc_library(
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
-        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
     ],
 )
 
@@ -4676,8 +4675,15 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
-    ],
+    ] + select({
+        "@platforms//os:android": [
+            "@envoy//source/common/quic/platform/mobile_impl:mobile_quiche_bug_tracker_impl_lib",
+        ],
+        "@platforms//os:ios": [
+            "@envoy//source/common/quic/platform/mobile_impl:mobile_quiche_bug_tracker_impl_lib",
+        ],
+        "//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
+    }),
 )
 
 envoy_cc_library(
@@ -4690,8 +4696,15 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
-    ],
+    ] + select({
+        "@platforms//os:android": [
+            ":quiche_common_mobile_quiche_logging_lib",
+        ],
+        "@platforms//os:ios": [
+            ":quiche_common_mobile_quiche_logging_lib",
+        ],
+        "//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
+    }),
 )
 
 envoy_cc_library(
@@ -4715,6 +4728,21 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         ":quiche_common_platform_export",
+    ],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_mobile_quiche_logging_lib",
+    srcs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_logging_impl.cc",
+    ],
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_logging_impl.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/log:absl_log",
     ],
 )
 

@@ -25,7 +25,6 @@
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
-#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http1/settings.h"
 #include "source/common/http/http2/codec_impl.h"
