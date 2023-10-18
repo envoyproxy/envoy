@@ -26,4 +26,3 @@ private:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-

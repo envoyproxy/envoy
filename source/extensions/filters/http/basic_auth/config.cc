@@ -65,4 +65,3 @@ REGISTER_FACTORY(BasicAuthFilterFactory, Server::Configuration::NamedHttpFilterC
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-
