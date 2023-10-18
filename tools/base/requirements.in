@@ -47,5 +47,5 @@ yarl>=1.7.2
 sphinxcontrib-applehelp==1.0.4
 sphinxcontrib-devhelp==1.0.2
 sphinxcontrib-htmlhelp==2.0.1
-sphinxcontrib-qthelp==1.0.3
+sphinxcontrib-qthelp==1.0.6
 sphinxcontrib-serializinghtml==1.1.5
