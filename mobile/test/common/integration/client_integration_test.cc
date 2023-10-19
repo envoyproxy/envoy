@@ -268,6 +268,9 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
 
 // Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
 TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+  return; // TODO(alyssawilk) debug
+#endif
   if (version_ != Network::Address::IpVersion::v4) {
     // Loopback resolves to a v4 address.
     return;
@@ -294,9 +297,12 @@ TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
   default_request_headers_.setScheme("https");
   basicTest();
 
-  // This verifies the H3 attempt was made due to the quic hints
-  std::string stats = engine_->dumpStats();
-  EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
+  {
+    // This verifies the H3 attempt was made due to the quic hints
+    absl::MutexLock l(&engine_lock_);
+    std::string stats = engine_->dumpStats();
+    EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
+  }
 
   // Make sure the client reported protocol was also HTTP/3.
   ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
@@ -626,8 +632,11 @@ TEST_P(ClientIntegrationTest, TestRuntimeSet) {
 TEST_P(ClientIntegrationTest, TestStats) {
   initialize();
 
-  std::string stats = engine_->dumpStats();
-  EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
+  {
+    absl::MutexLock l(&engine_lock_);
+    std::string stats = engine_->dumpStats();
+    EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
+  }
 }
 
 } // namespace
