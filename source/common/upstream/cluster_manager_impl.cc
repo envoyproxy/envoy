@@ -1064,20 +1064,15 @@ absl::optional<HttpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
-  std::cerr << "==> AAB httpConnPool" << std::endl; // TODO: rm
   // Select a host and create a connection pool for it if it does not already exist.
   auto pool = httpConnPoolImpl(priority, protocol, context, false);
   if (pool == nullptr) {
     return absl::nullopt;
   }
 
-  std::cerr << "==> AAB httpConnPool 2" << std::endl; // TODO: rm
   HttpPoolData data(
       [this, priority, protocol, context]() -> void {
         // Now that a new stream is being established, attempt to preconnect.
-        std::cerr << "==> AAB httpConnPool calling maybePreconnect, which will call "
-                     "httpConnPoolImpl in a callback"
-                  << std::endl; // TODO: rm
         maybePreconnect(*this, parent_.cluster_manager_state_,
                         [this, &priority, &protocol, &context]() {
                           return httpConnPoolImpl(priority, protocol, context, true);
@@ -1982,23 +1977,19 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
     LoadBalancerContext* context, bool peek) {
   std::cerr << "==> AAB httpConnPoolImpl" << std::endl; // TODO: rm
   HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
-  std::cerr << "==> AAB httpConnPoolImpl 1" << std::endl; // TODO: rm
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
       cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     }
-    std::cerr << "==> AAB httpConnPoolImpl no host, return nullptr" << std::endl; // TODO: rm
     return nullptr;
   }
-  std::cerr << "==> AAB httpConnPoolImpl 2" << std::endl; // TODO: rm
 
   // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
   // We could do better here, and always use the ALPN pool and simply make sure
   // we end up on a connection of the correct protocol, but for simplicity we're
   // starting with something simpler.
   auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
-  std::cerr << "==> AAB httpConnPoolImpl 3" << std::endl; // TODO: rm
   std::vector<uint8_t> hash_key;
   hash_key.reserve(upstream_protocols.size());
   for (auto protocol : upstream_protocols) {
@@ -2007,9 +1998,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
 
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_options = host->cluster().alternateProtocolsCacheOptions();
-  std::cerr << "==> AAB httpConnPoolImpl 4" << std::endl; // TODO: rm
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
-  std::cerr << "==> AAB httpConnPoolImpl 5" << std::endl; // TODO: rm
   if (context) {
     // Inherit socket options from downstream connection, if set.
     if (context->downstreamConnection()) {
@@ -2017,7 +2006,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
     }
     addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
   }
-  std::cerr << "==> AAB httpConnPoolImpl 6" << std::endl; // TODO: rm
 
   // Use the socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
@@ -2025,24 +2013,22 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   for (const auto& option : *upstream_options) {
     option->hashKey(hash_key);
   }
-  std::cerr << "==> AAB httpConnPoolImpl 7" << std::endl; // TODO: rm
 
   bool have_transport_socket_options = false;
   if (context && context->upstreamTransportSocketOptions()) {
     host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
     have_transport_socket_options = true;
   }
-  std::cerr << "==> AAB httpConnPoolImpl 8" << std::endl; // TODO: rm
 
   // If configured, use the downstream connection id in pool hash key
   if (cluster_info_->connectionPoolPerDownstreamConnection() && context &&
       context->downstreamConnection()) {
     context->downstreamConnection()->hashKey(hash_key);
   }
-  std::cerr << "==> AAB httpConnPoolImpl 9" << std::endl; // TODO: rm
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
   std::cerr << "==> AAB httpConnPoolImpl 10" << std::endl; // TODO: rm
+ 
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.

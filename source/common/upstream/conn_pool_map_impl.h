@@ -22,25 +22,35 @@ template <typename KEY_TYPE, typename POOL_TYPE> ConnPoolMap<KEY_TYPE, POOL_TYPE
 template <typename KEY_TYPE, typename POOL_TYPE>
 typename ConnPoolMap<KEY_TYPE, POOL_TYPE>::PoolOptRef
 ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory& factory) {
+  std::cerr << "==> AAB getPool" << std::endl;
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
+  std::cerr << "==> AAB getPool 2" << std::endl;
   // TODO(klarose): Consider how we will change the connection pool's configuration in the future.
   // The plan is to change the downstream socket options... We may want to take those as a parameter
   // here. Maybe we'll pass them to the factory function?
   auto pool_iter = active_pools_.find(key);
+  std::cerr << "==> AAB getPool 3" << std::endl;
   if (pool_iter != active_pools_.end()) {
+    std::cerr << "==> AAB getPool 4" << std::endl;
     return std::ref(*(pool_iter->second));
   }
+  std::cerr << "==> AAB getPool 5" << std::endl;
   ResourceLimit& connPoolResource = host_->cluster().resourceManager(priority_).connectionPools();
   // We need a new pool. Check if we have room.
+  std::cerr << "==> AAB getPool 6" << std::endl;
   if (!connPoolResource.canCreate()) {
+    std::cerr << "==> AAB getPool 7" << std::endl;
     // We're full. Try to free up a pool. If we can't, bail out.
     if (!freeOnePool()) {
+      std::cerr << "==> AAB getPool 8" << std::endl;
       host_->cluster().trafficStats()->upstream_cx_pool_overflow_.inc();
       return absl::nullopt;
     }
 
+    std::cerr << "==> AAB getPool 9" << std::endl;
     ASSERT(size() < connPoolResource.max(),
            "Freeing a pool should reduce the size to below the max.");
+    std::cerr << "==> AAB getPool 10" << std::endl;
 
     // TODO(klarose): Consider some simple hysteresis here. How can we prevent iterating over all
     // pools when we're at the limit every time we want to allocate a new one, even if most of the
@@ -51,10 +61,12 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
 
   // We have room for a new pool. Allocate one and let it know about any cached callbacks.
   auto new_pool = factory();
+  std::cerr << "==> AAB getPool 11" << std::endl;
   connPoolResource.inc();
   for (const auto& cb : cached_callbacks_) {
     new_pool->addIdleCallback(cb);
   }
+  std::cerr << "==> AAB getPool 12" << std::endl;
 
   auto inserted = active_pools_.emplace(key, std::move(new_pool));
   return std::ref(*inserted.first->second);
