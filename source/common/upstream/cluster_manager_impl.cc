@@ -1064,15 +1064,20 @@ absl::optional<HttpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
+  std::cerr << "==> AAB httpConnPool" << std::endl; // TODO: rm
   // Select a host and create a connection pool for it if it does not already exist.
   auto pool = httpConnPoolImpl(priority, protocol, context, false);
   if (pool == nullptr) {
     return absl::nullopt;
   }
 
+  std::cerr << "==> AAB httpConnPool 2" << std::endl; // TODO: rm
   HttpPoolData data(
       [this, priority, protocol, context]() -> void {
         // Now that a new stream is being established, attempt to preconnect.
+        std::cerr << "==> AAB httpConnPool calling maybePreconnect, which will call "
+                     "httpConnPoolImpl in a callback"
+                  << std::endl; // TODO: rm
         maybePreconnect(*this, parent_.cluster_manager_state_,
                         [this, &priority, &protocol, &context]() {
                           return httpConnPoolImpl(priority, protocol, context, true);
@@ -1975,12 +1980,14 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
+  std::cerr << "==> AAB httpConnPoolImpl" << std::endl; // TODO: rm
   HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
       cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     }
+    std::cerr << "==> AAB httpConnPoolImpl no host, return nullptr" << std::endl; // TODO: rm
     return nullptr;
   }
 
@@ -2031,6 +2038,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   // function. Otherwise, we'd need to capture a few of these variables by value.
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
+        std::cerr << "==> AAB calling allocateConnPool" << std::endl;
         auto pool = parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
