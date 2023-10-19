@@ -20,7 +20,11 @@ namespace Common {
 namespace Aws {
 namespace {
 
-MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
+MATCHER_P(WithName, expectedName, "") {
+  *result_listener << "\nexpected { name: \"" << expectedName << "\"} but got {name: \""
+                   << arg.name() << "\"}\n";
+  return ExplainMatchResult(expectedName, arg.name(), result_listener);
+}
 
 // Headers must be in alphabetical order by virtue of std::map
 TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
@@ -361,7 +365,8 @@ TEST(UtilityTest, ThreadLocalClusterExistsAlready) {
   NiceMock<Upstream::MockClusterManager> cm_;
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
   EXPECT_CALL(cm_, addOrUpdateCluster(_, _)).Times(0);
-  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", ""));
+  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name",
+                                                envoy::config::cluster::v3::Cluster::STATIC, ""));
 }
 
 // Verify that if thread local cluster doesn't exist we can create a new one.
@@ -369,7 +374,8 @@ TEST(UtilityTest, AddStaticClusterSuccess) {
   NiceMock<Upstream::MockClusterManager> cm_;
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
-  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1:80"));
+  EXPECT_TRUE(Utility::addInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
 }
 
 // Handle exception when adding thread local cluster fails.
@@ -378,16 +384,18 @@ TEST(UtilityTest, AddStaticClusterFailure) {
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _))
       .WillOnce(Throw(EnvoyException("exeption message")));
-  EXPECT_FALSE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1:80"));
+  EXPECT_FALSE(Utility::addInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
 }
 
-// Verify that even with missing port value and any path set in host will still succeed.
+// Verify that for uri argument in addInternalClusterStatic port value is optional
+// and can contain request path which will be ignored.
 TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
   NiceMock<Upstream::MockClusterManager> cm_;
   EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
-  EXPECT_TRUE(
-      Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1/something"));
+  EXPECT_TRUE(Utility::addInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something"));
 }
 
 } // namespace

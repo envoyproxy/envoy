@@ -81,6 +81,8 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
 )
 

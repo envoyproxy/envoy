@@ -48,10 +48,10 @@ public:
 
   void fetch(Http::RequestMessage& message, Tracing::Span& parent_span,
              MetadataFetcher::MetadataReceiver& receiver) override {
+    ASSERT(!request_);
+    ASSERT(!receiver_);
     complete_ = false;
-    if (!receiver_) {
-      receiver_ = &receiver;
-    }
+    receiver_ = makeOptRef(receiver);
     const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster_name_);
     if (thread_local_cluster == nullptr) {
       ENVOY_LOG(error, "{} AWS Metadata failed: [cluster = {}] not found", __func__, cluster_name_);
@@ -110,7 +110,8 @@ public:
 
     options.setRetryPolicy(route_retry_policy);
     options.setBufferBodyForRetry(true);
-    request_ = thread_local_cluster->httpAsyncClient().send(std::move(messagePtr), *this, options);
+    request_ = makeOptRefFromPtr(
+        thread_local_cluster->httpAsyncClient().send(std::move(messagePtr), *this, options));
   }
 
   // HTTP async receive method on success.
@@ -155,13 +156,16 @@ public:
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
 private:
-  Upstream::ClusterManager& cm_;
   bool complete_{};
-  MetadataFetcher::MetadataReceiver* receiver_{};
-  std::string cluster_name_;
-  Http::AsyncClient::Request* request_{};
+  Upstream::ClusterManager& cm_;
+  const std::string cluster_name_;
+  OptRef<MetadataFetcher::MetadataReceiver> receiver_;
+  OptRef<Http::AsyncClient::Request> request_;
 
-  void reset() { request_ = nullptr; }
+  void reset() {
+    request_.reset();
+    receiver_.reset();
+  }
 };
 } // namespace
 

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/message.h"
 
 #include "source/common/common/matchers.h"
@@ -101,12 +104,16 @@ public:
    * @param cm cluster manager
    * @param cluster_name a name for credentials provider cluster
    * @param cluster_type STATIC or STRICT_DNS or LOGICAL_DNS etc
-   * @param host provider's IP (STATIC cluster) or URL (STRICT_DNS)
-   * @return true if successfully added the cluster
+   * @param uri provider's IP (STATIC cluster) or URL (STRICT_DNS). Will use port 80 if the port is
+   * not specified in the uri or no matching cluster is found.
+   * @return true if successfully added the cluster or if a cluster with the cluster_name already
+   * exists.
    * @return false if failed to add the cluster
    */
-  static bool addInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
-                                       absl::string_view cluster_type, absl::string_view host);
+  static bool
+  addInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
+                           const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
+                           absl::string_view uri);
 };
 
 } // namespace Aws
