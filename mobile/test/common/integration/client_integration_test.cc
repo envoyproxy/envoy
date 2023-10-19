@@ -561,8 +561,11 @@ TEST_P(ClientIntegrationTest, TestRuntimeSet) {
 TEST_P(ClientIntegrationTest, TestStats) {
   initialize();
 
-  std::string stats = engine_->dumpStats();
-  EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
+  {
+    absl::MutexLock l(&engine_lock_);
+    std::string stats = engine_->dumpStats();
+    EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
+  }
 }
 
 } // namespace

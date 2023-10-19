@@ -188,9 +188,12 @@ void BaseClientIntegrationTest::TearDown() {
   }
   test_server_.reset();
   fake_upstreams_.clear();
-  if (engine_) {
-    engine_->terminate();
-    engine_.reset();
+  {
+    absl::MutexLock l(&engine_lock_);
+    if (engine_) {
+      engine_->terminate();
+      engine_.reset();
+    }
   }
   stream_.reset();
   stream_prototype_.reset();
