@@ -68,6 +68,7 @@ public:
                      Filesystem::Instance& file_system);
 
   // Server::Instance
+  void run() override { PANIC("not implemented"); }
   OptRef<Admin> admin() override {
     return makeOptRefFromPtr(static_cast<Envoy::Server::Admin*>(admin_.get()));
   }
