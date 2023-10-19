@@ -121,11 +121,9 @@ public:
 
         // Check if the handshake is complete and, if so, populate the result.
         if (is_assisting_client) {
-          is_handshake_complete_ =
-              (bytes_from_server_ == absl::StrCat(ServerInit, ServerFinished));
+          is_handshake_complete_ = (bytes_from_server_ == absl::StrCat(ServerInit, ServerFinished));
         } else {
-          is_handshake_complete_ =
-              (bytes_from_client_ == absl::StrCat(ClientInit, ClientFinished));
+          is_handshake_complete_ = (bytes_from_client_ == absl::StrCat(ClientInit, ClientFinished));
         }
         if (is_handshake_complete_) {
           populateHandshakeResult(response.mutable_result());

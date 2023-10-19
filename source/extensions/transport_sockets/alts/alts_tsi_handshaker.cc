@@ -142,8 +142,8 @@ AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
   tsi_zero_copy_grpc_protector* protector = nullptr;
   grpc_core::ExecCtx exec_ctx;
   tsi_result ok = alts_zero_copy_grpc_protector_create(
-      reinterpret_cast<const uint8_t*>(result.key_data().data()), AltsAes128GcmRekeyKeyLength,
-      true, is_client_,
+      reinterpret_cast<const uint8_t*>(result.key_data().data()), AltsAes128GcmRekeyKeyLength, true,
+      is_client_,
       /*is_integrity_only=*/false, /*enable_extra_copy=*/false, &max_frame_size, &protector);
   if (ok != TSI_OK) {
     return absl::InternalError(absl::StrFormat("Failed to create frame protector: %zu", ok));
@@ -151,9 +151,8 @@ AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
 
   // Calculate the unused bytes.
   std::size_t unused_bytes_size = received_bytes.size() - bytes_consumed;
-std::vector<uint8_t> unused_bytes(unused_bytes_size);
-  memcpy(unused_bytes.data(), received_bytes.data() + bytes_consumed,
-         unused_bytes_size);
+  std::vector<uint8_t> unused_bytes(unused_bytes_size);
+  memcpy(unused_bytes.data(), received_bytes.data() + bytes_consumed, unused_bytes_size);
 
   // Create and return the AltsHandshakeResult.
   auto handshake_result = std::make_unique<AltsHandshakeResult>();
