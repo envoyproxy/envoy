@@ -21,10 +21,16 @@ namespace OpenTelemetry {
 
 const std::string kOtelResourceAttributesEnv = "OTEL_RESOURCE_ATTRIBUTES";
 
+class EnvironmentResourceDetectorTest : public testing::Test {
+public:
+  ~EnvironmentResourceDetectorTest() override {
+    TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
+  }
+};
+
 // Test detector when env variable is not present
 TEST(EnvironmentResourceDetectorTest, EnvVariableNotPresent) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig config;
@@ -48,8 +54,6 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
                             "The OpenTelemetry environment resource detector is configured but the "
                             "'OTEL_RESOURCE_ATTRIBUTES'"
                             " environment variable is empty.");
-
-  TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 }
 
 // Test detector with valid values in the env variable
@@ -76,7 +80,6 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
     EXPECT_TRUE(expected != expected_attributes.end());
     EXPECT_EQ(expected->second, actual.second);
   }
-  TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 }
 
 // Test detector with invalid values mixed with valid ones in the env variable
@@ -97,8 +100,6 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributesWrongFo
                             "The OpenTelemetry environment resource detector is configured but the "
                             "'OTEL_RESOURCE_ATTRIBUTES'"
                             " environment variable has an invalid format.");
-
-  TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 }
 
 } // namespace OpenTelemetry
