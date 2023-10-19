@@ -413,7 +413,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       }
       auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
       if (!factory) {
-        throw EnvoyException(fmt::format("{} not found", name));
+        throwEnvoyExceptionOrPanic(fmt::format("{} not found", name));
       }
       ads_mux_ = factory->create(
           Config::Utility::factoryForGrpcApiConfigSource(
@@ -434,7 +434,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
       auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
       if (!factory) {
-        throw EnvoyException(fmt::format("{} not found", name));
+        throwEnvoyExceptionOrPanic(fmt::format("{} not found", name));
       }
       ads_mux_ = factory->create(
           Config::Utility::factoryForGrpcApiConfigSource(
@@ -465,7 +465,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (local_cluster_name_) {
     auto local_cluster = active_clusters_.find(local_cluster_name_.value());
     if (local_cluster == active_clusters_.end()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("local cluster '{}' must be defined", local_cluster_name_.value()));
     }
     local_cluster_params.emplace();
@@ -854,7 +854,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
           factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
 
   if (!new_cluster_pair_or_error.ok()) {
-    throw EnvoyException(std::string(new_cluster_pair_or_error.status().message()));
+    throwEnvoyExceptionOrPanic(std::string(new_cluster_pair_or_error.status().message()));
   }
   auto& new_cluster = new_cluster_pair_or_error->first;
   auto& lb = new_cluster_pair_or_error->second;
@@ -864,7 +864,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
 
   if (!added_via_api) {
     if (cluster_map.find(cluster_info->name()) != cluster_map.end()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("cluster manager: duplicate cluster '{}'", cluster_info->name()));
     }
   }
@@ -880,12 +880,13 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   }
 
   if (cluster_provided_lb && lb == nullptr) {
-    throw EnvoyException(fmt::format("cluster manager: cluster provided LB specified but cluster "
-                                     "'{}' did not provide one. Check cluster documentation.",
-                                     cluster_info->name()));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("cluster manager: cluster provided LB specified but cluster "
+                    "'{}' did not provide one. Check cluster documentation.",
+                    cluster_info->name()));
   }
   if (!cluster_provided_lb && lb != nullptr) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("cluster manager: cluster provided LB not specified but cluster "
                     "'{}' provided one. Check cluster documentation.",
                     cluster_info->name()));
@@ -1096,10 +1097,10 @@ void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicat
 void ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
   const auto& it = active_clusters_.find(cluster);
   if (it == active_clusters_.end()) {
-    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+    throwEnvoyExceptionOrPanic(fmt::format("Unknown gRPC client cluster '{}'", cluster));
   }
   if (it->second->added_via_api_) {
-    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster));
+    throwEnvoyExceptionOrPanic(fmt::format("gRPC client cluster '{}' is not static", cluster));
   }
 }
 

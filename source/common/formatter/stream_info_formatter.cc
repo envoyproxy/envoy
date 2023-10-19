@@ -140,7 +140,7 @@ FilterStateFormatter::create(const std::string& format, const absl::optional<siz
 
   SubstitutionFormatUtils::parseSubcommand(format, ':', key, serialize_type, field_name);
   if (key.empty()) {
-    throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
+    throwEnvoyExceptionOrPanic("Invalid filter state configuration, key cannot be empty.");
   }
 
   if (serialize_type.empty()) {
@@ -148,12 +148,12 @@ FilterStateFormatter::create(const std::string& format, const absl::optional<siz
   }
   if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION &&
       serialize_type != FIELD_SERIALIZATION) {
-    throw EnvoyException("Invalid filter state serialize type, only "
-                         "support PLAIN/TYPED/FIELD.");
+    throwEnvoyExceptionOrPanic("Invalid filter state serialize type, only "
+                               "support PLAIN/TYPED/FIELD.");
   }
   if ((serialize_type == FIELD_SERIALIZATION) ^ !field_name.empty()) {
-    throw EnvoyException("Invalid filter state serialize type, FIELD "
-                         "should be used with the field name.");
+    throwEnvoyExceptionOrPanic("Invalid filter state serialize type, FIELD "
+                               "should be used with the field name.");
   }
 
   const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
@@ -372,7 +372,7 @@ SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExt
   // Validate the input specifier here. The formatted string may be destined for a header, and
   // should not contain invalid characters {NUL, LR, CF}.
   if (std::regex_search(format, getSystemTimeFormatNewlinePattern())) {
-    throw EnvoyException("Invalid header configuration. Format string contains newline.");
+    throwEnvoyExceptionOrPanic("Invalid header configuration. Format string contains newline.");
   }
 }
 

@@ -252,9 +252,10 @@ void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
     const bool null_default_factory, const std::string& filter_config_name,
     absl::string_view type_url) const {
   if (null_default_factory) {
-    throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                     "configuration with type URL {}.",
-                                     filter_config_name, type_url));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("Error: cannot find filter factory {} for default filter "
+                    "configuration with type URL {}.",
+                    filter_config_name, type_url));
   }
 }
 
