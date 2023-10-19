@@ -16,15 +16,15 @@ void CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags, const std::str
                                         const std::string& subcommand,
                                         const absl::optional<size_t>& length) {
   if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {
-    throw EnvoyException(fmt::format("{} does not take any parameters or length", command));
+    throwEnvoyExceptionOrPanic(fmt::format("{} does not take any parameters or length", command));
   }
 
   if ((flags & PARAMS_REQUIRED).any() && (subcommand.length() == 0)) {
-    throw EnvoyException(fmt::format("{} requires parameters", command));
+    throwEnvoyExceptionOrPanic(fmt::format("{} requires parameters", command));
   }
 
   if ((flags & LENGTH_ALLOWED).none() && length.has_value()) {
-    throw EnvoyException(fmt::format("{} does not allow length to be specified.", command));
+    throwEnvoyExceptionOrPanic(fmt::format("{} does not allow length to be specified.", command));
   }
 }
 
@@ -93,7 +93,7 @@ void SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcomma
   alternative_header = "";
   parseSubcommand(subcommand, '?', main_header, alternative_header, subs);
   if (!subs.empty()) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         // Header format rules support only one alternative header.
         // docs/root/configuration/observability/access_log/access_log.rst#format-rules
         absl::StrCat("More than 1 alternative header specified in token: ", subcommand));
@@ -102,7 +102,8 @@ void SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcomma
   // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
   if (!Envoy::Http::validHeaderString(main_header) ||
       !Envoy::Http::validHeaderString(alternative_header)) {
-    throw EnvoyException("Invalid header configuration. Format string contains null or newline.");
+    throwEnvoyExceptionOrPanic(
+        "Invalid header configuration. Format string contains null or newline.");
   }
 }
 

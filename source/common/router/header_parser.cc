@@ -35,7 +35,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   // Host is disallowed as it created confusing and inconsistent behaviors for
   // HTTP/1 and HTTP/2. It could arguably be allowed on the response path.
   if (!Http::HeaderUtility::isModifiableHeader(key)) {
-    throw EnvoyException(":-prefixed or host headers may not be modified");
+    throwEnvoyExceptionOrPanic(":-prefixed or host headers may not be modified");
   }
 
   // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to colon
@@ -58,7 +58,7 @@ HeadersToAddEntry::HeadersToAddEntry(const HeaderValueOption& header_value_optio
   if (header_value_option.has_append()) {
     // 'append' is set and ensure the 'append_action' value is equal to the default value.
     if (header_value_option.append_action() != HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
-      throw EnvoyException("Both append and append_action are set and it's not allowed");
+      throwEnvoyExceptionOrPanic("Both append and append_action are set and it's not allowed");
     }
 
     append_action_ = header_value_option.append().value()
@@ -112,7 +112,7 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
     // request finalization assume their existence and they are needed for well-formedness in most
     // cases.
     if (!Http::HeaderUtility::isRemovableHeader(header)) {
-      throw EnvoyException(":-prefixed or host headers may not be removed");
+      throwEnvoyExceptionOrPanic(":-prefixed or host headers may not be removed");
     }
     header_parser->headers_to_remove_.emplace_back(header);
   }

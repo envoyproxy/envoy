@@ -53,7 +53,10 @@ UPSTREAM_HOST = random_loopback_host()
 ENVOY_HOST = UPSTREAM_HOST
 ENVOY_PORT = 54323
 ENVOY_ADMIN_PORT = 54324
-SOCKET_PATH = "@envoy_domain_socket"
+# Append process ID to the socket path to minimize chances of
+# conflict. We can't use TEST_TMPDIR for this because it makes
+# the socket path too long.
+SOCKET_PATH = f"@envoy_domain_socket_{os.getpid()}"
 SOCKET_MODE = 0
 ENVOY_BINARY = "./test/integration/hotrestart_main"
 

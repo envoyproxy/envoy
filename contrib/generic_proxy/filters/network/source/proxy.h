@@ -173,8 +173,6 @@ public:
       parent_.request_stream_frame_handler_ = &handler;
     }
     void completeDirectly() override { parent_.completeDirectly(); }
-    void bindUpstreamConn(Upstream::TcpPoolData&& pool_data) override;
-    OptRef<UpstreamManager> boundUpstreamConn() override;
 
     DecoderFilterSharedPtr filter_;
   };
@@ -332,36 +330,6 @@ private:
 };
 using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
-class UpstreamManagerImpl : public UpstreamConnection,
-                            public UpstreamManager,
-                            public ResponseDecoderCallback {
-public:
-  UpstreamManagerImpl(Filter& parent, Upstream::TcpPoolData&& tcp_pool_data);
-
-  // UpstreamConnection
-  void onPoolSuccessImpl() override;
-  void onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
-                         absl::string_view transport_failure_reason) override;
-  void onEventImpl(Network::ConnectionEvent event) override;
-
-  // ResponseDecoderCallback
-  void onDecodingSuccess(StreamFramePtr response) override;
-  void onDecodingFailure() override;
-  void writeToConnection(Buffer::Instance& buffer) override;
-  OptRef<Network::Connection> connection() override;
-
-  // UpstreamManager
-  void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) override;
-  void registerUpstreamCallback(uint64_t stream_id, UpstreamBindingCallback& cb) override;
-  void unregisterResponseCallback(uint64_t stream_id) override;
-  void unregisterUpstreamCallback(uint64_t stream_id) override;
-
-  Filter& parent_;
-
-  absl::flat_hash_map<uint64_t, PendingResponseCallback*> registered_response_callbacks_;
-  absl::flat_hash_map<uint64_t, UpstreamBindingCallback*> registered_upstream_callbacks_;
-};
-
 class Filter : public Envoy::Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
@@ -374,7 +342,6 @@ public:
     request_decoder_->setDecoderCallback(*this);
     response_encoder_ = config_->codecFactory().responseEncoder();
     message_creator_ = config_->codecFactory().messageCreator();
-    protocol_options_ = config_->codecFactory().protocolOptions();
   }
 
   // Envoy::Network::ReadFilter
@@ -402,13 +369,6 @@ public:
     }
     downstream_connection_closed_ = true;
     resetStreamsForUnexpectedError();
-
-    // If these is bound upstream connection, clean it up.
-    if (upstream_manager_ != nullptr) {
-      upstream_manager_->cleanUp(true);
-      downstreamConnection().dispatcher().deferredDelete(std::move(upstream_manager_));
-      upstream_manager_ = nullptr;
-    }
   }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
@@ -447,13 +407,6 @@ public:
 
   void mayBeDrainClose();
 
-  void bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data);
-  OptRef<UpstreamManager> boundUpstreamConn() {
-    return makeOptRefFromPtr<UpstreamManager>(upstream_manager_.get());
-  }
-
-  void onBoundUpstreamConnectionEvent(Network::ConnectionEvent event);
-
 protected:
   // This will be called when drain decision is made and all active streams are handled.
   // This is a virtual method so that it can be overridden by derived classes.
@@ -480,12 +433,8 @@ private:
   RequestDecoderPtr request_decoder_;
   ResponseEncoderPtr response_encoder_;
   MessageCreatorPtr message_creator_;
-  ProtocolOptions protocol_options_;
 
   Buffer::OwnedImpl response_buffer_;
-
-  // The upstream connection manager.
-  std::unique_ptr<UpstreamManagerImpl> upstream_manager_;
 
   std::list<ActiveStreamPtr> active_streams_;
   absl::flat_hash_map<uint64_t, ActiveStream*> frame_handlers_;
