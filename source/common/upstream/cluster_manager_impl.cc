@@ -2029,7 +2029,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
   std::cerr << "==> AAB httpConnPoolImpl 10" << std::endl; // TODO: rm
- 
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.

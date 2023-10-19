@@ -717,6 +717,9 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
   makeSingleRequest();
 }
 
+// Validate that
+TEST_P(AdsIntegrationTest, AdsStartedAfterAsyncClusterInitialization) {}
+
 // Validate that the request with duplicate clusters in the initial request during server init is
 // rejected.
 TEST_P(AdsIntegrationTest, DuplicateInitialClusters) {
