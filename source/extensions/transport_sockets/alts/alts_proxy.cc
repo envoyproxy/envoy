@@ -24,10 +24,10 @@ using ::grpc::gcp::StartClientHandshakeReq;
 using ::grpc::gcp::StartServerHandshakeReq;
 
 void AltsProxy::setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions) {
-  rpc_protocol_versions->mutable_max_rpc_version()->set_major(kMaxMajorRpcVersion);
-  rpc_protocol_versions->mutable_max_rpc_version()->set_minor(kMaxMinorRpcVersion);
-  rpc_protocol_versions->mutable_min_rpc_version()->set_major(kMinMajorRpcVersion);
-  rpc_protocol_versions->mutable_min_rpc_version()->set_minor(kMinMinorRpcVersion);
+  rpc_protocol_versions->mutable_max_rpc_version()->set_major(MaxMajorRpcVersion);
+  rpc_protocol_versions->mutable_max_rpc_version()->set_minor(MaxMinorRpcVersion);
+  rpc_protocol_versions->mutable_min_rpc_version()->set_major(MinMajorRpcVersion);
+  rpc_protocol_versions->mutable_min_rpc_version()->set_minor(MinMinorRpcVersion);
 }
 
 absl::StatusOr<std::unique_ptr<AltsProxy>>
@@ -67,10 +67,10 @@ absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
   HandshakerReq request;
   StartClientHandshakeReq* client_start = request.mutable_client_start();
   client_start->set_handshake_security_protocol(grpc::gcp::ALTS);
-  client_start->add_application_protocols(kApplicationProtocol);
-  client_start->add_record_protocols(kRecordProtocol);
+  client_start->add_application_protocols(ApplicationProtocol);
+  client_start->add_record_protocols(RecordProtocol);
   setRpcProtocolVersions(client_start->mutable_rpc_versions());
-  client_start->set_max_frame_size(kMaxFrameSize);
+  client_start->set_max_frame_size(MaxFrameSize);
 
   // Send the StartClientHandshakeReq message to the handshaker service and wait
   // for the response.
@@ -93,14 +93,14 @@ absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
 absl::StatusOr<HandshakerResp> AltsProxy::sendStartServerHandshakeReq(absl::string_view in_bytes) {
   // Prepare the StartServerHandshakeReq message.
   ServerHandshakeParameters server_parameters;
-  server_parameters.add_record_protocols(kRecordProtocol);
+  server_parameters.add_record_protocols(RecordProtocol);
   HandshakerReq request;
   StartServerHandshakeReq* server_start = request.mutable_server_start();
-  server_start->add_application_protocols(kApplicationProtocol);
+  server_start->add_application_protocols(ApplicationProtocol);
   (*server_start->mutable_handshake_parameters())[HandshakeProtocol::ALTS] = server_parameters;
   setRpcProtocolVersions(server_start->mutable_rpc_versions());
   server_start->set_in_bytes(std::string(in_bytes));
-  server_start->set_max_frame_size(kMaxFrameSize);
+  server_start->set_max_frame_size(MaxFrameSize);
 
   // Send the StartServerHandshakeReq message to the handshaker service and wait
   // for the response.

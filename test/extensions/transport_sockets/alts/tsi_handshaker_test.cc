@@ -46,22 +46,22 @@ using ::testing::IsNull;
 using ::testing::NotNull;
 using ::testing::Test;
 
-constexpr absl::string_view kClientInit = "CLIENT_INIT";
-constexpr absl::string_view kServerInit = "SERVER_INIT";
-constexpr absl::string_view kClientFinished = "CLIENT_FINISHED";
-constexpr absl::string_view kServerFinished = "SERVER_FINISHED";
+constexpr absl::string_view ClientInit = "CLIENT_INIT";
+constexpr absl::string_view ServerInit = "SERVER_INIT";
+constexpr absl::string_view ClientFinished = "CLIENT_FINISHED";
+constexpr absl::string_view ServerFinished = "SERVER_FINISHED";
 
-constexpr absl::string_view kKeyData = "fake_key_data_needs_to_be_at_least_44_characters_long";
-constexpr absl::string_view kLocalServiceAccount = "local_service_account";
-constexpr absl::string_view kPeerServiceAccount = "peer_service_account";
+constexpr absl::string_view KeyData = "fake_key_data_needs_to_be_at_least_44_characters_long";
+constexpr absl::string_view LocalServiceAccount = "local_service_account";
+constexpr absl::string_view PeerServiceAccount = "peer_service_account";
 
 void populateHandshakeResult(HandshakerResult* result) {
-  result->mutable_peer_identity()->set_service_account(kPeerServiceAccount);
+  result->mutable_peer_identity()->set_service_account(PeerServiceAccount);
   result->mutable_peer_rpc_versions();
-  result->mutable_local_identity()->set_service_account(kLocalServiceAccount);
-  result->set_application_protocol(kApplicationProtocol);
-  result->set_record_protocol(kRecordProtocol);
-  result->set_key_data(kKeyData);
+  result->mutable_local_identity()->set_service_account(LocalServiceAccount);
+  result->set_application_protocol(ApplicationProtocol);
+  result->set_record_protocol(RecordProtocol);
+  result->set_key_data(KeyData);
 }
 
 class CapturingTsiHandshakerCallbacks final : public TsiHandshakerCallbacks {
@@ -92,23 +92,23 @@ public:
       if (request.has_client_start()) {
         // The request contains a StartClientHandshakeReq message.
         is_assisting_client = true;
-        response.set_out_frames(kClientInit);
-        response.set_bytes_consumed(kClientInit.size());
+        response.set_out_frames(ClientInit);
+        response.set_bytes_consumed(ClientInit.size());
       } else if (request.has_server_start()) {
         // The request contains a StartServerHandshakeReq message.
-        EXPECT_EQ(request.server_start().in_bytes(), kClientInit);
-        std::string out_frames = absl::StrCat(kServerInit, kServerFinished);
+        EXPECT_EQ(request.server_start().in_bytes(), ClientInit);
+        std::string out_frames = absl::StrCat(ServerInit, ServerFinished);
         response.set_out_frames(out_frames);
         response.set_bytes_consumed(out_frames.size());
       } else if (request.has_next()) {
         // The request contains a NextHandshakeMessageReq message.
         std::string expected_in_bytes = is_assisting_client
-                                            ? absl::StrCat(kServerInit, kServerFinished)
-                                            : std::string(kClientFinished);
+                                            ? absl::StrCat(ServerInit, ServerFinished)
+                                            : std::string(ClientFinished);
         EXPECT_EQ(request.next().in_bytes(), expected_in_bytes);
         response.set_bytes_consumed(expected_in_bytes.size());
         if (is_assisting_client) {
-          response.set_out_frames(kClientFinished);
+          response.set_out_frames(ClientFinished);
         }
         populateHandshakeResult(response.mutable_result());
       } else {
@@ -219,7 +219,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
     auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
     EXPECT_TRUE(result->status_.ok());
-    EXPECT_EQ(result->to_send_->toString(), kClientInit);
+    EXPECT_EQ(result->to_send_->toString(), ClientInit);
     EXPECT_THAT(result->result_, IsNull());
   }
 
@@ -229,18 +229,18 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
     tsi_handshaker->setHandshakerCallbacks(capturing_callbacks);
     EXPECT_CALL(dispatcher, post(_)).WillOnce([](Envoy::Event::PostCb cb) { cb(); });
     Buffer::OwnedImpl received_bytes;
-    received_bytes.add(kServerInit.data(), kServerInit.size());
-    received_bytes.add(kServerFinished.data(), kServerFinished.size());
+    received_bytes.add(ServerInit.data(), ServerInit.size());
+    received_bytes.add(ServerFinished.data(), ServerFinished.size());
     EXPECT_TRUE(tsi_handshaker->next(received_bytes).ok());
 
     auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
     EXPECT_TRUE(result->status_.ok());
-    EXPECT_EQ(result->to_send_->toString(), kClientFinished);
+    EXPECT_EQ(result->to_send_->toString(), ClientFinished);
     EXPECT_THAT(result->result_, NotNull());
     EXPECT_THAT(result->result_->frame_protector, NotNull());
-    EXPECT_EQ(result->result_->peer_identity, kPeerServiceAccount);
-    EXPECT_EQ(result->result_->unused_bytes, "");
+    EXPECT_EQ(result->result_->peer_identity, PeerServiceAccount);
+    EXPECT_EQ(result->result_->unused_bytes.size(), 0);
   }
 }
 
@@ -257,13 +257,13 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
     tsi_handshaker->setHandshakerCallbacks(capturing_callbacks);
     EXPECT_CALL(dispatcher, post(_)).WillOnce([](Envoy::Event::PostCb cb) { cb(); });
     Buffer::OwnedImpl received_bytes;
-    received_bytes.add(kClientInit.data(), kClientInit.size());
+    received_bytes.add(ClientInit.data(), ClientInit.size());
     EXPECT_OK(tsi_handshaker->next(received_bytes));
 
     auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
     EXPECT_TRUE(result->status_.ok());
-    EXPECT_EQ(result->to_send_->toString(), absl::StrCat(kServerInit, kServerFinished));
+    EXPECT_EQ(result->to_send_->toString(), absl::StrCat(ServerInit, ServerFinished));
     EXPECT_THAT(result->result_, IsNull());
   }
 
@@ -273,7 +273,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
     tsi_handshaker->setHandshakerCallbacks(capturing_callbacks);
     EXPECT_CALL(dispatcher, post(_)).WillOnce([](Envoy::Event::PostCb cb) { cb(); });
     Buffer::OwnedImpl received_bytes;
-    received_bytes.add(kClientFinished.data(), kClientFinished.size());
+    received_bytes.add(ClientFinished.data(), ClientFinished.size());
     EXPECT_TRUE(tsi_handshaker->next(received_bytes).ok());
 
     auto result = capturing_callbacks.getNextResult();
@@ -282,8 +282,8 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
     EXPECT_EQ(result->to_send_->toString(), "");
     EXPECT_THAT(result->result_, NotNull());
     EXPECT_THAT(result->result_->frame_protector, NotNull());
-    EXPECT_EQ(result->result_->peer_identity, kPeerServiceAccount);
-    EXPECT_EQ(result->result_->unused_bytes, "");
+    EXPECT_EQ(result->result_->peer_identity, PeerServiceAccount);
+    EXPECT_EQ(result->result_->unused_bytes.size(), 0);
   }
 }
 
@@ -323,7 +323,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideError) {
     tsi_handshaker->setHandshakerCallbacks(capturing_callbacks);
     EXPECT_CALL(dispatcher, post(_)).WillOnce([](Envoy::Event::PostCb cb) { cb(); });
     Buffer::OwnedImpl received_bytes;
-    received_bytes.add(kClientInit.data(), kClientInit.size());
+    received_bytes.add(ClientInit.data(), ClientInit.size());
     ASSERT_THAT(tsi_handshaker->next(received_bytes), StatusCodeIs(absl::StatusCode::kInternal));
 
     auto result = capturing_callbacks.getNextResult();

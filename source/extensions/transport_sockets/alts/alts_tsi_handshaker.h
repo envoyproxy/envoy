@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "source/extensions/transport_sockets/alts/alts_proxy.h"
 #include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
@@ -14,12 +16,12 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-constexpr std::size_t kAltsMinFrameSize = 16 * 1024;
+constexpr std::size_t AltsMinFrameSize = 16 * 1024;
 
 struct AltsHandshakeResult {
   TsiFrameProtectorPtr frame_protector;
   std::string peer_identity;
-  std::string unused_bytes;
+  std::vector<uint8_t> unused_bytes;
 };
 
 // Manages a single ALTS handshake.

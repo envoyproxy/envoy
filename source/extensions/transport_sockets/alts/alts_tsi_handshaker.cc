@@ -1,10 +1,12 @@
 #include "source/extensions/transport_sockets/alts/alts_tsi_handshaker.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
@@ -19,7 +21,7 @@ namespace Alts {
 
 using ::grpc::gcp::HandshakerResp;
 
-constexpr std::size_t kAltsAes128GcmRekeyKeyLength = 44;
+constexpr std::size_t AltsAes128GcmRekeyKeyLength = 44;
 
 std::unique_ptr<AltsTsiHandshaker>
 AltsTsiHandshaker::createForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
@@ -97,10 +99,10 @@ absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* rece
 }
 
 std::size_t AltsTsiHandshaker::computeMaxFrameSize(const grpc::gcp::HandshakerResult& result) {
-  std::size_t max_frame_size = kAltsMinFrameSize;
+  std::size_t max_frame_size = AltsMinFrameSize;
   if (result.max_frame_size() > 0) {
-    max_frame_size = std::min<std::size_t>(result.max_frame_size(), kMaxFrameSize);
-    max_frame_size = std::max<std::size_t>(max_frame_size, kAltsMinFrameSize);
+    max_frame_size = std::min<std::size_t>(result.max_frame_size(), MaxFrameSize);
+    max_frame_size = std::max<std::size_t>(max_frame_size, AltsMinFrameSize);
   }
   return max_frame_size;
 }
@@ -122,11 +124,11 @@ AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
   if (result.application_protocol().empty()) {
     return absl::FailedPreconditionError("Handshake result has empty application protocol.");
   }
-  if (result.record_protocol() != kRecordProtocol) {
+  if (result.record_protocol() != RecordProtocol) {
     return absl::FailedPreconditionError(
         "Handshake result's record protocol is not ALTSRP_GCM_AES128_REKEY.");
   }
-  if (result.key_data().size() < kAltsAes128GcmRekeyKeyLength) {
+  if (result.key_data().size() < AltsAes128GcmRekeyKeyLength) {
     return absl::FailedPreconditionError("Handshake result's key data is too short.");
   }
   if (bytes_consumed > received_bytes.size()) {
@@ -140,7 +142,7 @@ AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
   tsi_zero_copy_grpc_protector* protector = nullptr;
   grpc_core::ExecCtx exec_ctx;
   tsi_result ok = alts_zero_copy_grpc_protector_create(
-      reinterpret_cast<const uint8_t*>(result.key_data().data()), kAltsAes128GcmRekeyKeyLength,
+      reinterpret_cast<const uint8_t*>(result.key_data().data()), AltsAes128GcmRekeyKeyLength,
       true, is_client_,
       /*is_integrity_only=*/false, /*enable_extra_copy=*/false, &max_frame_size, &protector);
   if (ok != TSI_OK) {
@@ -149,13 +151,15 @@ AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
 
   // Calculate the unused bytes.
   std::size_t unused_bytes_size = received_bytes.size() - bytes_consumed;
-  std::string unused_bytes(received_bytes.data() + bytes_consumed, unused_bytes_size);
+std::vector<uint8_t> unused_bytes(unused_bytes_size);
+  memcpy(unused_bytes.data(), received_bytes.data() + bytes_consumed,
+         unused_bytes_size);
 
   // Create and return the AltsHandshakeResult.
   auto handshake_result = std::make_unique<AltsHandshakeResult>();
   handshake_result->frame_protector = std::make_unique<TsiFrameProtector>(protector);
   handshake_result->peer_identity = result.peer_identity().service_account();
-  handshake_result->unused_bytes = std::move(unused_bytes);
+  handshake_result->unused_bytes = unused_bytes;
   return handshake_result;
 }
 

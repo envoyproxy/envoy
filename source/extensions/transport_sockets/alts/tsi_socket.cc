@@ -133,10 +133,13 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     if (!handshake_result->unused_bytes.empty()) {
       // All handshake data is consumed.
       ASSERT(raw_read_buffer_.length() == 0);
-      raw_read_buffer_.prepend(handshake_result->unused_bytes);
+      absl::string_view unused_bytes(
+          reinterpret_cast<const char*>(handshake_result->unused_bytes.data()),
+          handshake_result->unused_bytes.size());
+      raw_read_buffer_.prepend(unused_bytes);
     }
     ENVOY_CONN_LOG(debug, "TSI: Handshake successful: unused_bytes: {}", callbacks_->connection(),
-                   handshake_result->unused_bytes.length());
+                   handshake_result->unused_bytes.size());
     // Reset the watermarks with actual negotiated max frame size.
     raw_read_buffer_.setWatermarks(
         std::max<size_t>(actual_frame_size_to_use_, callbacks_->connection().bufferLimit()));

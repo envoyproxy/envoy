@@ -19,15 +19,15 @@ namespace TransportSockets {
 namespace Alts {
 
 // TODO(matthewstevenson88): Extend this to be configurable through API.
-constexpr std::size_t kChannelPoolSize = 10;
+constexpr std::size_t ChannelPoolSize = 10;
 
 std::unique_ptr<AltsChannelPool>
 AltsChannelPool::create(absl::string_view handshaker_service_address) {
   std::vector<std::shared_ptr<grpc::Channel>> channel_pool;
-  channel_pool.reserve(kChannelPoolSize);
+  channel_pool.reserve(ChannelPoolSize);
   grpc::ChannelArguments channel_args;
   channel_args.SetInt(GRPC_ARG_USE_LOCAL_SUBCHANNEL_POOL, 1);
-  for (std::size_t i = 0; i < kChannelPoolSize; ++i) {
+  for (std::size_t i = 0; i < ChannelPoolSize; ++i) {
     channel_pool.push_back(grpc::CreateCustomChannel(
         std::string(handshaker_service_address), grpc::InsecureChannelCredentials(), channel_args));
   }

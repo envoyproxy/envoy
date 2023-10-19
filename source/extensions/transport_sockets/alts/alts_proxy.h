@@ -15,13 +15,13 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-constexpr char kApplicationProtocol[] = "grpc";
-constexpr char kRecordProtocol[] = "ALTSRP_GCM_AES128_REKEY";
-constexpr std::size_t kMaxFrameSize = 1024 * 1024;
-constexpr std::size_t kMaxMajorRpcVersion = 2;
-constexpr std::size_t kMaxMinorRpcVersion = 1;
-constexpr std::size_t kMinMajorRpcVersion = 2;
-constexpr std::size_t kMinMinorRpcVersion = 1;
+constexpr char ApplicationProtocol[] = "grpc";
+constexpr char RecordProtocol[] = "ALTSRP_GCM_AES128_REKEY";
+constexpr std::size_t MaxFrameSize = 1024 * 1024;
+constexpr std::size_t MaxMajorRpcVersion = 2;
+constexpr std::size_t MaxMinorRpcVersion = 1;
+constexpr std::size_t MinMajorRpcVersion = 2;
+constexpr std::size_t MinMinorRpcVersion = 1;
 
 // Manages a bidirectional stream to the ALTS handshaker service. An AltsProxy
 // instance is tied to a single ALTS handshake and must not be reused.

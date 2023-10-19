@@ -40,25 +40,25 @@ using ::grpc::gcp::ServerHandshakeParameters;
 using ::grpc::gcp::StartClientHandshakeReq;
 using ::grpc::gcp::StartServerHandshakeReq;
 
-constexpr absl::string_view kClientStartResponse = "client_start_response";
-constexpr absl::string_view kServerStartResponse = "server_start_response";
-constexpr absl::string_view kNextResponse = "next_response";
+constexpr absl::string_view ClientStartResponse = "client_start_response";
+constexpr absl::string_view ServerStartResponse = "server_start_response";
+constexpr absl::string_view NextResponse = "next_response";
 
 HandshakerResp expectedClientStartResponse() {
   HandshakerResp response;
-  response.set_out_frames(kClientStartResponse);
+  response.set_out_frames(ClientStartResponse);
   return response;
 }
 
 HandshakerResp expectedServerStartResponse() {
   HandshakerResp response;
-  response.set_out_frames(kServerStartResponse);
+  response.set_out_frames(ServerStartResponse);
   return response;
 }
 
 HandshakerResp expectedNextResponse() {
   HandshakerResp response;
-  response.set_out_frames(kNextResponse);
+  response.set_out_frames(NextResponse);
   return response;
 }
 
@@ -87,11 +87,11 @@ public:
         response.mutable_status()->set_code(static_cast<int>(grpc::StatusCode::INTERNAL));
         response.mutable_status()->set_details("An internal error occurred.");
       } else if (request.has_client_start()) {
-        response.set_out_frames(kClientStartResponse);
+        response.set_out_frames(ClientStartResponse);
       } else if (request.has_server_start()) {
-        response.set_out_frames(kServerStartResponse);
+        response.set_out_frames(ServerStartResponse);
       } else if (request.has_next()) {
-        response.set_out_frames(kNextResponse);
+        response.set_out_frames(NextResponse);
       }
       EXPECT_TRUE(stream->Write(response));
     }
@@ -152,17 +152,17 @@ TEST_F(AltsProxyTest, ClientStartSuccess) {
   HandshakerReq expected_request;
   StartClientHandshakeReq* expected_client_start = expected_request.mutable_client_start();
   expected_client_start->set_handshake_security_protocol(grpc::gcp::ALTS);
-  expected_client_start->add_application_protocols(kApplicationProtocol);
-  expected_client_start->add_record_protocols(kRecordProtocol);
+  expected_client_start->add_application_protocols(ApplicationProtocol);
+  expected_client_start->add_record_protocols(RecordProtocol);
   expected_client_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_major(
-      kMaxMajorRpcVersion);
+      MaxMajorRpcVersion);
   expected_client_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_minor(
-      kMaxMinorRpcVersion);
+      MaxMinorRpcVersion);
   expected_client_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_major(
-      kMinMajorRpcVersion);
+      MinMajorRpcVersion);
   expected_client_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_minor(
-      kMinMinorRpcVersion);
-  expected_client_start->set_max_frame_size(kMaxFrameSize);
+      MinMinorRpcVersion);
+  expected_client_start->set_max_frame_size(MaxFrameSize);
   startFakeHandshakerService({expected_request}, grpc::Status::OK);
 
   auto alts_proxy = AltsProxy::create(getChannel());
@@ -175,19 +175,19 @@ TEST_F(AltsProxyTest, ClientFullHandshakeSuccess) {
   HandshakerReq expected_request_1;
   StartClientHandshakeReq* expected_client_start = expected_request_1.mutable_client_start();
   expected_client_start->set_handshake_security_protocol(grpc::gcp::ALTS);
-  expected_client_start->add_application_protocols(kApplicationProtocol);
-  expected_client_start->add_record_protocols(kRecordProtocol);
+  expected_client_start->add_application_protocols(ApplicationProtocol);
+  expected_client_start->add_record_protocols(RecordProtocol);
   expected_client_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_major(
-      kMaxMajorRpcVersion);
+      MaxMajorRpcVersion);
   expected_client_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_minor(
-      kMaxMinorRpcVersion);
+      MaxMinorRpcVersion);
   expected_client_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_major(
-      kMinMajorRpcVersion);
+      MinMajorRpcVersion);
   expected_client_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_minor(
-      kMinMinorRpcVersion);
-  expected_client_start->set_max_frame_size(kMaxFrameSize);
+      MinMinorRpcVersion);
+  expected_client_start->set_max_frame_size(MaxFrameSize);
   HandshakerReq expected_request_2;
-  expected_request_2.mutable_next()->set_in_bytes(kServerStartResponse);
+  expected_request_2.mutable_next()->set_in_bytes(ServerStartResponse);
   startFakeHandshakerService({expected_request_1, expected_request_2}, grpc::Status::OK);
 
   auto alts_proxy = AltsProxy::create(getChannel());
@@ -197,7 +197,7 @@ TEST_F(AltsProxyTest, ClientFullHandshakeSuccess) {
   grpc::gcp::HandshakerResp& handshaker_resp = resp.value();
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedClientStartResponse()));
 
-  resp = (*alts_proxy)->sendNextHandshakeReq(kServerStartResponse);
+  resp = (*alts_proxy)->sendNextHandshakeReq(ServerStartResponse);
   EXPECT_OK(resp);
   handshaker_resp = resp.value();
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedNextResponse()));
@@ -206,32 +206,32 @@ TEST_F(AltsProxyTest, ClientFullHandshakeSuccess) {
 TEST_F(AltsProxyTest, ServerStartSuccess) {
   HandshakerReq expected_request;
   ServerHandshakeParameters server_parameters;
-  server_parameters.add_record_protocols(kRecordProtocol);
+  server_parameters.add_record_protocols(RecordProtocol);
   StartServerHandshakeReq* expected_server_start = expected_request.mutable_server_start();
-  expected_server_start->add_application_protocols(kApplicationProtocol);
+  expected_server_start->add_application_protocols(ApplicationProtocol);
   (*expected_server_start->mutable_handshake_parameters())[HandshakeProtocol::ALTS] =
       server_parameters;
   expected_server_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_major(
-      kMaxMajorRpcVersion);
+      MaxMajorRpcVersion);
   expected_server_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_minor(
-      kMaxMinorRpcVersion);
+      MaxMinorRpcVersion);
   expected_server_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_major(
-      kMinMajorRpcVersion);
+      MinMajorRpcVersion);
   expected_server_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_minor(
-      kMinMinorRpcVersion);
-  expected_server_start->set_in_bytes(kClientStartResponse);
-  expected_server_start->set_max_frame_size(kMaxFrameSize);
+      MinMinorRpcVersion);
+  expected_server_start->set_in_bytes(ClientStartResponse);
+  expected_server_start->set_max_frame_size(MaxFrameSize);
   startFakeHandshakerService({expected_request}, grpc::Status::OK);
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
 
-  auto resp = (*alts_proxy)->sendStartServerHandshakeReq(kClientStartResponse);
+  auto resp = (*alts_proxy)->sendStartServerHandshakeReq(ClientStartResponse);
   EXPECT_OK(resp);
   grpc::gcp::HandshakerResp& handshaker_resp = resp.value();
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedServerStartResponse()));
 
-  resp = (*alts_proxy)->sendNextHandshakeReq(kClientStartResponse);
+  resp = (*alts_proxy)->sendNextHandshakeReq(ClientStartResponse);
   EXPECT_OK(resp);
   handshaker_resp = resp.value();
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedNextResponse()));
@@ -240,32 +240,32 @@ TEST_F(AltsProxyTest, ServerStartSuccess) {
 TEST_F(AltsProxyTest, ServerFullHandshakeSuccess) {
   HandshakerReq expected_request_1;
   ServerHandshakeParameters server_parameters;
-  server_parameters.add_record_protocols(kRecordProtocol);
+  server_parameters.add_record_protocols(RecordProtocol);
   StartServerHandshakeReq* expected_server_start = expected_request_1.mutable_server_start();
-  expected_server_start->add_application_protocols(kApplicationProtocol);
+  expected_server_start->add_application_protocols(ApplicationProtocol);
   (*expected_server_start->mutable_handshake_parameters())[HandshakeProtocol::ALTS] =
       server_parameters;
   expected_server_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_major(
-      kMaxMajorRpcVersion);
+      MaxMajorRpcVersion);
   expected_server_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_minor(
-      kMaxMinorRpcVersion);
+      MaxMinorRpcVersion);
   expected_server_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_major(
-      kMinMajorRpcVersion);
+      MinMajorRpcVersion);
   expected_server_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_minor(
-      kMinMinorRpcVersion);
-  expected_server_start->set_in_bytes(kClientStartResponse);
-  expected_server_start->set_max_frame_size(kMaxFrameSize);
+      MinMinorRpcVersion);
+  expected_server_start->set_in_bytes(ClientStartResponse);
+  expected_server_start->set_max_frame_size(MaxFrameSize);
   HandshakerReq expected_request_2;
-  expected_request_2.mutable_next()->set_in_bytes(kServerStartResponse);
+  expected_request_2.mutable_next()->set_in_bytes(ServerStartResponse);
   startFakeHandshakerService({expected_request_1, expected_request_2}, grpc::Status::OK);
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
   EXPECT_TRUE(TestUtility::protoEqual(
-      (*alts_proxy)->sendStartServerHandshakeReq(kClientStartResponse).value(),
+      (*alts_proxy)->sendStartServerHandshakeReq(ClientStartResponse).value(),
       expectedServerStartResponse()));
   EXPECT_TRUE(TestUtility::protoEqual(
-      (*alts_proxy)->sendNextHandshakeReq(kServerStartResponse).value(), expectedNextResponse()));
+      (*alts_proxy)->sendNextHandshakeReq(ServerStartResponse).value(), expectedNextResponse()));
 }
 
 TEST_F(AltsProxyTest, CreateFailsDueToNullChannel) {
@@ -290,7 +290,7 @@ TEST_F(AltsProxyTest, ServerStartRpcLevelFailure) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_THAT((*alts_proxy)->sendStartServerHandshakeReq(kClientStartResponse),
+  EXPECT_THAT((*alts_proxy)->sendStartServerHandshakeReq(ClientStartResponse),
               StatusIs(absl::StatusCode::kInternal));
 }
 
@@ -301,7 +301,7 @@ TEST_F(AltsProxyTest, NextRpcLevelFailure) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_THAT((*alts_proxy)->sendNextHandshakeReq(kServerStartResponse),
+  EXPECT_THAT((*alts_proxy)->sendNextHandshakeReq(ServerStartResponse),
               StatusIs(absl::StatusCode::kInternal));
 }
 
@@ -322,7 +322,7 @@ TEST_F(AltsProxyTest, ServerStartRequestLevelFailure) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_THAT((*alts_proxy)->sendStartServerHandshakeReq(kClientStartResponse),
+  EXPECT_THAT((*alts_proxy)->sendStartServerHandshakeReq(ClientStartResponse),
               StatusIs(absl::StatusCode::kInternal));
 }
 
@@ -333,7 +333,7 @@ TEST_F(AltsProxyTest, NextRequestLevelFailure) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_THAT((*alts_proxy)->sendNextHandshakeReq(kServerStartResponse),
+  EXPECT_THAT((*alts_proxy)->sendNextHandshakeReq(ServerStartResponse),
               StatusIs(absl::StatusCode::kInternal));
 }
 
