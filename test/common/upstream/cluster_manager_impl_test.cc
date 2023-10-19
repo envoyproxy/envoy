@@ -4542,19 +4542,24 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
 
   createWithBasicStaticCluster();
 
+  EXPECT_CALL(context1, upstreamSocketOptions()).WillRepeatedly(Return(options1));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(to_create1));
+  std::cerr << "==> AAB Test calling httpConnPool 1" << std::endl;
   Http::ConnectionPool::Instance* cp1 = HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1));
   EXPECT_NE(nullptr, cp1);
 
+  EXPECT_CALL(context2, upstreamSocketOptions()).WillRepeatedly(Return(options2));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(to_create2));
+  std::cerr << "==> AAB Test calling httpConnPool 2" << std::endl;
   Http::ConnectionPool::Instance* cp2 = HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context2));
   EXPECT_NE(nullptr, cp2);
 
   // The different upstream options should lead to different hashKeys, thus different pools.
+  std::cerr << "==> AAB Test compare cp1 and cp2" << std::endl;
   EXPECT_NE(cp1, cp2);
 
   Http::ConnectionPool::Instance* should_be_cp1 = HttpPoolDataPeer::getPool(

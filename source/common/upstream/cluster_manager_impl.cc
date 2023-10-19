@@ -1976,7 +1976,7 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
-  std::cerr << "==> AAB httpConnPoolImpl" << std::endl; // TODO: rm
+  std::cerr << "==> AAB httpConnPool" << std::endl;
   HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
@@ -1996,6 +1996,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   for (auto protocol : upstream_protocols) {
     hash_key.push_back(uint8_t(protocol));
   }
+  std::cerr << "==> AAB 1 hash_key(" << hash_key.size() << ")=";
+  for (auto x : hash_key)
+    std::cerr << x << " ";
+  std::cerr << std::endl;
 
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_options = host->cluster().alternateProtocolsCacheOptions();
@@ -2014,6 +2018,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   for (const auto& option : *upstream_options) {
     option->hashKey(hash_key);
   }
+  std::cerr << "==> AAB 2 hash_key(" << hash_key.size() << ")=";
+  for (auto x : hash_key)
+    std::cerr << x << " ";
+  std::cerr << std::endl;
 
   bool have_transport_socket_options = false;
   if (context && context->upstreamTransportSocketOptions()) {
@@ -2028,13 +2036,15 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   }
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
-  std::cerr << "==> AAB httpConnPoolImpl 10" << std::endl; // TODO: rm
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
+  std::cerr << "==> AAB FINAL hash_key(" << hash_key.size() << ")=";
+  for (auto x : hash_key)
+    std::cerr << x << " ";
+  std::cerr << std::endl;
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
-        std::cerr << "==> AAB httpConnPoolImpl calling allocateConnPool **** " << std::endl;
         auto pool = parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
