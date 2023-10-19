@@ -74,6 +74,7 @@ protected:
   Platform::StreamSharedPtr stream_;
   Platform::EngineSharedPtr engine_;
   Thread::ThreadPtr envoy_thread_;
+  absl::Mutex engine_lock_;
   bool explicit_flow_control_ = false;
   uint64_t min_delivery_size_ = 10;
   bool expect_dns_ = true;
