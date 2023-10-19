@@ -68,6 +68,9 @@ check_cached "$response"
 run_log "Snooze for 3 more seconds"
 sleep 3
 
+run_log "Snooze for one minute"
+sleep 60
+
 run_log "Valid-for-minute: More than a minute has passed, this request should get a validated response"
 response=$(curl -si "localhost:${PORT_PROXY}/service/1/valid-for-minute")
 check_validated "$response"

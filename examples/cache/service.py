@@ -65,8 +65,7 @@ async def get(request):
         return web.HTTPNotModified(headers={'ETag': computed_etag})
 
     request_date = datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
-    response = web.Response(
-        text=f"{body}\nResponse generated at: {request_date}\n")
+    response = web.Response(text=f"{body}\nResponse generated at: {request_date}\n")
 
     if stored_response.get('headers'):
         response.headers.update(stored_response.get('headers'))
@@ -74,6 +73,7 @@ async def get(request):
     _set_etag_header(response, computed_etag)
 
     return response
+
 
 if __name__ == "__main__":
     if not os.path.isfile('/etc/responses.yaml'):
