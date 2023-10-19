@@ -6,9 +6,9 @@
 #include <utility>
 #include <vector>
 
-#include "absl/random/distributions.h"
-#include "absl/random/random.h"
+#include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "grpcpp/channel.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
@@ -38,10 +38,14 @@ AltsChannelPool::AltsChannelPool(const std::vector<std::shared_ptr<grpc::Channel
     : channel_pool_(channel_pool) {}
 
 // TODO(matthewstevenson88): Add logic to limit number of outstanding channels.
-std::shared_ptr<grpc::Channel> AltsChannelPool::getChannel() const {
-  absl::BitGen gen;
-  auto index = absl::Uniform<int>(gen, /*lo=*/0, channel_pool_.size());
-  return channel_pool_[index];
+std::shared_ptr<grpc::Channel> AltsChannelPool::getChannel() {
+  std::shared_ptr<grpc::Channel> channel;
+  {
+    absl::MutexLock lock(&mu_);
+    channel = channel_pool_[index_];
+    index_ = (index_ + 1) % channel_pool_.size();
+  }
+  return channel;
 }
 
 std::size_t AltsChannelPool::getChannelPoolSize() const { return channel_pool_.size(); }

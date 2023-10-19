@@ -1,9 +1,11 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <vector>
 
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "grpcpp/channel.h"
 
 namespace Envoy {
@@ -18,13 +20,16 @@ public:
 
   // Gets a channel to the ALTS handshaker service. The caller is responsible
   // for checking that the channel is non-null.
-  std::shared_ptr<grpc::Channel> getChannel() const;
+  std::shared_ptr<grpc::Channel> getChannel();
 
   std::size_t getChannelPoolSize() const;
 
 private:
   explicit AltsChannelPool(const std::vector<std::shared_ptr<grpc::Channel>>& channel_pool);
 
+  // Use round-robin to select channels from the pool.
+  absl::Mutex mu_;
+  std::size_t index_ = 0;
   std::vector<std::shared_ptr<grpc::Channel>> channel_pool_;
 };
 

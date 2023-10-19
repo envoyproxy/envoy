@@ -153,8 +153,7 @@ AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
   std::size_t unused_bytes_size = received_bytes.size() - bytes_consumed;
   const uint8_t* unused_bytes_ptr =
       reinterpret_cast<const uint8_t*>(received_bytes.data() + bytes_consumed);
-  std::vector<uint8_t> unused_bytes(unused_bytes_ptr,
-                                    unused_bytes_ptr + unused_bytes_size);
+  std::vector<uint8_t> unused_bytes(unused_bytes_ptr, unused_bytes_ptr + unused_bytes_size);
 
   // Create and return the AltsHandshakeResult.
   auto handshake_result = std::make_unique<AltsHandshakeResult>();
