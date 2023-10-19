@@ -271,6 +271,14 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 }
 
 void Filter::onInitFailure(UpstreamFailureReason reason) {
+  // Guard against cases where ODCDS fails, and the filter has not attempted to
+  // create a connection to the upstream as it is not known what the upstream
+  // should be.
+  if (initial_upstream_connection_start_time_.has_value()) {
+    getStreamInfo().upstreamInfo()->upstreamTiming().recordConnectionPoolCallbackLatency(
+        initial_upstream_connection_start_time_.value(),
+        read_callbacks_->connection().dispatcher().timeSource());
+  }
   read_callbacks_->connection().close(
       Network::ConnectionCloseType::NoFlush,
       absl::StrCat(StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
@@ -428,6 +436,10 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                  cluster_name);
+  if (!initial_upstream_connection_start_time_.has_value()) {
+    initial_upstream_connection_start_time_.emplace(
+        read_callbacks_->connection().dispatcher().timeSource().monotonicTime());
+  }
 
   const Upstream::ClusterInfoConstSharedPtr& cluster = thread_local_cluster->info();
   getStreamInfo().setUpstreamClusterInfo(cluster);
@@ -572,6 +584,9 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+  upstream_info.upstreamTiming().recordConnectionPoolCallbackLatency(
+      initial_upstream_connection_start_time_.value(),
+      read_callbacks_->connection().dispatcher().timeSource());
   upstream_info.setUpstreamHost(host);
   upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
   upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());

@@ -13,5 +13,11 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tcp_proxy
+  change: |
+    added support to TCP Proxy for recording the latency in ``UpstreamTiming`` from when the first
+    initial connection to the upstream cluster was attempted to when either the
+    connection was successfully established or the filiter failed to initialize
+    any connection to the upstream.
 
 deprecated:

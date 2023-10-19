@@ -1748,6 +1748,7 @@ envoy_cc_test(
         "cpu:3",
     ],
     deps = [
+        ":fake_access_log_lib",
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
         ":tcp_proxy_integration_test_lib",
@@ -2473,6 +2474,21 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "fake_access_log_proto",
+    srcs = ["fake_access_log.proto"],
+)
+
+envoy_cc_test_library(
+    name = "fake_access_log_lib",
+    hdrs = [
+        "fake_access_log.h",
+    ],
+    deps = [
+        ":fake_access_log_proto_cc_proto",
     ],
 )
 
