@@ -14,7 +14,6 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Basic Auth]
-// [#not-implemented-hide:]
 // Basic Auth :ref:`configuration overview <config_http_filters_basic_auth>`.
 // [#extension: envoy.filters.http.basic_auth]
 
@@ -24,10 +23,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 //  .. code-block:: yaml
 //
-//  htpasswd:
+//  users:
 //    inline_string: |-
-//        user1:hashed_user1_password
-//        user2:hashed_user2_password
+//        user1:{SHA}hashed_user1_password
+//        user2:{SHA}hashed_user2_password
 //
 message BasicAuth {
   // Username-password pairs used to verify user credentials in the "Authorization" header.
