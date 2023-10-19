@@ -34,7 +34,7 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& 
 
       if (tag_specifier.regex().empty()) {
         if (addExtractorsMatching(name) == 0) {
-          throw EnvoyException(fmt::format(
+          throwEnvoyExceptionOrPanic(fmt::format(
               "No regex specified for tag specifier and no default regex for name: '{}'", name));
         }
       } else {

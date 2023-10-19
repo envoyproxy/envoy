@@ -46,6 +46,36 @@ jobs:
             --define=envoy_full_protos=disabled \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             //test/common/integration:client_integration_test
+  cc_build_no_exceptions:
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: cc_test_no_yaml
+    runs-on: ubuntu-20.04
+    timeout-minutes: 120
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Running C++ build with exceptions disabled'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
+      run: |
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-ci \
+             --define=admin_html=disabled \
+             --define=admin_functionality=disabled \
+             --define envoy_exceptions=disabled \
+             --define envoy_mobile_listener=disabled  \
+             --define=envoy_yaml=disabled \
+             --copt=-fno-unwind-tables \
+             --copt=-fno-exceptions \
+             //test/performance:test_binary_size
 
   cc_test:
     needs: env

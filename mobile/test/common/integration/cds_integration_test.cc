@@ -55,6 +55,8 @@ protected:
     // Wait for cluster to be added
     ASSERT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
     ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count + 1));
+    ASSERT_TRUE(waitForGaugeGe("cluster_manager.updated_clusters", 0));
+    ASSERT_TRUE(waitForGaugeGe("cluster_manager.cluster_removed", 0));
   }
 
   bool use_xdstp_{false};

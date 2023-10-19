@@ -39,6 +39,14 @@ public:
   virtual void waitForCounterExists(const std::string& name) PURE;
 
   /**
+   * Wait for a counter to not exist.
+   * @param name counter name.
+   * @param timeout amount of time to wait for the counter to not exist.
+   */
+  virtual void waitForCounterNonexistent(const std::string& name,
+                                         std::chrono::milliseconds timeout) PURE;
+
+  /**
    * Wait until a histogram has samples.
    * @param name histogram name.
    */

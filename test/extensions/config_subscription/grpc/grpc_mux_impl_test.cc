@@ -41,6 +41,7 @@ using testing::IsSubstring;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Config {
@@ -274,6 +275,62 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
 
   expectSendMessage("baz", {}, "");
   expectSendMessage("foo", {}, "");
+}
+
+// Validate cached nonces are cleared on reconnection.
+TEST_F(GrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
+  // Create the retry timer that will invoke the callback that will trigger
+  // reconnection when the gRPC connection is closed.
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
+      // Happens when adding a type url watch.
+      .WillRepeatedly(Return(ttl_mgr_timer));
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // Send on connection.
+  expectSendMessage(type_url, {"x", "y"}, {}, true);
+  grpc_mux_->start();
+
+  // Create a reply with some nonce.
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_version_info("3000");
+  response->set_nonce("111");
+  auto add_response_resource = [](const std::string& name,
+                                  envoy::service::discovery::v3::DiscoveryResponse& response) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+    cla.set_cluster_name(name);
+    auto res = response.add_resources();
+    res->PackFrom(cla);
+  };
+  add_response_resource("x", *response);
+  add_response_resource("y", *response);
+  {
+    // Pause EDS to allow the ACK to be cached.
+    auto resume_eds = grpc_mux_->pause(type_url);
+    // Send the reply.
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+    // Now disconnect, gRPC stream retry timer will kick in and reconnection will happen.
+    EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
+        .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+
+    // Unpausing will initiate a new request, with the same resources, version,
+    // but empty nonce.
+    expectSendMessage(type_url, {"x", "y"}, "3000", true, "");
+  }
+  expectSendMessage(type_url, {}, "3000", false);
 }
 
 // Validate pause-resume behavior.

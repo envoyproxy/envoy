@@ -107,7 +107,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   *span_.add_attributes() = key_value;
 }
 
-Tracer::Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
+Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const std::string& service_name)

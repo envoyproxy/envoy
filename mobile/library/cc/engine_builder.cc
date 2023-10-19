@@ -148,6 +148,8 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
         bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
     list->add_patterns()->set_exact("cluster_manager.active_clusters");
     list->add_patterns()->set_exact("cluster_manager.cluster_added");
+    list->add_patterns()->set_exact("cluster_manager.cluster_updated");
+    list->add_patterns()->set_exact("cluster_manager.cluster_removed");
     // Allow SDS related stats.
     list->add_patterns()->mutable_safe_regex()->set_regex("sds\\..*");
     list->add_patterns()->mutable_safe_regex()->set_regex(".*\\.ssl_context_update_by_sds");

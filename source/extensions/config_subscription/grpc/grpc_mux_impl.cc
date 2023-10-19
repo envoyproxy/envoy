@@ -130,6 +130,15 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   }
 }
 
+void GrpcMuxImpl::clearNonce() {
+  // Iterate over all api_states (for each type_url), and clear its nonce.
+  for (auto& [type_url, api_state] : api_state_) {
+    if (api_state) {
+      api_state->request_.clear_response_nonce();
+    }
+  }
+}
+
 void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
                                          const absl::flat_hash_set<std::string>& resource_names) {
   if (!xds_resources_delegate_.has_value()) {
@@ -451,6 +460,7 @@ void GrpcMuxImpl::onWriteable() { drainRequests(); }
 void GrpcMuxImpl::onStreamEstablished() {
   first_stream_request_ = true;
   grpc_stream_.maybeUpdateQueueSizeStat(0);
+  clearNonce();
   request_queue_ = std::make_unique<std::queue<std::string>>();
   for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
