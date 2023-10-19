@@ -68,7 +68,7 @@ check_cached "$response"
 run_log "Snooze for 3 more seconds"
 sleep 3
 
-run_log "Snooze for one minute"
+run_log "Snooze for one more minute"
 sleep 60
 
 run_log "Valid-for-minute: More than a minute has passed, this request should get a validated response"
