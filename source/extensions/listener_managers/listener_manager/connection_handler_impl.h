@@ -45,7 +45,7 @@ public:
   void incNumConnections() override;
   void decNumConnections() override;
   void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& config,
-                   Runtime::Loader& runtime) override;
+                   Runtime::Loader& runtime, Random::RandomGenerator& random) override;
   void removeListeners(uint64_t listener_tag) override;
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,

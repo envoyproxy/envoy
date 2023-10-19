@@ -755,7 +755,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
           }
         });
       },
-      server_.runtime());
+      server_.runtime(), server_.api().randomGenerator());
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {

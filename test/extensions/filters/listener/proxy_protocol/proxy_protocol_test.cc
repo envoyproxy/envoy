@@ -76,7 +76,7 @@ public:
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 getListenSocket(_))
         .WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this, runtime_);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr,
@@ -207,6 +207,7 @@ public:
   }
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
@@ -1980,7 +1981,7 @@ public:
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 getListenSocket(_))
         .WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this, runtime_);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
     conn_ = dispatcher_->createClientConnection(
         local_dst_address_, Network::Address::InstanceConstSharedPtr(),
         Network::Test::createRawBufferSocket(), nullptr, nullptr);
@@ -2080,6 +2081,7 @@ public:
   }
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

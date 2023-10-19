@@ -60,12 +60,13 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                              Network::ListenerConfig& listener, AddListenerCompletion completion,
-                             Runtime::Loader& runtime) {
-  dispatcher_->post([this, overridden_listener, &listener, &runtime, completion]() -> void {
-    handler_->addListener(overridden_listener, listener, runtime);
-    hooks_.onWorkerListenerAdded();
-    completion();
-  });
+                             Runtime::Loader& runtime, Random::RandomGenerator& random) {
+  dispatcher_->post(
+      [this, overridden_listener, &listener, &runtime, &random, completion]() -> void {
+        handler_->addListener(overridden_listener, listener, runtime, random);
+        hooks_.onWorkerListenerAdded();
+        completion();
+      });
 }
 
 uint64_t WorkerImpl::numConnections() const {

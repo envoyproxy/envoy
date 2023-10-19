@@ -35,7 +35,8 @@ void ConnectionHandlerImpl::decNumConnections() {
 }
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                                        Network::ListenerConfig& config, Runtime::Loader& runtime) {
+                                        Network::ListenerConfig& config, Runtime::Loader& runtime,
+                                        Random::RandomGenerator& random) {
   if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
@@ -82,7 +83,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       details->addActiveListener(
           config, address, listener_reject_fraction_, disable_listeners_,
           std::make_unique<ActiveTcpListener>(
-              *this, config, runtime,
+              *this, config, runtime, random,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
               address, config.connectionBalancer(*address),
               overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())

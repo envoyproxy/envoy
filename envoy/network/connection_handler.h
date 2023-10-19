@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -65,9 +66,10 @@ public:
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    * @param runtime the runtime for the server.
+   * @param random a random number generator.
    */
   virtual void addListener(absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
-                           Runtime::Loader& runtime) PURE;
+                           Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed

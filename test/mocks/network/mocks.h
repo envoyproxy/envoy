@@ -529,7 +529,7 @@ public:
   MOCK_METHOD(void, decNumConnections, ());
   MOCK_METHOD(void, addListener,
               (absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
-               Runtime::Loader& runtime));
+               Runtime::Loader& runtime, Random::RandomGenerator& random));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,

@@ -26,7 +26,6 @@
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
-#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
@@ -188,18 +187,6 @@ FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTri
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   ASSERT(isThreadSafe());
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, file_system_)};
-}
-
-Network::ListenerPtr
-DispatcherImpl::createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                               Runtime::Loader& runtime,
-                               const Network::ListenerConfig& listener_config,
-                               Server::ThreadLocalOverloadStateOptRef overload_state) {
-  ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(
-      *this, random_generator_, runtime, std::move(socket), cb, listener_config.bindToPort(),
-      listener_config.ignoreGlobalConnLimit(),
-      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

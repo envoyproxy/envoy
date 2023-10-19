@@ -70,14 +70,6 @@ public:
     return Filesystem::WatcherPtr{createFilesystemWatcher_()};
   }
 
-  Network::ListenerPtr
-  createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                 Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
-                 Server::ThreadLocalOverloadStateOptRef overload_state) override {
-    return Network::ListenerPtr{
-        createListener_(std::move(socket), cb, runtime, listener_config, overload_state)};
-  }
-
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
     auto timer = Event::TimerPtr{createTimer_(cb)};
     // Assert that the timer is not null to avoid confusing test failures down the line.
@@ -136,10 +128,6 @@ public:
   MOCK_METHOD(FileEvent*, createFileEvent_,
               (os_fd_t fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
-  MOCK_METHOD(Network::Listener*, createListener_,
-              (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
-               Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
-               Server::ThreadLocalOverloadStateOptRef overload_state));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
