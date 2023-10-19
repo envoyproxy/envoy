@@ -58,6 +58,7 @@ public:
     absl::string_view host() const override { return host_; }
     absl::string_view path() const override { return path_; }
     absl::string_view method() const override { return method_; }
+    void removeByKey(absl::string_view key) override { data_.erase(key); }
 
     std::string protocol_;
     std::string host_;
