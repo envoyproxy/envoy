@@ -1,7 +1,5 @@
 #include "engine_builder.h"
 
-#include <sstream>
-
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
@@ -9,7 +7,11 @@
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
+
+#if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
+#endif
+
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
@@ -169,7 +171,7 @@ EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
 }
 
 EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) {
-  callbacks_->on_engine_running = closure;
+  callbacks_->on_engine_running = std::move(closure);
   return *this;
 }
 
@@ -217,7 +219,7 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
 }
 
 EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
-  dns_preresolve_hostnames_ = std::move(hostnames);
+  dns_preresolve_hostnames_ = hostnames;
   return *this;
 }
 
@@ -340,7 +342,7 @@ EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
 
 EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zone,
                                               std::string sub_zone) {
-  node_locality_ = {region, zone, sub_zone};
+  node_locality_ = {std::move(region), std::move(zone), std::move(sub_zone)};
   return *this;
 }
 
@@ -374,7 +376,7 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
+EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
   addNativeFilter(
       "envoy.filters.http.platform_bridge",
       absl::StrCat(
@@ -386,7 +388,7 @@ EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
 }
 
 EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
-  runtime_guards_.push_back({guard, value});
+  runtime_guards_.emplace_back(std::move(guard), value);
   return *this;
 }
 
@@ -965,7 +967,7 @@ EngineSharedPtr EngineBuilder::build() {
     if (bootstrap) {
       options->setConfigProto(std::move(bootstrap));
     }
-    options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
+    options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_)));
     options->setConcurrency(1);
     cast_engine->run(std::move(options));
   }
