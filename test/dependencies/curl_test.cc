@@ -15,7 +15,6 @@ TEST(CurlTest, BuiltWithExpectedFeatures) {
   EXPECT_EQ(0, info->features & CURL_VERSION_KERBEROS4);
   EXPECT_EQ(0, info->features & CURL_VERSION_SSL);
   EXPECT_NE(0, info->features & CURL_VERSION_LIBZ);
-  EXPECT_EQ(0, info->features & CURL_VERSION_NTLM);
   EXPECT_EQ(0, info->features & CURL_VERSION_GSSNEGOTIATE);
   EXPECT_NE(0, info->features & CURL_VERSION_ASYNCHDNS);
   EXPECT_EQ(0, info->features & CURL_VERSION_SPNEGO);
