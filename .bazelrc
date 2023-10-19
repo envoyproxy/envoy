@@ -329,7 +329,6 @@ build:remote-tsan --config=rbe-toolchain-tsan
 build:remote-msvc-cl --config=remote-windows
 build:remote-msvc-cl --config=msvc-cl
 build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
-build:remote-msvc-cl --copt=-DNDEBUG
 
 build:remote-clang-cl --config=remote-windows
 build:remote-clang-cl --config=clang-cl
