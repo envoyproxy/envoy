@@ -293,9 +293,6 @@ public:
   RequestEncoderPtr requestEncoder() const override;
   ResponseEncoderPtr responseEncoder() const override;
   MessageCreatorPtr messageCreator() const override;
-  ProtocolOptions protocolOptions() const override;
-
-  ProtocolOptions protocol_options_;
 };
 
 class FakeStreamCodecFactoryConfig : public CodecFactoryConfig {
@@ -309,8 +306,6 @@ public:
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.fake.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
-
-  ProtocolOptions protocol_options_;
 };
 
 } // namespace GenericProxy

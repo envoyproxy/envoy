@@ -205,7 +205,6 @@ public:
   MessageCreatorPtr messageCreator() const override {
     return std::make_unique<DubboMessageCreator>();
   }
-  ProtocolOptions protocolOptions() const override { return {}; }
 };
 
 class DubboCodecFactoryConfig : public CodecFactoryConfig {
