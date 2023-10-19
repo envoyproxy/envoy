@@ -1,0 +1,106 @@
+name: Envoy/dependency
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Select a task'
+        required: true
+        default: build-image
+        enum:
+        - build-image
+
+concurrency:
+  group: ${{ github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  update_build_image:
+    if: github.event.inputs.task == 'build-image'
+    name: Update build image (PR)
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Fetch token for app auth
+      id: appauth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.23
+      with:
+        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+    - uses: actions/checkout@v4
+      name: Checkout Envoy repository
+      with:
+        path: envoy
+        fetch-depth: 0
+        token: ${{ steps.appauth.outputs.token }}
+    - uses: actions/checkout@v4
+      name: Checkout Envoy build tools repository
+      with:
+        repository: envoyproxy/envoy-build-tools
+        path: build-tools
+        fetch-depth: 0
+    - run: |
+        shas=(
+            tag
+            sha
+            mobile_sha
+            gcr_sha)
+        for sha in "${shas[@]}"; do
+            current_sha=$(bazel run //tools/dependency:build-image-sha "$sha")
+            echo "${sha}=${current_sha}" >> "$GITHUB_OUTPUT"
+        done
+      id: current
+      name: Current SHAs
+      working-directory: envoy
+    - run: |
+        # get current build image version
+        CONTAINER_TAG=$(git log -1 --pretty=format:"%H" "./docker")
+        echo "tag=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
+        echo "tag_short=${CONTAINER_TAG::7}" >> "$GITHUB_OUTPUT"
+      id: build-tools
+      name: Build image SHA
+      working-directory: build-tools
+
+    - name: Check Docker SHAs
+      id: build-images
+      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.0.23
+      with:
+        images: |
+           sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
+           mobile_sha: envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
+           gcr_sha: gcr.io/envoy-ci/envoy-build:${{ steps.build-tools.outputs.tag }}
+
+    - run: |
+        SHA_REPLACE=(
+            "$CURRENT_ENVOY_TAG:$ENVOY_TAG"
+            "$CURRENT_ENVOY_SHA:${OUTPUT_sha}"
+            "$CURRENT_ENVOY_MOBILE_SHA:${OUTPUT_mobile_sha}"
+            "$CURRENT_ENVOY_GCR_SHA:${OUTPUT_gcr_sha}")
+        echo "replace=${SHA_REPLACE[*]}" >> "$GITHUB_OUTPUT"
+      name: Find SHAs to replace
+      id: shas
+      env:
+        ENVOY_TAG: ${{ steps.build-tools.outputs.tag }}
+        CURRENT_ENVOY_TAG: ${{ steps.current.outputs.tag }}
+        CURRENT_ENVOY_SHA: ${{ steps.current.outputs.sha }}
+        CURRENT_ENVOY_MOBILE_SHA: ${{ steps.current.outputs.mobile_sha }}
+        CURRENT_ENVOY_GCR_SHA: ${{ steps.current.outputs.gcr_sha }}
+    - run: |
+        echo "${SHA_REPLACE}" | xargs bazel run @envoy_toolshed//sha:replace "${PWD}"
+      env:
+        SHA_REPLACE: ${{ steps.shas.outputs.replace }}
+      name: Update SHAs
+      working-directory: envoy
+    - name: Create a PR
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.23
+      with:
+        base: main
+        body: Created by Envoy dependency bot
+        branch: dependency-envoy/build-image/latest
+        committer-name: publish-envoy[bot]
+        committer-email: 140627008+publish-envoy[bot]@users.noreply.github.com
+        title: 'deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`'
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
+        working-directory: envoy
