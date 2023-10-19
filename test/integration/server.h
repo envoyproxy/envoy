@@ -463,6 +463,16 @@ public:
     notifyingStatsAllocator().waitForCounterExists(name);
   }
 
+  void waitForCounterNonexistent(const std::string& name,
+                                 std::chrono::milliseconds timeout) override {
+    Event::TestTimeSystem::RealTimeBound bound(timeout);
+    while (TestUtility::findCounter(statStore(), name) != nullptr) {
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+      ASSERT_FALSE(!bound.withinBound())
+          << "timed out waiting for counter " << name << " to not exist.";
+    }
+  }
+
   void waitForProactiveOverloadResourceUsageEq(
       const Server::OverloadProactiveResourceName resource_name, int64_t value,
       Event::Dispatcher& dispatcher,

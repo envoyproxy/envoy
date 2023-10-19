@@ -68,6 +68,7 @@ public:
                      Filesystem::Instance& file_system);
 
   // Server::Instance
+  void run() override { PANIC("not implemented"); }
   OptRef<Admin> admin() override {
     return makeOptRefFromPtr(static_cast<Envoy::Server::Admin*>(admin_.get()));
   }
@@ -85,7 +86,7 @@ public:
     return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
   }
   void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions>) override {}
-  DrainManager& drainManager() override { PANIC("not implemented"); }
+  DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool) override {}
   HotRestart& hotRestart() override { PANIC("not implemented"); }
@@ -188,6 +189,7 @@ private:
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Server::DrainManagerPtr drain_manager_;
 };
 
 } // namespace Server
