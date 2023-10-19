@@ -19,7 +19,7 @@ Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped
       Registry::FactoryRegistry<
           Compression::Compressor::NamedCompressorLibraryConfigFactory>::getFactoryByType(type);
   if (config_factory == nullptr) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Didn't find a registered implementation for type: '{}'", type));
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(

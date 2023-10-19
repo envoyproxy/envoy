@@ -78,45 +78,6 @@ using ResponseEncoderPtr = std::unique_ptr<ResponseEncoder>;
 using MessageCreatorPtr = std::unique_ptr<MessageCreator>;
 
 /**
- * Protocol specific options to control the behavior of the connection manager (generic proxy).
- */
-class ProtocolOptions {
-public:
-  ProtocolOptions(bool bind_upstream_connection)
-      : bind_upstream_connection_(bind_upstream_connection) {}
-  ProtocolOptions() = default;
-
-  /**
-   * @return true if the upstream connection should be bound to the downstream connection, false
-   * otherwise.
-   *
-   * By default, one random upstream connection will be selected from the upstream connection pool
-   * and used for every request. And after the request is finished, the upstream connection will be
-   * released back to the upstream connection pool.
-   *
-   * If this option is true, the upstream connection will be bound to the downstream connection and
-   * have same lifetime as the downstream connection. The same upstream connection will be used for
-   * all requests from the same downstream connection.
-   *
-   * And if this options is true, one of the following requirements must be met:
-   * 1. The request must be handled one by one. That is, the next request can not be sent to the
-   *    upstream until the previous request is finished.
-   * 2. Unique request id must be provided for each request and response. The request id must be
-   *    unique for each request and response pair in same connection pair. And the request id must
-   *    be the same for the corresponding request and response.
-   * TODO(wbpcode): add pipeline support in the future.
-   *
-   * This could be useful for some protocols that require the same upstream connection to be used
-   * for all requests from the same downstream connection. For example, the protocol using stateful
-   * connection.
-   */
-  bool bindUpstreamConnection() const { return bind_upstream_connection_; }
-
-private:
-  bool bind_upstream_connection_{false};
-};
-
-/**
  * Factory used to create generic stream encoder and decoder. If the developer wants to add
  * new protocol support to this proxy, they need to implement the corresponding codec factory for
  * the corresponding protocol.
@@ -149,11 +110,6 @@ public:
    * Create message creator.
    */
   virtual MessageCreatorPtr messageCreator() const PURE;
-
-  /**
-   * @return the options to control the behavior of generic proxy filter.
-   */
-  virtual ProtocolOptions protocolOptions() const PURE;
 };
 
 using CodecFactoryPtr = std::unique_ptr<CodecFactory>;

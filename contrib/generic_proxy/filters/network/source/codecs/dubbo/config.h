@@ -42,6 +42,7 @@ public:
   absl::string_view host() const override { return inner_metadata_->request().serviceName(); }
   absl::string_view path() const override { return inner_metadata_->request().serviceName(); }
   absl::string_view method() const override { return inner_metadata_->request().methodName(); }
+  void removeByKey(absl::string_view key) override;
 
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
@@ -205,7 +206,6 @@ public:
   MessageCreatorPtr messageCreator() const override {
     return std::make_unique<DubboMessageCreator>();
   }
-  ProtocolOptions protocolOptions() const override { return {}; }
 };
 
 class DubboCodecFactoryConfig : public CodecFactoryConfig {

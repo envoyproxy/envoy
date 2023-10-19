@@ -68,9 +68,9 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
     if (pipe->mode() != 0 && !abstract_namespace && bind_result.return_value_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.return_value_ != 0) {
-        throw EnvoyException(fmt::format("Failed to create socket with mode {}: {}",
-                                         std::to_string(pipe->mode()),
-                                         errorDetails(set_permissions.errno_)));
+        throwEnvoyExceptionOrPanic(fmt::format("Failed to create socket with mode {}: {}",
+                                               std::to_string(pipe->mode()),
+                                               errorDetails(set_permissions.errno_)));
       }
     }
     return bind_result;

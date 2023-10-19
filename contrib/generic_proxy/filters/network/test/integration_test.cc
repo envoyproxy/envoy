@@ -136,8 +136,8 @@ public:
     response_decoder_->setDecoderCallback(*response_decoder_callback_);
   }
 
-  std::string defaultConfig() {
-    return absl::StrCat(ConfigHelper::baseConfig(false), R"EOF(
+  std::string defaultConfig(bool bind_upstream_connection = false) {
+    return absl::StrCat(ConfigHelper::baseConfig(false), fmt::format(R"EOF(
     filter_chains:
       filters:
         name: meta
@@ -148,12 +148,13 @@ public:
           - name: envoy.filters.generic.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.router.v3.Router
+              bind_upstream_connection: {}
           codec_config:
             name: fake
             typed_config:
               "@type": type.googleapis.com/xds.type.v3.TypedStruct
               type_url: envoy.generic_proxy.codecs.fake.type
-              value: {}
+              value: {{}}
           route_config:
             name: test-routes
             virtual_hosts:
@@ -187,7 +188,8 @@ public:
                                   typed_config:
                                     "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
                                     cluster: cluster_0
-)EOF");
+)EOF",
+                                                                     bind_upstream_connection));
   }
 
   // Create client connection.
@@ -375,13 +377,11 @@ TEST_P(IntegrationTest, RequestAndResponse) {
 
 TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
   FakeStreamCodecFactoryConfig codec_factory_config;
-  codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
   auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
-  codec_factory->protocol_options_ = ProtocolOptions{true};
 
-  initialize(defaultConfig(), std::move(codec_factory));
+  initialize(defaultConfig(true), std::move(codec_factory));
 
   EXPECT_TRUE(makeClientConnectionForTest());
 
@@ -418,13 +418,11 @@ TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
 
 TEST_P(IntegrationTest, MultipleRequests) {
   FakeStreamCodecFactoryConfig codec_factory_config;
-  codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
   auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
-  codec_factory->protocol_options_ = ProtocolOptions{true};
 
-  initialize(defaultConfig(), std::move(codec_factory));
+  initialize(defaultConfig(true), std::move(codec_factory));
 
   EXPECT_TRUE(makeClientConnectionForTest());
 
@@ -499,13 +497,11 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
 TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   FakeStreamCodecFactoryConfig codec_factory_config;
-  codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
   auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
-  codec_factory->protocol_options_ = ProtocolOptions{true};
 
-  initialize(defaultConfig(), std::move(codec_factory));
+  initialize(defaultConfig(true), std::move(codec_factory));
 
   EXPECT_TRUE(makeClientConnectionForTest());
 

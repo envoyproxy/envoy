@@ -172,26 +172,26 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
   auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(
       header_validator_config);
   if (!factory) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Header validator extension not found: '{}'", header_validator_config.name()));
   }
 
   header_validator_factory = factory->createFromProto(header_validator_config.typed_config(),
                                                       context.getServerFactoryContext());
   if (!header_validator_factory) {
-    throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
-                                     header_validator_config.name()));
+    throwEnvoyExceptionOrPanic(fmt::format("Header validator extension could not be created: '{}'",
+                                           header_validator_config.name()));
   }
 #else
   if (config.has_typed_header_validation_config()) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
                     config.typed_header_validation_config().name()));
   }
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_universal_header_validator")) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         "Header validator can not be enabled since this Envoy binary does not support it.");
   }
 #endif
@@ -402,7 +402,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));
   }
 
@@ -439,12 +439,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     extension->mutable_typed_config()->PackFrom(xff_config);
   } else {
     if (use_remote_address_) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           "Original IP detection extensions and use_remote_address may not be mixed");
     }
 
     if (xff_num_trusted_hops_ > 0) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
     }
   }
@@ -454,14 +454,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto* factory =
         Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(extension_config);
     if (!factory) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Original IP detection extension not found: '{}'", extension_config.name()));
     }
 
     auto extension = factory->createExtension(extension_config.typed_config(), context_);
     if (!extension) {
-      throw EnvoyException(fmt::format("Original IP detection extension could not be created: '{}'",
-                                       extension_config.name()));
+      throwEnvoyExceptionOrPanic(fmt::format(
+          "Original IP detection extension could not be created: '{}'", extension_config.name()));
     }
     original_ip_detection_extensions_.push_back(extension);
   }
@@ -472,14 +472,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto* factory =
         Envoy::Config::Utility::getFactory<Http::EarlyHeaderMutationFactory>(extension_config);
     if (!factory) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Early header mutation extension not found: '{}'", extension_config.name()));
     }
 
     auto extension = factory->createExtension(extension_config.typed_config(), context_);
     if (!extension) {
-      throw EnvoyException(fmt::format("Early header mutation extension could not be created: '{}'",
-                                       extension_config.name()));
+      throwEnvoyExceptionOrPanic(fmt::format(
+          "Early header mutation extension could not be created: '{}'", extension_config.name()));
     }
     early_header_mutation_extensions_.push_back(std::move(extension));
   }
@@ -566,12 +566,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_access_log_options()) {
     if (config.flush_access_log_on_new_request() /* deprecated */) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
     }
 
     if (config.has_access_log_flush_interval()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           "Only one of access_log_flush_interval or access_log_options can be specified.");
     }
 
@@ -624,15 +624,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
     if (!context_.isQuicListener()) {
-      throw EnvoyException("HTTP/3 codec configured on non-QUIC listener.");
+      throwEnvoyExceptionOrPanic("HTTP/3 codec configured on non-QUIC listener.");
     }
 #else
-    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+    throwEnvoyExceptionOrPanic("HTTP3 configured but not enabled in the build.");
 #endif
     break;
   }
   if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
-    throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
+    throwEnvoyExceptionOrPanic("Non-HTTP/3 codec configured on QUIC listener.");
   }
 
   Http::FilterChainHelper<Server::Configuration::FactoryContext,
@@ -646,7 +646,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
         upgrade_filter_factories_.end()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Error: multiple upgrade configs with the same name: '{}'", name));
     }
     if (!upgrade_config.filters().empty()) {
@@ -657,7 +657,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       // TODO(auni53): Validate encode dependencies too.
       auto status = upgrade_dependency_manager.validDecodeDependencies();
       if (!status.ok()) {
-        throw EnvoyException(std::string(status.message()));
+        throwEnvoyExceptionOrPanic(std::string(status.message()));
       }
 
       upgrade_filter_factories_.emplace(
