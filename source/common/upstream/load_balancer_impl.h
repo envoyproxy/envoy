@@ -695,8 +695,7 @@ public:
                 ? absl::optional<Runtime::Double>(
                       {least_request_config->active_request_bias(), runtime})
                 : absl::nullopt),
-        enable_full_scan_(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), enable_full_scan, false)) {
+        enable_full_scan_(false) {
     initialize();
   }
 

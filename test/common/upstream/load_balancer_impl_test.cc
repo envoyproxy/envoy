@@ -2912,21 +2912,23 @@ TEST_P(LeastRequestLoadBalancerTest, FullScan) {
   hostSet().healthy_hosts_[4]->stats().rq_active_.set(5);
 
   // Creating various load balancer objects with different choice configs.
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
   // Enable full table scan on hosts
   lr_lb_config.mutable_enable_full_scan()->set_value(true);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  common_config_.mutable_healthy_panic_threshold()->set_value(0);
+
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       1,       lr_lb_config, simTime()};
   lr_lb_config.mutable_choice_count()->set_value(3);
-  LeastRequestLoadBalancer lb_3{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_3{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       1,       lr_lb_config, simTime()};
   lr_lb_config.mutable_choice_count()->set_value(4);
-  LeastRequestLoadBalancer lb_4{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_4{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       1,       lr_lb_config, simTime()};
   lr_lb_config.mutable_choice_count()->set_value(6);
-  LeastRequestLoadBalancer lb_6{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_6{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       1,       lr_lb_config, simTime()};
 
   // random is called only once every time and is not to select the host.
 
