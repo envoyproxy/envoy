@@ -16,6 +16,10 @@ on:
       build_image_mobile_sha:
         type: string
         default: f47fb698cfda583769b9d28e8d1c58cfc7774d5da4f31cd8190d8975c3850c7e
+      # this is authoritative, but is not currently used in github ci
+      build_image_gcr_sha:
+        type: string
+        default: 2a473cd9808182735d54e03b158975389948b9559b8e8fc624cfafbaf7059e62
       build_image_tag:
         type: string
         default: fdd65c6270a8507a18d5acd6cf19a18cb695e4fa
