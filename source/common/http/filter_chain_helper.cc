@@ -37,25 +37,28 @@ void FilterChainUtility::createFilterChainForFactories(
   bool added_missing_config_filter = false;
   for (const auto& filter_config_provider : filter_factories) {
     // If this filter is disabled explicitly, skip trying to create it.
-    if (options.filterDisabled(filter_config_provider->name())) {
+    if (options.filterDisabled(filter_config_provider.provider->name())
+            .value_or(filter_config_provider.disabled)) {
       continue;
     }
 
-    auto config = filter_config_provider->config();
+    auto config = filter_config_provider.provider->config();
     if (config.has_value()) {
       Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
-      manager.applyFilterFactoryCb({filter_config_provider->name(), factory_cb.name},
+      manager.applyFilterFactoryCb({filter_config_provider.provider->name(), factory_cb.name},
                                    factory_cb.factory_cb);
       continue;
     }
 
     // If a filter config is missing after warming, inject a local reply with status 500.
     if (!added_missing_config_filter) {
-      ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
+      ENVOY_LOG(trace, "Missing filter config for a provider {}",
+                filter_config_provider.provider->name());
       manager.applyFilterFactoryCb({}, MissingConfigFilterFactory);
       added_missing_config_filter = true;
     } else {
-      ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider->name());
+      ENVOY_LOG(trace, "Provider {} missing a filter config",
+                filter_config_provider.provider->name());
     }
   }
 }

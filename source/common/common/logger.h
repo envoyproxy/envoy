@@ -54,6 +54,7 @@ const static bool should_log = true;
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
+  FUNCTION(geolocation)                                                                            \
   FUNCTION(grpc)                                                                                   \
   FUNCTION(happy_eyeballs)                                                                         \
   FUNCTION(hc)                                                                                     \

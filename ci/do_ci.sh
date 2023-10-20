@@ -525,6 +525,11 @@ case $CI_TARGET in
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
+        # Disable this pending resolution to https://github.com/envoyproxy/envoy/issues/30286
+        # Run pip requirements tests
+        # echo "Check pip requirements ..."
+        # bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       //tools/base:requirements_test
         ;;
 
     dev)
@@ -786,9 +791,11 @@ case $CI_TARGET in
     publish)
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
         PUBLISH_ARGS=(
-            --publish-commitish="$BUILD_SHA"
+            --publish-commitish="$ENVOY_COMMIT"
+            --publish-commit-message
             --publish-assets=/build/release.signed/release.signed.tar.zst)
         if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
             PUBLISH_ARGS+=(--dry-run)
@@ -854,6 +861,12 @@ case $CI_TARGET in
            bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
            "${ENVOY_BINARY_DIR}/schema_validator_tool"
         echo "Release files created in ${ENVOY_BINARY_DIR}"
+        ;;
+
+    release.server_only.binary)
+        setup_clang_toolchain
+        echo "bazel release build..."
+        bazel_envoy_binary_build release
         ;;
 
     release.signed)

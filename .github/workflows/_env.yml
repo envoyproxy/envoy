@@ -12,13 +12,13 @@ on:
         default: envoyproxy/envoy-build-ubuntu
       build_image_sha:
         type: string
-        default: 8d3763e19d5b71fdc95666d75073ce4581e566ce28ca09106607b6a3ef7ba902
+        default: 3c8a3ce6f90dcfb5d09dc8f79bb01404d3526d420061f9a176e0a8e91e1e573e
       build_image_mobile_sha:
         type: string
-        default: 0f51a1015964355092d9204acdacdd727474d1af189bc256dd5a28e6126f9c95
+        default: f47fb698cfda583769b9d28e8d1c58cfc7774d5da4f31cd8190d8975c3850c7e
       build_image_tag:
         type: string
-        default: 94e5d873c145ae86f205117e76276161c9af4806
+        default: fdd65c6270a8507a18d5acd6cf19a18cb695e4fa
 
       check_mobile_run:
         type: boolean
@@ -26,10 +26,6 @@ on:
       prime_build_image:
         type: boolean
         default: false
-
-      start_check_status:
-        type: string
-        default:
 
       repo_ref:
         type: string
@@ -136,21 +132,11 @@ jobs:
     - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
-        fetch-depth: ${{ ! (inputs.check_mobile_run || inputs.trusted) && 1 || 0 }}
+        fetch-depth: ${{ ! (inputs.check_mobile_run || ! startsWith(github.event_name, 'pull_request')) && 1 || 0 }}
         # WARNING: This allows untrusted code to run!!!
         #  If this is set, then anything before or after in the job should be regarded as
         #  compromised.
-        ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
-    # If we are in a trusted CI run then the provided commit _must_ be either the latest for
-    # this branch, or an antecdent.
-    - run: |
-        if ! git merge-base --is-ancestor "${{ inputs.repo_ref }}" HEAD; then
-            echo "Provided Envoy ref (${{ inputs.repo_ref }}) is not an ancestor of current branch" >&2
-            exit 1
-        fi
-        git checkout "${{ inputs.repo_ref }}"
-      if: ${{ inputs.trusted }}
-      name: Check provided ref
+        ref: ${{ startsWith(github.event_name, 'pull_request') && inputs.repo_ref || '' }}
 
     - uses: ./.github/actions/env
       name: Generate environment variables
@@ -182,16 +168,6 @@ jobs:
         if [[ -n "${{ steps.env.outputs.repo_ref_pr_number }}" ]]; then
             echo "PR: https://github.com/envoyproxy/envoy/pull/${{ steps.env.outputs.repo_ref_pr_number }}"
         fi
-
-  check:
-    if: ${{ inputs.start_check_status && github.event_name != 'pull_request' }}
-    uses: ./.github/workflows/_workflow-start.yml
-    permissions:
-      contents: read
-      statuses: write
-    with:
-      workflow_name: ${{ inputs.start_check_status }}
-      sha: ${{ inputs.repo_ref_sha }}
 
   cache:
     if: ${{ inputs.prime_build_image }}

@@ -12,7 +12,6 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 
 namespace Envoy {
@@ -29,9 +28,6 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   quic::QuicConfig quic_config_;
   // The connection send buffer limits from cluster config.
   const uint32_t buffer_limit_;
-  // This arguably should not be shared across connections but as Envoy doesn't
-  // support push promise it's really moot point.
-  quic::QuicClientPushPromiseIndex push_promise_index_;
   // Hard code with the default crypto stream as there's no pluggable crypto for upstream Envoy.
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
 };
