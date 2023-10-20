@@ -8,8 +8,6 @@ set -e
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
-# shellcheck source=ci/setup_cache.sh
-. "$(dirname "$0")"/setup_cache.sh
 # shellcheck source=ci/build_setup.sh
 . "$(dirname "$0")"/build_setup.sh
 

@@ -11,9 +11,6 @@ trap finish EXIT
 echo "disk space at beginning of build:"
 df -h
 
-# shellcheck source=ci/setup_cache.sh
-. "$(dirname "$0")"/setup_cache.sh
-
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/c/source
 
 read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTIONS:-}"
