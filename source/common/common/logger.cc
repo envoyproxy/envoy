@@ -227,7 +227,8 @@ void Context::enableFineGrainLogger() {
       current_context.load()->fine_grain_log_format_ = kDefaultFineGrainLogFormat;
     }
     getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(
-        current_context.load()->fine_grain_default_level_, current_context.load()->fine_grain_log_format_);
+        current_context.load()->fine_grain_default_level_,
+        current_context.load()->fine_grain_log_format_);
   }
 }
 
