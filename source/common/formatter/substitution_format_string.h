@@ -34,13 +34,14 @@ public:
       auto* factory =
           Envoy::Config::Utility::getFactory<CommandParserFactoryBase<FormatterContext>>(formatter);
       if (!factory) {
-        throw EnvoyException(absl::StrCat("Formatter not found: ", formatter.name()));
+        throwEnvoyExceptionOrPanic(absl::StrCat("Formatter not found: ", formatter.name()));
       }
       auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
           formatter.typed_config(), context.messageValidationVisitor(), *factory);
       auto parser = factory->createCommandParserFromProto(*typed_config, context);
       if (!parser) {
-        throw EnvoyException(absl::StrCat("Failed to create command parser: ", formatter.name()));
+        throwEnvoyExceptionOrPanic(
+            absl::StrCat("Failed to create command parser: ", formatter.name()));
       }
       commands.push_back(std::move(parser));
     }

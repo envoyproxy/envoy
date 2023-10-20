@@ -363,6 +363,7 @@ TEST_F(HttpFilterTest, ErrorOpen) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: true
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -400,6 +401,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: true
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -433,13 +435,9 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), "true");
 }
 
-// Test when failure_mode_allow is set with runtime flag closed and the response from the
+// Test when failure_mode_allow is set with header add closed and the response from the
 // authorization service is Error that the request is allowed to continue.
-TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add", "false"}});
-
+TEST_F(HttpFilterTest, ErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
@@ -448,6 +446,7 @@ TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: false
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -474,13 +473,9 @@ TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
   EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), EMPTY_STRING);
 }
 
-// Test when failure_mode_allow is set with runtime flag closed and the response from the
+// Test when failure_mode_allow is set with header add closed and the response from the
 // authorization service is an immediate Error that the request is allowed to continue.
-TEST_F(HttpFilterTest, ImmediateErrorOpenWithRuntimeFlagClose) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add", "false"}});
-
+TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
@@ -489,6 +484,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithRuntimeFlagClose) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: false
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())

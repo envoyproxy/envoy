@@ -24,7 +24,7 @@ namespace {
 class SampleDriver : public Driver {
 public:
   SpanPtr startSpan(const Config&, Tracing::TraceContext&, const StreamInfo::StreamInfo&,
-                    const std::string&, const Tracing::Decision) override {
+                    const std::string&, Tracing::Decision) override {
     return nullptr;
   }
 };

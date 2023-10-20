@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <list>
 #include <memory>
 #include <string>
@@ -679,16 +680,19 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
       runtime_.snapshot().getInteger(ConnectionManagerImpl::PrematureResetTotalStreamCountKey, 500);
 
   if (closed_non_internally_destroyed_requests_ < limit) {
-    return;
+    // Even though the total number of streams have not reached `limit`, check if the number of bad
+    // streams is high enough that even if every subsequent stream is good, the connection
+    // would be closed once the limit is reached, and if so close the connection now.
+    if (number_premature_stream_resets_ * 2 < limit) {
+      return;
+    }
+  } else {
+    if (number_premature_stream_resets_ * 2 < closed_non_internally_destroyed_requests_) {
+      return;
+    }
   }
 
-  if (static_cast<double>(number_premature_stream_resets_) /
-          closed_non_internally_destroyed_requests_ <
-      .5) {
-    return;
-  }
-
-  if (drain_state_ == DrainState::NotDraining) {
+  if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
     stats_.named_.downstream_rq_too_many_premature_resets_.inc();
     doConnectionClose(Network::ConnectionCloseType::Abort, absl::nullopt,
                       "too_many_premature_resets");
@@ -2240,6 +2244,8 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
   if (end_stream) {
     return true;
   }
+  // Filter manager will return early from decodeData and decodeTrailers if
+  // request has completed.
   if (deferred_data_ != nullptr) {
     end_stream = state_.deferred_end_stream_ && request_trailers_ == nullptr;
     filter_manager_.decodeData(*deferred_data_, end_stream);
@@ -2269,19 +2275,26 @@ bool ConnectionManagerImpl::shouldDeferRequestProxyingToNextIoCycle() {
 }
 
 void ConnectionManagerImpl::onDeferredRequestProcessing() {
+  if (streams_.empty()) {
+    return;
+  }
   requests_during_dispatch_count_ = 1; // 1 stream is always let through
   // Streams are inserted at the head of the list. As such process deferred
-  // streams at the back of the list first.
-  for (auto reverse_iter = streams_.rbegin(); reverse_iter != streams_.rend();) {
-    auto& stream_ptr = *reverse_iter;
-    // Move the iterator to the next item in case the `onDeferredRequestProcessing` call removes the
-    // stream from the list.
-    ++reverse_iter;
-    bool was_deferred = stream_ptr->onDeferredRequestProcessing();
+  // streams in the reverse order.
+  auto reverse_iter = std::prev(streams_.end());
+  bool at_first_element = false;
+  do {
+    at_first_element = reverse_iter == streams_.begin();
+    // Move the iterator to the previous item in case the `onDeferredRequestProcessing` call removes
+    // the stream from the list.
+    auto previous_element = std::prev(reverse_iter);
+    bool was_deferred = (*reverse_iter)->onDeferredRequestProcessing();
     if (was_deferred && shouldDeferRequestProxyingToNextIoCycle()) {
       break;
     }
-  }
+    reverse_iter = previous_element;
+    // TODO(yanavlasov): see if `rend` can be used.
+  } while (!at_first_element);
 }
 
 } // namespace Http

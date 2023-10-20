@@ -72,11 +72,11 @@ TagExtractorPtr TagExtractorImplBase::createTagExtractor(absl::string_view name,
                                                          absl::string_view negative_match,
                                                          Regex::Type re_type) {
   if (name.empty()) {
-    throw EnvoyException("tag_name cannot be empty");
+    throwEnvoyExceptionOrPanic("tag_name cannot be empty");
   }
 
   if (regex.empty()) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
   switch (re_type) {

@@ -26,13 +26,13 @@ on:
         default: ''
       repo_ref:
         type: string
-      given_ref:
-        type: string
       sha:
         type: string
     secrets:
       ENVOY_CI_SYNC_APP_ID:
       ENVOY_CI_SYNC_APP_KEY:
+      ENVOY_CI_PUBLISH_APP_ID:
+      ENVOY_CI_PUBLISH_APP_KEY:
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
@@ -50,7 +50,7 @@ jobs:
           name: github
           run_pre: ./.github/actions/publish/release/setup
           run_pre_with: |
-            ref: ${{ inputs.given_ref }}
+            ref: ${{ inputs.repo_ref }}
             bucket: envoy-pr
           env: |
             export ENVOY_PUBLISH_DRY_RUN=1
@@ -71,7 +71,8 @@ jobs:
     if: ${{ inputs.trusted }}
     name: ${{ matrix.name || matrix.target }}
     permissions:
-      contents: write
+      contents: read
+      packages: read
     strategy:
       fail-fast: false
       matrix:
@@ -80,9 +81,10 @@ jobs:
           name: github
           run_pre: ./.github/actions/publish/release/setup
           run_pre_with: |
-            ref: ${{ inputs.given_ref }}
+            ref: ${{ inputs.repo_ref }}
             bucket: envoy-postsubmit
           env: |
+            export ENVOY_COMMIT=${{ inputs.sha }}
             if [[ '${{ inputs.version_dev }}' == 'dev' ]]; then
                 export ENVOY_PUBLISH_DRY_RUN=1
             fi
@@ -97,6 +99,9 @@ jobs:
       env: ${{ matrix.env }}
       trusted: true
       repo_ref: ${{ inputs.repo_ref }}
+    secrets:
+      app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
   publish_docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
