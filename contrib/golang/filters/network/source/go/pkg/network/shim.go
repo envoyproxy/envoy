@@ -71,11 +71,11 @@ type upstreamConnWrapper struct {
 }
 
 func CreateUpstreamConn(addr string, filter api.UpstreamFilter) {
-	connID := atomic.AddUint64(&upstreamConnIDGenerator, 1)
 	conn := &upstreamConnWrapper{
 		UpstreamFilter: filter,
 		finalizer:      new(int),
 	}
+	connID := atomic.AddUint64(&upstreamConnIDGenerator, 1)
 	_ = UpstreamFilters.StoreFilterByConnID(connID, conn)
 
 	h := cgoAPI.UpstreamConnect(libraryID, addr, connID)
