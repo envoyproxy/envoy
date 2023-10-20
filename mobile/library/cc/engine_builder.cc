@@ -939,7 +939,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   listener_manager->mutable_typed_config()->PackFrom(api);
   listener_manager->set_name("envoy.listener_manager_impl.api");
 
-  bootstrap->PrintDebugString();
   return bootstrap;
 }
 
