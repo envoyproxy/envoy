@@ -317,7 +317,7 @@ static void BM_UsedCountersJson(benchmark::State& state, bool per_endpoint_stats
 }
 BENCHMARK_CAPTURE(BM_UsedCountersJson, per_endpoint_stats_disabled, false)
     ->Unit(benchmark::kMillisecond);
-BENCHMARK_CAPTURE(BM_UsedCountersJson, per_endpoint_stats_true, true)
+BENCHMARK_CAPTURE(BM_UsedCountersJson, per_endpoint_stats_enabled, true)
     ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
