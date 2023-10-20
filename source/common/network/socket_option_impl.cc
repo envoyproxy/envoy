@@ -39,15 +39,10 @@ bool SocketOptionImpl::setOption(Socket& socket,
 }
 
 void SocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
-  std::cerr << "==> AAB SocketOptionImpl::hashKey, size=" << hash_key.size()
-            << ", optname.has_value? " << optname_.hasValue() << std::endl;
   if (optname_.hasValue()) {
     pushScalarToByteVector(optname_.level(), hash_key);
-    std::cerr << "==> AAB SocketOptionImpl::hashKey 2, size=" << hash_key.size() << std::endl;
     pushScalarToByteVector(optname_.option(), hash_key);
-    std::cerr << "==> AAB SocketOptionImpl::hashKey 3, size=" << hash_key.size() << std::endl;
     hash_key.insert(hash_key.end(), value_.begin(), value_.end());
-    std::cerr << "==> AAB SocketOptionImpl::hashKey 4, size=" << hash_key.size() << std::endl;
   }
 }
 

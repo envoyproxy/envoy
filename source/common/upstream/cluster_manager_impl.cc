@@ -86,8 +86,8 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
   return {{"https", sni, host->address()->ip()->port()}};
 }
 
-bool isAdsCluster(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                  absl::string_view cluster_name) {
+bool isBlockingAdsCluster(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                          absl::string_view cluster_name) {
   if (bootstrap.dynamic_resources().has_ads_config()) {
     const auto& ads_config_source = bootstrap.dynamic_resources().ads_config();
     // We only care about EnvoyGrpc, not GoogleGrpc, because we only need to delay ADS mux
@@ -399,8 +399,11 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
   // Load all the primary clusters.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     if (is_primary_cluster(cluster)) {
-      const bool required_for_ads = isAdsCluster(bootstrap, cluster.name());
+      const bool required_for_ads = isBlockingAdsCluster(bootstrap, cluster.name());
       has_ads_cluster |= required_for_ads;
+      // TODO(abeyad): Consider passing a lambda for a "post-cluster-init" callback, which would
+      // include a conditional ads_mux_->start() call, if other uses cases for "post-cluster-init"
+      // functionality pops up.
       loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
                   required_for_ads, active_clusters_);
     }
@@ -478,7 +481,7 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
     if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
         !Config::SubscriptionFactory::isPathBasedConfigSource(
             cluster.eds_cluster_config().eds_config().config_source_specifier_case())) {
-      const bool required_for_ads = isAdsCluster(bootstrap, cluster.name());
+      const bool required_for_ads = isBlockingAdsCluster(bootstrap, cluster.name());
       has_ads_cluster |= required_for_ads;
       loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
                   required_for_ads, active_clusters_);
