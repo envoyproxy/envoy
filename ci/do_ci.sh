@@ -9,15 +9,11 @@ export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
-if [[ -z "$NO_BUILD_SETUP" ]]; then
-    # shellcheck source=ci/setup_cache.sh
-    . "$(dirname "$0")"/setup_cache.sh
-    # shellcheck source=ci/build_setup.sh
-    . "$(dirname "$0")"/build_setup.sh
+# shellcheck source=ci/build_setup.sh
+. "$(dirname "$0")"/build_setup.sh
 
-    echo "building using ${NUM_CPUS} CPUs"
-    echo "building for ${ENVOY_BUILD_ARCH}"
-fi
+echo "building using ${NUM_CPUS} CPUs"
+echo "building for ${ENVOY_BUILD_ARCH}"
 cd "${SRCDIR}"
 
 # Its better to fetch too little rather than too much, as whatever is
