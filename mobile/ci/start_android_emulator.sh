@@ -8,7 +8,7 @@ echo "no" | "${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager" create avd -n 
 system_profiler SPHardwareDataType
 
 # shellcheck disable=SC2094
-nohup "${ANDROID_HOME}/emulator/emulator" -cores 3 -partition-size 1024 -avd test_android_emulator -no-snapshot-load  > nohup.out 2>&1 | tail -f nohup.out & {
+nohup "${ANDROID_HOME}/emulator/emulator" -partition-size 1024 -avd test_android_emulator -no-snapshot-load  > nohup.out 2>&1 | tail -f nohup.out & {
     # shellcheck disable=SC2016
     "${ANDROID_HOME}/platform-tools/adb" wait-for-device shell 'while [[ -z $(getprop sys.boot_completed | tr -d '\''\r'\'') ]]; do sleep 1; done; input keyevent 82'
 }
