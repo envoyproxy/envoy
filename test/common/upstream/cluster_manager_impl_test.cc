@@ -4533,9 +4533,8 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
 
   createWithBasicStaticCluster();
 
-  std::cerr << "==> AAB Test 1" << std::endl;
   Network::Socket::OptionsSharedPtr options1 =
-      Network::SocketOptionFactory::buildIpTransparentOptions();
+      Network::SocketOptionFactory::buildTcpKeepaliveOptions({});
   Http::ConnectionPool::MockInstance* to_create1 =
       new NiceMock<Http::ConnectionPool::MockInstance>();
   EXPECT_CALL(context1, upstreamSocketOptions()).WillOnce(Return(options1));
@@ -4545,9 +4544,8 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
           ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1));
   EXPECT_NE(nullptr, cp1);
 
-  std::cerr << "==> AAB Test 2" << std::endl;
   Network::Socket::OptionsSharedPtr options2 =
-      Network::SocketOptionFactory::buildSocketMarkOptions(3);
+      Network::SocketOptionFactory::buildReusePortOptions();
   Http::ConnectionPool::MockInstance* to_create2 =
       new NiceMock<Http::ConnectionPool::MockInstance>();
   EXPECT_CALL(context2, upstreamSocketOptions()).WillOnce(Return(options2));
@@ -4560,17 +4558,15 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
   // The different upstream options should lead to different hashKeys, thus different pools.
   EXPECT_NE(cp1, cp2);
 
-  std::cerr << "==> AAB Test 3" << std::endl;
   Network::Socket::OptionsSharedPtr options1_again =
-      Network::SocketOptionFactory::buildIpTransparentOptions();
+      Network::SocketOptionFactory::buildTcpKeepaliveOptions({});
   EXPECT_CALL(context1, upstreamSocketOptions()).WillOnce(Return(options1_again));
   Http::ConnectionPool::Instance* should_be_cp1 = HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1));
 
-  std::cerr << "==> AAB Test 4" << std::endl;
   Network::Socket::OptionsSharedPtr options2_again =
-      Network::SocketOptionFactory::buildSocketMarkOptions(3);
+      Network::SocketOptionFactory::buildReusePortOptions();
   EXPECT_CALL(context2, upstreamSocketOptions()).WillOnce(Return(options2_again));
   Http::ConnectionPool::Instance* should_be_cp2 = HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")

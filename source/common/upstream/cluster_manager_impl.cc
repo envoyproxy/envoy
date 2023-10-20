@@ -57,8 +57,6 @@ namespace {
 
 void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
                          const Network::Socket::OptionsSharedPtr& to_add) {
-  std::cerr << "==> AAB inside addOptionsIfNotNull, to_add="
-            << (to_add.get() == nullptr ? "null" : std::to_string(to_add->size())) << std::endl;
   if (to_add != nullptr) {
     Network::Socket::appendOptions(options, to_add);
   }
@@ -1997,10 +1995,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   for (auto protocol : upstream_protocols) {
     hash_key.push_back(uint8_t(protocol));
   }
-  std::cerr << "==> AAB 1 hash_key(" << hash_key.size() << "): ";
-  for (auto x : hash_key)
-    std::cerr << x << " ";
-  std::cerr << std::endl;
 
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_options = host->cluster().alternateProtocolsCacheOptions();
@@ -2008,19 +2002,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   if (context) {
     // Inherit socket options from downstream connection, if set.
     if (context->downstreamConnection()) {
-      std::cerr << "==> AAB addOptionsIfNotNull 1" << std::endl;
       addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
     }
-    std::cerr << "==> AAB addOptionsIfNotNull 2, upstream_options.size=" << upstream_options->size()
-              << std::endl;
     addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
-    std::cerr << "==> AAB addOptionsIfNotNull 3, upstream_options.size=" << upstream_options->size()
-              << std::endl;
   }
-  std::cerr << "==> AAB 2 hash_key(" << hash_key.size() << "): ";
-  for (auto x : hash_key)
-    std::cerr << x << " ";
-  std::cerr << std::endl;
 
   // Use the socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
@@ -2028,10 +2013,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   for (const auto& option : *upstream_options) {
     option->hashKey(hash_key);
   }
-  std::cerr << "==> AAB 3 hash_key(" << hash_key.size() << "): ";
-  for (auto x : hash_key)
-    std::cerr << x << " ";
-  std::cerr << std::endl;
 
   bool have_transport_socket_options = false;
   if (context && context->upstreamTransportSocketOptions()) {
