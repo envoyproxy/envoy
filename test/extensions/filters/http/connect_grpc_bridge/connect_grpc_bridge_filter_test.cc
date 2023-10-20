@@ -437,6 +437,19 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryGetRequestTimeout) {
   EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().ConnectTimeoutMs));
 }
 
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestWithNoBodyNorTrailers) {
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
+  request_headers_.setContentType("application/proto");
+
+  Buffer::OwnedImpl data{};
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .WillOnce(
+          Invoke(([&](Buffer::Instance& d, bool) { EXPECT_EQ('\0', d.drainInt<uint8_t>()); })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, true));
+}
+
 TEST_F(ConnectGrpcBridgeFilterTest, StreamingSupportedContentType) {
   request_headers_.setContentType("application/connect+proto");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
