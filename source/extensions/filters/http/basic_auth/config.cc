@@ -8,6 +8,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BasicAuth {
 
+using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
+
 namespace {
 
 UserMap readHtpasswd(std::string htpasswd) {
