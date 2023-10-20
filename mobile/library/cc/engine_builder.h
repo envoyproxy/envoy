@@ -198,7 +198,7 @@ public:
   EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
 #endif
-  EngineBuilder& addPlatformFilter(std::string name);
+  EngineBuilder& addPlatformFilter(const std::string& name);
 
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 

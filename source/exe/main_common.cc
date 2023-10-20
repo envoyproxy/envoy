@@ -29,6 +29,33 @@
 
 namespace Envoy {
 
+StrippedMainBase::CreateInstanceFunction createFunction() {
+  return
+      [](Init::Manager& init_manager, const Server::Options& options,
+         Event::TimeSystem& time_system, ListenerHooks& hooks, Server::HotRestart& restarter,
+         Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
+         Server::ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
+         ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+         Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
+         Buffer::WatermarkFactorySharedPtr watermark_factory) {
+        auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
+        return std::make_unique<Server::InstanceImpl>(
+            init_manager, options, time_system, local_address, hooks, restarter, store,
+            access_log_lock, component_factory, std::move(random_generator), tls, thread_factory,
+            file_system, std::move(process_context), watermark_factory);
+      };
+}
+
+MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
+                               ListenerHooks& listener_hooks,
+                               Server::ComponentFactory& component_factory,
+                               std::unique_ptr<Server::Platform> platform_impl,
+                               std::unique_ptr<Random::RandomGenerator>&& random_generator,
+                               std::unique_ptr<ProcessContext> process_context)
+    : StrippedMainBase(options, time_system, listener_hooks, component_factory,
+                       std::move(platform_impl), std::move(random_generator),
+                       std::move(process_context), createFunction()) {}
+
 bool MainCommonBase::run() {
   switch (options_.mode()) {
   case Server::Mode::Serve:
