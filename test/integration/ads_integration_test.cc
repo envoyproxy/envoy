@@ -717,8 +717,58 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
   makeSingleRequest();
 }
 
-// Validate that
-TEST_P(AdsIntegrationTest, AdsStartedAfterAsyncClusterInitialization) {}
+TEST_P(AdsIntegrationTest, AdsStartedAfterAsyncClusterInitialization) {
+  //   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  //     // Enable health checking for the first cluster.
+  //     auto* dummy_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+  //     auto* health_check = dummy_cluster->add_health_checks();
+  //     health_check->mutable_timeout()->set_seconds(30);
+  //     health_check->mutable_interval()->CopyFrom(
+  //         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+  //     health_check->mutable_no_traffic_interval()->CopyFrom(
+  //         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+  //     health_check->mutable_unhealthy_threshold()->set_value(1);
+  //     health_check->mutable_healthy_threshold()->set_value(1);
+  //     health_check->mutable_http_health_check()->set_path("/healthcheck");
+  //     health_check->mutable_http_health_check()->set_codec_client_type(
+  //         envoy::type::v3::CodecClientType::HTTP2);
+  //   });
+
+  //   initialize();
+
+  //   // Make sure statically provisioned runtime values were loaded.
+  //   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
+  //   EXPECT_EQ("yar", getRuntimeKey("bar"));
+  //   EXPECT_EQ("", getRuntimeKey("baz"));
+
+  //   // Respond to the initial health check, which should complete initialization of primary
+  //   clusters. waitForNextUpstreamRequest();
+  //   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  //   test_server_->waitForGaugeEq("cluster.dummy_cluster.membership_healthy", 1);
+
+  //   // After this xDS connection should be established. Verify that dynamic runtime values are
+  //   loaded. acceptXdsConnection();
+  //   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+  //                                       {"some_rtds_layer"}, {}, true));
+  //   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+  //     name: some_rtds_layer
+  //     layer:
+  //       foo: bar
+  //       baz: meh
+  //   )EOF");
+  //   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+  //       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+  //   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+
+  //   EXPECT_EQ("bar", getRuntimeKey("foo"));
+  //   EXPECT_EQ("yar", getRuntimeKey("bar"));
+  //   EXPECT_EQ("meh", getRuntimeKey("baz"));
+
+  //   EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  //   EXPECT_EQ(initial_load_success_ + 1, test_server_->counter("runtime.load_success")->value());
+  //   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
+  //   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
+}
 
 // Validate that the request with duplicate clusters in the initial request during server init is
 // rejected.

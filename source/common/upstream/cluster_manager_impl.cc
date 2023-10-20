@@ -57,6 +57,8 @@ namespace {
 
 void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
                          const Network::Socket::OptionsSharedPtr& to_add) {
+  std::cerr << "==> AAB inside addOptionsIfNotNull, to_add="
+            << (to_add.get() == nullptr ? "null" : std::to_string(to_add->size())) << std::endl;
   if (to_add != nullptr) {
     Network::Socket::appendOptions(options, to_add);
   }
@@ -1976,7 +1978,6 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
-  std::cerr << "==> AAB httpConnPool" << std::endl;
   HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
@@ -1996,7 +1997,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   for (auto protocol : upstream_protocols) {
     hash_key.push_back(uint8_t(protocol));
   }
-  std::cerr << "==> AAB 1 hash_key(" << hash_key.size() << ")=";
+  std::cerr << "==> AAB 1 hash_key(" << hash_key.size() << "): ";
   for (auto x : hash_key)
     std::cerr << x << " ";
   std::cerr << std::endl;
@@ -2007,10 +2008,19 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   if (context) {
     // Inherit socket options from downstream connection, if set.
     if (context->downstreamConnection()) {
+      std::cerr << "==> AAB addOptionsIfNotNull 1" << std::endl;
       addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
     }
+    std::cerr << "==> AAB addOptionsIfNotNull 2, upstream_options.size=" << upstream_options->size()
+              << std::endl;
     addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
+    std::cerr << "==> AAB addOptionsIfNotNull 3, upstream_options.size=" << upstream_options->size()
+              << std::endl;
   }
+  std::cerr << "==> AAB 2 hash_key(" << hash_key.size() << "): ";
+  for (auto x : hash_key)
+    std::cerr << x << " ";
+  std::cerr << std::endl;
 
   // Use the socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
@@ -2018,7 +2028,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   for (const auto& option : *upstream_options) {
     option->hashKey(hash_key);
   }
-  std::cerr << "==> AAB 2 hash_key(" << hash_key.size() << ")=";
+  std::cerr << "==> AAB 3 hash_key(" << hash_key.size() << "): ";
   for (auto x : hash_key)
     std::cerr << x << " ";
   std::cerr << std::endl;
@@ -2039,10 +2049,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
-  std::cerr << "==> AAB FINAL hash_key(" << hash_key.size() << ")=";
-  for (auto x : hash_key)
-    std::cerr << x << " ";
-  std::cerr << std::endl;
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
         auto pool = parent_.parent_.factory_.allocateConnPool(
