@@ -5,6 +5,7 @@ set -e
 echo "y" | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install 'system-images;android-29;google_apis;x86_64' --channel=3
 echo "no" | "${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager" create avd -n test_android_emulator -k 'system-images;android-29;google_apis;x86_64' --device pixel_4 --force
 "${ANDROID_HOME}"/emulator/emulator -accel-check
+system_profiler SPHardwareDataType
 
 # shellcheck disable=SC2094
 nohup "${ANDROID_HOME}/emulator/emulator" -partition-size 1024 -avd test_android_emulator -no-snapshot-load  > nohup.out 2>&1 | tail -f nohup.out & {
