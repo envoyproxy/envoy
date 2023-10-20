@@ -11,6 +11,9 @@ bug_fixes:
 - area: http
   change: |
     Fixed recursion when HTTP connection is disconnected due to a high number of premature resets.
+- area: grpc
+  change: |
+    Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
