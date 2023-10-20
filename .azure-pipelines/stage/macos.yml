@@ -24,7 +24,12 @@ jobs:
   - script: ./ci/mac_ci_setup.sh
     displayName: "Install dependencies"
 
-  - script: ./ci/mac_ci_steps.sh
+  - bash: |
+      set -e
+      GCP_SERVICE_ACCOUNT_KEY_PATH=$(mktemp -t gcp_service_account.XXXXXX.json)
+      bash -c 'echo "$(GcpServiceAccountKey)"' | base64 --decode > "${GCP_SERVICE_ACCOUNT_KEY_PATH}"
+      BAZEL_BUILD_EXTRA_OPTIONS+=" --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_PATH}"
+      ./ci/mac_ci_steps.sh
     displayName: "Run Mac CI"
     env:
       BAZEL_BUILD_EXTRA_OPTIONS: >-
@@ -32,7 +37,6 @@ jobs:
         --flaky_test_attempts=2
         --remote_cache=grpcs://remotebuildexecution.googleapis.com
         --remote_instance_name=projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
       ENVOY_RBE: 1
 
   - task: PublishTestResults@2
