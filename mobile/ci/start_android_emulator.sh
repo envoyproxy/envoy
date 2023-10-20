@@ -2,7 +2,7 @@
 
 set -e
 
-echo "y" | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install 'system-images;android-30;google_atd;x86_64'
+echo "y" | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install 'system-images;android-30;google_atd;x86_64' --channel=3
 echo "no" | "${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager" create avd -n test_android_emulator -k 'system-images;android-30;google_atd;x86_64' --device pixel_4 --force
 "${ANDROID_HOME}"/emulator/emulator -accel-check
 system_profiler SPHardwareDataType
