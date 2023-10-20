@@ -11,9 +11,6 @@ trap finish EXIT
 echo "disk space at beginning of build:"
 df -h
 
-# shellcheck source=ci/setup_cache.sh
-. "$(dirname "$0")"/setup_cache.sh
-
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 
