@@ -8,7 +8,14 @@ namespace GenericProxy {
 UpstreamConnection::~UpstreamConnection() {
   // Do clean up here again to ensure the cleanUp is called. This is safe to call
   // multiple times because of the is_cleand_up_ flag.
-  cleanUp(true);
+  this->cleanUp(true);
+}
+
+void UpstreamConnection::initialize() {
+  if (!initialized_) {
+    initialized_ = true;
+    newConnection();
+  }
 }
 
 void UpstreamConnection::cleanUp(bool close_connection) {
@@ -75,13 +82,7 @@ void UpstreamConnection::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& co
   onPoolSuccessImpl();
 }
 
-void UpstreamConnection::onEvent(Network::ConnectionEvent event) {
-  // Ignore events if the connection is already cleaned up.
-  if (is_cleaned_up_) {
-    return;
-  }
-  onEventImpl(event);
-}
+void UpstreamConnection::onEvent(Network::ConnectionEvent event) { onEventImpl(event); }
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

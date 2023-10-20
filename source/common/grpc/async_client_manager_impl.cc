@@ -84,7 +84,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   UNREFERENCED_PARAMETER(config_);
   UNREFERENCED_PARAMETER(api_);
   UNREFERENCED_PARAMETER(stat_names_);
-  throw EnvoyException("Google C++ gRPC client is not linked");
+  throwEnvoyExceptionOrPanic("Google C++ gRPC client is not linked");
 #else
   ASSERT(google_tls_slot_ != nullptr);
 #endif
@@ -94,7 +94,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   for (const auto& header : config.initial_metadata()) {
     // Validate key
     if (!validateGrpcHeaderChars(header.key())) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Illegal characters in gRPC initial metadata header key: {}.", header.key()));
     }
 
@@ -102,7 +102,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     // Binary base64 encoded - handled by the GRPC library
     if (!::absl::EndsWith(header.key(), "-bin") &&
         !validateGrpcCompatibleAsciiHeaderValue(header.value())) {
-      throw EnvoyException(fmt::format(
+      throwEnvoyExceptionOrPanic(fmt::format(
           "Illegal ASCII value for gRPC initial metadata header key: {}.", header.key()));
     }
   }

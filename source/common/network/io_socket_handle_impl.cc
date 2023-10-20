@@ -542,8 +542,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
-    throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
-                                     errorDetails(result.errno_)));
+    throwEnvoyExceptionOrPanic(fmt::format("getsockname failed for '{}': ({}) {}", fd_,
+                                           result.errno_, errorDetails(result.errno_)));
   }
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
@@ -556,7 +556,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
@@ -569,7 +569,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     ss_len = sizeof(ss);
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
     if (result.return_value_ != 0) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }

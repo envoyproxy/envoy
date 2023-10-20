@@ -7,6 +7,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
+#include "test/server/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -298,7 +299,7 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     Stats::Gauge& g2 = child_store.rootScope()->gaugeFromStatName(
         dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate);
 
-    HotRestartingChild hot_restarting_child(0, 0, "@envoy_domain_socket", 0);
+    HotRestartingChild hot_restarting_child(0, 0, testDomainSocketName(), 0);
     hot_restarting_child.mergeParentStats(child_store, stats_proto);
     EXPECT_EQ(1, c1.value());
     EXPECT_EQ(1, c2.value());

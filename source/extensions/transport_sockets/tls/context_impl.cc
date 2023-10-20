@@ -99,7 +99,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       Registry::FactoryRegistry<CertValidatorFactory>::getFactory(cert_validator_name);
 
   if (!cert_validator_factory) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         absl::StrCat("Failed to get certificate validator factory for ", cert_validator_name));
   }
 
@@ -148,21 +148,23 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
           bad_ciphers.push_back(cipher_str);
         }
       }
-      throw EnvoyException(fmt::format("Failed to initialize cipher suites {}. The following "
-                                       "ciphers were rejected when tried individually: {}",
-                                       config.cipherSuites(), absl::StrJoin(bad_ciphers, ", ")));
+      throwEnvoyExceptionOrPanic(fmt::format("Failed to initialize cipher suites {}. The following "
+                                             "ciphers were rejected when tried individually: {}",
+                                             config.cipherSuites(),
+                                             absl::StrJoin(bad_ciphers, ", ")));
     }
 
     if (!capabilities_.provides_ciphers_and_curves &&
         !SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
-      throw EnvoyException(absl::StrCat("Failed to initialize ECDH curves ", config.ecdhCurves()));
+      throwEnvoyExceptionOrPanic(
+          absl::StrCat("Failed to initialize ECDH curves ", config.ecdhCurves()));
     }
 
     // Set signature algorithms if given, otherwise fall back to BoringSSL defaults.
     if (!capabilities_.provides_sigalgs && !config.signatureAlgorithms().empty()) {
       if (!SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signatureAlgorithms().c_str())) {
-        throw EnvoyException(absl::StrCat("Failed to initialize TLS signature algorithms ",
-                                          config.signatureAlgorithms()));
+        throwEnvoyExceptionOrPanic(absl::StrCat("Failed to initialize TLS signature algorithms ",
+                                                config.signatureAlgorithms()));
       }
     }
   }
@@ -189,7 +191,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
 #ifdef BORINGSSL_FIPS
   if (!capabilities_.is_fips_compliant) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
   }
 #endif
@@ -228,9 +230,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
         if (ecdsa_group == nullptr ||
             EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
-          throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only P-256 "
-                                           "ECDSA certificates are supported",
-                                           ctx.cert_chain_file_path_));
+          throwEnvoyExceptionOrPanic(
+              fmt::format("Failed to load certificate chain from {}, only P-256 "
+                          "ECDSA certificates are supported",
+                          ctx.cert_chain_file_path_));
         }
         ctx.is_ecdsa_ = true;
       } break;
@@ -242,14 +245,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         const unsigned rsa_key_length = RSA_bits(rsa_public_key);
 #ifdef BORINGSSL_FIPS
         if (rsa_key_length != 2048 && rsa_key_length != 3072 && rsa_key_length != 4096) {
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
                           "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
                           ctx.cert_chain_file_path_));
         }
 #else
         if (rsa_key_length < 2048) {
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               fmt::format("Failed to load certificate chain from {}, only RSA "
                           "certificates with 2048-bit or larger keys are supported",
                           ctx.cert_chain_file_path_));
@@ -258,9 +261,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       } break;
 #ifdef BORINGSSL_FIPS
       default:
-        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA and "
-                                         "ECDSA certificates are supported in FIPS mode",
-                                         ctx.cert_chain_file_path_));
+        throwEnvoyExceptionOrPanic(
+            fmt::format("Failed to load certificate chain from {}, only RSA and "
+                        "ECDSA certificates are supported in FIPS mode",
+                        ctx.cert_chain_file_path_));
 #endif
       }
 
@@ -273,12 +277,12 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         Ssl::BoringSslPrivateKeyMethodSharedPtr private_key_method =
             private_key_method_provider->getBoringSslPrivateKeyMethod();
         if (private_key_method == nullptr) {
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               fmt::format("Failed to get BoringSSL private key method from provider"));
         }
 #ifdef BORINGSSL_FIPS
         if (!ctx.private_key_method_provider_->checkFips()) {
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               fmt::format("Private key method doesn't support FIPS mode with current parameters"));
         }
 #endif
@@ -431,7 +435,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   }
 
   if (alpn_protocols.size() >= 65535) {
-    throw EnvoyException("Invalid ALPN protocol string");
+    throwEnvoyExceptionOrPanic("Invalid ALPN protocol string");
   }
 
   std::vector<uint8_t> out(alpn_protocols.size() + 1);
@@ -439,7 +443,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   for (size_t i = 0; i <= alpn_protocols.size(); i++) {
     if (i == alpn_protocols.size() || alpn_protocols[i] == ',') {
       if (i - start > 255) {
-        throw EnvoyException("Invalid ALPN protocol string");
+        throwEnvoyExceptionOrPanic("Invalid ALPN protocol string");
       }
 
       out[start] = i - start;
@@ -784,7 +788,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
-    throw EnvoyException("Server TlsCertificates must have a certificate specified");
+    throwEnvoyExceptionOrPanic("Server TlsCertificates must have a certificate specified");
   }
 
   for (auto& ctx : tls_contexts_) {
@@ -870,15 +874,15 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     auto& ocsp_resp_bytes = tls_certificates[i].get().ocspStaple();
     if (ocsp_resp_bytes.empty()) {
       if (ctx.is_must_staple_) {
-        throw EnvoyException("OCSP response is required for must-staple certificate");
+        throwEnvoyExceptionOrPanic("OCSP response is required for must-staple certificate");
       }
       if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple) {
-        throw EnvoyException("Required OCSP response is missing from TLS context");
+        throwEnvoyExceptionOrPanic("Required OCSP response is missing from TLS context");
       }
     } else {
       auto response = std::make_unique<Ocsp::OcspResponseWrapper>(ocsp_resp_bytes, time_source_);
       if (!response->matchesCertificate(*ctx.cert_chain_)) {
-        throw EnvoyException("OCSP response does not match its TLS certificate");
+        throwEnvoyExceptionOrPanic("OCSP response does not match its TLS certificate");
       }
       ctx.ocsp_response_ = std::move(response);
     }
@@ -971,7 +975,7 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
 
         ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
         if (ASN1_STRING_length(cn_asn1) <= 0) {
-          throw EnvoyException("Invalid TLS context has an empty subject CN");
+          throwEnvoyExceptionOrPanic("Invalid TLS context has an empty subject CN");
         }
 
         rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
@@ -1009,7 +1013,7 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
       // It's possible that the certificate doesn't have a subject, but
       // does have SANs. Make sure that we have one or the other.
       if (cn_index < 0 && san_count == 0) {
-        throw EnvoyException("Invalid TLS context has neither subject CN nor SAN names");
+        throwEnvoyExceptionOrPanic("Invalid TLS context has neither subject CN nor SAN names");
       }
 
       rc = X509_NAME_digest(X509_get_issuer_name(cert), EVP_sha256(), hash_buffer, &hash_length);
@@ -1402,7 +1406,7 @@ void TlsContext::loadCertificateChain(const std::string& data, const std::string
   cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
   if (cert_chain_ == nullptr || !SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
     logSslErrorChain();
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
   }
   // Read rest of the certificate chain.
@@ -1412,7 +1416,7 @@ void TlsContext::loadCertificateChain(const std::string& data, const std::string
       break;
     }
     if (!SSL_CTX_add_extra_chain_cert(ssl_ctx_.get(), cert.get())) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
     }
     // SSL_CTX_add_extra_chain_cert() takes ownership.
@@ -1423,7 +1427,7 @@ void TlsContext::loadCertificateChain(const std::string& data, const std::string
   if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
     ERR_clear_error();
   } else {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
   }
 }
@@ -1437,8 +1441,9 @@ void TlsContext::loadPrivateKey(const std::string& data, const std::string& data
                               !password.empty() ? const_cast<char*>(password.c_str()) : nullptr));
 
   if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
-    throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}", data_path,
-                                     Utility::getLastCryptoError().value_or("unknown")));
+    throwEnvoyExceptionOrPanic(fmt::format("Failed to load private key from {}, Cause: {}",
+                                           data_path,
+                                           Utility::getLastCryptoError().value_or("unknown")));
   }
 
   checkPrivateKey(pkey, data_path);
@@ -1458,7 +1463,7 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& data_pat
       !PKCS12_parse(pkcs12.get(), !password.empty() ? const_cast<char*>(password.c_str()) : nullptr,
                     &temp_private_key, &temp_cert, &temp_ca_certs)) {
     logSslErrorChain();
-    throw EnvoyException(absl::StrCat("Failed to load pkcs12 from ", data_path));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Failed to load pkcs12 from ", data_path));
   }
   cert_chain_.reset(temp_cert);
   bssl::UniquePtr<EVP_PKEY> pkey(temp_private_key);
@@ -1472,11 +1477,12 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& data_pat
   }
   if (!SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
     logSslErrorChain();
-    throw EnvoyException(absl::StrCat("Failed to load certificate from ", data_path));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Failed to load certificate from ", data_path));
   }
   if (temp_private_key == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
-    throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}", data_path,
-                                     Utility::getLastCryptoError().value_or("unknown")));
+    throwEnvoyExceptionOrPanic(fmt::format("Failed to load private key from {}, Cause: {}",
+                                           data_path,
+                                           Utility::getLastCryptoError().value_or("unknown")));
   }
 
   checkPrivateKey(pkey, data_path);
@@ -1490,17 +1496,17 @@ void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
   case EVP_PKEY_EC: {
     const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
     if (!EC_KEY_check_fips(ecdsa_private_key)) {
-      throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
-                                       "pairwise consistency test required in FIPS mode",
-                                       key_path));
+      throwEnvoyExceptionOrPanic(fmt::format("Failed to load private key from {}, ECDSA key failed "
+                                             "pairwise consistency test required in FIPS mode",
+                                             key_path));
     }
   } break;
   case EVP_PKEY_RSA: {
     RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
     if (!RSA_check_fips(rsa_private_key)) {
-      throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
-                                       "pairwise consistency test required in FIPS mode",
-                                       key_path));
+      throwEnvoyExceptionOrPanic(fmt::format("Failed to load private key from {}, RSA key failed "
+                                             "pairwise consistency test required in FIPS mode",
+                                             key_path));
     }
   } break;
   }
