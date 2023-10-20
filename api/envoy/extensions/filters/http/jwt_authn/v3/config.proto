@@ -53,7 +53,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 17]
+// [#next-free-field: 19]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -230,6 +230,18 @@ message JwtProvider {
   //
   string payload_in_metadata = 9;
 
+  // Alters the payload representation in the request dynamic metadata to facilitate its use in matching.
+  message NormalizePayload {
+    // Converts the space delimited claims into lists of string, e.g. ``"email
+    // profile"`` is translated to ``["email", "profile"]``. For example,
+    // ``scope`` claim requires this normalization per `RFC8693
+    // <https://datatracker.ietf.org/doc/html/rfc8693#name-scope-scopes-claim>`_.
+    repeated string space_delimited_claims = 1;
+  }
+
+  // Normalizes the payload representation in the request metadata.
+  NormalizePayload normalize_payload_in_metadata = 18;
+
   // If not empty, similar to :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`,
   // a successfully verified JWT header will be written to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>`
   // as an entry (``protobuf::Struct``) in ``envoy.filters.http.jwt_authn`` ``namespace`` with the
@@ -302,8 +314,17 @@ message JwtProvider {
   //     - name: x-jwt-claim-nested-claim
   //       claim: claim.nested.key
   //
-  // This header is only reserved for jwt claim; any other value will be overwrite.
+  // This header is only reserved for jwt claim; any other value will be overwritten.
   repeated JwtClaimToHeader claim_to_headers = 15;
+
+  // Clears route cache in order to allow JWT token to correctly affect
+  // routing decisions. Filter clears all cached routes when:
+  //
+  // 1. The field is set to ``true``.
+  //
+  // 2. At least one ``claim_to_headers`` header is added to the request.
+  //
+  bool clear_route_cache = 17;
 }
 
 // This message specifies JWT Cache configuration.
