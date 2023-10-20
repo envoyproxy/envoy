@@ -97,3 +97,19 @@ message ConfigsPerRoute {
   //
   map<string, RouterPlugin> plugins_config = 1;
 }
+
+message FilterManagerConfigPerFilter {
+  // Name of the each managed filter
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The config field is used for setting managed filter's config
+  google.protobuf.Any config = 2;
+}
+
+message FilterManagerConfig {
+  // Configuration of the Go plugin when running as FilterManager,
+  // keyed on the :ref:`plugin_name <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.Config.plugin_name>`
+  // of the Go plugin.
+  //
+  repeated FilterManagerConfigPerFilter configs = 1 [(validate.rules).repeated = {min_items: 1}];
+}

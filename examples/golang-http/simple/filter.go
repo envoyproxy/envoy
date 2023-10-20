@@ -45,7 +45,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 			// do time-consuming jobs
 
 			// resume the filter
-			f.callbacks.Continue(status)
+			f.callbacks.Continue(api.Continue)
 		}()
 
 		// suspend the filter
