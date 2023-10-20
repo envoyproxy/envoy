@@ -1713,7 +1713,8 @@ void ConnectionManagerImpl::ActiveStream::encode1xxHeaders(ResponseHeaderMap& re
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(
-      response_headers, request_headers_.get(), connection_manager_.config_, EMPTY_STRING,
+      response_headers, request_headers_.get(), connection_manager_.codec_->protocol(),
+      connection_manager_.config_, EMPTY_STRING,
       filter_manager_.streamInfo(), connection_manager_.proxy_name_,
       connection_manager_.clear_hop_by_hop_response_headers_);
 
@@ -1744,9 +1745,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     headers.setReferenceServer(connection_manager_.config_.serverName());
   }
   ConnectionManagerUtility::mutateResponseHeaders(
-      headers, request_headers_.get(), connection_manager_.config_,
-      connection_manager_.config_.via(), filter_manager_.streamInfo(),
-      connection_manager_.proxy_name_, connection_manager_.clear_hop_by_hop_response_headers_);
+      headers, request_headers_.get(), connection_manager_.codec_->protocol(),
+      connection_manager_.config_, connection_manager_.config_.via(),
+      filter_manager_.streamInfo(), connection_manager_.proxy_name_,
+      connection_manager_.clear_hop_by_hop_response_headers_);
 
   bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&

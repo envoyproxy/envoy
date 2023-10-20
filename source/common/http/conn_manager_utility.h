@@ -92,6 +92,7 @@ public:
    */
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                     const RequestHeaderMap* request_headers,
+                                    Protocol protocol,
                                     ConnectionManagerConfig& config, const std::string& via,
                                     const StreamInfo::StreamInfo& stream_info,
                                     absl::string_view proxy_name,

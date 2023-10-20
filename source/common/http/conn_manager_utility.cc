@@ -479,6 +479,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
 
 void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                                      const RequestHeaderMap* request_headers,
+                                                     Protocol protocol,
                                                      ConnectionManagerConfig& config,
                                                      const std::string& via,
                                                      const StreamInfo::StreamInfo& stream_info,
@@ -509,7 +510,9 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
   if (clear_hop_by_hop) {
     response_headers.removeTransferEncoding();
-    response_headers.removeKeepAlive();
+    if (protocol != Protocol::Http11) {
+      response_headers.removeKeepAlive();
+    }
     response_headers.removeProxyConnection();
   }
 
