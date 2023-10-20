@@ -6,7 +6,8 @@ load(
     "READFILTER_FUZZ_FILTERS",
     "READFILTER_NOFUZZ_FILTERS",
 )
-load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_py_namespace")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 
