@@ -4535,6 +4535,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
   // won't affect the hash key (because if the socket option isn't available on the given platform,
   // an empty SocketOptionImpl is used instead) and the test will end up using the same connection
   // pool for different options, instead of different connection pool.
+  // See https://github.com/envoyproxy/envoy/issues/30360 for details.
   Network::Socket::OptionsSharedPtr options1 =
       Network::SocketOptionFactory::buildTcpKeepaliveOptions({});
   Network::Socket::OptionsSharedPtr options2 =
