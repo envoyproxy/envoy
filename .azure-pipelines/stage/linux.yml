@@ -48,17 +48,20 @@ jobs:
         eq(${{ parameters.runBuild }}, 'true'))
   timeoutInMinutes: ${{ parameters.timeoutBuild }}
   pool: ${{ parameters.pool }}
-  variables:
-  - name: ciTarget
-    ${{ if eq(parameters.runTests, false) }}:
-      value: release.server_only
-    ${{ if ne(parameters.runTests, false) }}:
-      value: release
   steps:
+  - bash: |
+      if [[ "${{ parameters.runTests }}" == "false" ]]; then
+          CI_TARGET="release.server_only"
+      else
+          CI_TARGET="release"
+      fi
+      echo "${CI_TARGET}"
+      echo "##vso[task.setvariable variable=value;isoutput=true]${CI_TARGET}"
+    name: target
   - template: ../ci.yml
     parameters:
       managedAgent: ${{ parameters.managedAgent }}
-      ciTarget: $(ciTarget)
+      ciTarget: $(target.value)
       cacheName: "release"
       bazelBuildExtraOptions: ${{ parameters.bazelBuildExtraOptions }}
       cacheTestResults: ${{ parameters.cacheTestResults }}

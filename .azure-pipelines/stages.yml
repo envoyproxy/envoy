@@ -84,8 +84,9 @@ stages:
   - template: stage/linux.yml
     parameters:
       cacheTestResults: ${{ parameters.cacheTestResults }}
+      # these are parsed differently and _must_ be expressed in this way
       runBuild: variables['RUN_BUILD']
-      runTests: variables['RUN_TESTS']
+      runTests: $(RUN_TESTS)
       tmpfsDockerDisabled: true
 
 - stage: linux_arm64
@@ -93,6 +94,7 @@ stages:
   dependsOn: ${{ parameters.buildStageDeps }}
   variables:
     RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
+    RUN_TESTS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
   jobs:
   - template: stage/linux.yml
     parameters:
@@ -102,6 +104,7 @@ stages:
       timeoutBuild: 180
       pool: envoy-arm-large
       runBuild: variables['RUN_BUILD']
+      runTests: $(RUN_TESTS)
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
 - stage: check
