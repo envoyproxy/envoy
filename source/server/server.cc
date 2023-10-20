@@ -58,6 +58,10 @@
 #include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
+#if defined(TCMALLOC)
+#include "tcmalloc/malloc_extension.h"
+#endif
+
 namespace Envoy {
 namespace Server {
 namespace {
@@ -422,6 +426,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
+
+  if (bootstrap_.has_memory_allocator_manager()) {
+    configureBackgroundMemoryRelease();
+  }
 
   if (bootstrap_.has_application_log_config()) {
     THROW_IF_NOT_OK(
@@ -853,6 +861,17 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
     ENVOY_LOG(info, "starting server in drain mode");
     InstanceImpl::failHealthcheck(true);
   }
+}
+
+void InstanceImpl::configureBackgroundMemoryRelease() {
+#if defined(TCMALLOC)
+  uint64_t background_release_rate_bytes_per_second =
+      bootstrap_.memory_allocator_manager().background_release_rate_bytes_per_second();
+  tcmalloc::MallocExtension::SetBackgroundReleaseRate(
+      tcmalloc::MallocExtension::BytesPerSecond{background_release_rate_bytes_per_second});
+  ENVOY_LOG(info, "configured tcmalloc with background release rate: {} bytes per second",
+            background_release_rate_bytes_per_second);
+#endif
 }
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,

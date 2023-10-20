@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 40]
+// [#next-free-field: 41]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -401,6 +401,8 @@ message Bootstrap {
 
   // Optional application log configuration.
   ApplicationLogConfig application_log_config = 38;
+
+  MemoryAllocatorManager memory_allocator_manager = 40;
 }
 
 // Administration interface :ref:`operations documentation
@@ -723,4 +725,9 @@ message CustomInlineHeader {
 
   // The type of the header that is expected to be set as the inline header.
   InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
+}
+
+message MemoryAllocatorManager {
+  // Configures tcmalloc to perform background release of free memory in amount of bytes per second;
+  uint64 background_release_rate_bytes_per_second = 1 [(validate.rules).uint64 = {gte: 1}];
 }
