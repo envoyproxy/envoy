@@ -7,14 +7,10 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import java.lang.StringBuilder;
-import javax.annotation.Nullable;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
-import io.envoyproxy.envoymobile.engine.JniLibrary;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
