@@ -73,6 +73,55 @@ public:
     return *host;
   }
 
+  MockHost& addHostSingleCounter(MockClusterMockPrioritySet& cluster, uint32_t priority = 0) {
+    host_count_++;
+    MockHostSet* host_set = cluster.priority_set_.getMockHostSet(priority);
+    auto host = std::make_shared<NiceMock<MockHost>>();
+    ON_CALL(*host, address())
+        .WillByDefault(Return(Network::Utility::parseInternetAddressAndPort(
+            fmt::format("127.0.0.{}:80", host_count_))));
+    ON_CALL(*host, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
+    ON_CALL(*host, coarseHealth()).WillByDefault(Return(Host::Health::Healthy));
+
+    counters_.emplace_back();
+    auto& c1 = counters_.back();
+    c1.add((host_count_ * 10) + 1);
+
+    ON_CALL(*host, counters())
+        .WillByDefault(
+            Return(std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>{
+                {"c1", c1}}));
+    ON_CALL(*host, gauges())
+        .WillByDefault(
+            Return(std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>{}));
+    host_set->hosts_.push_back(host);
+    return *host;
+  }
+
+  MockHost& addHostSingleGauge(MockClusterMockPrioritySet& cluster, uint32_t priority = 0) {
+    host_count_++;
+    MockHostSet* host_set = cluster.priority_set_.getMockHostSet(priority);
+    auto host = std::make_shared<NiceMock<MockHost>>();
+    ON_CALL(*host, address())
+        .WillByDefault(Return(Network::Utility::parseInternetAddressAndPort(
+            fmt::format("127.0.0.{}:80", host_count_))));
+    ON_CALL(*host, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
+    ON_CALL(*host, coarseHealth()).WillByDefault(Return(Host::Health::Healthy));
+
+    gauges_.emplace_back();
+    auto& g1 = gauges_.back();
+    g1.add((host_count_ * 10) + 1);
+
+    ON_CALL(*host, counters())
+        .WillByDefault(
+            Return(std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>{}));
+    ON_CALL(*host, gauges())
+        .WillByDefault(Return(
+            std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>{{"g1", g1}}));
+    host_set->hosts_.push_back(host);
+    return *host;
+  }
+
   void addHosts(MockClusterMockPrioritySet& cluster, uint32_t count = 1) {
     for (uint32_t i = 0; i < count; i++) {
       addHost(cluster);

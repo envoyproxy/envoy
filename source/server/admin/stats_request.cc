@@ -80,6 +80,10 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
   const uint64_t starting_response_length = response.length();
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
+      if (params_.type_ != StatsType::All && phase_ == Phase::CountersAndGauges) {
+        renderPerHostMetrics(response);
+      }
+
       if (phase_stat_count_ == 0) {
         render_->noStats(response, phase_string_);
       } else {
@@ -210,13 +214,22 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
 }
 
 void StatsRequest::renderPerHostMetrics(Buffer::Instance& response) {
-  auto render = [this, &response](auto&& metric) {
-    if (params_.shouldShowMetric(metric)) {
-      render_->generate(response, metric.name(), metric.value());
-    }
-  };
-
-  Upstream::HostUtility::forEachHostMetric(cluster_manager_, render, render);
+  Upstream::HostUtility::forEachHostMetric(
+      cluster_manager_,
+      [&](Stats::PrimitiveCounterSnapshot&& metric) {
+        if ((params_.type_ == StatsType::All || params_.type_ == StatsType::Counters) &&
+            params_.shouldShowMetric(metric)) {
+          ++phase_stat_count_;
+          render_->generate(response, metric.name(), metric.value());
+        }
+      },
+      [&](Stats::PrimitiveGaugeSnapshot&& metric) {
+        if ((params_.type_ == StatsType::All || params_.type_ == StatsType::Gauges) &&
+            params_.shouldShowMetric(metric)) {
+          ++phase_stat_count_;
+          render_->generate(response, metric.name(), metric.value());
+        }
+      });
 }
 
 template <class SharedStatType>
