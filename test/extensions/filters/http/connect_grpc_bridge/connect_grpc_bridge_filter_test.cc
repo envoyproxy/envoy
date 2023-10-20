@@ -444,9 +444,8 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestWithNoBodyNorTrailers) {
   Buffer::OwnedImpl data{};
 
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ('\0', d.drainInt<uint8_t>());
-      })));
+      .WillOnce(
+          Invoke(([&](Buffer::Instance& d, bool) { EXPECT_EQ('\0', d.drainInt<uint8_t>()); })));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, true));
 }
