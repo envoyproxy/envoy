@@ -87,11 +87,13 @@ envoy_genjson(
     yaml_srcs = ["//:.github/workflows/_env.yml"],
 )
 
-
 sh_binary(
     name = "build-image-sha",
     srcs = ["version.sh"],
-    args = ["$(JQ_BIN)", "$(location :build-images)"],
+    args = [
+        "$(JQ_BIN)",
+        "$(location :build-images)",
+    ],
     data = [
         ":build-images",
         "@jq_toolchains//:resolved_toolchain",
