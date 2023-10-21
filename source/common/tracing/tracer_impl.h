@@ -55,6 +55,8 @@ public:
   const CustomTagMap* customTags() const override { return nullptr; }
   bool verbose() const override { return false; }
   uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
+  // This EgressConfigImpl is only used for async client tracing. Return false here is OK.
+  bool spawnUpstreamSpan() const override { return false; }
 };
 
 using EgressConfig = ConstSingleton<EgressConfigImpl>;
@@ -63,7 +65,7 @@ class NullTracer : public Tracer {
 public:
   // Tracing::Tracer
   SpanPtr startSpan(const Config&, TraceContext&, const StreamInfo::StreamInfo&,
-                    const Tracing::Decision) override {
+                    Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
   }
 };
@@ -75,7 +77,7 @@ public:
   // Tracing::Tracer
   SpanPtr startSpan(const Config& config, TraceContext& trace_context,
                     const StreamInfo::StreamInfo& stream_info,
-                    const Tracing::Decision tracing_decision) override;
+                    Tracing::Decision tracing_decision) override;
 
   DriverSharedPtr driverForTest() const { return driver_; }
 

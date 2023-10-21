@@ -38,8 +38,8 @@ getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc
         google_grpc_credentials_factory_name);
   }
   if (credentials_factory == nullptr) {
-    throw EnvoyException(absl::StrCat("Unknown google grpc credentials factory: ",
-                                      google_grpc_credentials_factory_name));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Unknown google grpc credentials factory: ",
+                                            google_grpc_credentials_factory_name));
   }
   return credentials_factory->getChannelCredentials(grpc_service, api);
 }
@@ -79,7 +79,7 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
     slices.emplace_back(raw_slice.mem_, raw_slice.len_,
                         &BufferInstanceContainer::derefBufferInstanceContainer, container);
   }
-  return {&slices[0], slices.size()};
+  return {&slices[0], slices.size()}; // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 }
 
 class GrpcSliceBufferFragmentImpl : public Buffer::BufferFragment {

@@ -5,7 +5,7 @@ and an image based on Windows2019.
 
 ## Ubuntu Envoy image
 
-The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CI checks,
+The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build-ubuntu:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh). Developers
 may work with the latest build image SHA in [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8)
 repo to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest built Ubuntu Envoy image.
@@ -13,9 +13,14 @@ Moreover, the Docker image at [`envoyproxy/envoy:dev-<hash>`](https://hub.docker
 The `<hash>` corresponds to the main commit at which the binary was compiled. Lastly, `envoyproxy/envoy:dev` contains an Envoy
 binary built from the latest tip of main that passed tests.
 
-## Alpine Envoy image
+## Distroless Envoy image
 
-Minimal images based on Alpine Linux allow for quicker deployment of Envoy. The Alpine base image is only built with symbols stripped.
+Minimal images based on a [distroless](https://github.com/GoogleContainerTools/distroless) allow for quicker deployment of Envoy.
+
+The Distroless base image is only built with symbols stripped.
+
+## Debug Envoy image
+
 To get the binary with symbols, use the corresponding Ubuntu based debug image. The image is pushed with two different tags:
 `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
 main commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of main that passed tests.
@@ -81,7 +86,7 @@ ENVOY_DOCKER_PULL=true ./ci/run_envoy_docker.sh <build_script_args>
 An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
 
 ```bash
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+./ci/run_envoy_docker.sh './ci/do_ci.sh dev'
 ```
 
 The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
@@ -89,22 +94,29 @@ can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
 generate the binary in `~/build/envoy/source/exe/envoy-fastbuild` you can run:
 
 ```bash
-ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh dev'
 ```
 
 For a release version of the Envoy binary you can run:
 
 ```bash
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release.server_only'
+./ci/run_envoy_docker.sh './ci/do_ci.sh release.server_only'
 ```
 
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
+To enable the previous behavior of the `release.server_only` target where the final binary was copied to a tar.gz file
+(e.g. envoy-binary.tar.gz), you can run:
+
+  ```bash
+  ./ci/run_envoy_docker.sh './ci/do_ci.sh release.server_only.binary
+  ```
+
 For a debug version of the Envoy binary you can run:
 
 ```bash
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.debug.server_only'
+./ci/run_envoy_docker.sh './ci/do_ci.sh debug.server_only'
 ```
 
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
@@ -114,38 +126,39 @@ To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main
 the BAZEL_BUILD_EXTRA_OPTIONS environment variable
 
 ```bash
-./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_cache=http://127.0.0.1:28080' ./ci/do_ci.sh bazel.release"
+./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_cache=http://127.0.0.1:28080' ./ci/do_ci.sh release"
 ```
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
-* `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang.
-* `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
-* `bazel.asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-asan` with clang.
-* `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
-* `bazel.debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
-* `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
-* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
-* `bazel.dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
-* `bazel.dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
-* `bazel.dev.contrib <test>` &mdash; build Envoy static binary with contrib and run a specified test or test dir under `-c fastbuild` with clang.
-* `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
-* `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with clang.
-* `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with clang.
-* `bazel.sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
-* `bazel.sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
-* `bazel.sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
-* `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
-* `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
-* `bazel.msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
-* `bazel.msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
-* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
-* `bazel.tsan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-tsan` with clang.
-* `bazel.fuzz` &mdash; build and run fuzz tests under `-c dbg --config=asan-fuzzer` with clang.
-* `bazel.fuzz <test>` &mdash; build and run a specified fuzz test or test dir under `-c dbg --config=asan-fuzzer` with clang. If specifying a single fuzz test, must use the full target name with "_with_libfuzzer" for `<test>`.
-* `bazel.compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
-* `bazel.compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
-* `bazel.clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
+* `api` &mdash; build and run API tests under `-c fastbuild` with clang.
+* `asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
+* `asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-asan` with clang.
+* `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
+* `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
+* `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
+* `docker` &mdash; build Docker images, expects `release` or `release.server_only` to have been run furst.
+* `dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
+* `dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
+* `dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
+* `dev.contrib <test>` &mdash; build Envoy static binary with contrib and run a specified test or test dir under `-c fastbuild` with clang.
+* `release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
+* `release <test>` &mdash; build Envoy static binaries and run a specified test or test dir under `-c opt` with clang.
+* `release.server_only` &mdash; build Envoy static binaries under `-c opt` with clang.
+* `sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
+* `sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
+* `sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
+* `coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
+* `msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
+* `msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
+* `tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
+* `tsan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-tsan` with clang.
+* `fuzz` &mdash; build and run fuzz tests under `-c dbg --config=asan-fuzzer` with clang.
+* `fuzz <test>` &mdash; build and run a specified fuzz test or test dir under `-c dbg --config=asan-fuzzer` with clang. If specifying a single fuzz test, must use the full target name with "_with_libfuzzer" for `<test>`.
+* `compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
+* `compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
+* `clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
 * `check_proto_format`&mdash; check configuration, formatting and build issues in API proto files.
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
 * `format`&mdash; run validation, linting and formatting tools.

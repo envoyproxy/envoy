@@ -202,11 +202,15 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "make_elements_helper_lib",
+    hdrs = ["make_elements_helper.h"],
+)
+
 envoy_cc_benchmark_binary(
     name = "symbol_table_benchmark",
     srcs = [
         "make_elements_helper.cc",
-        "make_elements_helper.h",
         "symbol_table_speed_test.cc",
     ],
     external_deps = [
@@ -214,6 +218,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
+        ":make_elements_helper_lib",
         ":stat_test_utility_lib",
         "//source/common/common:hash_lib",
         "//source/common/memory:stats_lib",

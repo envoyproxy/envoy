@@ -77,7 +77,7 @@ TEST(FetchRecordConverterImpl, shouldProcessRecords) {
   const auto ptr = reinterpret_cast<const uint32_t*>(data->data() + record_count_offset);
   const uint32_t record_count = be32toh(*ptr);
   ASSERT_EQ(record_count, 3);
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // Here we check whether our manual implementation really works.
 // https://github.com/apache/kafka/blob/3.3.2/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java

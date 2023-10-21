@@ -2704,6 +2704,20 @@ virtual_hosts:
               config.route(headers, 0)->routeEntry()->clusterName());
   }
 
+  { // Repeated parameter - match should only track the first, and match
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("example.com", "/?debug3=foo&debug3=bar", "GET");
+    EXPECT_EQ("local_service_with_string_match_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  { // Repeated parameter - match should only track the first, and not match
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("example.com", "/?debug3=bar&debug3=foo", "GET");
+    EXPECT_EQ("local_service_without_query_parameters",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("example.com", "/?debug=2", "GET");
     EXPECT_EQ("local_service_with_valueless_query_parameter",
@@ -3191,10 +3205,19 @@ TEST_F(RouterMatcherHashPolicyTest, HashQueryParameters) {
                                                                  nullptr));
   }
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo?param=xyz", "GET");
-    Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
-                                                                nullptr));
+    Http::TestRequestHeaderMapImpl headers1 = genHeaders("www.lyft.com", "/foo?param=xyz", "GET");
+    Router::RouteConstSharedPtr route1 = config().route(headers1, 0);
+    auto val1 = route1->routeEntry()->hashPolicy()->generateHash(nullptr, headers1, add_cookie_nop_,
+                                                                 nullptr);
+    EXPECT_TRUE(val1);
+
+    // Only the first appearance of the query parameter should be considered
+    Http::TestRequestHeaderMapImpl headers2 =
+        genHeaders("www.lyft.com", "/foo?param=xyz&param=qwer", "GET");
+    Router::RouteConstSharedPtr route2 = config().route(headers2, 0);
+    auto val2 = route1->routeEntry()->hashPolicy()->generateHash(nullptr, headers2, add_cookie_nop_,
+                                                                 nullptr);
+    EXPECT_EQ(val1, val2);
   }
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar?param=xyz", "GET");
@@ -3372,13 +3395,13 @@ TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
   EXPECT_NE(hash_1, hash_2);
 }
 
-TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
+// Verify that invalid enums (which are now fatal) don't pass early config
+// validate checks.
+TEST_F(RouterMatcherHashPolicyTest, InvalidHashPoliciesInvalid) {
   {
-    auto hash_policy = firstRouteHashPolicy();
-    EXPECT_EQ(envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
-                  POLICY_SPECIFIER_NOT_SET,
-              hash_policy->policy_specifier_case());
-    EXPECT_THROW(config(), EnvoyException);
+    auto* hash_policy = firstRouteHashPolicy();
+    EXPECT_THROW(MessageUtil::validate(*hash_policy, ProtobufMessage::getStrictValidationVisitor()),
+                 EnvoyException);
   }
   {
     auto route = route_config_.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
@@ -3388,7 +3411,8 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
     EXPECT_EQ(envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
                   POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
-    EXPECT_THROW(config(), EnvoyException);
+    EXPECT_THROW(MessageUtil::validate(*route, ProtobufMessage::getStrictValidationVisitor()),
+                 EnvoyException);
   }
 }
 
@@ -6670,6 +6694,8 @@ TEST(NullConfigImplTest, All) {
   EXPECT_FALSE(config.usesVhds());
   EXPECT_FALSE(config.mostSpecificHeaderMutationsWins());
   EXPECT_EQ(0Ul, config.maxDirectResponseBodySizeBytes());
+  config.metadata();
+  config.typedMetadata();
 }
 
 class BadHttpRouteConfigurationsTest : public testing::Test, public ConfigImplTestBase {};
@@ -7547,7 +7573,7 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
   EXPECT_THROW_WITH_MESSAGE(
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
-      EnvoyException, "response body file missing_file does not exist");
+      EnvoyException, "file missing_file does not exist");
 
   // The default max body size in bytes is 4096 (MaxResponseBodySizeBytes).
   const std::string body(MaxResponseBodySizeBytes + 1, '*');
@@ -7560,7 +7586,7 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   // Change the max body size to 2048 (MaxResponseBodySizeBytes/2) bytes.
   auto filename = TestEnvironment::writeStringToFileForTest("body", body);
   route.mutable_direct_response()->mutable_body()->set_filename(filename);
-  expected_message = "response body file " + filename + " size is 4097 bytes; maximum is 2048";
+  expected_message = "file " + filename + " size is 4097 bytes; maximum is 2048";
   EXPECT_THROW_WITH_MESSAGE(
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2),
       EnvoyException, expected_message);
@@ -7572,6 +7598,26 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
   route.mutable_direct_response()->mutable_body()->set_filename(EMPTY_STRING);
   route.mutable_direct_response()->mutable_body()->set_inline_bytes(body);
+  EXPECT_EQ(
+      MaxResponseBodySizeBytes + 1,
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
+}
+
+TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithEnv) {
+  constexpr uint64_t MaxResponseBodySizeBytes = 4096;
+  envoy::config::route::v3::Route route;
+
+  const std::string body(MaxResponseBodySizeBytes + 1, '*');
+  TestEnvironment::setEnvVar("ResponseBodyContents", body, 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ResponseBodyContents"); });
+
+  route.mutable_direct_response()->mutable_body()->set_environment_variable("ResponseBodyContents");
+
+  std::string expected_message("response body size is 4097 bytes; maximum is 4096");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
+      EnvoyException, expected_message);
   EXPECT_EQ(
       MaxResponseBodySizeBytes + 1,
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
@@ -7674,9 +7720,11 @@ virtual_hosts:
 TEST_F(RouteConfigurationV2, RouteConfigGetters) {
   const std::string yaml = R"EOF(
 name: foo
+metadata: { filter_metadata: { com.bar.foo: { baz: test_config_value }, baz: {name: config_bluh} } }
 virtual_hosts:
   - name: bar
     domains: ["*"]
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_vh_value }, baz: {name: vh_bluh} } }
     routes:
       - match:
           safe_regex:
@@ -7716,6 +7764,26 @@ virtual_hosts:
 
   EXPECT_EQ("bar", symbol_table_->toString(route_entry->virtualHost().statName()));
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
+
+  // Get metadata of virtual host.
+  const auto& vh_metadata = route_entry->virtualHost().metadata();
+  const auto& vh_typed_metadata = route_entry->virtualHost().typedMetadata();
+
+  EXPECT_EQ(
+      "test_vh_value",
+      Envoy::Config::Metadata::metadataValue(&vh_metadata, "com.bar.foo", "baz").string_value());
+  EXPECT_NE(nullptr, vh_typed_metadata.get<Baz>(baz_factory.name()));
+  EXPECT_EQ("vh_bluh", vh_typed_metadata.get<Baz>(baz_factory.name())->name);
+
+  // Get metadata of route configuration.
+  const auto& config_metadata = route_entry->virtualHost().routeConfig().metadata();
+  const auto& config_typed_metadata = route_entry->virtualHost().routeConfig().typedMetadata();
+
+  EXPECT_EQ("test_config_value",
+            Envoy::Config::Metadata::metadataValue(&config_metadata, "com.bar.foo", "baz")
+                .string_value());
+  EXPECT_NE(nullptr, config_typed_metadata.get<Baz>(baz_factory.name()));
+  EXPECT_EQ("config_bluh", config_typed_metadata.get<Baz>(baz_factory.name())->name);
 }
 
 TEST_F(RouteConfigurationV2, RouteTracingConfig) {
@@ -9355,7 +9423,6 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, PatternMatchRewriteSimple) {
-
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: path_pattern
@@ -9385,6 +9452,145 @@ virtual_hosts:
   EXPECT_EQ("/rest/two/one", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/rest/two/one", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchRewriteDoubleEqual) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/one/two/{code=*}/{loc=*}/{curr=*}/{tri=**}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{code}/{loc}/{curr}/{tri}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/one/two/en/gb/ilp==/dGasdA/?key1=test1&key2=test2", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/en/gb/ilp==/dGasdA/?key1=test1&key2=test2",
+            route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/en/gb/ilp==/dGasdA/?key1=test1&key2=test2", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchRewriteTripleEqualVariable) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/one/{two}/{code===na/*}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{code}/{two}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/one/two/==na/three", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/==na/three/two", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/==na/three/two", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchRewriteDoubleEqualVariable) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/one/{two}/{code==na/*}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{code}/{two}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/one/two/=na/three", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/=na/three/two", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/=na/three/two", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchRewriteDoubleEqualInWildcard) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/one/two/{code=*}/{loc=*}/{curr=*}/{tri=**}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{code}/{loc}/{curr}/{tri}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/one/two/en/gb/ilp/dGasdA==/?key1=test1&key2=test2", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/en/gb/ilp/dGasdA==/?key1=test1&key2=test2",
+            route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/en/gb/ilp/dGasdA==/?key1=test1&key2=test2", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 
@@ -9463,44 +9669,6 @@ virtual_hosts:
   EXPECT_EQ("/one?one=0&two=1&three=2&four=3&go=ls", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/one?one=0&two=1&three=2&four=3&go=ls", headers.get_(Http::Headers::get().Path));
-  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
-}
-
-TEST_F(RouteMatcherTest,
-       DEPRECATED_FEATURE_TEST(PatternMatchWildcardFilenameQueryParametersTruncated)) {
-
-  mergeValues({{"envoy.reloadable_features.append_query_parameters_path_rewriter", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: path_pattern
-    domains: ["*"]
-    routes:
-      - match:
-          path_match_policy:
-            name: envoy.path.match.uri_template.uri_template_matcher
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-              path_template: "/api/cart/item/{one}/**.m3u8"
-          case_sensitive: false
-        route:
-          cluster: "path-pattern-cluster-one"
-          path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.uri_template_rewriter
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
-              path_template_rewrite: "/{one}"
-  )EOF";
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  Http::TestRequestHeaderMapImpl headers = genHeaders(
-      "path.prefix.com", "/api/cart/item/one/song.m3u8?one=0&two=1&three=2&four=3&go=ls", "GET");
-  const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ("/one", route->currentUrlPathAfterRewrite(headers));
-  route->finalizeRequestHeaders(headers, stream_info, true);
-  EXPECT_EQ("/one", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 
@@ -9761,35 +9929,6 @@ virtual_hosts:
       EnvoyException,
       "mismatch between variables in path_match_policy /rest/{one}/{two} and path_rewrite_policy "
       "/rest/{one}/{two}/{missing}");
-}
-
-TEST_F(RouteMatcherTest, PatternMatchInvalidVariableName) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: path_pattern
-    domains: ["*"]
-    routes:
-      - match:
-          path_match_policy:
-            name: envoy.path.match.uri_template.uri_template_matcher
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-              path_template: "/rest/{on==e}/{two}"
-          case_sensitive: false
-        route:
-          cluster: "path-pattern-cluster-one"
-          path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.uri_template_rewriter
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
-              path_template_rewrite: "/rest/{one}/{two}/{missing}"
-  )EOF";
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
-
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "path_match_policy.path_template /rest/{on==e}/{two} is invalid");
 }
 
 TEST_F(RouteMatcherTest, PatternMatchWildcardMiddleThreePartVariableNamed) {
@@ -10801,19 +10940,20 @@ virtual_hosts:
   const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
-  EXPECT_FALSE(route1->filterDisabled("test.filter"));
+  EXPECT_FALSE(route1->filterDisabled("test.filter").value());
+  EXPECT_EQ(route1->filterDisabled("unknown.filter"), absl::nullopt);
 
   const auto route2 = config.route(genHeaders("host1", "/route2", "GET"), 0);
-  EXPECT_TRUE(route2->filterDisabled("test.filter"));
+  EXPECT_TRUE(route2->filterDisabled("test.filter").value());
 
   const auto route3 = config.route(genHeaders("host2", "/route3", "GET"), 0);
-  EXPECT_TRUE(route3->filterDisabled("test.filter"));
+  EXPECT_TRUE(route3->filterDisabled("test.filter").value());
 
   const auto route4 = config.route(genHeaders("host2", "/route4", "GET"), 0);
-  EXPECT_FALSE(route4->filterDisabled("test.filter"));
+  EXPECT_FALSE(route4->filterDisabled("test.filter").value());
 
   const auto route5 = config.route(genHeaders("host3", "/route5", "GET"), 0);
-  EXPECT_TRUE(route5->filterDisabled("test.filter"));
+  EXPECT_TRUE(route5->filterDisabled("test.filter").value());
 }
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};

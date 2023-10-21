@@ -43,7 +43,7 @@ public:
 private:
   Thread::MutexBasicLockable mutex_;
   TokenBucketImpl impl_ ABSL_GUARDED_BY(mutex_);
-  bool reset_once_ ABSL_GUARDED_BY(mutex_);
+  bool reset_once_ ABSL_GUARDED_BY(mutex_){false};
   mutable Thread::ThreadSynchronizer synchronizer_; // Used only for testing.
   friend class SharedTokenBucketImplTest;
 };

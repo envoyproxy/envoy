@@ -1,4 +1,3 @@
-#include "grpc_trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 
 #include "source/common/common/logger.h"

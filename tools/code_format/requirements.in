@@ -1,4 +1,0 @@
-flake8
-pep8-naming
-pyflakes==2.4.0
-yapf

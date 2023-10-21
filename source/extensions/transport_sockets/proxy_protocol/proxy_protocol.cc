@@ -21,7 +21,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
-UpstreamProxyProtocolStats GenerateUpstreamProxyProtocolStats(Stats::Scope& stats_scope) {
+UpstreamProxyProtocolStats generateUpstreamProxyProtocolStats(Stats::Scope& stats_scope) {
   const char prefix[]{"upstream.proxyprotocol."};
   return {ALL_PROXY_PROTOCOL_TRANSPORT_SOCKET_STATS(POOL_COUNTER_PREFIX(stats_scope, prefix))};
 }
@@ -31,7 +31,7 @@ UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig config,
     Stats::Scope& scope)
     : PassthroughSocket(std::move(transport_socket)), options_(options), version_(config.version()),
-      stats_(GenerateUpstreamProxyProtocolStats(scope)),
+      stats_(generateUpstreamProxyProtocolStats(scope)),
       pass_all_tlvs_(config.has_pass_through_tlvs() ? config.pass_through_tlvs().match_type() ==
                                                           ProxyProtocolPassThroughTLVs::INCLUDE_ALL
                                                     : false) {

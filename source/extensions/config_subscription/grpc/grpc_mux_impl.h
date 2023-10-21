@@ -94,6 +94,8 @@ private:
   void drainRequests();
   void setRetryTimer();
   void sendDiscoveryRequest(absl::string_view type_url);
+  // Clears the nonces of all subscribed types in this gRPC mux.
+  void clearNonce();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
@@ -263,7 +265,7 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
-  bool first_stream_request_;
+  bool first_stream_request_{true};
 
   // Helper function for looking up and potentially allocating a new ApiState.
   ApiState& apiStateFor(absl::string_view type_url);

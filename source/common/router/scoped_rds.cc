@@ -103,11 +103,13 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
         MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             *config_proto, factory_context.messageValidationContext().staticValidationVisitor());
     if (!scoped_route_config.route_configuration_name().empty()) {
-      throw EnvoyException("Fetching routes via RDS (route_configuration_name) is not supported "
-                           "with inline scoped routes.");
+      throwEnvoyExceptionOrPanic(
+          "Fetching routes via RDS (route_configuration_name) is not supported "
+          "with inline scoped routes.");
     }
     if (!scoped_route_config.has_route_configuration()) {
-      throw EnvoyException("You must specify a route_configuration with inline scoped routes.");
+      throwEnvoyExceptionOrPanic(
+          "You must specify a route_configuration with inline scoped routes.");
     }
     RouteConfigProviderPtr route_config_provider =
         config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
@@ -430,8 +432,8 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   if (!status_or_applied.status().ok()) {
     return status_or_applied.status();
   }
-  bool any_applied = status_or_applied.value();
-  auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
+  const bool any_applied = status_or_applied.value();
+  const auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
   if (!status.ok()) {
     return status;
   }

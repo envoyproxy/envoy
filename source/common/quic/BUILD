@@ -143,16 +143,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_server_push_utils_for_envoy_lib",
-    srcs = ["spdy_server_push_utils_for_envoy.cc"],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "@com_github_google_quiche//:quic_core_http_spdy_server_push_utils_header",
-    ],
-)
-
-envoy_cc_library(
     name = "envoy_quic_stream_lib",
     hdrs = ["envoy_quic_stream.h"],
     tags = ["nofips"],
@@ -336,7 +326,6 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         "//envoy/network:connection_interface",
-        "//source/common/network:listen_socket_lib",
     ],
 )
 
@@ -349,6 +338,7 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_network_connection_lib",
         "//source/common/network:generic_listener_filter_impl_base_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
     ],
@@ -434,7 +424,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
-        "//source/common/network:listen_socket_lib",
+        "//source/common/network:connection_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "@com_github_google_quiche//:quic_core_config_lib",

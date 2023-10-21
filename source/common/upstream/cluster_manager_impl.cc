@@ -413,7 +413,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       }
       auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
       if (!factory) {
-        throw EnvoyException(fmt::format("{} not found", name));
+        throwEnvoyExceptionOrPanic(fmt::format("{} not found", name));
       }
       ads_mux_ = factory->create(
           Config::Utility::factoryForGrpcApiConfigSource(
@@ -434,7 +434,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
       auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
       if (!factory) {
-        throw EnvoyException(fmt::format("{} not found", name));
+        throwEnvoyExceptionOrPanic(fmt::format("{} not found", name));
       }
       ads_mux_ = factory->create(
           Config::Utility::factoryForGrpcApiConfigSource(
@@ -465,7 +465,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (local_cluster_name_) {
     auto local_cluster = active_clusters_.find(local_cluster_name_.value());
     if (local_cluster == active_clusters_.end()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("local cluster '{}' must be defined", local_cluster_name_.value()));
     }
     local_cluster_params.emplace();
@@ -854,7 +854,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
           factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
 
   if (!new_cluster_pair_or_error.ok()) {
-    throw EnvoyException(std::string(new_cluster_pair_or_error.status().message()));
+    throwEnvoyExceptionOrPanic(std::string(new_cluster_pair_or_error.status().message()));
   }
   auto& new_cluster = new_cluster_pair_or_error->first;
   auto& lb = new_cluster_pair_or_error->second;
@@ -864,7 +864,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
 
   if (!added_via_api) {
     if (cluster_map.find(cluster_info->name()) != cluster_map.end()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("cluster manager: duplicate cluster '{}'", cluster_info->name()));
     }
   }
@@ -880,12 +880,13 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   }
 
   if (cluster_provided_lb && lb == nullptr) {
-    throw EnvoyException(fmt::format("cluster manager: cluster provided LB specified but cluster "
-                                     "'{}' did not provide one. Check cluster documentation.",
-                                     cluster_info->name()));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("cluster manager: cluster provided LB specified but cluster "
+                    "'{}' did not provide one. Check cluster documentation.",
+                    cluster_info->name()));
   }
   if (!cluster_provided_lb && lb != nullptr) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("cluster manager: cluster provided LB not specified but cluster "
                     "'{}' provided one. Check cluster documentation.",
                     cluster_info->name()));
@@ -1096,10 +1097,10 @@ void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicat
 void ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
   const auto& it = active_clusters_.find(cluster);
   if (it == active_clusters_.end()) {
-    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+    throwEnvoyExceptionOrPanic(fmt::format("Unknown gRPC client cluster '{}'", cluster));
   }
   if (it->second->added_via_api_) {
-    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster));
+    throwEnvoyExceptionOrPanic(fmt::format("gRPC client cluster '{}' is not static", cluster));
   }
 }
 
@@ -1274,15 +1275,20 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
   auto entry = cluster_initialization_map_.find(cluster_name);
   // TODO(kbaichoo): if EDS can be configured via cluster_type() then modify the
   // merging logic below.
-  // We should only merge if the cluster type is the same as before and this is
-  // an EDS cluster. This is due to the fact that EDS clusters get
-  // ClusterLoadAssignment from the configuration server but pass per priority
-  // deltas in updates to the ClusterManager. In the future we may decide to
-  // change how the updates propagate among those components.
+  //
+  // This method may be called multiple times to create multiple ClusterInitializationObject
+  // instances for the same cluster. And before the thread local clusters are actually initialized,
+  // the new instances will override the old instances in the work threads. But part of data is be
+  // created only once, such as load balancer factory. So we should always to merge the new instance
+  // with the old one to keep the latest instance have all necessary data.
+  //
+  // More specifically, this will happen in the following scenarios for now:
+  // 1. EDS clusters: the ClusterLoadAssignment of EDS cluster may be updated multiples before
+  //   the thread local cluster is initialized.
+  // 2. Clusters in the unit tests: the cluster in the unit test may be updated multiples before
+  //   the thread local cluster is initialized by calling 'updateHosts' manually.
   const bool should_merge_with_prior_cluster =
-      entry != cluster_initialization_map_.end() &&
-      entry->second->cluster_info_->type() == cluster_info->type() &&
-      cluster_info->type() == envoy::config::cluster::v3::Cluster::EDS;
+      entry != cluster_initialization_map_.end() && entry->second->cluster_info_ == cluster_info;
 
   if (should_merge_with_prior_cluster) {
     // We need to copy from an existing Cluster Initialization Object. In
@@ -1355,9 +1361,6 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
       load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map) {
 
-  ASSERT(cluster_info_->type() == envoy::config::cluster::v3::Cluster::EDS,
-         fmt::format("Using merge constructor on possible non-mergable cluster of type {}",
-                     cluster_info_->type()));
   // Because EDS Clusters receive the entire ClusterLoadAssignment but only
   // provides the delta we must process the hosts_added and hosts_removed and
   // not simply overwrite with hosts added.

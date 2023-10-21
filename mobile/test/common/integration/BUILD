@@ -22,6 +22,12 @@ envoy_cc_test(
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
+        "@envoy//source/common/quic:active_quic_listener_lib",
+        "@envoy//source/common/quic:client_connection_factory_lib",
+        "@envoy//source/common/quic:quic_server_factory_lib",
+        "@envoy//source/common/quic:quic_transport_socket_factory_lib",
+        "@envoy//source/common/quic:udp_gso_batch_writer_lib",
+        "@envoy//source/extensions/udp_packet_writer/gso:config",
     ],
 )
 
@@ -157,6 +163,32 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "@envoy//source/exe:process_wide_lib",
+        "@envoy//test/integration:autonomous_upstream_lib",
+        "@envoy//test/integration:utility_lib",
+        "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
+        "@envoy//test/test_common:environment_lib",
+        "@envoy_build_config//:extension_registry",
+    ] + envoy_select_signal_trace(
+        ["@envoy//source/common/signal:sigaction_lib"],
+        "@envoy",
+    ),
+)
+
+envoy_cc_test_library(
+    name = "xds_test_server_interface_lib",
+    srcs = [
+        "xds_test_server.cc",
+        "xds_test_server_interface.cc",
+    ],
+    hdrs = [
+        "xds_test_server.h",
+        "xds_test_server_interface.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":base_client_integration_test_lib",
+        "@envoy//source/common/grpc:google_grpc_creds_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",

@@ -21,7 +21,6 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -197,6 +196,10 @@ public:
       clusters.emplace(cluster.first, *cluster.second->cluster_);
     }
     return clusters;
+  }
+
+  const ClusterInitializationMap& clusterInitializationMap() const {
+    return cluster_initialization_map_;
   }
 
   OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {

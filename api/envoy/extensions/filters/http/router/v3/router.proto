@@ -8,6 +8,7 @@ import "envoy/extensions/filters/network/http_connection_manager/v3/http_connect
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -52,7 +53,13 @@ message Router {
   // useful in scenarios where other filters (auth, ratelimit, etc.) make
   // outbound calls and have child spans rooted at the same ingress
   // parent. Defaults to false.
-  bool start_child_span = 2;
+  //
+  // .. attention::
+  //   This field is deprecated by the
+  //   :ref:`spawn_upstream_span <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
+  //   Please use that ``spawn_upstream_span`` field to control the span creation.
+  bool start_child_span = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configuration for HTTP upstream logs emitted by the router. Upstream logs
   // are configured in the same way as access logs, but each log entry represents

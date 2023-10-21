@@ -56,10 +56,9 @@ ValidationInstance::ValidationInstance(
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
-      mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
-      time_system_(time_system), server_contexts_(*this),
-      quic_stat_names_(stats_store_.symbolTable()) {
+      grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
+      router_context_(stats_store_.symbolTable()), time_system_(time_system),
+      server_contexts_(*this), quic_stat_names_(stats_store_.symbolTable()) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
@@ -117,6 +116,11 @@ void ValidationInstance::initialize(const Options& options,
   thread_local_.registerThread(*dispatcher_, true);
 
   runtime_ = component_factory.createRuntime(*this, initial_config);
+  ENVOY_BUG(runtime_ != nullptr,
+            "Component factory should not return nullptr from createRuntime()");
+  drain_manager_ = component_factory.createDrainManager(*this);
+  ENVOY_BUG(drain_manager_ != nullptr,
+            "Component factory should not return nullptr from createDrainManager()");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());

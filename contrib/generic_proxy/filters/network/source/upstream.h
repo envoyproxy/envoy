@@ -21,7 +21,8 @@ public:
 
   void newConnection() { tcp_pool_handle_ = tcp_pool_data_.newConnection(*this); }
 
-  void cleanUp(bool close_connection);
+  void initialize();
+  virtual void cleanUp(bool close_connection);
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason, absl::string_view,
@@ -48,6 +49,9 @@ protected:
   ResponseDecoderPtr response_decoder_;
 
   bool is_cleaned_up_{};
+  // Whether the upstream connection is created. This will be set to true when the initialize()
+  // is called.
+  bool initialized_{};
 
   Tcp::ConnectionPool::Cancellable* tcp_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr owned_conn_data_;

@@ -25,7 +25,6 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::HasSubstr;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;

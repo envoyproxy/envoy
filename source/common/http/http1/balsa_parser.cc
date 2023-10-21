@@ -5,9 +5,9 @@
 #include <cstdint>
 
 #include "source/common/common/assert.h"
-#include "source/common/common/regex.h"
 #include "source/common/http/headers.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -22,6 +22,7 @@ using ::quiche::BalsaHeaders;
 constexpr absl::string_view kColonSlashSlash = "://";
 // Response must start with "HTTP".
 constexpr char kResponseFirstByte = 'H';
+constexpr absl::string_view kHttpVersionPrefix = "HTTP/";
 
 // Allowed characters for field names according to Section 5.1
 // and for methods according to Section 9.1 of RFC 9110:
@@ -120,19 +121,21 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
          std::all_of(path_query.begin(), path_query.end(), is_valid_path_query_char);
 }
 
+// Returns true if `version_input` is a valid HTTP version string as defined at
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3, or empty (for HTTP/0.9).
 bool isVersionValid(absl::string_view version_input) {
-  // HTTP-version is defined at
-  // https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3. HTTP/0.9 requests
-  // have no http-version, so empty `version_input` is also accepted.
+  if (version_input.empty()) {
+    return true;
+  }
 
-  static const auto regex = [] {
-    envoy::type::matcher::v3::RegexMatcher matcher;
-    *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
-    matcher.set_regex("|HTTP/[0-9]\\.[0-9]");
-    return Regex::Utility::parseRegex(matcher);
-  }();
+  if (!absl::StartsWith(version_input, kHttpVersionPrefix)) {
+    return false;
+  }
+  version_input.remove_prefix(kHttpVersionPrefix.size());
 
-  return regex->match(version_input);
+  // Version number is in the form of "[0-9].[0-9]".
+  return version_input.size() == 3 && absl::ascii_isdigit(version_input[0]) &&
+         version_input[1] == '.' && absl::ascii_isdigit(version_input[2]);
 }
 
 bool isHeaderNameValid(absl::string_view name) {

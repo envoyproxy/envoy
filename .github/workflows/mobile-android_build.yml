@@ -19,7 +19,6 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
 
   androidbuild:
     if: ${{ needs.env.outputs.mobile_android_build == 'true' }}
@@ -63,9 +62,9 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
+    - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
-        java-version: '8'
+        java-version: '11'
         java-package: jdk
         architecture: x64
         distribution: zulu
@@ -76,7 +75,7 @@ jobs:
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 15
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -116,9 +115,9 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
+    - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
-        java-version: '8'
+        java-version: '11'
         java-package: jdk
         architecture: x64
         distribution: zulu
@@ -129,7 +128,7 @@ jobs:
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 15
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -169,9 +168,9 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
+    - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
-        java-version: '8'
+        java-version: '11'
         java-package: jdk
         architecture: x64
         distribution: zulu
@@ -182,7 +181,7 @@ jobs:
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 15
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:
@@ -222,9 +221,9 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
+    - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
-        java-version: '8'
+        java-version: '11'
         java-package: jdk
         architecture: x64
         distribution: zulu
@@ -235,7 +234,7 @@ jobs:
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 15
         max_attempts: 3
         command: ./mobile/ci/start_android_emulator.sh
     # Return to using:

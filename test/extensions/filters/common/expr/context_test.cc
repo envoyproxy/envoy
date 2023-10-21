@@ -794,7 +794,7 @@ TEST(Context, FilterStateAttributes) {
   const std::string ip_string = "ip";
   const std::string port_string = "port";
   filter_state.setData(address_key,
-                       std::make_unique<Network::DestinationAddress>(
+                       std::make_unique<Network::AddressObject>(
                            std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
                        StreamInfo::FilterState::StateType::ReadOnly);
   {

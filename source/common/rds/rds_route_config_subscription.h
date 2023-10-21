@@ -72,8 +72,6 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
 
-  bool validateUpdateSize(int num_resources);
-
   virtual void beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
                                     std::unique_ptr<Cleanup>&) {}
   virtual void afterProviderUpdate() {}
@@ -98,7 +96,7 @@ protected:
   RdsStats stats_;
   RouteConfigProviderManager& route_config_provider_manager_;
   const uint64_t manager_identifier_;
-  RouteConfigProvider* route_config_provider_;
+  RouteConfigProvider* route_config_provider_{nullptr};
   RouteConfigUpdatePtr config_update_info_;
   Envoy::Config::OpaqueResourceDecoderSharedPtr resource_decoder_;
 };

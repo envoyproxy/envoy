@@ -82,10 +82,10 @@ InstanceImpl::InstanceImpl(
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
     Buffer::WatermarkFactorySharedPtr watermark_factory)
-    : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
-      options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             options.ignoreUnknownDynamicFields()),
+    : init_manager_(init_manager), live_(false), options_(options),
+      validation_context_(options_.allowUnknownStaticFields(),
+                          !options.rejectUnknownDynamicFields(),
+                          options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
@@ -98,7 +98,6 @@ InstanceImpl::InstanceImpl(
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
-      terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
@@ -340,8 +339,8 @@ void registerCustomInlineHeadersFromBootstrap(
   for (const auto& inline_header : bootstrap.inline_headers()) {
     const Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
     if (!canBeRegisteredAsInlineHeader(lower_case_name)) {
-      throw EnvoyException(fmt::format("Header {} cannot be registered as an inline header.",
-                                       inline_header.inline_header_name()));
+      throwEnvoyExceptionOrPanic(fmt::format("Header {} cannot be registered as an inline header.",
+                                             inline_header.inline_header_name()));
     }
     switch (inline_header.inline_header_type()) {
     case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_HEADER:
@@ -378,8 +377,9 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
   // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
-    throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
-                         "should be non-empty");
+    throwEnvoyExceptionOrPanic(
+        "At least one of --config-path or --config-yaml or Options::configProto() "
+        "should be non-empty");
   }
 
   if (!config_path.empty()) {
@@ -387,7 +387,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
 #else
     if (!config_path.empty()) {
-      throw EnvoyException("Cannot load from file with YAML disabled\n");
+      throwEnvoyExceptionOrPanic("Cannot load from file with YAML disabled\n");
     }
     UNREFERENCED_PARAMETER(api);
 #endif
@@ -399,7 +399,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
 #else
-    throw EnvoyException("Cannot load from YAML with YAML disabled\n");
+    throwEnvoyExceptionOrPanic("Cannot load from YAML with YAML disabled\n");
 #endif
   }
   if (config_proto.ByteSizeLong() != 0) {
@@ -450,7 +450,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   tracing_session_ = perfetto::Tracing::NewTrace();
   tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
   if (tracing_fd_ == -1) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
   }
   // Configure the tracing session.
@@ -517,7 +517,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     version_int = bootstrap_.stats_server_version_override().value();
   } else {
     if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+      throwEnvoyExceptionOrPanic("compiled GIT SHA is invalid. Invalid build.");
     }
   }
   server_stats_->version_.set(version_int);
@@ -692,7 +692,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   if (initial_config.admin().address()) {
     if (!admin_) {
-      throw EnvoyException("Admin address configured but admin support compiled out");
+      throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
     }
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
                               initial_config.admin().address(),
@@ -803,12 +803,12 @@ void InstanceImpl::onRuntimeReady() {
     });
   }
 
-  // If there is no global limit to the number of active connections, warn on startup.
-  // TODO (tonya11en): Move this functionality into the overload manager.
-  if (!runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
+  // TODO (nezdolik): Fully deprecate this runtime key in the next release.
+  if (runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
-              "there is no configured limit to the number of allowed active connections. Set a "
-              "limit via the runtime key {}",
+              "Usage of the deprecated runtime key {}, consider switching to "
+              "`envoy.resource_monitors.downstream_connections` instead."
+              "This runtime key will be removed in future.",
               Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
@@ -893,6 +893,14 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+
+  // If there is no global limit to the number of active connections, warn on startup.
+  if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
+    ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
+                    "connections. Configure a "
+                    "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
+  }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that

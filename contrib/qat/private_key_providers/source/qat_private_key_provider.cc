@@ -310,6 +310,7 @@ QatPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
 }
 
 bool QatPrivateKeyMethodProvider::checkFips() { return false; }
+bool QatPrivateKeyMethodProvider::isAvailable() { return initialized_; }
 
 QatPrivateKeyConnection::QatPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb,
                                                  Event::Dispatcher& dispatcher, QatHandle& handle,
@@ -355,6 +356,10 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
 
   ASSERT(manager_);
 
+  if (!manager_->checkQatDevice()) {
+    return;
+  }
+
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 5));
 
@@ -370,13 +375,15 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
 
   if (EVP_PKEY_id(pkey.get()) != EVP_PKEY_RSA) {
     // TODO(ipuustin): add support also to ECDSA keys.
-    throw EnvoyException("Only RSA keys are supported.");
+    ENVOY_LOG(warn, "Only RSA keys are supported.");
+    return;
   }
   pkey_ = std::move(pkey);
 
   section_ = std::make_shared<QatSection>(libqat);
   if (!section_->startSection(api_, poll_delay)) {
-    throw EnvoyException("Failed to start QAT.");
+    ENVOY_LOG(warn, "Failed to start QAT.");
+    return;
   }
 
   method_ = std::make_shared<SSL_PRIVATE_KEY_METHOD>();
@@ -384,6 +391,7 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
   method_->decrypt = privateKeyDecrypt;
   method_->complete = privateKeyComplete;
 
+  initialized_ = true;
   ENVOY_LOG(info, "initialized QAT private key provider");
 }
 

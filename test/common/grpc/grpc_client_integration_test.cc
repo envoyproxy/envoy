@@ -36,8 +36,9 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
   // The check in this test is based on HTTP2 codec logic (i.e., including H2_FRAME_HEADER_SIZE).
   // Skip this test if default protocol of this integration test is no longer HTTP2.
-  if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2)
+  if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2) {
     return;
+  }
   initialize();
   auto stream = createStream(empty_metadata_);
 
@@ -109,8 +110,9 @@ TEST_P(GrpcClientIntegrationTest, MultiStreamWithBytesMeter) {
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
   // The check in this test is based on HTTP2 codec logic (i.e., including H2_FRAME_HEADER_SIZE).
   // Skip this test if default protocol of this integration test is no longer HTTP2.
-  if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2)
+  if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2) {
     return;
+  }
   initialize();
   auto stream_0 = createStream(empty_metadata_);
   auto stream_1 = createStream(empty_metadata_);

@@ -67,7 +67,7 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
-      target_xds_authority_(grpc_mux_context.target_xds_authority_), first_stream_request_(true),
+      target_xds_authority_(grpc_mux_context.target_xds_authority_),
       dispatcher_(grpc_mux_context.dispatcher_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
@@ -127,6 +127,15 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   // clear error_detail after the request is sent if it exists.
   if (apiStateFor(type_url).request_.has_error_detail()) {
     apiStateFor(type_url).request_.clear_error_detail();
+  }
+}
+
+void GrpcMuxImpl::clearNonce() {
+  // Iterate over all api_states (for each type_url), and clear its nonce.
+  for (auto& [type_url, api_state] : api_state_) {
+    if (api_state) {
+      api_state->request_.clear_response_nonce();
+    }
   }
 }
 
@@ -451,6 +460,7 @@ void GrpcMuxImpl::onWriteable() { drainRequests(); }
 void GrpcMuxImpl::onStreamEstablished() {
   first_stream_request_ = true;
   grpc_stream_.maybeUpdateQueueSizeStat(0);
+  clearNonce();
   request_queue_ = std::make_unique<std::queue<std::string>>();
   for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);

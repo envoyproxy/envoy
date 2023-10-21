@@ -463,6 +463,24 @@ public:
     notifyingStatsAllocator().waitForCounterExists(name);
   }
 
+  void waitForCounterNonexistent(const std::string& name,
+                                 std::chrono::milliseconds timeout) override {
+    Event::TestTimeSystem::RealTimeBound bound(timeout);
+    while (TestUtility::findCounter(statStore(), name) != nullptr) {
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+      ASSERT_FALSE(!bound.withinBound())
+          << "timed out waiting for counter " << name << " to not exist.";
+    }
+  }
+
+  void waitForProactiveOverloadResourceUsageEq(
+      const Server::OverloadProactiveResourceName resource_name, int64_t value,
+      Event::Dispatcher& dispatcher,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    ASSERT_TRUE(TestUtility::waitForProactiveOverloadResourceUsageEq(
+        overloadState(), resource_name, value, time_system_, dispatcher, timeout));
+  }
+
   // TODO(#17956): Add Gauge type to NotifyingAllocator and adopt it in this method.
   void waitForGaugeDestroyed(const std::string& name) override {
     ASSERT_TRUE(TestUtility::waitForGaugeDestroyed(statStore(), name, time_system_));
@@ -523,6 +541,7 @@ public:
   // Should not be called until createAndRunEnvoyServer() is called.
   virtual Server::Instance& server() PURE;
   virtual Stats::Store& statStore() PURE;
+  virtual Server::ThreadLocalOverloadState& overloadState() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
   virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
@@ -594,6 +613,11 @@ public:
     RELEASE_ASSERT(stat_store_ != nullptr, "");
     return *stat_store_;
   }
+  Server::ThreadLocalOverloadState& overloadState() override {
+    RELEASE_ASSERT(server_ != nullptr, "");
+    return server_->overloadManager().getThreadLocalOverloadState();
+  }
+
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
   Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() override {

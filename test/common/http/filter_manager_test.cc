@@ -610,6 +610,91 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTest, MetadataContinueAllFollowedByHeadersLocalReply) {
+  initialize();
+
+  std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
+
+  std::shared_ptr<MockStreamFilter> filter_2(new NiceMock<MockStreamFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto decoder_factory = createStreamFilterFactoryCb(filter_1);
+        manager.applyFilterFactoryCb({"filter1", "filter1"}, decoder_factory);
+        decoder_factory = createStreamFilterFactoryCb(filter_2);
+        manager.applyFilterFactoryCb({"filter2", "filter2"}, decoder_factory);
+        return true;
+      }));
+  filter_manager_->createFilterChain();
+
+  // Decode path:
+  EXPECT_CALL(*filter_1, decodeHeaders(_, _)).WillOnce(Return(FilterHeadersStatus::StopIteration));
+  RequestHeaderMapPtr basic_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*basic_headers)));
+
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*basic_headers, false);
+
+  EXPECT_CALL(*filter_1, decodeMetadata(_)).WillOnce(Return(FilterMetadataStatus::ContinueAll));
+  MetadataMap map1 = {{"a", "b"}};
+  MetadataMap map2 = {{"c", "d"}};
+  EXPECT_CALL(*filter_2, decodeHeaders(_, _)).WillOnce([&]() {
+    filter_2->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "bad_headers", nullptr,
+                                                 absl::nullopt, "bad_headers");
+    return FilterHeadersStatus::StopIteration;
+  });
+  // filter_2 should never decode metadata.
+  EXPECT_CALL(*filter_2, decodeMetadata(_)).Times(0);
+  filter_manager_->decodeMetadata(map1);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, MetadataContinueAllFollowedByHeadersLocalReplyRuntimeFlagOff) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.stop_decode_metadata_on_local_reply", "false"}});
+  initialize();
+
+  std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
+
+  std::shared_ptr<MockStreamFilter> filter_2(new NiceMock<MockStreamFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto decoder_factory = createStreamFilterFactoryCb(filter_1);
+        manager.applyFilterFactoryCb({"filter1", "filter1"}, decoder_factory);
+        decoder_factory = createStreamFilterFactoryCb(filter_2);
+        manager.applyFilterFactoryCb({"filter2", "filter2"}, decoder_factory);
+        return true;
+      }));
+  filter_manager_->createFilterChain();
+
+  // Decode path:
+  EXPECT_CALL(*filter_1, decodeHeaders(_, _)).WillOnce(Return(FilterHeadersStatus::StopIteration));
+  RequestHeaderMapPtr basic_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*basic_headers)));
+
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*basic_headers, false);
+
+  EXPECT_CALL(*filter_1, decodeMetadata(_)).WillOnce(Return(FilterMetadataStatus::ContinueAll));
+  MetadataMap map1 = {{"a", "b"}};
+  MetadataMap map2 = {{"c", "d"}};
+  EXPECT_CALL(*filter_2, decodeHeaders(_, _)).WillOnce([&]() {
+    filter_2->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "bad_headers", nullptr,
+                                                 absl::nullopt, "bad_headers");
+    return FilterHeadersStatus::StopIteration;
+  });
+  // filter_2 decodes metadata, even though the decoder filter chain has been aborted.
+  EXPECT_CALL(*filter_2, decodeMetadata(_));
+  filter_manager_->decodeMetadata(map1);
+  filter_manager_->destroyFilters();
+}
+
 TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
   initialize();
 
