@@ -44,26 +44,35 @@ get_new_date () {
        --arg dep "$DEP" \
        'if has($dep) then .[$dep].version = $new_version | .[$dep].urls |= map(gsub($existing_version; $new_version)) else . end' \
        "$DEP_DATA" > "$tmpfile"
-    # cat "$tmpfile" >&2
     output="$(\
       "$DEP_CHECK" \
         --repository_locations="$tmpfile" \
         --path "${BUILD_WORKSPACE_DIRECTORY}" \
         -c release_dates 2>&1)"
-    # echo "$output" >&2
     echo "$output" \
         | grep -E "^Mismatch" \
         | grep "$DEP" \
         | cut -d= -f2 \
-        | xargs || echo ""
+        | xargs || {
+        cat "$tmpfile" >&2
+        echo "$output" >&2
+        rm "$tmpfile"
+        exit 1
+    }
     rm "$tmpfile"
 }
 
 post_version_update () {
     local date_ln new_date
-    date_ln=$(find_date_line)
-    new_date=$(get_new_date)
-    if [[ -n "$new_date" ]]; then
-        update_date "$date_ln" "$EXISTING_DATE" "$new_date"
+    if [[ "$EXISTING_VERSION" == "$VERSION" ]]; then
+        echo "Nothing to update" >&2
+        exit 0
     fi
+    date_ln="$(find_date_line)"
+    new_date="$(get_new_date)"
+    if [[ -z "$new_date" ]]; then
+        echo "Unable to retrieve date" >&2
+        exit 1
+    fi
+    update_date "$date_ln" "$EXISTING_DATE" "$new_date"
 }
