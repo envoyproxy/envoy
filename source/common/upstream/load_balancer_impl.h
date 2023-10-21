@@ -694,8 +694,7 @@ public:
             least_request_config.has_value() && least_request_config->has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
                       {least_request_config->active_request_bias(), runtime})
-                : absl::nullopt),
-        enable_full_scan_(false) {
+                : absl::nullopt) {
     initialize();
   }
 
@@ -752,7 +751,7 @@ private:
   double active_request_bias_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
-  const bool enable_full_scan_;
+  const bool enable_full_scan_{};
 };
 
 /**
