@@ -184,7 +184,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
 
     bool append = false;
     if (sh.has_append()) {
-      append = sh.append().value;
+      append = sh.append().value();
       const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
                                                                           : CheckOperation::SET;
       auto checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
