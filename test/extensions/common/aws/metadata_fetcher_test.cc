@@ -19,6 +19,7 @@
 
 using Envoy::Extensions::HttpFilters::Common::MockUpstream;
 using testing::_;
+using testing::AllOf;
 using testing::InSequence;
 using testing::Mock;
 using testing::NiceMock;
@@ -31,6 +32,45 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
+
+MATCHER_P(OptionsHasRetryPolicy, expectedValue, "") {
+  *result_listener << "\nexpected is retry_policy present: \"" << expectedValue
+                   << "\" but got is retry_policy present: \"" << arg.retry_policy.has_value()
+                   << "\"\n";
+  return ExplainMatchResult(expectedValue, arg.retry_policy.has_value(), result_listener);
+}
+
+MATCHER_P(OptionsHasBufferBodyForRetry, expectedValue, "") {
+  *result_listener << "\nexpected { buffer_body_for_retry: \"" << expectedValue
+                   << "\"} but got {buffer_body_for_retry: \"" << arg.buffer_body_for_retry
+                   << "\"}\n";
+  return ExplainMatchResult(expectedValue, arg.buffer_body_for_retry, result_listener);
+}
+
+MATCHER_P(OptionsRetryPolicyHasNumRetries, expectedRetries, "") {
+  *result_listener << "\nexpected { num_retries: \"" << expectedRetries
+                   << "\"} but got {num_retries: \""
+                   << arg.retry_policy.value().num_retries().value() << "\"}\n";
+  return ExplainMatchResult(expectedRetries, arg.retry_policy.value().num_retries().value(),
+                            result_listener);
+}
+
+MATCHER_P(OptionsRetryPolicyHasPerTryTimeout, expectedTimeout, "") {
+  *result_listener << "\nexpected { per_try_timeout: \"" << expectedTimeout
+                   << "\"} but got { per_try_timeout: \""
+                   << arg.retry_policy.value().per_try_timeout().seconds() << "\"}\n";
+  return ExplainMatchResult(expectedTimeout, arg.retry_policy.value().per_try_timeout().seconds(),
+                            result_listener);
+}
+
+MATCHER_P(OptionsRetryPolicyHasPerTryIdleTimeout, expectedIdleTimeout, "") {
+  *result_listener << "\nexpected { per_try_idle_timeout: \"" << expectedIdleTimeout
+                   << "\"} but got { per_try_idle_timeout: \""
+                   << arg.retry_policy.value().per_try_idle_timeout().seconds() << "\"}\n";
+  return ExplainMatchResult(expectedIdleTimeout,
+                            arg.retry_policy.value().per_try_idle_timeout().seconds(),
+                            result_listener);
+}
 
 class MetadataFetcherTest : public testing::Test {
 public:
@@ -209,21 +249,13 @@ TEST_F(MetadataFetcherTest, TestDefaultRetryPolicy) {
   MockMetadataReceiver receiver;
 
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
-              send_(_, _, _))
+              send_(_, _,
+                    AllOf(OptionsHasRetryPolicy(true), OptionsHasBufferBodyForRetry(true),
+                          OptionsRetryPolicyHasNumRetries(3), OptionsRetryPolicyHasPerTryTimeout(5),
+                          OptionsRetryPolicyHasPerTryIdleTimeout(1))))
       .WillOnce(Invoke(
           [](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-            EXPECT_TRUE(options.retry_policy.has_value());
-            EXPECT_TRUE(options.buffer_body_for_retry);
-            EXPECT_TRUE(options.retry_policy.value().has_num_retries());
-            EXPECT_EQ(options.retry_policy.value().num_retries().value(), 3);
-
-            EXPECT_TRUE(options.retry_policy.value().has_per_try_timeout());
-            EXPECT_EQ(options.retry_policy.value().per_try_timeout().seconds(), 5);
-
-            EXPECT_TRUE(options.retry_policy.value().has_per_try_idle_timeout());
-            EXPECT_EQ(options.retry_policy.value().per_try_idle_timeout().seconds(), 1);
-
             const std::string& retry_on = options.retry_policy.value().retry_on();
             std::set<std::string> retry_on_modes = absl::StrSplit(retry_on, ',');
 
