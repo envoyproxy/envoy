@@ -450,6 +450,14 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestWithNoBodyNorTrailers) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, true));
 }
 
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestRemovesContentLength) {
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
+  request_headers_.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
+  request_headers_.setContentLength(1337);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ("", request_headers_.get_("content-length"));
+}
+
 TEST_F(ConnectGrpcBridgeFilterTest, StreamingSupportedContentType) {
   request_headers_.setContentType("application/connect+proto");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
