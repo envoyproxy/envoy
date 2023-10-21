@@ -182,7 +182,19 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
     const LowerCaseString header_name(sh.header().key());
 
-    if (sh.append_action().has_value()) {
+    bool append = false; 
+    if (sh.has_append()) {
+      append = sh.append().value;
+      const auto check_op = (append && !headers.get(header_name).empty())
+                                ? CheckOperation::APPEND
+                                : CheckOperation::SET;
+      auto checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
+                                           check_op, header_name, header_value, append);
+      if (checkResult == CheckResult::FAIL) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
+      }
+    } else  {
       switch (sh.append_action()) {
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         append_mode_for_append_action = true;
@@ -238,18 +250,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
         return absl::InvalidArgumentError(absl::StrCat(
             "Invalid append_action value ", static_cast<absl::string_view>(header_name)));
       }
-    } else {
-      const bool append_mode = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
-      const auto check_op = (append_mode && !headers.get(header_name).empty())
-                                ? CheckOperation::APPEND
-                                : CheckOperation::SET;
-      auto checkResult = handleCheckResult(headers, replacing_message, checker, rejected_mutations,
-                                           check_op, header_name, header_value, append_mode);
-      if (checkResult == CheckResult::FAIL) {
-        return absl::InvalidArgumentError(absl::StrCat(
-            "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
-      }
-    }
+    } 
   }
 
   // After header mutation, check the ending headers are not exceeding the HCM limit.
