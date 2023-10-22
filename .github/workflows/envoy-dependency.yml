@@ -7,17 +7,82 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: 'Select a task'
+        description: Select a task
         required: true
-        default: build-image
-        enum:
+        default: bazel
+        type: choice
+        options:
+        - bazel
+        - bazel-api
         - build-image
+      dependency:
+        description: Dependency to update (if applicable)
+      version:
+        description: Version to set (optional)
+      pr:
+        type: boolean
+        default: true
+      pr_message:
+        description: Additional message for PR, eg to fix an issue (optional)
 
 concurrency:
   group: ${{ github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
+
 jobs:
+  update_bazel:
+    if: startsWith(inputs.task, 'bazel')
+    name: >-
+      Update dep
+      (${{ inputs.pr && 'PR/' || '' }}${{ inputs.task == 'bazel' && 'bazel' || 'bazel/api' }}/${{ inputs.dependency }}/${{ inputs.version }})
+    runs-on: ubuntu-22.04
+    steps:
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.0.25
+      with:
+        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
+        app_key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+    - id: version
+      name: Shorten (possible) SHA
+      uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.0.25
+      with:
+        string: ${{ inputs.version }}
+        length: 7
+        min: 40
+    - run: |
+        echo "Updating(${TASK}): ${DEPENDENCY} -> ${VERSION}"
+        bazel run --config=ci //bazel:${TARGET} $DEPENDENCY $VERSION
+      name: Update dependency
+      env:
+        DEPENDENCY: ${{ inputs.dependency }}
+        VERSION: ${{ inputs.version }}
+        TARGET: ${{ inputs.task == 'bazel' && 'update' || 'api-update' }}
+        TASK: ${{ inputs.task == 'bazel' && 'bazel' || 'api/bazel' }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.0.25
+      name: Upload diff
+      with:
+        name: ${{ inputs.dependency }}-${{ steps.version.outputs.string }}
+    - name: Create a PR
+      if: ${{ inputs.pr }}
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.25
+      with:
+        base: main
+        body: |
+          Created by Envoy dependency bot for @${{ github.actor }}
+
+          ${{ inputs.pr_message }}
+        branch: >-
+          dependency/${{ inputs.task }}/${{ inputs.dependency }}/${{ steps.version.outputs.string }}
+        committer-name: publish-envoy[bot]
+        committer-email: 140627008+publish-envoy[bot]@users.noreply.github.com
+        title: >-
+          ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}`
+          -> ${{ steps.version.outputs.string }}
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+
   update_build_image:
     if: github.event.inputs.task == 'build-image'
     name: Update build image (PR)
