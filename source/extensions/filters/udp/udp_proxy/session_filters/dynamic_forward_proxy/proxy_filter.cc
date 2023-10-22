@@ -106,7 +106,8 @@ ReadFilterStatus ProxyFilter::onData(Network::UdpRecvData& data) {
   return ReadFilterStatus::StopIteration;
 }
 
-void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
+void ProxyFilter::onLoadDnsCacheComplete(
+  const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_LOG(debug, "load DNS cache complete, continuing");
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
@@ -114,10 +115,14 @@ void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsH
   load_dns_cache_completed_ = true;
   read_callbacks_->continueFilterChain();
 
-  while (!datagrams_buffer_.empty()) {
-    BufferedDatagramPtr buffered_datagram = std::move(datagrams_buffer_.front());
-    datagrams_buffer_.pop();
-    read_callbacks_->injectDatagramToFilterChain(*buffered_datagram);
+  if (host_info && host_info->address()) {
+    while (!datagrams_buffer_.empty()) {
+      BufferedDatagramPtr buffered_datagram = std::move(datagrams_buffer_.front());
+      datagrams_buffer_.pop();
+      read_callbacks_->injectDatagramToFilterChain(*buffered_datagram);
+    }
+  } else {
+    ENVOY_LOG(debug, "DNS lookup failed");
   }
 
   config_->disableBuffer();

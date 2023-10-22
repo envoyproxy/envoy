@@ -173,11 +173,12 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOpt
   }
 
   new_session->createFilterChain();
-  new_session->onNewSession();
   auto new_session_ptr = new_session.get();
   sessions_.emplace(std::move(new_session));
+  new_session_ptr->onNewSession();
 
-  return new_session_ptr;
+  // Check if the session was not removed during onNewSession().
+  return (sessions_.contains(new_session_ptr) ? new_session_ptr : nullptr);
 }
 
 Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(

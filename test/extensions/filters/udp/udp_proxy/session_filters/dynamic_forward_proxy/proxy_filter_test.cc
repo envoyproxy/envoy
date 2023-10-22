@@ -209,8 +209,12 @@ TEST_F(DynamicProxyFilterTest,
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 
   EXPECT_CALL(callbacks_, continueFilterChain());
-  filter_->onLoadDnsCacheComplete(
-      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>());
+
+  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 50);
+  EXPECT_CALL(*host_info, address());
+  filter_->onLoadDnsCacheComplete(host_info);
+
   EXPECT_CALL(*handle, onDestroy());
 }
 
@@ -237,8 +241,12 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithDefaultBufferConfig) {
 
   EXPECT_CALL(callbacks_, continueFilterChain());
   EXPECT_CALL(callbacks_, injectDatagramToFilterChain(_)).Times(2);
-  filter_->onLoadDnsCacheComplete(
-      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>());
+
+  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 50);
+  EXPECT_CALL(*host_info, address());
+  filter_->onLoadDnsCacheComplete(host_info);
+
   EXPECT_CALL(*handle, onDestroy());
   EXPECT_FALSE(filter_config_->bufferEnabled());
 }
@@ -267,8 +275,12 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferSizeOverflow) {
 
   EXPECT_CALL(callbacks_, continueFilterChain());
   EXPECT_CALL(callbacks_, injectDatagramToFilterChain(_));
-  filter_->onLoadDnsCacheComplete(
-      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>());
+
+  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 50);
+  EXPECT_CALL(*host_info, address());
+  filter_->onLoadDnsCacheComplete(host_info);
+
   EXPECT_CALL(*handle, onDestroy());
   EXPECT_FALSE(filter_config_->bufferEnabled());
 }
@@ -297,8 +309,12 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferBytesOverflow) {
 
   EXPECT_CALL(callbacks_, continueFilterChain());
   EXPECT_CALL(callbacks_, injectDatagramToFilterChain(_));
-  filter_->onLoadDnsCacheComplete(
-      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>());
+
+  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 50);
+  EXPECT_CALL(*host_info, address());
+  filter_->onLoadDnsCacheComplete(host_info);
+
   EXPECT_CALL(*handle, onDestroy());
   EXPECT_FALSE(filter_config_->bufferEnabled());
 }
