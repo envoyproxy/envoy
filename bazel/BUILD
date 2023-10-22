@@ -899,6 +899,7 @@ updater(
     dependencies = ":repository_locations",
     post_script = ":version_update_post.sh",
     pydict = True,
+    tags = ["skip_on_windows"],
     version_file = ":repository_locations.bzl",
 )
 
@@ -908,6 +909,7 @@ updater(
     dependencies = "@envoy_api//bazel:repository_locations",
     post_script = ":version_update_post.sh",
     pydict = True,
+    tags = ["skip_on_windows"],
     version_file = "@envoy_api//bazel:repository_locations.bzl",
     version_path_replace = "external/envoy_api:api",
 )
