@@ -14,7 +14,8 @@ bug_fixes:
     length header in 1)STREAMED BodySendMode 2) BUFFERED_PARTIAL BodySendMode and 3) BUFFERED BodySendMode + SKIP HeaderSendMode.
     This will enable chunked-encoding whenever feasible in HTTP1.1. Besides, ext_proc filter keep content length header
     in BUFFERED BodySendMode + SEND HeaderSendMode. It is now external processor's responsibility to set the content length
-    correctly matched to the mutated body.
+    correctly matched to the mutated body. if those two doesn't match, the mutation will be rejected and local reply with error
+    status will be returned.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

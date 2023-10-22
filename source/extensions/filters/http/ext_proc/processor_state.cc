@@ -236,7 +236,20 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
         }
       }
+
       if (common_response.has_body_mutation()) {
+        if (headers_ != nullptr && headers_->ContentLength() != nullptr) {
+          size_t content_length = 0;
+          // When body mutation by external processor is enabled, content-length header is only
+          // allowed in BUFFERED mode. If its value doesn't match the length of mutated body, the
+          // corresponding body mutation will be rejected and local reply will be sent with an error
+          // message.
+          if (absl::SimpleAtoi(headers_->getContentLengthValue(), &content_length) &&
+              content_length != common_response.body_mutation().body().size()) {
+            return absl::InternalError(
+                "mismatch between content length and the lenght of mutated body");
+          }
+        }
         ENVOY_LOG(debug, "Applying body response to buffered data. State = {}",
                   static_cast<int>(callback_state_));
         modifyBufferedData([&common_response](Buffer::Instance& data) {

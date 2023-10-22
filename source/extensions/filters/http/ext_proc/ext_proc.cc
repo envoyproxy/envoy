@@ -521,7 +521,12 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
   }
 
-  if (encoding_state_.shouldRemoveContentLength()) {
+  // The content-length header will be kept when either one of the following conditions is met:
+  // (1) `shouldRemoveContentLength` returns false.
+  // (2) side stream processing has been completed. For example, it could be caused by stream error
+  // that triggers the local reply or due to spurious message that skips the side stream
+  // mutation.
+  if (!processing_complete_ && encoding_state_.shouldRemoveContentLength()) {
     headers.removeContentLength();
   }
   return status;
