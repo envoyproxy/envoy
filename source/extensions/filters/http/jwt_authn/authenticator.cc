@@ -84,7 +84,8 @@ private:
   void startVerify();
 
   // Copy the JWT Claim to HTTP Header
-  void addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name);
+  void addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name,
+                           const bool list_claim_keys = false);
 
   // The jwks cache object.
   JwksCache& jwks_cache_;
@@ -300,13 +301,21 @@ void AuthenticatorImpl::verifyKey() {
 }
 
 void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
-                                            const std::string& header_name) {
+                                            const std::string& header_name,
+                                            const bool list_claim_keys) {
   StructUtils payload_getter(jwt_->payload_pb_);
   const ProtobufWkt::Value* claim_value;
   const auto status = payload_getter.GetValue(claim_name, claim_value);
   std::string str_claim_value;
   if (status == StructUtils::OK) {
-    if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kStringValue) {
+    if (list_claim_keys) {
+      if (claim_value->has_struct_value()) {
+        const auto& fields = claim_value->struct_value().fields();
+        str_claim_value = absl::StrJoin(fields, ",", [](std::string* out, const auto& field) {
+          absl::StrAppend(out, field.first);
+        });
+      }
+    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kStringValue) {
       str_claim_value = claim_value->string_value();
     } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kNumberValue) {
       str_claim_value = convertClaimDoubleToString(claim_value->number_value());
@@ -344,7 +353,8 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
 
   // Copy JWT claim to header
   for (const auto& header_and_claim : provider.claim_to_headers()) {
-    addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
+    addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name(),
+                        header_and_claim.list_claim_keys());
   }
 
   if (!provider.forward()) {

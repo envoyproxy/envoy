@@ -153,6 +153,11 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
   EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
   EXPECT_EQ(headers.get_("x-jwt-bool-claim"), "true");
   EXPECT_EQ(headers.get_("x-jwt-int-claim"), "9999");
+
+  // This check verifies whether the claim with the list_claim_keys value set is
+  // successfully added to header.
+  ASSERT_THAT(absl::StrSplit(headers.get_("x-jwt-claim-list-key"), ','),
+              testing::UnorderedElementsAre("key-2", "key-3", "key-4", "key-5"));
 }
 
 // This test verifies when wrong claim is passed in claim_to_headers
@@ -172,6 +177,7 @@ TEST_F(AuthenticatorTest, TestClaimToHeaderWithHeaderReplace) {
   EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
   EXPECT_FALSE(headers.has("x-jwt-claim-nested-wrong"));
   EXPECT_FALSE(headers.has("x-jwt-unsupported-type-claim"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-list-key-wrong"));
 }
 
 // This test verifies the Jwt is forwarded if "forward" flag is set.

@@ -762,4 +762,9 @@ message JwtClaimToHeader {
   // String separated with "." in case of nested claims. The nested claim name must use dot "." to separate
   // the JSON name path.
   string claim_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // If the claim name refers to a struct type (e.g. tenants: {"key": {}}), this field can be used to
+  // return a comma separated list of keys from the struct. This is useful for cases where the struct
+  // represents a list of elements such as tenants: {"key": {}, "key2": {}}.
+  bool list_claim_keys = 3;
 }

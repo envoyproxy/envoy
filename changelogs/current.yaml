@@ -20,5 +20,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: jwt
+  change: |
+    Added a new field `list_claim_keys` on
+    :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>`
+    to extract keys from JWT token claims. This field enables the retrieval of keys from custom JWT
+    token claims, such as `{"tenants": {"bitdrift": {}}` (in this case a claim_name of `tenants
+    would extract the key "bitdrift").
 
 deprecated:
