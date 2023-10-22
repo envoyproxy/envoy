@@ -107,7 +107,7 @@ ReadFilterStatus ProxyFilter::onData(Network::UdpRecvData& data) {
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(
-  const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_LOG(debug, "load DNS cache complete, continuing");
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
