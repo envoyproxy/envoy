@@ -4,7 +4,7 @@ aiohttp>=3.8.1
 cffi>=1.15.0
 colorama
 coloredlogs
-envoy.base.utils>=0.4.0
+envoy.base.utils>=0.4.27
 envoy.code.check>=0.3.6
 envoy.dependency.check>=0.1.7
 envoy.dependency.pip_check>=0.1.4
