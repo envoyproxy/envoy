@@ -290,8 +290,9 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::decodeHeaders(Http::RequestHe
       unary_payload_frame_flags_ |= Envoy::Grpc::GRPC_FH_COMPRESSED;
     }
 
+    headers.removeContentLength();
+
     if (end_stream) {
-      headers.removeContentLength();
       Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, request_buffer_);
       decoder_callbacks_->addDecodedData(request_buffer_, true);
     }
