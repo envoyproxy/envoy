@@ -300,8 +300,8 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
 
   if (!validation_visitor.errors().empty()) {
     // TODO(snowp): Output all violations.
-    throw EnvoyException(fmt::format("requirement violation while creating match tree: {}",
-                                     validation_visitor.errors()[0]));
+    throwEnvoyExceptionOrPanic(fmt::format("requirement violation while creating match tree: {}",
+                                           validation_visitor.errors()[0]));
   }
 
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = nullptr;

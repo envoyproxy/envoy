@@ -1,4 +1,4 @@
-#include "span_context_extractor.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 #include "envoy/tracing/tracer.h"
 

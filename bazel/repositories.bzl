@@ -115,13 +115,14 @@ envoy_entry_point(
     name = "get_project_json",
     pkg = "envoy.base.utils",
     script = "envoy.project_data",
+    init_data = [":__init__.py"],
 )
 
 genrule(
     name = "project",
     outs = ["project.json"],
     cmd = """
-    $(location :get_project_json) . > $@
+    $(location :get_project_json) $$(dirname $(location @envoy//:VERSION.txt)) > $@
     """,
     tools = [
         ":get_project_json",
@@ -139,6 +140,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -149,6 +151,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -159,6 +162,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -169,6 +173,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -179,6 +184,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 ''')
@@ -325,6 +331,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    _com_github_maxmind_libmaxminddb()
 
     # TODO(keith): Remove patch when we update rules_pkg
     external_http_archive(
@@ -982,7 +989,10 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
 def _v8():
     external_http_archive(
         name = "v8",
-        patches = ["@envoy//bazel:v8.patch"],
+        patches = [
+            "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_include.patch",
+        ],
         patch_args = ["-p1"],
     )
     native.bind(
@@ -1392,3 +1402,13 @@ def _is_linux_s390x(ctxt):
 
 def _is_linux_x86_64(ctxt):
     return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")
+
+def _com_github_maxmind_libmaxminddb():
+    external_http_archive(
+        name = "com_github_maxmind_libmaxminddb",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "maxmind",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux",
+    )

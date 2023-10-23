@@ -8,8 +8,6 @@ set -e
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
-# shellcheck source=ci/setup_cache.sh
-. "$(dirname "$0")"/setup_cache.sh
 # shellcheck source=ci/build_setup.sh
 . "$(dirname "$0")"/build_setup.sh
 
@@ -525,6 +523,11 @@ case $CI_TARGET in
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
+        # Disable this pending resolution to https://github.com/envoyproxy/envoy/issues/30286
+        # Run pip requirements tests
+        # echo "Check pip requirements ..."
+        # bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       //tools/base:requirements_test
         ;;
 
     dev)
@@ -565,11 +568,17 @@ case $CI_TARGET in
               -- --stdout \
                  -d "$ENVOY_RELEASE_TARBALL" \
             | tar xfO - envoy > distribution/custom/envoy
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/zstd \
+              -- --stdout \
+                 -d "$ENVOY_RELEASE_TARBALL" \
+            | tar xfO - envoy-contrib > distribution/custom/envoy-contrib
         # Build the packages
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               --remote_download_toplevel \
               -c opt \
               --//distribution:envoy-binary=//distribution:custom/envoy \
+              --//distribution:envoy-contrib-binary=//distribution:custom/envoy-contrib \
               //distribution:packages.tar.gz
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
             cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
@@ -648,7 +657,23 @@ case $CI_TARGET in
         setup_clang_toolchain
         echo "generating docs..."
         # Build docs.
-        "${ENVOY_SRCDIR}/docs/build.sh"
+        [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
+        rm -rf "${DOCS_OUTPUT_DIR}"
+        mkdir -p "${DOCS_OUTPUT_DIR}"
+        if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
+            export SPHINX_RUNNER_ARGS="-v warn"
+            BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
+        fi
+        if [[ -n "${DOCS_BUILD_RST}" ]]; then
+            bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
+            cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+        fi
+        DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --//tools/tarball:target=//docs:html \
+              //tools/tarball:unpack \
+              "$DOCS_OUTPUT_DIR"
         ;;
 
     docs-upload)
@@ -764,9 +789,11 @@ case $CI_TARGET in
     publish)
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
         PUBLISH_ARGS=(
-            --publish-commitish="$BUILD_SHA"
+            --publish-commitish="$ENVOY_COMMIT"
+            --publish-commit-message
             --publish-assets=/build/release.signed/release.signed.tar.zst)
         if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
             PUBLISH_ARGS+=(--dry-run)
@@ -834,12 +861,15 @@ case $CI_TARGET in
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 
+    release.server_only.binary)
+        setup_clang_toolchain
+        echo "bazel release build..."
+        bazel_envoy_binary_build release
+        ;;
+
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
-        # The default config expects these files
-        mkdir -p distribution/custom
-        cp -a /build/*/*64 distribution/custom/
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release

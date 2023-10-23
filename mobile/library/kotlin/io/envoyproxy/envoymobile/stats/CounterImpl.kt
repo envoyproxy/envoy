@@ -3,15 +3,17 @@ package io.envoyproxy.envoymobile
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import java.lang.ref.WeakReference
 
-/**
- * Envoy implementation of a `Counter`.
- */
+/** Envoy implementation of a `Counter`. */
 internal class CounterImpl : Counter {
   var envoyEngine: WeakReference<EnvoyEngine>
   var series: String
   var tags: Tags
 
-  internal constructor(engine: EnvoyEngine, elements: List<Element>, tags: Tags = TagsBuilder().build()) {
+  internal constructor(
+    engine: EnvoyEngine,
+    elements: List<Element>,
+    tags: Tags = TagsBuilder().build()
+  ) {
     this.envoyEngine = WeakReference<EnvoyEngine>(engine)
     this.series = elements.joinToString(separator = ".") { it.value }
     this.tags = tags

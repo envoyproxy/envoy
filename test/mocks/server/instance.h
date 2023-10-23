@@ -18,6 +18,7 @@ public:
   Secret::SecretManager& secretManager() override { return *(secret_manager_); }
 
   MOCK_METHOD(OptRef<Admin>, admin, ());
+  MOCK_METHOD(void, run, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));

@@ -7,28 +7,26 @@ import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 
 /**
- * A collection of platform-level callbacks that are specified by consumers
- * who wish to interact with streams.
+ * A collection of platform-level callbacks that are specified by consumers who wish to interact
+ * with streams.
  *
  * `StreamCallbacks` are bridged through to `EnvoyHTTPCallbacks` to communicate with the engine.
  */
 internal class StreamCallbacks {
-  var onHeaders: (
-    (headers: ResponseHeaders, endStream: Boolean, streamIntel: StreamIntel) -> Unit
-  )? = null
+  var onHeaders:
+    ((headers: ResponseHeaders, endStream: Boolean, streamIntel: StreamIntel) -> Unit)? =
+    null
   var onData: ((data: ByteBuffer, endStream: Boolean, streamIntel: StreamIntel) -> Unit)? = null
   var onTrailers: ((trailers: ResponseTrailers, streamIntel: StreamIntel) -> Unit)? = null
   var onCancel: ((finalStreamIntel: FinalStreamIntel) -> Unit)? = null
-  var onError: (
-    (error: EnvoyError, finalStreamIntel: FinalStreamIntel) -> Unit
-  )? = null
+  var onError: ((error: EnvoyError, finalStreamIntel: FinalStreamIntel) -> Unit)? = null
   var onSendWindowAvailable: ((streamIntel: StreamIntel) -> Unit)? = null
   var onComplete: ((finalStreamIntel: FinalStreamIntel) -> Unit)? = null
 }
 
 /**
- * Class responsible for bridging between the platform-level `StreamCallbacks` and the
- * engine's `EnvoyHTTPCallbacks`.
+ * Class responsible for bridging between the platform-level `StreamCallbacks` and the engine's
+ * `EnvoyHTTPCallbacks`.
  */
 internal class EnvoyHTTPCallbacksAdapter(
   private val executor: Executor,
