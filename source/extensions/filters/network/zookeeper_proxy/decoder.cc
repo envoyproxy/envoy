@@ -368,12 +368,11 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Insta
   }
 
   // Connect responses are special, they have no full reply header
-  // but just an xid.value() with no zxid.value() nor error fields like the ones
+  // but just an xid with no zxid nor error fields like the ones
   // available for all other server generated messages.
   if (xid_code == XidCodes::ConnectXid) {
     status = parseConnectResponse(data, offset, len.value(), latency.value());
     if (!status.ok()) {
-      callbacks_.onDecodeError();
       return absl::InvalidArgumentError(fmt::format("parseConnectResponse: {}", status.message()));
     }
 
@@ -858,6 +857,7 @@ absl::Status DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& of
       }
       break;
     default:
+      callbacks_.onDecodeError();
       return absl::InvalidArgumentError(
           fmt::format("unknown opcode within a transaction: {}", opcode.value()));
     }
@@ -1134,7 +1134,7 @@ Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data, Decod
 
 absl::Status DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype,
                                                 Buffer::OwnedImpl& zk_filter_buffer) {
-  ASSERT(dtype == DecodeType::READ || dtype == DecodeType::WRITE); // can we still use ASSERT???
+  ASSERT(dtype == DecodeType::READ || dtype == DecodeType::WRITE);
 
   const uint32_t data_len = data.length();
   uint64_t offset = 0;
@@ -1149,7 +1149,8 @@ absl::Status DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeTy
     len = helper_.peekInt32(data, offset);
     if (!len.ok()) {
       callbacks_.onDecodeError();
-      return absl::InvalidArgumentError(len.status().message());
+      return absl::InvalidArgumentError(
+          fmt::format("peekInt32 for len: {}", len.status().message()));
     }
 
     status = ensureMinLength(len.value(), dtype == DecodeType::READ
@@ -1248,6 +1249,7 @@ absl::Status DecoderImpl::parseConnectResponse(Buffer::Instance& data, uint64_t&
   absl::Status status =
       ensureMinLength(len, PROTOCOL_VERSION_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
   if (!status.ok()) {
+    callbacks_.onDecodeError();
     return status;
   }
 
@@ -1261,6 +1263,7 @@ absl::Status DecoderImpl::parseConnectResponse(Buffer::Instance& data, uint64_t&
   offset += SESSION_LENGTH;
   status = skipString(data, offset);
   if (!status.ok()) {
+    callbacks_.onDecodeError();
     return status;
   }
 

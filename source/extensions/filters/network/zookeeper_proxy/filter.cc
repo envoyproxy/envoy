@@ -365,10 +365,11 @@ void ZooKeeperFilter::onSetAclRequest(const std::string& path, const int32_t ver
 }
 
 void ZooKeeperFilter::onSyncRequest(const absl::StatusOr<std::string>& path) {
-  config_->stats_.sync_rq_.inc();
-  if (path.ok()) {
-    setDynamicMetadata({{"opname", "sync"}, {"path", path.value()}});
+  if (!path.ok()) {
+    return;
   }
+  config_->stats_.sync_rq_.inc();
+  setDynamicMetadata({{"opname", "sync"}, {"path", path.value()}});
 }
 
 void ZooKeeperFilter::onCheckRequest(const std::string&, const int32_t) {
@@ -411,17 +412,19 @@ void ZooKeeperFilter::onAddWatchRequest(const std::string& path, const int32_t m
 }
 
 void ZooKeeperFilter::onGetEphemeralsRequest(const absl::StatusOr<std::string>& path) {
-  config_->stats_.getephemerals_rq_.inc();
-  if (path.ok()) {
-    setDynamicMetadata({{"opname", "getephemerals"}, {"path", path.value()}});
+  if (!path.ok()) {
+    return;
   }
+  config_->stats_.getephemerals_rq_.inc();
+  setDynamicMetadata({{"opname", "getephemerals"}, {"path", path.value()}});
 }
 
 void ZooKeeperFilter::onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) {
-  config_->stats_.getallchildrennumber_rq_.inc();
-  if (path.ok()) {
-    setDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", path.value()}});
+  if (!path.ok()) {
+    return;
   }
+  config_->stats_.getallchildrennumber_rq_.inc();
+  setDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", path.value()}});
 }
 
 void ZooKeeperFilter::onCloseRequest() {
