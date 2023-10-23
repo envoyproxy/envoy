@@ -37,6 +37,7 @@ public:
 
   Upstream::ClusterInfoConstSharedPtr info() const override { return info_; }
   const Upstream::PrioritySet& prioritySet() const override { return *this; }
+  PrioritySet& prioritySet() override { return *this; }
   const std::vector<Upstream::HostSetPtr>& hostSetsPerPriority() const override {
     return host_sets_;
   }
