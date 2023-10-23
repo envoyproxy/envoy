@@ -4,7 +4,12 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+- area: upstream
+  change: |
+    Fixed a reported issue (https://github.com/envoyproxy/envoy/issues/11004) that causes the Least
+    Request load balancer policy to be unfair when the number of hosts are very small, when the number
+    of hosts is smaller than the choice_count, instead of randomly selection hosts from the list, we
+    perform a full scan on it to choose the host with least requests.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -20,5 +25,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: upstream
+  change: |
+    Adds the option enable_full_scan on :ref:`load balancer policy <envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    so instead of using the choice_count to choose the hosts, we do a full scan on this list of hosts.
 
 deprecated:
