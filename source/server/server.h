@@ -243,7 +243,7 @@ public:
 
   ~InstanceImpl() override;
 
-  void run();
+  void run() override;
 
   // Server::Instance
   OptRef<Admin> admin() override { return makeOptRefFromPtr(admin_.get()); }

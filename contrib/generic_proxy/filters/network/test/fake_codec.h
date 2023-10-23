@@ -58,6 +58,7 @@ public:
     absl::string_view host() const override { return host_; }
     absl::string_view path() const override { return path_; }
     absl::string_view method() const override { return method_; }
+    void removeByKey(absl::string_view key) override { data_.erase(key); }
 
     std::string protocol_;
     std::string host_;
@@ -293,9 +294,6 @@ public:
   RequestEncoderPtr requestEncoder() const override;
   ResponseEncoderPtr responseEncoder() const override;
   MessageCreatorPtr messageCreator() const override;
-  ProtocolOptions protocolOptions() const override;
-
-  ProtocolOptions protocol_options_;
 };
 
 class FakeStreamCodecFactoryConfig : public CodecFactoryConfig {
@@ -309,8 +307,6 @@ public:
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.fake.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
-
-  ProtocolOptions protocol_options_;
 };
 
 } // namespace GenericProxy

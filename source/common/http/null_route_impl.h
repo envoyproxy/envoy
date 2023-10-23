@@ -245,7 +245,7 @@ struct NullRouteImpl : public Router::Route {
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return Router::DefaultRouteMetadataPack::get().typed_metadata_;
   }
-  bool filterDisabled(absl::string_view) const override { return false; }
+  absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   const std::string& routeName() const override { return EMPTY_STRING; }
 
   RouteEntryImpl route_entry_;

@@ -1,11 +1,12 @@
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
+load("@envoy_toolshed//:macros.bzl", "json_data")
+load("@envoy_toolshed//dependency:macros.bzl", "updater")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
@@ -886,4 +887,29 @@ platform(
 cc_library(
     name = "python_headers",
     visibility = ["//visibility:public"],
+)
+
+# These can be run as follows:
+#
+# $ bazel run //bazel:update ENVOY_DEP NEW_VERSION
+# $ bazel run //bazel:api-update API_DEP NEW_VERSION
+updater(
+    name = "update",
+    data = ["//tools/dependency:check"],
+    dependencies = ":repository_locations",
+    post_script = ":version_update_post.sh",
+    pydict = True,
+    tags = ["skip_on_windows"],
+    version_file = ":repository_locations.bzl",
+)
+
+updater(
+    name = "api-update",
+    data = ["//tools/dependency:check"],
+    dependencies = "@envoy_api//bazel:repository_locations",
+    post_script = ":version_update_post.sh",
+    pydict = True,
+    tags = ["skip_on_windows"],
+    version_file = "@envoy_api//bazel:repository_locations.bzl",
+    version_path_replace = "external/envoy_api:api",
 )

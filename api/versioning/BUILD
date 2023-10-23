@@ -177,6 +177,7 @@ proto_library(
         "//envoy/extensions/filters/network/wasm/v3:pkg",
         "//envoy/extensions/filters/network/zookeeper_proxy/v3:pkg",
         "//envoy/extensions/filters/udp/dns_filter/v3:pkg",
+        "//envoy/extensions/filters/udp/udp_proxy/session/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/v3:pkg",
         "//envoy/extensions/formatter/cel/v3:pkg",
