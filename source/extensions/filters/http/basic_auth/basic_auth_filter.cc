@@ -36,12 +36,7 @@ bool FilterConfig::validateUser(absl::string_view username, absl::string_view pa
     return false;
   }
 
-  std::string hashed_password = computeSHA1(password);
-  if (hashed_password == user->second.hash) {
-    return true;
-  }
-
-  return false;
+  return computeSHA1(password) == user->scond.hash;
 }
 
 BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
