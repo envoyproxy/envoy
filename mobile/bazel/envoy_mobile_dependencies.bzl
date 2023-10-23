@@ -60,6 +60,8 @@ def kotlin_dependencies(extra_maven_dependencies = []):
     maven_install(
         artifacts = [
             "com.google.code.findbugs:jsr305:3.0.2",
+            # Java Proto Lite
+            "com.google.protobuf:protobuf-javalite:3.24.4",
             # Kotlin
             "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.6.21",
             "org.jetbrains.kotlin:kotlin-stdlib-common:1.6.21",

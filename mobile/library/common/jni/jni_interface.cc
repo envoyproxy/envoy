@@ -2,6 +2,8 @@
 #include <string>
 #include <utility>
 
+#include "source/common/protobuf/protobuf.h"
+
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/data/utility.h"
@@ -1219,7 +1221,7 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jlong connect_time
                       jboolean trust_chain_verification, jobjectArray filter_chain,
                       jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
                       jobjectArray runtime_guards, jstring node_id, jstring node_region,
-                      jstring node_zone, jstring node_sub_zone,
+                      jstring node_zone, jstring node_sub_zone, jbyteArray serialized_node_metadata,
                       Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1286,6 +1288,9 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jlong connect_time
     builder.setNodeLocality(native_node_region, getCppString(env, node_zone),
                             getCppString(env, node_sub_zone));
   }
+  Envoy::ProtobufWkt::Struct node_metadata;
+  javaByteArrayToProto(env, serialized_node_metadata, &node_metadata);
+  builder.setNodeMetadata(node_metadata);
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
@@ -1307,22 +1312,24 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
     jstring xds_auth_header, jstring xds_auth_token, jstring xds_jwt_token,
     jlong xds_jwt_token_lifetime, jstring xds_root_certs, jstring xds_sni, jstring node_id,
-    jstring node_region, jstring node_zone, jstring node_sub_zone, jstring cds_resources_locator,
-    jlong cds_timeout_seconds, jboolean enable_cds) {
+    jstring node_region, jstring node_zone, jstring node_sub_zone,
+    jbyteArray serialized_node_metadata, jstring cds_resources_locator, jlong cds_timeout_seconds,
+    jboolean enable_cds) {
   Envoy::Platform::EngineBuilder builder;
 
-  configureBuilder(
-      env, grpc_stats_domain, connect_timeout_seconds, dns_refresh_seconds,
-      dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max, dns_query_timeout_seconds,
-      dns_min_refresh_seconds, dns_preresolve_hostnames, enable_dns_cache,
-      dns_cache_save_interval_seconds, enable_drain_post_dns_refresh, enable_http3,
-      http3_connection_options, http3_client_connection_options, quic_hints,
-      enable_gzip_decompression, enable_brotli_decompression, enable_socket_tagging,
-      enable_interface_binding, h2_connection_keepalive_idle_interval_milliseconds,
-      h2_connection_keepalive_timeout_seconds, max_connections_per_host, stats_flush_seconds,
-      stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,
-      trust_chain_verification, filter_chain, stat_sinks, enable_platform_certificates_validation,
-      runtime_guards, node_id, node_region, node_zone, node_sub_zone, builder);
+  configureBuilder(env, grpc_stats_domain, connect_timeout_seconds, dns_refresh_seconds,
+                   dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max,
+                   dns_query_timeout_seconds, dns_min_refresh_seconds, dns_preresolve_hostnames,
+                   enable_dns_cache, dns_cache_save_interval_seconds, enable_drain_post_dns_refresh,
+                   enable_http3, http3_connection_options, http3_client_connection_options,
+                   quic_hints, enable_gzip_decompression, enable_brotli_decompression,
+                   enable_socket_tagging, enable_interface_binding,
+                   h2_connection_keepalive_idle_interval_milliseconds,
+                   h2_connection_keepalive_timeout_seconds, max_connections_per_host,
+                   stats_flush_seconds, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
+                   app_version, app_id, trust_chain_verification, filter_chain, stat_sinks,
+                   enable_platform_certificates_validation, runtime_guards, node_id, node_region,
+                   node_zone, node_sub_zone, serialized_node_metadata, builder);
 
 #ifdef ENVOY_GOOGLE_GRPC
   std::string native_xds_address = getCppString(env, xds_address);

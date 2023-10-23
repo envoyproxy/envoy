@@ -1,19 +1,16 @@
 package io.envoyproxy.envoymobile.engine;
 
+import com.google.protobuf.Struct;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import java.lang.StringBuilder;
-import javax.annotation.Nullable;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
-import io.envoyproxy.envoymobile.engine.JniLibrary;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
@@ -77,6 +74,7 @@ public class EnvoyConfiguration {
   public final String nodeRegion;
   public final String nodeZone;
   public final String nodeSubZone;
+  public final Struct nodeMetadata;
   public final String cdsResourcesLocator;
   public final Integer cdsTimeoutSeconds;
   public final Boolean enableCds;
@@ -151,7 +149,7 @@ public class EnvoyConfiguration {
    *                                                      xDS server.
    * @param xdsJwtToken                                   the JWT token to use for authenticating
    *                                                      with the xDS server.
-   * @param xdsTokenLifetime                              the lifetime of the JWT token.
+   * @param xdsJwtTokenLifetime                           the lifetime of the JWT token.
    * @param xdsRootCerts                                  the root certificates to use for the TLS
    *                                                      handshake during connection establishment
    *                                                      with the xDS management server.
@@ -161,6 +159,7 @@ public class EnvoyConfiguration {
    * @param nodeRegion                                    the node region in the Node metadata.
    * @param nodeZone                                      the node zone in the Node metadata.
    * @param nodeSubZone                                   the node sub-zone in the Node metadata.
+   * @param nodeMetadata                                  the node metadata.
    * @param cdsResourcesLocator                           the resources locator for CDS.
    * @param cdsTimeoutSeconds                             the timeout for CDS fetches.
    * @param enableCds                                     enables CDS, used because all CDS params
@@ -186,8 +185,8 @@ public class EnvoyConfiguration {
       String rtdsResourceName, Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
       String xdsAuthHeader, String xdsAuthToken, String xdsJwtToken, Integer xdsJwtTokenLifetime,
       String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
-      String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
-      boolean enableCds) {
+      String nodeSubZone, Struct nodeMetadata, String cdsResourcesLocator,
+      Integer cdsTimeoutSeconds, boolean enableCds) {
     JniLibrary.load();
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -257,6 +256,7 @@ public class EnvoyConfiguration {
     this.nodeRegion = nodeRegion;
     this.nodeZone = nodeZone;
     this.nodeSubZone = nodeSubZone;
+    this.nodeMetadata = nodeMetadata;
     this.cdsResourcesLocator = cdsResourcesLocator;
     this.cdsTimeoutSeconds = cdsTimeoutSeconds;
     this.enableCds = enableCds;
@@ -268,25 +268,25 @@ public class EnvoyConfiguration {
     List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
     Collections.reverse(reverseFilterChain);
 
-    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
-    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
-    byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
-    byte[][] quic_hints = JniBridgeUtility.mapToJniBytes(quicHints);
+    byte[][] filterChain = JniBridgeUtility.toJniBytes(reverseFilterChain);
+    byte[][] statsSinks = JniBridgeUtility.stringsToJniBytes(statSinks);
+    byte[][] dnsPreresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
+    byte[][] runtimeGuards = JniBridgeUtility.mapToJniBytes(this.runtimeGuards);
+    byte[][] quicHints = JniBridgeUtility.mapToJniBytes(this.quicHints);
 
     return JniLibrary.createBootstrap(
         grpcStatsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
-        dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve,
+        dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        http3ConnectionOptions, http3ClientConnectionOptions, quic_hints, enableGzipDecompression,
+        http3ConnectionOptions, http3ClientConnectionOptions, quicHints, enableGzipDecompression,
         enableBrotliDecompression, enableSocketTagging, enableInterfaceBinding,
         h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filter_chain,
-        stats_sinks, enablePlatformCertificatesValidation, runtime_guards, rtdsResourceName,
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
+        statsSinks, enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName,
         rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsJwtToken,
         xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId, nodeRegion, nodeZone, nodeSubZone,
-        cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        nodeMetadata.toByteArray(), cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {
