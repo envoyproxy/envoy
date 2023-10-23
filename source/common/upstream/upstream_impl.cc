@@ -1097,8 +1097,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   // configured they will interfere with each other and both get incorrect values.
   if (perEndpointStatsEnabled() &&
       server_context.bootstrap().cluster_manager().has_load_stats_config()) {
-    throw EnvoyException("Only one of cluster per_endpoint_stats and cluster manager "
-                         "load_stats_config can be specified");
+    throwEnvoyExceptionOrPanic("Only one of cluster per_endpoint_stats and cluster manager "
+                               "load_stats_config can be specified");
   }
 
   if (config.has_max_requests_per_connection() &&
