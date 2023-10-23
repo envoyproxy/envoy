@@ -14,65 +14,65 @@ namespace BasicAuth {
 namespace {
 
 // Function to compute SHA1 hash
-std::string computeSHA1(const std::string& password) {
+std::string computeSHA1(absl::string_view password) {
   unsigned char hash[SHA_DIGEST_LENGTH];
 
   // Calculate the SHA-1 hash
-  SHA1(reinterpret_cast<const unsigned char*>(password.c_str()), password.length(), hash);
+  SHA1(reinterpret_cast<const unsigned char*>(password.data()), password.length(), hash);
 
   // Encode the binary hash in Base64
-  std::string encodedHash = Base64::encode(reinterpret_cast<const char*>(hash), SHA_DIGEST_LENGTH);
-
-  return encodedHash;
+  return Base64::encode(reinterpret_cast<const char*>(hash), SHA_DIGEST_LENGTH);
 }
 
 } // namespace
 
-FilterConfig::FilterConfig(UserMap users, const std::string& stats_prefix, Stats::Scope& scope)
-    : users_(users), stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
+FilterConfig::FilterConfig(UserMapConstPtr users, const std::string& stats_prefix,
+                           Stats::Scope& scope)
+    : users_(std::move(users)), stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
 
-bool FilterConfig::validateUser(const std::string& username, const std::string& password) {
-  const auto user = users_.find(username);
-  if (user == users_.end()) {
+bool FilterConfig::validateUser(absl::string_view username, absl::string_view password) const {
+  auto user = users_->find(username);
+  if (user == users_->end()) {
     return false;
   }
 
-  std::string hashedPassword = computeSHA1(password);
-  if (hashedPassword == user->second.hash) {
+  std::string hashed_password = computeSHA1(password);
+  if (hashed_password == user->second.hash) {
     return true;
   }
 
   return false;
 }
 
-BasicAuthFilter::BasicAuthFilter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
+BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
 
 Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  ENVOY_LOG(debug, "Called Filter : {}", __func__);
-
   auto auth_header = headers.get(Http::CustomHeaders::get().Authorization);
   if (!auth_header.empty()) {
-    auto auth_value = auth_header[0]->value().getStringView();
+    absl::string_view auth_value = auth_header[0]->value().getStringView();
 
-    if (auth_value.substr(0, 6) == "Basic ") {
+    if (absl::StartsWith(auth_value, "Basic ")) {
       // Extract and decode the Base64 part of the header.
-      auto base64Token = auth_value.substr(6);
-      std::string decoded = Base64::decodeWithoutPadding(base64Token);
+      absl::string_view base64Token = auth_value.substr(6);
+      const std::string decoded = Base64::decodeWithoutPadding(base64Token);
 
       // The decoded string is in the format "username:password".
-      size_t colonPos = decoded.find(':');
+      const size_t colon_pos = decoded.find(':');
 
-      if (colonPos != std::string::npos) {
-        std::string username = decoded.substr(0, colonPos);
-        std::string password = decoded.substr(colonPos + 1);
+      if (colon_pos != std::string::npos) {
+        absl::string_view decoded_view = decoded;
+        absl::string_view username = decoded_view.substr(0, colon_pos);
+        absl::string_view password = decoded_view.substr(colon_pos + 1);
 
         if (config_->validateUser(username, password)) {
           config_->stats().allowed_.inc();
           return Http::FilterHeadersStatus::Continue;
         } else {
           config_->stats().denied_.inc();
-          decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Basic Auth failed", nullptr,
-                                             absl::nullopt, "");
+          decoder_callbacks_->sendLocalReply(
+              Http::Code::Unauthorized,
+              "User authentication failed. Invalid username/password combination", nullptr,
+              absl::nullopt, "invalid_credential_for_basic_auth");
           return Http::FilterHeadersStatus::StopIteration;
         }
       }
@@ -80,13 +80,13 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   config_->stats().denied_.inc();
-  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Missing username or password",
-                                     nullptr, absl::nullopt, "");
+  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized,
+                                     "User authentication failed. Missing username and password",
+                                     nullptr, absl::nullopt, "no_credential_for_basic_auth");
   return Http::FilterHeadersStatus::StopIteration;
 }
 
 void BasicAuthFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  ENVOY_LOG(debug, "Called Filter : {}", __func__);
   decoder_callbacks_ = &callbacks;
 }
 

@@ -220,7 +220,7 @@ envoy.filters.http.bandwidth_limit:
 envoy.filters.http.basic_auth:
   categories:
   - envoy.filters.http
-  security_posture: unknown
+  security_posture: robust_to_untrusted_downstream
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.basic_auth.v3.BasicAuth

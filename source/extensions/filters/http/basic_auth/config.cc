@@ -12,36 +12,37 @@ using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
 
 namespace {
 
-UserMap readHtpasswd(std::string htpasswd) {
-  UserMap users;
+UserMapConstPtr readHtpasswd(const std::string& htpasswd) {
+  std::unique_ptr<UserMap> users = std::make_unique<UserMap>();
   std::istringstream htpsswd_ss(htpasswd);
   std::string line;
 
   while (std::getline(htpsswd_ss, line)) {
-    size_t colonPos = line.find(':');
+    const size_t colon_pos = line.find(':');
 
-    if (colonPos != std::string::npos) {
+    if (colon_pos != std::string::npos) {
       std::string name, hash;
 
-      name = line.substr(0, colonPos);
-      hash = line.substr(colonPos + 1);
+      name = line.substr(0, colon_pos);
+      hash = line.substr(colon_pos + 1);
 
-      if (name.length() == 0) {
-        throw EnvoyException("invalid user name");
+      if (name.empty()) {
+        throw EnvoyException("basic auth: invalid user name");
       }
 
-      if (hash.find("{SHA}") == 0) {
+      if (absl::StartsWith(hash, "{SHA}")) {
         hash = hash.substr(5);
+        // The base64 encoded SHA1 hash is 28 bytes long
         if (hash.length() != 28) {
-          throw EnvoyException("invalid SHA hash length");
+          throw EnvoyException("basic auth: invalid SHA hash length");
         }
 
-        users.insert({name, {name, hash}});
+        users->insert({name, {name, hash}});
         continue;
       }
     }
 
-    throw EnvoyException("unsupported htpasswd format: please use {SHA}");
+    throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
   }
 
   return users;
@@ -52,10 +53,10 @@ UserMap readHtpasswd(std::string htpasswd) {
 Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
     const BasicAuth& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-  auto htpasswd = Config::DataSource::read(proto_config.users(), false, context.api());
-  auto users = readHtpasswd(htpasswd);
-  FilterConfigSharedPtr config =
-      std::make_shared<FilterConfig>(users, stats_prefix, context.scope());
+  const std::string htpasswd = Config::DataSource::read(proto_config.users(), false, context.api());
+  UserMapConstPtr users = readHtpasswd(htpasswd);
+  FilterConfigConstSharedPtr config =
+      std::make_unique<FilterConfig>(std::move(users), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
   };

@@ -37,31 +37,32 @@ struct User {
 };
 
 using UserMap = absl::flat_hash_map<std::string, User>; // username, User
+using UserMapConstPtr = std::unique_ptr<const UserMap>;
 
 /**
  * Configuration for the Basic Auth filter.
  */
 class FilterConfig {
 public:
-  FilterConfig(UserMap users, const std::string& stats_prefix, Stats::Scope& scope);
-  BasicAuthStats& stats() { return stats_; }
-  bool validateUser(const std::string& username, const std::string& password);
+  FilterConfig(UserMapConstPtr users, const std::string& stats_prefix, Stats::Scope& scope);
+  const BasicAuthStats& stats() const { return stats_; }
+  bool validateUser(absl::string_view username, absl::string_view password) const;
 
 private:
   static BasicAuthStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return BasicAuthStats{ALL_BASIC_AUTH_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  UserMap users_;
+  UserMapConstPtr users_;
   BasicAuthStats stats_;
 };
-using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
 
 // The Envoy filter to process HTTP basic auth.
-class BasicAuthFilter : public Http::PassThroughFilter,
+class BasicAuthFilter : public Http::PassThroughDecoderFilter,
                         public Logger::Loggable<Logger::Id::basic_auth> {
 public:
-  BasicAuthFilter(FilterConfigSharedPtr config);
+  BasicAuthFilter(FilterConfigConstSharedPtr config);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -70,7 +71,7 @@ public:
 private:
   // The callback function.
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
-  FilterConfigSharedPtr config_;
+  FilterConfigConstSharedPtr config_;
 };
 
 } // namespace BasicAuth
