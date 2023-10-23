@@ -116,6 +116,11 @@ def create_issues(access_token, runtime_and_pr):
         print('Creating issues...')
         for title, body, login in issues:
             try:
+                # for setec backports, we may not find a user, which will
+                # cause repo.create_issue to crash. Preempt this by hitting the
+                # exception block below.
+                if not login:
+                    raise github.GithubException("login required")
                 repo.create_issue(title, body=body, assignees=[login], labels=labels)
             except github.GithubException as e:
                 try:
