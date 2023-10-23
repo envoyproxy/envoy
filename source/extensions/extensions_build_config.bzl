@@ -48,6 +48,7 @@ EXTENSIONS = {
     #
 
     "envoy.credentials.basic_auth":                     "//source/extensions/credentials/basic_auth:config",
+    "envoy.credentials.bearer_token":                   "//source/extensions/credentials/bearer_token:config",
 
     #
     #

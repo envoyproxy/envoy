@@ -178,13 +178,13 @@ envoy.credentials.basic_auth:
   status: alpha
   type_urls:
   - envoy.extensions.credentials.basic_auth.v3.BasicAuth
-envoy.credentials.oauth2:
+envoy.credentials.bearer_token:
   categories:
   - envoy.credentials
   security_posture: unknown
   status: alpha
   type_urls:
-  - envoy.extensions.credentials.oauth2.v3.OAuth2
+  - envoy.extensions.credentials.bearer_token.v3.BearerToken
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
