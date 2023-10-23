@@ -17,7 +17,7 @@ bug_fixes:
     not depend on an Envoy Cluster (i.e. GoogleGrpc) is not affected by this change.
 - area: grpc
   change: |
-    Fixed a bug in grpc async client cache which intermittently causes cpu spikes due to busy loop in timer expiration.
+    Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
