@@ -15,7 +15,8 @@ namespace BasicAuth {
 class FilterTest : public testing::Test {
 public:
   FilterTest() {
-    std::unique_ptr<UserMap> users = std::make_unique<UserMap>();
+    std::unique_ptr<absl::flat_hash_map<std::string, User>> users =
+        std::make_unique<absl::flat_hash_map<std::string, User>>();
     users->insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
     users->insert({"user2", {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}}); // user2:test2
     config_ = std::make_shared<FilterConfig>(users, "stats", *stats_.rootScope());
@@ -25,7 +26,7 @@ public:
 
   NiceMock<Stats::IsolatedStoreImpl> stats_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
-  FilterConfigSharedPtr config_;
+  FilterConfigConstSharedPtr config_;
   std::shared_ptr<BasicAuthFilter> filter_;
 };
 
