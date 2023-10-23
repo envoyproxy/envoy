@@ -93,7 +93,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci-macos \
+            --config=mobile-remote-ci \
             --fat_apk_cpu=x86_64 \
             //examples/java/hello_world:hello_envoy
         adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
