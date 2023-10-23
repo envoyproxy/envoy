@@ -27,7 +27,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 Common::CredentialInjectorSharedPtr
 BasicAuthCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
     const BasicAuth& config, Server::Configuration::FactoryContext& context) {
-  const auto& password_secret = config.password();
+  const std::string& password_secret = config.password();
   auto& cluster_manager = context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
