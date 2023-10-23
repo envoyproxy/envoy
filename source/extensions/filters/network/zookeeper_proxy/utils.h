@@ -9,6 +9,8 @@
 #include "source/common/common/byte_order.h"
 #include "source/common/common/logger.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -27,15 +29,15 @@ class BufferHelper : public Logger::Loggable<Logger::Id::filter> {
 public:
   BufferHelper(uint32_t max_len) : max_len_(max_len) {}
 
-  int32_t peekInt32(Buffer::Instance& buffer, uint64_t& offset);
-  int64_t peekInt64(Buffer::Instance& buffer, uint64_t& offset);
-  std::string peekString(Buffer::Instance& buffer, uint64_t& offset);
-  bool peekBool(Buffer::Instance& buffer, uint64_t& offset);
+  absl::StatusOr<int32_t> peekInt32(Buffer::Instance& buffer, uint64_t& offset);
+  absl::StatusOr<int64_t> peekInt64(Buffer::Instance& buffer, uint64_t& offset);
+  absl::StatusOr<std::string> peekString(Buffer::Instance& buffer, uint64_t& offset);
+  absl::StatusOr<bool> peekBool(Buffer::Instance& buffer, uint64_t& offset);
   void skip(uint32_t len, uint64_t& offset);
   void reset() { current_ = 0; }
 
 private:
-  void ensureMaxLen(uint32_t size);
+  absl::Status ensureMaxLen(uint32_t size);
 
   const uint32_t max_len_;
   uint32_t current_{};
