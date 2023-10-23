@@ -105,6 +105,10 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       ENVOY_LOG(debug, "Replacing complete message");
       // Completely replace the body that may already exist.
       if (common_response.has_body_mutation()) {
+        // Remove the content length here because in this case external processor probably won't
+        // properly set the content-length header to match the length of the new body that replaces
+        // the original one.
+        headers_->removeContentLength();
         body_replaced_ = true;
         if (bufferedData() == nullptr) {
           Buffer::OwnedImpl new_body;
