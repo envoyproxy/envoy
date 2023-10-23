@@ -514,7 +514,10 @@ def _com_github_intel_ipp_crypto_crypto_mb():
         # to create dynamic *.so library target. Linker fails when linking
         # with boringssl_fips library. Envoy uses only static library
         # anyways, so created dynamic library would not be used anyways.
-        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch",
+            "@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch",
+        ],
         patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
     )

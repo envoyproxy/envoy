@@ -120,13 +120,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-112.0.5615.39 (linux/beta)
-        version = "88d7a40bd06a34da6ee0d985545755199d047258",
-        sha256 = "1e759891e168c5957f2f4d519929e2b4cef9303b7cf2049601081f4fca95bf21",
+        # chromium-118.0.5993.54 (linux/beta)
+        version = "45cf810dbdbd767f09f8cb0b0fcccd342c39041f",
+        sha256 = "f1f421738e9ba39dd88daf8cf3096ddba9c53e2b6b41b32fff5a3ff82f4cd162",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2023-02-14",
+        release_date = "2023-08-28",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
@@ -731,13 +731,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "jwt_verify_lib",
         project_desc = "JWT verification library for C++",
         project_url = "https://github.com/google/jwt_verify_lib",
-        version = "c29ba4bdab2cc9a7b4d80d1d3ebff3bf5b9bf6e2",
-        sha256 = "5851ab1857edf46b31dc298fba984e1b7638f80a58f88a84a83402540643a99f",
+        version = "b59e8075d4a4f975ba6f109e1916d6e60aeb5613",
+        sha256 = "637e4983506c4f26bbe2808ae4e1944e46cbb2277d34ff0b8a3b72bdac3c4b91",
         strip_prefix = "jwt_verify_lib-{version}",
         urls = ["https://github.com/google/jwt_verify_lib/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.jwt_authn", "envoy.filters.http.gcp_authn"],
-        release_date = "2022-11-04",
+        release_date = "2023-05-17",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/google/jwt_verify_lib/blob/{version}/LICENSE",
