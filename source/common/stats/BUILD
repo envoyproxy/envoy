@@ -28,6 +28,7 @@ envoy_cc_library(
     name = "custom_stat_namespaces_lib",
     srcs = ["custom_stat_namespaces_impl.cc"],
     hdrs = ["custom_stat_namespaces_impl.h"],
+    external_deps = ["abseil_flat_hash_set"],
     deps = [
         "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/common:assert_lib",
