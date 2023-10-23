@@ -26,14 +26,27 @@ jobs:
       key: '"windows.release" | $(cacheKeyBazel)'
       path: $(Build.StagingDirectory)/repository_cache
     continueOnError: true
-  - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
+
+  - bash: |
+      set -e
+      ENVOY_SHARED_TMP_DIR="C:\\Users\\VSSADM~1\\AppData\\Local\\Temp\\bazel-shared"
+      mkdir -p "$ENVOY_SHARED_TMP_DIR"
+      GCP_SERVICE_ACCOUNT_KEY_PATH=$(mktemp -p "${ENVOY_SHARED_TMP_DIR}" -t gcp_service_account.XXXXXX.json)
+      bash -c 'echo "$(GcpServiceAccountKey)"' | base64 --decode > "${GCP_SERVICE_ACCOUNT_KEY_PATH}"
+      export BAZEL_BUILD_EXTRA_OPTIONS+=" --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_PATH}"
+      export ENVOY_SHARED_TMP_DIR
+      ci/run_envoy_docker.sh ci/windows_ci_steps.sh
     displayName: "Run Windows msvc-cl CI"
     env:
       CI_TARGET: "windows"
       ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
       ENVOY_RBE: "true"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --config=remote-msvc-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      BAZEL_BUILD_EXTRA_OPTIONS: >-
+        --config=remote-ci
+        --config=rbe-google
+        --config=remote-msvc-cl
+        --jobs=$(RbeJobs)
+        --flaky_test_attempts=2
 
   - task: PublishTestResults@2
     inputs:

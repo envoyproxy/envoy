@@ -14,6 +14,7 @@
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/config/v2_link_hacks.h"
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -50,6 +51,7 @@ public:
 
 namespace {
 
+using ::envoy::config::bootstrap::v3::Bootstrap;
 using ::testing::_;
 using ::testing::DoAll;
 using ::testing::InSequence;
@@ -64,8 +66,8 @@ using ::testing::SaveArg;
 
 using namespace std::chrono_literals;
 
-envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml) {
+  Bootstrap bootstrap;
   TestUtility::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
@@ -85,6 +87,67 @@ void verifyCaresDnsConfigAndUnpack(
   typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 }
 
+// A gRPC MuxFactory that returns a MockGrpcMux instance when trying to instantiate a mux for the
+// `envoy.config_mux.grpc_mux_factory` type. This enables testing call expectations on the ADS gRPC
+// mux.
+class MockGrpcMuxFactory : public Config::MuxFactory {
+public:
+  std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
+  void shutdownAll() override {}
+  std::shared_ptr<Config::GrpcMux>
+  create(std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+         Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+         const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+         BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+         OptRef<Config::XdsResourcesDelegate>, bool) override {
+    return std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  }
+};
+
+// A ClusterManagerImpl that overrides postThreadLocalClusterUpdate set up call expectations on the
+// ADS gRPC mux. The ADS mux should not be started until the ADS cluster has been initialized. This
+// solves the problem outlined in https://github.com/envoyproxy/envoy/issues/27702.
+class UpdateOverrideClusterManagerImpl : public TestClusterManagerImpl {
+public:
+  UpdateOverrideClusterManagerImpl(const Bootstrap& bootstrap, ClusterManagerFactory& factory,
+                                   Stats::Store& stats, ThreadLocal::Instance& tls,
+                                   Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                                   AccessLog::AccessLogManager& log_manager,
+                                   Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                                   ProtobufMessage::ValidationContext& validation_context,
+                                   Api::Api& api, Http::Context& http_context,
+                                   Grpc::Context& grpc_context, Router::Context& router_context,
+                                   Server::Instance& server)
+      : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
+                               main_thread_dispatcher, admin, validation_context, api, http_context,
+                               grpc_context, router_context, server) {}
+
+protected:
+  void postThreadLocalClusterUpdate(ClusterManagerCluster& cluster,
+                                    ThreadLocalClusterUpdateParams&& params) override {
+    int expected_start_call_count = 0;
+    if (cluster.cluster().info()->name() == "ads_cluster") {
+      // For the ADS cluster, we expect that the postThreadLocalClusterUpdate call below will
+      // invoke the ADS mux's start() method. Subsequent calls to postThreadLocalClusterUpdate()
+      // should not invoke the ADS mux's start() method.
+      if (!post_tls_update_for_ads_cluster_called_) {
+        expected_start_call_count = 1;
+      }
+      post_tls_update_for_ads_cluster_called_ = true;
+    }
+
+    EXPECT_CALL(dynamic_cast<Config::MockGrpcMux&>(*adsMux()), start())
+        .Times(expected_start_call_count);
+
+    // The ClusterManagerImpl::postThreadLocalClusterUpdate method calls ads_mux_->start() if the
+    // cluster is used in ADS for EnvoyGrpc.
+    TestClusterManagerImpl::postThreadLocalClusterUpdate(cluster, std::move(params));
+  }
+
+private:
+  bool post_tls_update_for_ads_cluster_called_ = false;
+};
+
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
@@ -92,13 +155,35 @@ public:
         router_context_(factory_.stats_.symbolTable()),
         registered_dns_factory_(dns_resolver_factory_) {}
 
-  virtual void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
+  virtual void create(const Bootstrap& bootstrap) {
+    cluster_manager_ = TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
+  }
+
+  void createWithBasicStaticCluster() {
+    const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+    create(parseBootstrapFromV3Yaml(yaml));
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -142,6 +227,15 @@ public:
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
         router_context_, server_);
+    cluster_manager_->init(bootstrap);
+  }
+
+  void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
+    cluster_manager_ = std::make_unique<UpdateOverrideClusterManagerImpl>(
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
+        *factory_.api_, http_context_, grpc_context_, router_context_, server_);
+    cluster_manager_->init(bootstrap);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -199,7 +293,7 @@ public:
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };
 
-envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
+Bootstrap defaultConfig() {
   const std::string yaml = R"EOF(
 static_resources:
   clusters: []
@@ -584,6 +678,122 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   EXPECT_CALL(log_manager_, createAccessLog(Filesystem::FilePathAndType{
                                 Filesystem::DestinationType::File, "foo"}));
   create(parseBootstrapFromV3Json(json));
+}
+
+TEST_F(ClusterManagerImplTest, AdsCluster) {
+  MockGrpcMuxFactory factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  const std::string yaml = R"EOF(
+  dynamic_resources:
+    ads_config:
+      transport_api_version: V3
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  createWithUpdateOverrideClusterManager(parseBootstrapFromV3Yaml(yaml));
+}
+
+TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
+  MockGrpcMuxFactory factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  const std::string yaml = R"EOF(
+  dynamic_resources:
+    ads_config:
+      transport_api_version: V3
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  createWithUpdateOverrideClusterManager(parseBootstrapFromV3Yaml(yaml));
+
+  const std::string update_static_ads_cluster_yaml = R"EOF(
+    name: ads_cluster
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: ads_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 12001
+  )EOF";
+
+  // The static ads_cluster should not be updated by the ClusterManager (only dynamic clusters can
+  // be added or updated outside of the Bootstrap config).
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(
+      parseClusterFromV3Yaml(update_static_ads_cluster_yaml), "version2"));
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(1, factory_.stats_
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
+
+  const std::string new_cluster_yaml = R"EOF(
+    name: new_cluster
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: new_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 12001
+  )EOF";
+
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(new_cluster_yaml), "version1"));
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(2, factory_.stats_
+                   .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
@@ -1228,7 +1438,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
 class ClusterManagerLifecycleTest : public ClusterManagerImplTest,
                                     public testing::WithParamInterface<bool> {
 protected:
-  void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override {
+  void create(const Bootstrap& bootstrap) override {
     if (useDeferredCluster()) {
       auto bootstrap_with_deferred_cluster = bootstrap;
       bootstrap_with_deferred_cluster.mutable_cluster_manager()
@@ -3827,10 +4037,15 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
 // Also tests that if hosts are added/removed between mergeable updates, delivery will
 // happen and the scheduled update will be cancelled.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
-  createWithLocalClusterUpdate();
-
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 1st add of the 2 static localhost endpoints.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
         // 1st removal.
@@ -3866,6 +4081,8 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
       .Times(2)
       .WillRepeatedly(
           Invoke([](const auto& hosts_removed) { EXPECT_EQ(1, hosts_removed.size()); }));
+
+  createWithLocalClusterUpdate();
 
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
@@ -3964,10 +4181,15 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
 
 // Tests that mergeable updates outside of a window get applied immediately.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
-  createWithLocalClusterUpdate();
-
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 2 static host endpoints on Bootstrap's cluster.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
         // HC update, immediately delivered.
@@ -3975,6 +4197,8 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
       }));
+
+  createWithLocalClusterUpdate();
 
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
@@ -4000,6 +4224,14 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
 
 // Tests that mergeable updates inside of a window are not applied immediately.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }));
+
   createWithLocalClusterUpdate();
 
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
@@ -4028,10 +4260,15 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
 // Tests that mergeable updates outside of a window get applied immediately when
 // merging is disabled, and that the counters are correct.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindowDisabled) {
-  createWithLocalClusterUpdate(false);
-
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 2 static host endpoints on Bootstrap's cluster.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
         // HC update, immediately delivered.
@@ -4039,6 +4276,8 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindowDisabled) {
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
       }));
+
+  createWithLocalClusterUpdate(false);
 
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
@@ -4061,32 +4300,39 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindowDisabled) {
 }
 
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesDestroyedOnUpdate) {
-  // We create the default cluster, although for this test we won't use it since
-  // we can only update dynamic clusters.
-  createWithLocalClusterUpdate();
-
   // Ensure we see the right set of added/removed hosts on every call, for the
   // dynamically added/updated cluster.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
-        // 1st add, when the cluster is added.
+        // 1st add, which adds 2 localhost static hosts at ports 11001 and 11002.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(2, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 2nd add, when the dynamic `new_cluster` is added with static host 127.0.0.1:12001.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(1, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
       }))
       .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed) -> void {
-        // 1st removal.
+        // 1st removal of the dynamic `new_cluster`.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(1, hosts_removed.size());
       }));
 
   EXPECT_CALL(local_hosts_removed_, post(_)).WillOnce(Invoke([](const auto& hosts_removed) {
-    // 1st removal.
+    // 1st removal of the dynamic `new_cluster`.
     EXPECT_EQ(1, hosts_removed.size());
   }));
+
+  // We create the default cluster, although for this test we won't use it since
+  // we can only update dynamic clusters.
+  createWithLocalClusterUpdate();
 
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
 
@@ -4200,7 +4446,7 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesDestroyedOnUpdate) {
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
@@ -4217,7 +4463,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
 }
 
 TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
@@ -4233,17 +4479,17 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
 }
 
 TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:11002")));
+      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:11001")));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
-        EXPECT_EQ("127.0.0.1:11002", host->address()->asStringView());
+        EXPECT_EQ("127.0.0.1:11001", host->address()->asStringView());
         return to_create;
       }));
   EXPECT_CALL(*to_create, addIdleCallback(_));
@@ -4262,7 +4508,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   Http::ConnectionPool::MockInstance* to_create =
@@ -4279,43 +4525,52 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
-  createWithLocalClusterUpdate();
   NiceMock<MockLoadBalancerContext> context1;
   NiceMock<MockLoadBalancerContext> context2;
 
+  createWithBasicStaticCluster();
+
+  // NOTE: many of these socket options are not available on Windows, so if changing the socket
+  // options used below, ensure they are available on Windows and Linux, as otherwise, the option
+  // won't affect the hash key (because if the socket option isn't available on the given platform,
+  // an empty SocketOptionImpl is used instead) and the test will end up using the same connection
+  // pool for different options, instead of different connection pool.
+  // See https://github.com/envoyproxy/envoy/issues/30360 for details.
+  Network::Socket::OptionsSharedPtr options1 =
+      Network::SocketOptionFactory::buildTcpKeepaliveOptions({});
+  Network::Socket::OptionsSharedPtr options2 =
+      Network::SocketOptionFactory::buildIpPacketInfoOptions();
   Http::ConnectionPool::MockInstance* to_create1 =
       new NiceMock<Http::ConnectionPool::MockInstance>();
   Http::ConnectionPool::MockInstance* to_create2 =
       new NiceMock<Http::ConnectionPool::MockInstance>();
-  Network::Socket::OptionsSharedPtr options1 =
-      Network::SocketOptionFactory::buildIpTransparentOptions();
-  Network::Socket::OptionsSharedPtr options2 =
-      Network::SocketOptionFactory::buildSocketMarkOptions(3);
 
-  EXPECT_CALL(context1, upstreamSocketOptions()).WillRepeatedly(Return(options1));
-  EXPECT_CALL(context2, upstreamSocketOptions()).WillRepeatedly(Return(options2));
+  EXPECT_CALL(context1, upstreamSocketOptions()).WillOnce(Return(options1));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(to_create1));
-
   Http::ConnectionPool::Instance* cp1 = HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1));
+  EXPECT_NE(nullptr, cp1);
 
+  EXPECT_CALL(context2, upstreamSocketOptions()).WillOnce(Return(options2));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(to_create2));
   Http::ConnectionPool::Instance* cp2 = HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context2));
-
-  Http::ConnectionPool::Instance* should_be_cp1 = HttpPoolDataPeer::getPool(
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1));
-  EXPECT_NE(nullptr, cp1);
   EXPECT_NE(nullptr, cp2);
-  Http::ConnectionPool::Instance* should_be_cp2 = HttpPoolDataPeer::getPool(
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context2));
 
   // The different upstream options should lead to different hashKeys, thus different pools.
   EXPECT_NE(cp1, cp2);
+
+  EXPECT_CALL(context1, upstreamSocketOptions()).WillOnce(Return(options1));
+  Http::ConnectionPool::Instance* should_be_cp1 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1));
+
+  EXPECT_CALL(context2, upstreamSocketOptions()).WillOnce(Return(options2));
+  Http::ConnectionPool::Instance* should_be_cp2 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context2));
 
   // Reusing the same options should lead to the same connection pools.
   EXPECT_EQ(cp1, should_be_cp1);
@@ -4323,7 +4578,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   Http::ConnectionPool::MockInstance* to_create =
@@ -4339,7 +4594,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
 }
 
 TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   Http::ConnectionPool::MockInstance* pool_mock = new Http::ConnectionPool::MockInstance();
@@ -4521,9 +4776,11 @@ public:
     ASSERT(!added_or_updated_);
     added_or_updated_ = true;
   }
+  bool requiredForAds() const override { return required_for_ads_; }
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
   bool added_or_updated_{};
+  bool required_for_ads_{};
 };
 
 TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
@@ -6055,7 +6312,7 @@ public:
 
     ReadyWatcher initialized;
     EXPECT_CALL(initialized, ready());
-    envoy::config::bootstrap::v3::Bootstrap config = parseBootstrapFromV3Yaml(yaml);
+    Bootstrap config = parseBootstrapFromV3Yaml(yaml);
     if (ratio != 0) {
       config.mutable_static_resources()
           ->mutable_clusters(0)
