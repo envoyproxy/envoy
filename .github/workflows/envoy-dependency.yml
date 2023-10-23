@@ -90,7 +90,7 @@ jobs:
     steps:
     - name: Fetch token for app auth
       id: appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.23
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.25
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
@@ -130,7 +130,7 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.0.23
+      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.0.25
       with:
         images: |
            sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
@@ -159,7 +159,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.23
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.25
       with:
         base: main
         body: Created by Envoy dependency bot
