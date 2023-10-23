@@ -80,6 +80,9 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
   const uint64_t starting_response_length = response.length();
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
+      // In the case of filtering by type, we need to call this before checking for
+      // no stats in the phase, and then after that this function returns without the normal
+      // advancing to the next phase.
       if (params_.type_ != StatsType::All && phase_ == Phase::CountersAndGauges) {
         renderPerHostMetrics(response);
       }
@@ -89,10 +92,12 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
       } else {
         phase_stat_count_ = 0;
       }
+
       if (params_.type_ != StatsType::All) {
         render_->finalize(response);
         return false;
       }
+
       switch (phase_) {
       case Phase::TextReadouts:
         phase_ = Phase::CountersAndGauges;
