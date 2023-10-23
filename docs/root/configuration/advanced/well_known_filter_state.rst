@@ -56,6 +56,12 @@ The following list of filter state objects are consumed by Envoy extensions:
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` to disable tunneling on a
   per-connection bases. Accepts values "true" and "false".
 
+``envoy.filters.listener.local_replay_owner``
+  :ref:`Information of the filter sending local replay` contains the information to identify the filter
+   generating the local replay from the filter chain. Fields:
+
+  * ``filter_config_name``: config_name from context;
+  * ``details``: local replay details.
 
 Filter state object fields
 --------------------------

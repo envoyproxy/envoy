@@ -127,6 +127,9 @@ minor_behavior_changes:
 - area: router
   change: |
     Enable environment_variable in router direct response.
+- area: tracing
+  change: |
+    Added filter invocking local replay in filter state as <envoy.filters.listener.local_replay_owner>.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
