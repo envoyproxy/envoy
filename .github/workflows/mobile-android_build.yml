@@ -58,7 +58,7 @@ jobs:
       contents: read
       packages: read
     name: java_helloworld
-    runs-on: macos-12
+    runs-on: custom
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -70,12 +70,11 @@ jobs:
         distribution: zulu
     - run: |
         cd mobile
-        ./ci/linux_ci_setup.sh --android
+        ./ci/linux_ci_setup.sh
       name: 'Install dependencies'
     # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
     - name: Enable KVM group permissions
       run: |
-        sudo mkdir -p /etc/udev/rules.d
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
