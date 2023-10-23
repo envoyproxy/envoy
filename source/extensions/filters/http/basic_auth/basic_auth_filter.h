@@ -36,8 +36,8 @@ struct User {
   std::string hash;
 };
 
-using UserMap = absl::flat_hash_map<std::string, User>; // username, User
-using UserMapConstPtr = std::unique_ptr<const UserMap>;
+using UserMapConstPtr =
+    std::unique_ptr<const absl::flat_hash_map<std::string, User>>; // username, User
 
 /**
  * Configuration for the Basic Auth filter.

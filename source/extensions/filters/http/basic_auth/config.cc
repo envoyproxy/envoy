@@ -13,7 +13,8 @@ using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
 namespace {
 
 UserMapConstPtr readHtpasswd(const std::string& htpasswd) {
-  std::unique_ptr<UserMap> users = std::make_unique<UserMap>();
+  std::unique_ptr<absl::flat_hash_map<std::string, User>> users =
+      std::make_unique<absl::flat_hash_map<std::string, User>>();
   std::istringstream htpsswd_ss(htpasswd);
   std::string line;
 
@@ -23,8 +24,9 @@ UserMapConstPtr readHtpasswd(const std::string& htpasswd) {
     if (colon_pos != std::string::npos) {
       std::string name, hash;
 
-      name = line.substr(0, colon_pos);
-      hash = line.substr(colon_pos + 1);
+      absl::string_view line_view = line;
+      name = line_view.substr(0, colon_pos);
+      hash = line_view.substr(colon_pos + 1);
 
       if (name.empty()) {
         throw EnvoyException("basic auth: invalid user name");
