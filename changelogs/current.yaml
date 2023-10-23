@@ -27,7 +27,7 @@ removed_config_or_runtime:
 new_features:
 - area: upstream
   change: |
-    Adds the option enable_full_scan on :ref:`load balancer policy <envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    Adds the option enable_full_scan on :ref:`least_request <envoy.extensions.load_balancing_policies>`
     so instead of using the choice_count to choose the hosts, we do a full scan on this list of hosts.
 
 deprecated:
