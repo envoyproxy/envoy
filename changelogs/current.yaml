@@ -21,7 +21,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
+- area: maglev
+  change: |
+    Removed ``envoy.reloadable_features.allow_compact_maglev`` and legacy code paths.
 new_features:
 
 deprecated:

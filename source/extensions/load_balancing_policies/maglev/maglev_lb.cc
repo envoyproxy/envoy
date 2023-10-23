@@ -37,8 +37,7 @@ public:
                     bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
 
     MaglevTableSharedPtr maglev_table;
-    if (shouldUseCompactTable(normalized_host_weights.size(), table_size) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_compact_maglev")) {
+    if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
       maglev_table =
           std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
                                                table_size, use_hostname_for_hashing, stats);
