@@ -25,15 +25,16 @@ UserMapConstPtr readHtpasswd(const std::string& htpasswd) {
       std::string name, hash;
 
       absl::string_view line_view = line;
+      absl::string_view hash_view;
       name = line_view.substr(0, colon_pos);
-      hash = line_view.substr(colon_pos + 1);
+      hash_view = line_view.substr(colon_pos + 1);
 
       if (name.empty()) {
         throw EnvoyException("basic auth: invalid user name");
       }
 
-      if (absl::StartsWith(hash, "{SHA}")) {
-        hash = hash.substr(5);
+      if (absl::StartsWith(hash_view, "{SHA}")) {
+        hash = hash_view.substr(5);
         // The base64 encoded SHA1 hash is 28 bytes long
         if (hash.length() != 28) {
           throw EnvoyException("basic auth: invalid SHA hash length");
