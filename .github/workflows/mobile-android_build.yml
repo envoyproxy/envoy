@@ -70,7 +70,7 @@ jobs:
         distribution: zulu
     - run: |
         cd mobile
-        ./ci/mac_ci_setup.sh --android
+        ./ci/linux_ci_setup.sh --android
       name: 'Install dependencies'
     # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
     - name: Enable KVM group perms
