@@ -19,6 +19,8 @@ public:
   Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap&) const override {
     return nullptr;
   }
+
+  bool isStrict() const override { return false; }
 };
 
 } // namespace
@@ -66,7 +68,7 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
   }
 
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
-    decoder_callbacks_->setUpstreamOverrideHost(upstream_address.value());
+    decoder_callbacks_->setUpstreamOverrideHost(upstream_address.value(), config->isStrict());
   }
   return Http::FilterHeadersStatus::Continue;
 }

@@ -169,7 +169,7 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
     return nullptr;
   }
 
-  auto host_iter = host_map->find(override_host.value());
+  auto host_iter = host_map->find(override_host.value().first);
 
   // The override host cannot be found in the host map.
   if (host_iter == host_map->end()) {
@@ -194,6 +194,16 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
     return host;
   }
   return nullptr;
+}
+
+bool HostUtility::allowLBChooseHost(LoadBalancerContext* context) {
+  auto override_host = context->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return true;
+  }
+
+  // Return opposite value to "strict" setting.
+  return !override_host.value().second;
 }
 
 } // namespace Upstream

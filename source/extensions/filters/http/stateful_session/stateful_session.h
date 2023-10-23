@@ -33,6 +33,8 @@ public:
     return factory_->create(headers);
   }
 
+  bool isStrict() const { return factory_->isStrict(); }
+
 private:
   Http::SessionStateFactorySharedPtr factory_;
 };

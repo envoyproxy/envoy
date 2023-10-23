@@ -52,6 +52,7 @@ public:
    * @param headers request headers.
    */
   virtual SessionStatePtr create(const RequestHeaderMap& headers) const PURE;
+  virtual bool isStrict() const PURE;
 };
 
 using SessionStateFactorySharedPtr = std::shared_ptr<SessionStateFactory>;

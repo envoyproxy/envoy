@@ -251,8 +251,11 @@ private:
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
-  void setUpstreamOverrideHost(absl::string_view) override {}
-  absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }
+  void setUpstreamOverrideHost(absl::string_view, bool) override {}
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+  upstreamOverrideHost() const override {
+    return absl::nullopt;
+  }
   absl::string_view filterConfigName() const override { return ""; }
 
   // ScopeTrackedObject

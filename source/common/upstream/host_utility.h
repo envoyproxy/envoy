@@ -28,6 +28,7 @@ public:
   // A utility function to select override host from host map according to load balancer context.
   static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, HostStatusSet status,
                                                LoadBalancerContext* context);
+  static bool allowLBChooseHost(LoadBalancerContext* context);
 };
 
 } // namespace Upstream
