@@ -231,9 +231,6 @@ public:
 
   /**
    * Kick off a new upstream request.
-   * @param with_tracing whether to set up tracing.
-   * @param with_bound_upstream whether to set up bound upstream. This is only make sense when
-   * protocol_options_.bindUpstreamConnection() is true.
    */
   void kickOffNewUpstreamRequest() {
     EXPECT_CALL(mock_filter_callback_, routeEntry()).WillOnce(Return(&mock_route_entry_));
@@ -698,17 +695,29 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseAndMultipleRequest) 
   for (size_t i = 0; i < 5; i++) {
     setup(FrameFlags(StreamFlags(i)));
 
-    std::cout << "i: " << i << std::endl;
-
-    EXPECT_CALL(*mock_client_codec_, encode(_, _))
-        .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
-          Buffer::OwnedImpl buffer;
-          buffer.add("hello");
-          // Expect response.
-          callback.onEncodingSuccess(buffer, true);
-        }));
+    // Expect immediate encoding.
+    if (GetParam().bind_upstream && i > 0) {
+      EXPECT_CALL(*mock_client_codec_, encode(_, _))
+          .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
+            Buffer::OwnedImpl buffer;
+            buffer.add("hello");
+            // Expect response.
+            callback.onEncodingSuccess(buffer, true);
+          }));
+    }
 
     kickOffNewUpstreamRequest();
+
+    // Expect encoding after pool ready.
+    if (!GetParam().bind_upstream || i == 0) {
+      EXPECT_CALL(*mock_client_codec_, encode(_, _))
+          .WillOnce(Invoke([&](const StreamFrame&, EncodingCallbacks& callback) -> void {
+            Buffer::OwnedImpl buffer;
+            buffer.add("hello");
+            // Expect response.
+            callback.onEncodingSuccess(buffer, true);
+          }));
+    }
 
     auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
 
