@@ -29,6 +29,9 @@ concurrency:
   group: ${{ github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
+env:
+  COMMITTER_NAME: dependency-envoy[bot]
+  COMMITTER_EMAIL: 148525496+dependency-envoy[bot]@users.noreply.github.com
 
 jobs:
   update_bazel:
@@ -76,8 +79,8 @@ jobs:
           ${{ inputs.pr_message }}
         branch: >-
           dependency/${{ inputs.task }}/${{ inputs.dependency }}/${{ steps.version.outputs.string }}
-        committer-name: publish-envoy[bot]
-        committer-email: 140627008+publish-envoy[bot]@users.noreply.github.com
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
         title: >-
           ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}`
           -> ${{ steps.version.outputs.string }}
@@ -164,8 +167,8 @@ jobs:
         base: main
         body: Created by Envoy dependency bot
         branch: dependency-envoy/build-image/latest
-        committer-name: publish-envoy[bot]
-        committer-email: 140627008+publish-envoy[bot]@users.noreply.github.com
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
         title: 'deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`'
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
         working-directory: envoy
