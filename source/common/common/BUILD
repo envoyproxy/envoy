@@ -207,7 +207,10 @@ envoy_cc_library(
         "json_escape_string.h",
         "logger.h",
     ],
-    external_deps = ["abseil_synchronization"],
+    external_deps = [
+        "abseil_synchronization",
+        "abseil_flat_hash_map",
+    ],
     deps = [
         ":base_logger_lib",
         ":fmt_lib",
