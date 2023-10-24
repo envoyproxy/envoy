@@ -187,11 +187,12 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
 }
 
 // Verifies set_response_code filter's per-route config overrides the filter config.
-TEST_P(CompositeFilterIntegrationTest, TestPerRouteResponseCode) {
-  std::string filter_name = "match_delegate_filter";
-  prependCompositeFilter(filter_name);
+TEST_P(CompositeFilterIntegrationTest, TestPerRouteResponseCodeConfig) {
+  std::string top_level_filter_name = "match_delegate_filter";
+  prependCompositeFilter(top_level_filter_name);
 
-  addResponseCodeFilterPerRouteConfig(/*filter_name=*/filter_name, /*route_prefix=*/"/somepath",
+  addResponseCodeFilterPerRouteConfig(/*filter_name=*/top_level_filter_name,
+                                      /*route_prefix=*/"/somepath",
                                       /*code=*/406);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
