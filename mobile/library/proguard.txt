@@ -2,6 +2,7 @@
 -dontwarn kotlin.**
 -dontwarn org.jetbrains.annotations.NotNull
 -dontwarn org.jetbrains.annotations.Nullable
+-dontwarn com.google.protobuf.**
 
 -dontnote android.support.**
 -dontnote kotlin.**
