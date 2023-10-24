@@ -114,22 +114,24 @@ def create_issues(access_token, runtime_and_pr):
 
     if get_confirmation():
         print('Creating issues...')
+        issue_created = False
         for title, body, login in issues:
             try:
-                # for setec backports, we may not find a user, which will
-                # cause repo.create_issue to crash. Preempt this by hitting the
-                # exception block below.
-                if not login:
-                    raise github.GithubException("login required")
-                repo.create_issue(title, body=body, assignees=[login], labels=labels)
+                # for setec backports, we may not find a user, which would make
+                # create_issue crash.
+                if login:
+                  repo.create_issue(title, body=body, assignees=[login], labels=labels)
+                  issue_created = True;
             except github.GithubException as e:
+                print((
+                    'unable to assign issue %s to %s. Add them to the Envoy proxy org'
+                    'and assign it their way.') % (title, login))
+
+            if not issue_created:
                 try:
                     if login:
                         body += '\ncc @' + login
                     repo.create_issue(title, body=body, labels=labels)
-                    print((
-                        'unable to assign issue %s to %s. Add them to the Envoy proxy org'
-                        'and assign it their way.') % (title, login))
                 except github.GithubException as e:
                     print('GithubException while creating issue.')
                     raise
