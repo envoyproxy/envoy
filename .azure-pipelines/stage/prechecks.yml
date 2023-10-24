@@ -99,7 +99,7 @@ jobs:
           authGPGKey: ${{ parameters.authGPGKey }}
           # GNUPGHOME inside the container
           pathGPGConfiguredHome: /build/.gnupg
-          pathGPGHome: /tmp/envoy-docker-build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
       - bash: |
           set -e
           ci/run_envoy_docker.sh "
@@ -107,7 +107,7 @@ jobs:
               && gpg --clearsign /tmp/authority \
               && cat /tmp/authority.asc \
               && gpg --verify /tmp/authority.asc"
-          rm -rf /tmp/envoy-docker-build/.gnupg
+          rm -rf $(Build.StagingDirectory)/.gnupg
         displayName: "Ensure container CI can sign with GPG"
         condition: and(not(canceled()), eq(variables['CI_TARGET'], 'docs'))
 
@@ -129,10 +129,6 @@ jobs:
           ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-readme'
         displayName: "Dockerhub publishing test"
         env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
 
@@ -155,14 +151,9 @@ jobs:
         condition: and(failed(), eq(variables['CI_TARGET'], 'check_and_fix_proto_format'))
 
       # Publish docs
-      - script: |
-          ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
+      - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
         displayName: "Upload Docs to GCS"
         env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
 

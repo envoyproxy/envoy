@@ -587,5 +587,10 @@ void RequestHeaderMapImpl::setByReference(absl::string_view key, absl::string_vi
   HeaderMapImpl::insertByKey(HeaderString(key), HeaderString(val));
 }
 
+void RequestHeaderMapImpl::removeByKey(absl::string_view key) {
+  ASSERT(validatedLowerCaseString(key));
+  HeaderMapImpl::removeExisting(key);
+}
+
 } // namespace Http
 } // namespace Envoy

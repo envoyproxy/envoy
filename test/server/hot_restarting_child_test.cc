@@ -9,6 +9,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/server/hot_restart_udp_forwarding_test_helper.h"
+#include "test/server/utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -93,7 +94,7 @@ public:
     hot_restarting_child_->initialize(dispatcher_);
   }
   void TearDown() override { hot_restarting_child_.reset(); }
-  std::string socket_path_{"@envoy_domain_socket"};
+  std::string socket_path_ = testDomainSocketName();
   Api::MockOsSysCalls os_sys_calls_;
   Event::MockDispatcher dispatcher_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};

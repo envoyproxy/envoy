@@ -18,7 +18,7 @@ class MockFilterChainOptions : public FilterChainOptions {
 public:
   MockFilterChainOptions() = default;
 
-  MOCK_METHOD(bool, filterDisabled, (absl::string_view), (const));
+  MOCK_METHOD(absl::optional<bool>, filterDisabled, (absl::string_view), (const));
 };
 
 TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
@@ -32,7 +32,7 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
             Filter::NamedHttpFilterFactoryCb{"filter_type_name",
                                              [](FilterChainFactoryCallbacks&) {}},
             name);
-    filter_factories.push_back(std::move(provider));
+    filter_factories.push_back({std::move(provider), false});
   }
 
   {
@@ -44,9 +44,43 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
 
   {
 
-    EXPECT_CALL(options, filterDisabled("filter_0")).WillOnce(Return(true));
-    EXPECT_CALL(options, filterDisabled("filter_1")).WillOnce(Return(false));
-    EXPECT_CALL(options, filterDisabled("filter_2")).WillOnce(Return(true));
+    EXPECT_CALL(options, filterDisabled("filter_0")).WillOnce(Return(absl::make_optional(true)));
+    EXPECT_CALL(options, filterDisabled("filter_1")).WillOnce(Return(absl::make_optional(false)));
+    EXPECT_CALL(options, filterDisabled("filter_2")).WillOnce(Return(absl::nullopt));
+
+    // 'filter_1' and 'filter_2' should be added.
+    EXPECT_CALL(manager, applyFilterFactoryCb(_, _)).Times(2);
+    FilterChainUtility::createFilterChainForFactories(manager, options, filter_factories);
+  }
+}
+
+TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabledAndDefaultDisabled) {
+  NiceMock<MockFilterChainManager> manager;
+  NiceMock<MockFilterChainOptions> options;
+  FilterChainUtility::FilterFactoriesList filter_factories;
+
+  for (const auto& name : {"filter_0", "filter_1", "filter_2"}) {
+    auto provider =
+        std::make_unique<Filter::StaticFilterConfigProviderImpl<Filter::NamedHttpFilterFactoryCb>>(
+            Filter::NamedHttpFilterFactoryCb{"filter_type_name",
+                                             [](FilterChainFactoryCallbacks&) {}},
+            name);
+    filter_factories.push_back({std::move(provider), true});
+  }
+
+  {
+    // If empty filter chain options is provided, all filters should not be added because they are
+    // all disabled by default.
+    EXPECT_CALL(manager, applyFilterFactoryCb(_, _)).Times(0);
+    FilterChainUtility::createFilterChainForFactories(manager, Http::EmptyFilterChainOptions{},
+                                                      filter_factories);
+  }
+
+  {
+
+    EXPECT_CALL(options, filterDisabled("filter_0")).WillOnce(Return(absl::make_optional(true)));
+    EXPECT_CALL(options, filterDisabled("filter_1")).WillOnce(Return(absl::make_optional(false)));
+    EXPECT_CALL(options, filterDisabled("filter_2")).WillOnce(Return(absl::nullopt));
 
     // Only filter_1 should be added.
     EXPECT_CALL(manager, applyFilterFactoryCb(_, _));

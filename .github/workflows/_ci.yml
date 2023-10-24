@@ -2,6 +2,9 @@ name: Envoy CI
 
 on:
   workflow_call:
+    secrets:
+      app_id:
+      app_key:
     inputs:
       target:
         required: true
@@ -92,9 +95,23 @@ jobs:
     steps:
     - if: ${{ inputs.cache_build_image }}
       name: Restore Docker cache (${{ inputs.cache_build_image }})
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.27
       with:
         image_tag: ${{ inputs.cache_build_image }}
+
+    - name: Check workflow context
+      id: context
+      run: |
+        if [[ "${{ inputs.trusted }}" != "false" && -n "${{ secrets.app_id }}" && -n "${{ secrets.app_key }}" ]]; then
+            echo "use_appauth=true" >> $GITHUB_OUTPUT
+        fi
+    - if: ${{ steps.context.outputs.use_appauth == 'true' }}
+      name: Fetch token for app auth
+      id: appauth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.27
+      with:
+        app_id: ${{ secrets.app_id }}
+        key: ${{ secrets.app_key }}
 
     - uses: actions/checkout@v4
       name: Checkout Envoy repository
@@ -104,6 +121,7 @@ jobs:
         #  If this is set, then anything before or after in the job should be regarded as
         #  compromised.
         ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
+        token: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
     # If we are in a trusted CI run then the provided commit _must_ be either the latest for
     # this branch, or an antecdent.
@@ -120,7 +138,7 @@ jobs:
       run: git config --global --add safe.directory /__w/envoy/envoy
 
     - if: ${{ inputs.diskspace_hack }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.27
     - run: |
         echo "disk space at beginning of build:"
         df -h
@@ -128,7 +146,7 @@ jobs:
 
     - if: ${{ inputs.run_pre }}
       name: Run pre action ${{ inputs.run_pre && format('({0})', inputs.run_pre) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.27
       with:
         uses: ${{ inputs.run_pre }}
         with: ${{ inputs.run_pre_with }}
@@ -148,11 +166,11 @@ jobs:
         command_prefix: ${{ inputs.command_prefix }}
         command_ci: ${{ inputs.command_ci }}
         env: ${{ inputs.env }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
     - if: ${{ inputs.run_post }}
       name: Run post action ${{ inputs.run_pre && format('({0})', inputs.run_post) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.27
       with:
         uses: ${{ inputs.run_post }}
         with: ${{ inputs.run_post_with }}

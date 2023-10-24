@@ -250,7 +250,7 @@ class RepoNotifier(runner.Runner):
         hours = age.seconds // 3600
         markup = ("*" if age > self.slo_max else "")
         return (
-            f"<{pull['html_url']}|{pull['title']}> has been waiting "
+            f"<{pull['html_url']}|{html.escape(pull['title'])}> has been waiting "
             f"{markup}{days} days {hours} hours{markup}")
 
     async def run(self):
@@ -279,7 +279,6 @@ class RepoNotifier(runner.Runner):
         print(json.dumps(report))
 
     async def send_message(self, channel, text):
-        text = html.escape(text)
         if self.dry_run:
             self.log.notice(f"Slack message ({channel}):\n{text}")
             return
@@ -290,7 +289,7 @@ class RepoNotifier(runner.Runner):
             # Only send texts if we have the slack UID
             if not (uid := assignees.get(name)):
                 continue
-            message = html.escape("\n".join(text))
+            message = "\n".join(text)
             if self.dry_run:
                 self.log.notice(f"Slack message ({name}):\n{message}")
                 continue
