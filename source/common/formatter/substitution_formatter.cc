@@ -28,6 +28,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
@@ -1897,7 +1898,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
     str = value.string_value();
   } else {
-    ProtobufUtil::StatusOr<std::string> json_or_error =
+    absl::StatusOr<std::string> json_or_error =
         MessageUtil::getJsonStringFromMessage(value, false, true);
     ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
     if (json_or_error.ok()) {
