@@ -24,11 +24,11 @@ android_binary(
     name = "cronet",
     srcs = [],
     manifest = "ChromiumNetManifest.xml",
-    # TODO(fredyw): Temporarily disable proguard.
-    # proguard_specs = ["//library:proguard_rules"],
+    proguard_specs = ["//library:proguard_rules"],
     visibility = ["//visibility:public"],
     deps = [
         ":net",
         "//library/java/org/chromium/net/impl:cronvoy",
+        artifact("com.google.protobuf:protobuf-javalite"),
     ],
 )

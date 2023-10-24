@@ -9,8 +9,7 @@ android_binary(
     name = "hello_envoy_kt",
     custom_package = "io.envoyproxy.envoymobile.helloenvoyexperimentaltest",
     manifest = "AndroidManifest.xml",
-    # TODO(fredyw): Temporarily disable proguard.
-    # proguard_specs = ["//library:proguard_rules"],
+    proguard_specs = ["//library:proguard_rules"],
     deps = [
         "hello_envoy_kt_lib",
     ],
@@ -35,6 +34,7 @@ kt_android_library(
         artifact("androidx.recyclerview:recyclerview"),
         artifact("androidx.annotation:annotation"),
         artifact("com.google.code.findbugs:jsr305"),
+        artifact("com.google.protobuf:protobuf-javalite"),
     ],
 )
 
