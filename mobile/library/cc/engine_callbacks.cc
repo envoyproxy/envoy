@@ -7,7 +7,7 @@ namespace {
 
 void c_on_engine_running(void* context) {
   auto engine_callbacks = *static_cast<EngineCallbacksSharedPtr*>(context);
-  std::function<void()> on_engine_running_cb = engine_callbacks->on_engine_running;
+  std::function<void()> on_engine_running_cb = std::move(engine_callbacks->on_engine_running);
   engine_callbacks->on_engine_running = {};
   on_engine_running_cb();
 }
