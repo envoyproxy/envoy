@@ -57,6 +57,11 @@ public:
       : secret_reader_(secret_reader){};
 
   // Common::CredentialInjector
+  RequestPtr requestCredential(Callbacks& callbacks) override {
+    callbacks.onSuccess();
+    return nullptr;
+  };
+
   bool inject(Http::RequestHeaderMap& headers, bool overrite) override;
 
 private:

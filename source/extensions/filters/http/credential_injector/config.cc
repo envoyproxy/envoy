@@ -10,11 +10,11 @@ namespace HttpFilters {
 namespace CredentialInjector {
 
 using Envoy::Extensions::Credentials::Common::NamedCredentialInjectorConfigFactory;
-using envoy::extensions::filters::http::credential_injector::v3::CredentialInjector;
 
 Http::FilterFactoryCb CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
-    const CredentialInjector& proto_config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
+    const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
+        proto_config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   // find the credential injector factory
   const std::string type{
       TypeUtil::typeUrlToDescriptorFullName(proto_config.credential().typed_config().type_url())};

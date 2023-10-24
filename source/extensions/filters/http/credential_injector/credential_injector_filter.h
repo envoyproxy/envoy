@@ -25,6 +25,7 @@ struct CredentialInjectorStats {
   ALL_credential_injector_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+using Envoy::Extensions::Credentials::Common::CredentialInjector;
 using Envoy::Extensions::Credentials::Common::CredentialInjectorSharedPtr;
 
 /**
@@ -36,9 +37,15 @@ public:
                Stats::Scope& scope);
   CredentialInjectorStats& stats() { return stats_; }
 
+  CredentialInjector::RequestPtr requestCredential(CredentialInjector::Callbacks& callbacks) {
+    return injector_->requestCredential(callbacks);
+  }
+
   // Inject configured credential to the HTTP request header.
   // Return true if the credential has been successful injected into the header.
-  bool injectCredential(Http::RequestHeaderMap& headers);
+  bool injectCredential(Http::RequestHeaderMap& headers) {
+    return injector_->inject(headers, overrite_);
+  }
 
 private:
   static CredentialInjectorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -54,15 +61,31 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 // The Envoy filter to inject credentials.
 class CredentialInjectorFilter : public Http::PassThroughFilter,
+                                 public CredentialInjector::Callbacks,
                                  public Logger::Loggable<Logger::Id::credential_injector> {
 public:
   CredentialInjectorFilter(FilterConfigSharedPtr config);
 
+  // Http::StreamFilterBase
+  void onDestroy() override;
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override;
+
+  // CredentialInjector::Callbacks
+  void onSuccess() override;
+  void onFailure() override;
 
 private:
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::RequestHeaderMap* request_headers_{};
+
   FilterConfigSharedPtr config_;
+
+  // Tracks any outstanding in-flight credential requests, allowing us to cancel the request
+  // if the filter ends before the request completes.
+  CredentialInjector::RequestPtr in_flight_credential_request_;
 };
 
 } // namespace CredentialInjector
