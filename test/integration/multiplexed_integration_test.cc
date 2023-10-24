@@ -2159,11 +2159,6 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   // Check access log if the agnostic stream lifetime is not extended.
   // It should have access logged since it has received the entire response.
   int hcm_logged_wire_bytes_sent, hcm_logged_wire_header_bytes_sent;
-  if (!Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
-    hcm_logged_wire_bytes_sent = access_log_values[0];
-    hcm_logged_wire_header_bytes_sent = access_log_values[1];
-  }
 
   // Grant the sender (Envoy) additional window so it can finish sending the
   // stream.
@@ -2181,13 +2176,11 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   EXPECT_EQ(accumulator.bodyWireBytesReceivedDiscountingHeaders(),
             accumulator.bodyWireBytesReceivedGivenPayloadAndFrames());
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    // Access logs are only available now due to the expanded agnostic stream
-    // lifetime.
-    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
-    hcm_logged_wire_bytes_sent = access_log_values[0];
-    hcm_logged_wire_header_bytes_sent = access_log_values[1];
-  }
+  // Access logs are only available now due to the expanded agnostic stream
+  // lifetime.
+  auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
+  hcm_logged_wire_bytes_sent = access_log_values[0];
+  hcm_logged_wire_header_bytes_sent = access_log_values[1];
   EXPECT_EQ(accumulator.stream_wire_header_bytes_recieved_, hcm_logged_wire_header_bytes_sent);
   EXPECT_EQ(accumulator.stream_wire_bytes_recieved_, hcm_logged_wire_bytes_sent)
       << "Received " << accumulator.stream_wire_bytes_recieved_
