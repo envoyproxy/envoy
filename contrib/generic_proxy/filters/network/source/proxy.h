@@ -31,7 +31,6 @@
 #include "contrib/generic_proxy/filters/network/source/route.h"
 #include "contrib/generic_proxy/filters/network/source/stats.h"
 #include "contrib/generic_proxy/filters/network/source/upstream.h"
-#include "stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -115,7 +114,7 @@ private:
 class ActiveStream : public FilterChainManager,
                      public LinkedObject<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
-                     public ResponseEncoderCallback,
+                     public EncodingCallbacks,
                      public Tracing::Config,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
@@ -333,15 +332,13 @@ using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 class Filter : public Envoy::Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
-               public RequestDecoderCallback {
+               public ServerCodecCallbacks {
 public:
   Filter(FilterConfigSharedPtr config, TimeSource& time_source, Runtime::Loader& runtime)
       : config_(std::move(config)), stats_(config_->stats()),
         drain_decision_(config_->drainDecision()), time_source_(time_source), runtime_(runtime) {
-    request_decoder_ = config_->codecFactory().requestDecoder();
-    request_decoder_->setDecoderCallback(*this);
-    response_encoder_ = config_->codecFactory().responseEncoder();
-    message_creator_ = config_->codecFactory().messageCreator();
+    server_codec_ = config_->codecFactory().createServerCodec();
+    server_codec_->setCodecCallbacks(*this);
   }
 
   // Envoy::Network::ReadFilter
@@ -373,7 +370,7 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  void sendFrameToDownstream(StreamFrame& frame, ResponseEncoderCallback& callback);
+  void sendFrameToDownstream(StreamFrame& frame, EncodingCallbacks& callbacks);
 
   Network::Connection& downstreamConnection() {
     ASSERT(callbacks_ != nullptr);
@@ -430,9 +427,7 @@ private:
   TimeSource& time_source_;
   Runtime::Loader& runtime_;
 
-  RequestDecoderPtr request_decoder_;
-  ResponseEncoderPtr response_encoder_;
-  MessageCreatorPtr message_creator_;
+  ServerCodecPtr server_codec_;
 
   Buffer::OwnedImpl response_buffer_;
 

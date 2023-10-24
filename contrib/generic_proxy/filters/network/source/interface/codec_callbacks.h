@@ -13,11 +13,11 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 /**
- * Decoder callback of request.
+ * Callbacks of ServerCodec.
  */
-class RequestDecoderCallback {
+class ServerCodecCallbacks {
 public:
-  virtual ~RequestDecoderCallback() = default;
+  virtual ~ServerCodecCallbacks() = default;
   /**
    * If request decoding success then this method will be called.
    * @param frame request frame from decoding. Frist frame should be StreamRequest
@@ -51,11 +51,11 @@ public:
 };
 
 /**
- * Decoder callback of Response.
+ * Callbacks of ClientCodec.
  */
-class ResponseDecoderCallback {
+class ClientCodecCallbacks {
 public:
-  virtual ~ResponseDecoderCallback() = default;
+  virtual ~ClientCodecCallbacks() = default;
 
   /**
    * If response decoding success then this method will be called.
@@ -91,29 +91,14 @@ public:
 };
 
 /**
- * Encoder callback of request.
+ * Callback of request/response frame.
  */
-class RequestEncoderCallback {
+class EncodingCallbacks {
 public:
-  virtual ~RequestEncoderCallback() = default;
+  virtual ~EncodingCallbacks() = default;
 
   /**
-   * If request encoding success then this method will be called.
-   * @param buffer encoding result buffer.
-   * @param end_stream if last frame is encoded.
-   */
-  virtual void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) PURE;
-};
-
-/**
- * Encoder callback of Response.
- */
-class ResponseEncoderCallback {
-public:
-  virtual ~ResponseEncoderCallback() = default;
-
-  /**
-   * If response encoding success then this method will be called.
+   * If encoding success then this method will be called to notify the generic proxy.
    * @param buffer encoding result buffer.
    * @param end_stream if last frame is encoded.
    */

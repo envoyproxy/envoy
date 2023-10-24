@@ -654,14 +654,6 @@ private:
       // * 0b010000: envoy::config::core::v3::HealthStatus::TIMEOUT
       // * 0b100000: envoy::config::core::v3::HealthStatus::DEGRADED
       //
-      // If runtime flag `envoy.reloadable_features.validate_detailed_override_host_statuses` is
-      // disabled, the old coarse health status Host::Health will be used. The specific
-      // correspondence is shown below:
-      //
-      // * 0b001: Host::Health::Unhealthy
-      // * 0b010: Host::Health::Degraded
-      // * 0b100: Host::Health::Healthy
-      //
       // If multiple bit fields are set, it is acceptable as long as the status of override host is
       // in any of these statuses.
       const HostUtility::HostStatusSet override_host_statuses_{};
