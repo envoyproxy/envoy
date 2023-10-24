@@ -85,7 +85,7 @@ private:
 
   // Copy the JWT Claim to HTTP Header
   void addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name,
-                           const bool list_claim_keys = false);
+                           const bool allow_serialize_object = false);
 
   // The jwks cache object.
   JwksCache& jwks_cache_;
@@ -302,34 +302,48 @@ void AuthenticatorImpl::verifyKey() {
 
 void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
                                             const std::string& header_name,
-                                            const bool list_claim_keys) {
+                                            const bool allow_serialize_object) {
   StructUtils payload_getter(jwt_->payload_pb_);
   const ProtobufWkt::Value* claim_value;
   const auto status = payload_getter.GetValue(claim_name, claim_value);
   std::string str_claim_value;
   if (status == StructUtils::OK) {
-    if (list_claim_keys) {
-      if (claim_value->has_struct_value()) {
-        const auto& fields = claim_value->struct_value().fields();
-        str_claim_value = absl::StrJoin(fields, ",", [](std::string* out, const auto& field) {
-          absl::StrAppend(out, field.first);
-        });
-      }
-    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kStringValue) {
+    switch (claim_value->kind_case()) {
+    case Envoy::ProtobufWkt::Value::kStringValue:
       str_claim_value = claim_value->string_value();
-    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kNumberValue) {
+      break;
+    case Envoy::ProtobufWkt::Value::kNumberValue:
       str_claim_value = convertClaimDoubleToString(claim_value->number_value());
-    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kBoolValue) {
+      break;
+    case Envoy::ProtobufWkt::Value::kBoolValue:
       str_claim_value = claim_value->bool_value() ? "true" : "false";
-    } else {
-      ENVOY_LOG(
-          debug,
-          "--------claim : {} is not a primitive type of int, double, string, or bool -----------",
-          claim_name);
+      break;
+    case Envoy::ProtobufWkt::Value::kStructValue:
+      ABSL_FALLTHROUGH_INTENDED;
+    case Envoy::ProtobufWkt::Value::kListValue: {
+      if (!allow_serialize_object) {
+        ENVOY_LOG(debug,
+                  "[jwt_auth] claim : {} is an object type but allow_serialize_object is not set",
+                  claim_name);
+        break;
+      }
+
+      std::string output;
+      auto status = claim_value->has_struct_value()
+                        ? ProtobufUtil::MessageToJsonString(claim_value->struct_value(), &output)
+                        : ProtobufUtil::MessageToJsonString(claim_value->list_value(), &output);
+      if (status.ok()) {
+        str_claim_value = Envoy::Base64::encode(output.data(), output.size());
+      }
+      break;
     }
+    default:
+      break;
+    }
+
     if (!str_claim_value.empty()) {
       headers_->addCopy(Http::LowerCaseString(header_name), str_claim_value);
-      ENVOY_LOG(debug, "--------claim : {} with value : {} is added to the header : {} -----------",
+      ENVOY_LOG(debug, "[jwt_auth] claim : {} with value : {} is added to the header : {}",
                 claim_name, str_claim_value, header_name);
     }
   }
@@ -354,7 +368,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   // Copy JWT claim to header
   for (const auto& header_and_claim : provider.claim_to_headers()) {
     addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name(),
-                        header_and_claim.list_claim_keys());
+                        header_and_claim.allow_serialize_object());
   }
 
   if (!provider.forward()) {

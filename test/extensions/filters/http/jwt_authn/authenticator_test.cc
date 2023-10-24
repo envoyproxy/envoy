@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
@@ -154,10 +155,13 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
   EXPECT_EQ(headers.get_("x-jwt-bool-claim"), "true");
   EXPECT_EQ(headers.get_("x-jwt-int-claim"), "9999");
 
-  // This check verifies whether the claim with the list_claim_keys value set is
-  // successfully added to header.
-  ASSERT_THAT(absl::StrSplit(headers.get_("x-jwt-claim-list-key"), ','),
-              testing::UnorderedElementsAre("key-2", "key-3", "key-4", "key-5"));
+  // This check verifies whether the claim with the allow_serialize_object value set is
+  // successfully serialized and added to headers.
+  std::string expected_json = "[\"str1\",\"str2\"]";
+
+  ASSERT_EQ(headers.get_("x-jwt-claim-object-key"),
+            Envoy::Base64::encode(expected_json.data(), expected_json.size()));
+  EXPECT_EQ(headers.get_("x-jwt-claim-primitive-key"), "9999");
 }
 
 // This test verifies when wrong claim is passed in claim_to_headers
@@ -177,7 +181,6 @@ TEST_F(AuthenticatorTest, TestClaimToHeaderWithHeaderReplace) {
   EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
   EXPECT_FALSE(headers.has("x-jwt-claim-nested-wrong"));
   EXPECT_FALSE(headers.has("x-jwt-unsupported-type-claim"));
-  EXPECT_FALSE(headers.has("x-jwt-claim-list-key-wrong"));
 }
 
 // This test verifies the Jwt is forwarded if "forward" flag is set.

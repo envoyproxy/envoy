@@ -97,12 +97,12 @@ providers:
       claim_name: "nested.nested-2.key-3"
     - header_name: "x-jwt-int-claim"
       claim_name: "nested.nested-2.key-4"
-    - header_name: "x-jwt-claim-list-key"
-      claim_name: "nested.nested-2"
-      list_claim_keys: true
-    - header_name: "x-jwt-claim-list-key-wrong"
+    - header_name: "x-jwt-claim-object-key"
+      claim_name: "nested.nested-2.key-5"
+      allow_serialize_object: true
+    - header_name: "x-jwt-claim-primitive-key"
       claim_name: "nested.nested-2.key-4"
-      list_claim_keys: true
+      allow_serialize_object: true
 rules:
 - match:
     path: "/"
