@@ -71,7 +71,7 @@ stages:
       macBuildStageDeps:
       - env
       windowsBuildStageDeps:
-      - env
+      checkStageDeps:
 
 # Scheduled run anywhere
 - ${{ if eq(variables.pipelineScheduled, true) }}:

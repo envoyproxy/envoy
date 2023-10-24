@@ -260,9 +260,8 @@ public:
    * Return error status for relaxed conversion and set has_unknown_field to false if relaxed
    * conversion(ignore unknown field) fails.
    */
-  static Protobuf::util::Status loadFromJsonNoThrow(const std::string& json,
-                                                    Protobuf::Message& message,
-                                                    bool& has_unknown_fileld);
+  static absl::Status loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+                                          bool& has_unknown_fileld);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -483,10 +482,10 @@ public:
    * @param pretty_print whether the returned JSON should be formatted.
    * @param always_print_primitive_fields whether to include primitive fields set to their default
    * values, e.g. an int32 set to 0 or a bool set to false.
-   * @return ProtobufUtil::StatusOr<std::string> of formatted JSON object, or an error status if
+   * @return absl::StatusOr<std::string> of formatted JSON object, or an error status if
    * conversion fails.
    */
-  static ProtobufUtil::StatusOr<std::string>
+  static absl::StatusOr<std::string>
   getJsonStringFromMessage(const Protobuf::Message& message, bool pretty_print = false,
                            bool always_print_primitive_fields = false);
 
@@ -523,7 +522,7 @@ public:
    *
    * @param code the protobuf error code
    */
-  static std::string codeEnumToString(ProtobufUtil::StatusCode code);
+  static std::string codeEnumToString(absl::StatusCode code);
 
   /**
    * Modifies a message such that all sensitive data (that is, fields annotated as

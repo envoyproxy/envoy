@@ -13,9 +13,9 @@
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
+using absl::Status;
+using absl::StatusCode;
 using Envoy::Protobuf::TextFormat;
-using Envoy::ProtobufUtil::Status;
-using Envoy::ProtobufUtil::StatusCode;
 using Envoy::ProtobufWkt::Empty;
 
 namespace Envoy {
