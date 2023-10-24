@@ -1,0 +1,51 @@
+name: Envoy/release
+
+permissions:
+  contents: read
+
+on:
+  release:
+    types:
+    - published
+    branches:
+    - main
+    - release/v*
+
+jobs:
+  # On release to `main`:
+  # - fork the branch to a release branch
+  # - add an initial dev commit
+  # - remove anything unwanted
+  # - push branch
+  create_release_branch:
+    runs-on: ubuntu-22.04
+    if: endsWith(github.ref, '.0')
+    name: Create release branch
+    steps:
+    - name: Fetch token for app auth
+      id: appauth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.18
+      with:
+        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ steps.appauth.outputs.token }}
+    - name: Create release branch
+      run: |
+        version="$(cut -d- -f1 < VERSION.txt | cut -d. -f-2)"
+        release_branch="release/v${version}"
+        commit_sha="$(git rev-parse HEAD)"
+        git config --global user.name "$COMMITTER_NAME"
+        git config --global user.email "$COMMITTER_EMAIL"
+        echo "Creating ${release_branch} from ${commit_sha}"
+        git checkout -b "$release_branch"
+        bazel run @envoy_repo//:dev -- --patch
+        git rm -rf .github/workflows/mobile*yml
+        git commit . -m "repo: Remove mobile ci for release branch"
+        git log
+        git push origin "$release_branch"
+      env:
+        COMMITTER_NAME: publish-envoy[bot]
+        COMMITTER_EMAIL: 140627008+publish-envoy[bot]@users.noreply.github.com

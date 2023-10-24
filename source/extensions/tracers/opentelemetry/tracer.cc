@@ -107,7 +107,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   *span_.add_attributes() = key_value;
 }
 
-Tracer::Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
+Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const std::string& service_name)
@@ -168,7 +168,7 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
 }
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& operation_name,
-                                   SystemTime start_time, const Tracing::Decision tracing_decision,
+                                   SystemTime start_time, Tracing::Decision tracing_decision,
                                    bool downstream_span) {
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
   Span new_span(config, operation_name, start_time, time_source_, *this, downstream_span);

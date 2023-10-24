@@ -166,7 +166,7 @@ jobs:
         command_prefix: ${{ inputs.command_prefix }}
         command_ci: ${{ inputs.command_ci }}
         env: ${{ inputs.env }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
     - if: ${{ inputs.run_post }}
       name: Run post action ${{ inputs.run_pre && format('({0})', inputs.run_post) || '' }}

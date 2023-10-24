@@ -35,7 +35,7 @@ WatcherImpl::~WatcherImpl() {
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, Watcher::OnChangedCb cb) {
   FileWatchPtr watch = addWatch(path, events, cb, false);
   if (watch == nullptr) {
-    throw EnvoyException(absl::StrCat("invalid watch path ", path));
+    throwEnvoyExceptionOrPanic(absl::StrCat("invalid watch path ", path));
   }
 }
 
@@ -73,7 +73,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
          reinterpret_cast<void*>(watch_fd));
 
   if (kevent(queue_, &event, 1, nullptr, 0, nullptr) == -1 || event.flags & EV_ERROR) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("unable to add filesystem watch for file {}: {}", path, errorDetails(errno)));
   }
 

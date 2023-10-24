@@ -175,20 +175,20 @@ public:
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
-  using ClusterManagerImpl::ClusterManagerImpl;
-
-  TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         ClusterManagerFactory& factory, Stats::Store& stats,
-                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager,
-                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                         Http::Context& http_context, Grpc::Context& grpc_context,
-                         Router::Context& router_context, Server::Instance& server)
-      : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
-                           main_thread_dispatcher, admin, validation_context, api, http_context,
-                           grpc_context, router_context, server) {}
+  static std::unique_ptr<TestClusterManagerImpl>
+  createAndInit(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                ClusterManagerFactory& factory, Stats::Store& stats, ThreadLocal::Instance& tls,
+                Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+                Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context,
+                Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+                Router::Context& router_context, Server::Instance& server) {
+    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
+        bootstrap, factory, stats, tls, runtime, local_info, log_manager, main_thread_dispatcher,
+        admin, validation_context, api, http_context, grpc_context, router_context, server)};
+    cluster_manager->init(bootstrap);
+    return cluster_manager;
+  }
 
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
@@ -213,12 +213,30 @@ public:
   ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name) {
     return ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::move(thread_name));
   }
+
+protected:
+  using ClusterManagerImpl::ClusterManagerImpl;
+
+  TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                         ClusterManagerFactory& factory, Stats::Store& stats,
+                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                         const LocalInfo::LocalInfo& local_info,
+                         AccessLog::AccessLogManager& log_manager,
+                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                         ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+                         Http::Context& http_context, Grpc::Context& grpc_context,
+                         Router::Context& router_context, Server::Instance& server)
+      : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
+                           main_thread_dispatcher, admin, validation_context, api, http_context,
+                           grpc_context, router_context, server) {}
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls
 // it with the right values at the right times.
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
+  using TestClusterManagerImpl::TestClusterManagerImpl;
+
   MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                   ClusterManagerFactory& factory, Stats::Store& stats,
                                   ThreadLocal::Instance& tls, Runtime::Loader& runtime,

@@ -2764,7 +2764,6 @@ envoy_cc_library(
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
-        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
     ],
 )
 
@@ -3041,15 +3040,11 @@ envoy_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_http_client_lib",
     srcs = [
-        "quiche/quic/core/http/quic_client_promised_info.cc",
-        "quiche/quic/core/http/quic_client_push_promise_index.cc",
         "quiche/quic/core/http/quic_spdy_client_session.cc",
         "quiche/quic/core/http/quic_spdy_client_session_base.cc",
         "quiche/quic/core/http/quic_spdy_client_stream.cc",
     ],
     hdrs = [
-        "quiche/quic/core/http/quic_client_promised_info.h",
-        "quiche/quic/core/http/quic_client_push_promise_index.h",
         "quiche/quic/core/http/quic_spdy_client_session.h",
         "quiche/quic/core/http/quic_spdy_client_session_base.h",
         "quiche/quic/core/http/quic_spdy_client_stream.h",
@@ -3068,7 +3063,6 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":spdy_core_framer_lib",
         ":spdy_core_protocol_lib",
-        "@envoy//source/common/quic:spdy_server_push_utils_for_envoy_lib",
     ],
 )
 
@@ -3133,15 +3127,6 @@ envoy_quic_cc_library(
     deps = [
         ":quic_core_http_spdy_session_lib",
         ":quic_core_types_lib",
-    ],
-)
-
-envoy_quic_cc_library(
-    name = "quic_core_http_spdy_server_push_utils_header",
-    hdrs = ["quiche/quic/core/http/spdy_server_push_utils.h"],
-    deps = [
-        ":quic_platform_base",
-        ":spdy_core_http2_header_block_lib",
     ],
 )
 
@@ -4680,8 +4665,15 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
-    ],
+    ] + select({
+        "@platforms//os:android": [
+            "@envoy//source/common/quic/platform/mobile_impl:mobile_quiche_bug_tracker_impl_lib",
+        ],
+        "@platforms//os:ios": [
+            "@envoy//source/common/quic/platform/mobile_impl:mobile_quiche_bug_tracker_impl_lib",
+        ],
+        "//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
+    }),
 )
 
 envoy_cc_library(
@@ -4694,8 +4686,15 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
-    ],
+    ] + select({
+        "@platforms//os:android": [
+            ":quiche_common_mobile_quiche_logging_lib",
+        ],
+        "@platforms//os:ios": [
+            ":quiche_common_mobile_quiche_logging_lib",
+        ],
+        "//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
+    }),
 )
 
 envoy_cc_library(
@@ -4719,6 +4718,21 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         ":quiche_common_platform_export",
+    ],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_mobile_quiche_logging_lib",
+    srcs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_logging_impl.cc",
+    ],
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_logging_impl.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/log:absl_log",
     ],
 )
 

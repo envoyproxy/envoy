@@ -17,7 +17,10 @@
 
 package api
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // ****************** filter status start ******************//
 type StatusType int
@@ -444,3 +447,13 @@ func (t ConnectionInfoType) String() string {
 	}
 	return "unknown"
 }
+
+// *************** errors start **************//
+var (
+	ErrInternalFailure = errors.New("internal failure")
+	ErrValueNotFound   = errors.New("value not found")
+	// Failed to serialize the value when we fetch the value as string
+	ErrSerializationFailure = errors.New("serialization failure")
+)
+
+// *************** errors end **************//

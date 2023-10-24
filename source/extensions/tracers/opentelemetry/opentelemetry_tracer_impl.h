@@ -8,7 +8,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/tracers/common/factory_base.h"
-#include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
 namespace Envoy {
@@ -36,7 +35,7 @@ public:
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const StreamInfo::StreamInfo& stream_info,
                              const std::string& operation_name,
-                             const Tracing::Decision tracing_decision) override;
+                             Tracing::Decision tracing_decision) override;
 
 private:
   class TlsTracer : public ThreadLocal::ThreadLocalObject {

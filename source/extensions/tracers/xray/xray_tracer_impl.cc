@@ -65,7 +65,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const std::string& operation_name,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.
   // if there's a X-Ray header and it has a sampling decision already determined (i.e. Sample=1)
   // then we can move on; otherwise, we ask the sampling strategy whether this request should be

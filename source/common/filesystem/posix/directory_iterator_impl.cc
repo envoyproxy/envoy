@@ -28,7 +28,7 @@ void DirectoryIteratorImpl::openDirectory() {
   DIR* temp_dir = ::opendir(directory_path_.c_str());
   dir_ = temp_dir;
   if (!dir_) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("unable to open directory {}: {}", directory_path_, errorDetails(errno)));
   }
 }
@@ -37,7 +37,7 @@ void DirectoryIteratorImpl::nextEntry() {
   errno = 0;
   dirent* entry = ::readdir(dir_);
   if (entry == nullptr && errno != 0) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("unable to iterate directory {}: {}", directory_path_, errorDetails(errno)));
   }
 
@@ -65,7 +65,7 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(absl::string_view filename) cons
     // TODO: throwing an exception here makes this dangerous to use in worker threads,
     // and in general since it's not clear to the user of Directory that an exception
     // may be thrown. Perhaps make this return StatusOr and handle failures gracefully.
-    throw EnvoyException(fmt::format("unable to stat file: '{}' ({})", full_path, errno));
+    throwEnvoyExceptionOrPanic(fmt::format("unable to stat file: '{}' ({})", full_path, errno));
   } else if (S_ISDIR(stat_buf.st_mode)) {
     return DirectoryEntry{std::string{filename}, FileType::Directory, absl::nullopt};
   } else if (S_ISREG(stat_buf.st_mode)) {

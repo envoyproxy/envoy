@@ -3,7 +3,6 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
-
 import java.nio.ByteBuffer;
 
 public class JniLibrary {
@@ -322,5 +321,6 @@ public class JniLibrary {
       long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsAuthenticationHeader,
       String xdsAuthenticationToken, String xdsJwtToken, long xdsJwtTokenLifetime,
       String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
-      String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
+      String nodeSubZone, byte[] nodeMetadata, String cdsResourcesLocator, long cdsTimeoutSeconds,
+      boolean enableCds);
 }

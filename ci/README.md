@@ -106,6 +106,13 @@ For a release version of the Envoy binary you can run:
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
+To enable the previous behavior of the `release.server_only` target where the final binary was copied to a tar.gz file
+(e.g. envoy-binary.tar.gz), you can run:
+
+  ```bash
+  ./ci/run_envoy_docker.sh './ci/do_ci.sh release.server_only.binary
+  ```
+
 For a debug version of the Envoy binary you can run:
 
 ```bash

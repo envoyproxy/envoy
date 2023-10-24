@@ -514,7 +514,10 @@ def _com_github_intel_ipp_crypto_crypto_mb():
         # to create dynamic *.so library target. Linker fails when linking
         # with boringssl_fips library. Envoy uses only static library
         # anyways, so created dynamic library would not be used anyways.
-        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch",
+            "@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch",
+        ],
         patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
     )
@@ -789,6 +792,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/base",
     )
     native.bind(
+        name = "abseil_btree",
+        actual = "@com_google_absl//absl/container:btree",
+    )
+    native.bind(
         name = "abseil_flat_hash_map",
         actual = "@com_google_absl//absl/container:flat_hash_map",
     )
@@ -989,7 +996,10 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
 def _v8():
     external_http_archive(
         name = "v8",
-        patches = ["@envoy//bazel:v8.patch"],
+        patches = [
+            "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_include.patch",
+        ],
         patch_args = ["-p1"],
     )
     native.bind(

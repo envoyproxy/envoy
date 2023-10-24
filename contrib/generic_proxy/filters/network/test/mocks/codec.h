@@ -73,7 +73,6 @@ public:
   MOCK_METHOD(RequestEncoderPtr, requestEncoder, (), (const));
   MOCK_METHOD(ResponseEncoderPtr, responseEncoder, (), (const));
   MOCK_METHOD(MessageCreatorPtr, messageCreator, (), (const));
-  MOCK_METHOD(ProtocolOptions, protocolOptions, (), (const));
 };
 
 class MockProxyFactory : public ProxyFactory {

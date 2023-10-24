@@ -8,8 +8,6 @@ set -e
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
-# shellcheck source=ci/setup_cache.sh
-. "$(dirname "$0")"/setup_cache.sh
 # shellcheck source=ci/build_setup.sh
 . "$(dirname "$0")"/build_setup.sh
 
@@ -525,6 +523,11 @@ case $CI_TARGET in
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
+        # Disable this pending resolution to https://github.com/envoyproxy/envoy/issues/30286
+        # Run pip requirements tests
+        # echo "Check pip requirements ..."
+        # bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       //tools/base:requirements_test
         ;;
 
     dev)
@@ -856,6 +859,12 @@ case $CI_TARGET in
            bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
            "${ENVOY_BINARY_DIR}/schema_validator_tool"
         echo "Release files created in ${ENVOY_BINARY_DIR}"
+        ;;
+
+    release.server_only.binary)
+        setup_clang_toolchain
+        echo "bazel release build..."
+        bazel_envoy_binary_build release
         ;;
 
     release.signed)

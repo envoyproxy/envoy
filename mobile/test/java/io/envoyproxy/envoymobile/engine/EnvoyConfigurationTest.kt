@@ -1,18 +1,16 @@
 package io.envoyproxy.envoymobile.engine
 
+import com.google.protobuf.Struct
+import com.google.protobuf.Value
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
-import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.HeaderMatchConfig
-import io.envoyproxy.envoymobile.engine.HeaderMatchConfig.Type
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
 import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.nio.ByteBuffer
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.Assert.fail
 import org.junit.Test
 import java.util.regex.Pattern
 
@@ -115,6 +113,7 @@ class EnvoyConfigurationTest {
     nodeRegion: String = "",
     nodeZone: String = "",
     nodeSubZone: String = "",
+    nodeMetadata: Struct = Struct.getDefaultInstance(),
     cdsResourcesLocator: String = "",
     cdsTimeoutSeconds: Int = 0,
     enableCds: Boolean = false,
@@ -170,6 +169,7 @@ class EnvoyConfigurationTest {
       nodeRegion,
       nodeZone,
       nodeSubZone,
+      nodeMetadata,
       cdsResourcesLocator,
       cdsTimeoutSeconds,
       enableCds
@@ -427,4 +427,19 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
     assertThat(resolvedTemplate).contains("stats.example.com");
  }
+
+  @Test
+  fun `test node metadata`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      nodeMetadata = Struct.newBuilder()
+        .putFields("metadata_field", Value.newBuilder().setStringValue("metadata_value").build())
+        .build()
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("metadata_field")
+    assertThat(resolvedTemplate).contains("metadata_value")
+  }
 }
