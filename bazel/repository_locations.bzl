@@ -1432,6 +1432,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-12-15",
         cpe = "N/A",
     ),
+    libpfm = dict(
+        project_name = "libpfm",
+        project_desc = "A helper library to develop monitoring tools",
+        project_url = "https://sourceforge.net/projects/perfmon2",
+        version = "4.11.0",
+        sha256 = "5da5f8872bde14b3634c9688d980f68bda28b510268723cc12973eedbab9fecc",
+        strip_prefix = "libpfm-{version}",
+        use_category = ["test_only"],
+        urls = ["https://downloads.sourceforge.net/project/perfmon2/libpfm4/libpfm-{version}.tar.gz"],
+        release_date = "2020-09-03",
+    ),
     rules_license = dict(
         project_name = "rules_license",
         project_desc = "Bazel rules for checking open source licenses",
