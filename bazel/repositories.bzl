@@ -571,8 +571,6 @@ def _net_zlib():
     external_http_archive(
         name = "net_zlib",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
     )
 
     native.bind(
