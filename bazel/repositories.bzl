@@ -339,7 +339,12 @@ def envoy_dependencies(skip_targets = []):
         patches = ["@envoy//bazel:rules_pkg.patch"],
     )
     external_http_archive("com_github_aignas_rules_shellcheck")
-    external_http_archive("aspect_bazel_lib")
+    external_http_archive(
+        "aspect_bazel_lib",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:aspect.patch"],
+    )
+
     _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
@@ -476,6 +481,10 @@ def _com_github_gabime_spdlog():
 def _com_github_google_benchmark():
     external_http_archive(
         name = "com_github_google_benchmark",
+    )
+    external_http_archive(
+        name = "libpfm",
+        build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
     )
     native.bind(
         name = "benchmark",
