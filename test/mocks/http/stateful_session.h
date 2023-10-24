@@ -20,6 +20,7 @@ public:
   MockSessionStateFactory();
 
   MOCK_METHOD(Http::SessionStatePtr, create, (const Http::RequestHeaderMap& headers), (const));
+  MOCK_METHOD(bool, isStrict, (), (const));
 };
 
 class MockSessionStateFactoryConfig : public Http::SessionStateFactoryConfig {

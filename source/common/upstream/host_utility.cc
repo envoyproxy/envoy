@@ -197,6 +197,10 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
 }
 
 bool HostUtility::allowLBChooseHost(LoadBalancerContext* context) {
+  if (context == nullptr) {
+    return true;
+  }
+
   auto override_host = context->overrideHostToSelect();
   if (!override_host.has_value()) {
     return true;

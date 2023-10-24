@@ -173,7 +173,7 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
   }
   {
     // The host map does not contain the expected host.
-    LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", false};
     EXPECT_CALL(context, overrideHostToSelect())
         .WillOnce(Return(absl::make_optional(override_host)));
     auto host_map = std::make_shared<HostMap>();
@@ -184,7 +184,7 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
     EXPECT_CALL(*mock_host, healthStatus())
         .WillRepeatedly(Return(envoy::config::core::v3::HealthStatus::UNHEALTHY));
 
-    LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", false};
     EXPECT_CALL(context, overrideHostToSelect())
         .WillRepeatedly(Return(absl::make_optional(override_host)));
 
@@ -207,7 +207,7 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
     EXPECT_CALL(*mock_host, healthStatus())
         .WillRepeatedly(Return(envoy::config::core::v3::HealthStatus::DEGRADED));
 
-    LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", false};
     EXPECT_CALL(context, overrideHostToSelect())
         .WillRepeatedly(Return(absl::make_optional(override_host)));
 
@@ -338,7 +338,7 @@ TEST(HostUtilityTest, SelectOverrideHostTestRuntimeFlagFlase) {
   }
   {
     // The host map does not contain the expected host.
-    LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", false};
     EXPECT_CALL(context, overrideHostToSelect())
         .WillOnce(Return(absl::make_optional(override_host)));
     auto host_map = std::make_shared<HostMap>();
@@ -349,7 +349,7 @@ TEST(HostUtilityTest, SelectOverrideHostTestRuntimeFlagFlase) {
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
     EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Unhealthy));
 
-    LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", false};
     EXPECT_CALL(context, overrideHostToSelect())
         .WillOnce(Return(absl::make_optional(override_host)));
 
@@ -362,7 +362,7 @@ TEST(HostUtilityTest, SelectOverrideHostTestRuntimeFlagFlase) {
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
     EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Degraded));
 
-    LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", false};
     EXPECT_CALL(context, overrideHostToSelect())
         .WillOnce(Return(absl::make_optional(override_host)));
 
