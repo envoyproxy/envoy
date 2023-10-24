@@ -477,6 +477,10 @@ def _com_github_google_benchmark():
     external_http_archive(
         name = "com_github_google_benchmark",
     )
+    external_http_archive(
+        name = "libpfm",
+        build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
+    )
     native.bind(
         name = "benchmark",
         actual = "@com_github_google_benchmark//:benchmark",
