@@ -54,8 +54,8 @@ public:
     TestReadFilter(IntegrationTest& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      parent_.response_decoder_->decode(data);
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+      parent_.client_codec_->decode(data, end_stream);
       return Network::FilterStatus::Continue;
     }
     Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
@@ -65,19 +65,19 @@ public:
   };
   using TestReadFilterSharedPtr = std::shared_ptr<TestReadFilter>;
 
-  struct TestRequestEncoderCallback : public RequestEncoderCallback {
+  struct TestRequestEncoderCallback : public EncodingCallbacks {
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
     Buffer::OwnedImpl buffer_;
   };
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
 
-  struct TestResponseEncoderCallback : public ResponseEncoderCallback {
+  struct TestResponseEncoderCallback : public EncodingCallbacks {
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
     Buffer::OwnedImpl buffer_;
   };
   using TestResponseEncoderCallbackSharedPtr = std::shared_ptr<TestResponseEncoderCallback>;
 
-  struct TestResponseDecoderCallback : public ResponseDecoderCallback {
+  struct TestResponseDecoderCallback : public ClientCodecCallbacks {
     TestResponseDecoderCallback(IntegrationTest& parent) : parent_(parent) {}
 
     struct SingleResponse {
@@ -125,15 +125,17 @@ public:
     integration_ = std::make_unique<GenericProxyIntegrationTest>(config_yaml);
     integration_->initialize();
 
-    // Create codec for downstream client.
+    // Create codec for downstream client to encode request and decode response.
     codec_factory_ = std::move(codec_factory);
-    request_encoder_ = codec_factory_->requestEncoder();
-    response_decoder_ = codec_factory_->responseDecoder();
-    response_encoder_ = codec_factory_->responseEncoder();
+    client_codec_ = codec_factory_->createClientCodec();
+
     request_encoder_callback_ = std::make_shared<TestRequestEncoderCallback>();
     response_decoder_callback_ = std::make_shared<TestResponseDecoderCallback>(*this);
+    client_codec_->setCodecCallbacks(*response_decoder_callback_);
+
+    // Helper codec for upstream server to encode response.
+    server_codec_ = codec_factory_->createServerCodec();
     response_encoder_callback_ = std::make_shared<TestResponseEncoderCallback>();
-    response_decoder_->setDecoderCallback(*response_decoder_callback_);
   }
 
   std::string defaultConfig(bool bind_upstream_connection = false) {
@@ -207,7 +209,7 @@ public:
 
   // Send downstream request.
   void sendRequestForTest(StreamFrame& request) {
-    request_encoder_->encode(request, *request_encoder_callback_);
+    client_codec_->encode(request, *request_encoder_callback_);
     client_connection_->write(request_encoder_callback_->buffer_, false);
     client_connection_->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
     // Clear buffer for next encoding.
@@ -230,7 +232,7 @@ public:
 
   // Send upstream response.
   void sendResponseForTest(const StreamFrame& response) {
-    response_encoder_->encode(response, *response_encoder_callback_);
+    server_codec_->encode(response, *response_encoder_callback_);
 
     auto result =
         upstream_connection_->write(response_encoder_callback_->buffer_.toString(), false);
@@ -280,9 +282,9 @@ public:
 
   // Codec.
   CodecFactoryPtr codec_factory_;
-  RequestEncoderPtr request_encoder_;
-  ResponseDecoderPtr response_decoder_;
-  ResponseEncoderPtr response_encoder_;
+  ServerCodecPtr server_codec_;
+  ClientCodecPtr client_codec_;
+
   TestRequestEncoderCallbackSharedPtr request_encoder_callback_;
   TestResponseDecoderCallbackSharedPtr response_decoder_callback_;
   TestResponseEncoderCallbackSharedPtr response_encoder_callback_;

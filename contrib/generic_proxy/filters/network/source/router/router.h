@@ -41,11 +41,11 @@ enum class StreamResetReason : uint32_t {
 class RouterFilter;
 class UpstreamRequest;
 
-class GenericUpstream : public UpstreamConnection, public ResponseDecoderCallback {
+class GenericUpstream : public UpstreamConnection, public ClientCodecCallbacks {
 public:
-  GenericUpstream(Upstream::TcpPoolData&& tcp_pool_data, ResponseDecoderPtr&& response_decoder)
-      : UpstreamConnection(std::move(tcp_pool_data), std::move(response_decoder)) {
-    response_decoder_->setDecoderCallback(*this);
+  GenericUpstream(Upstream::TcpPoolData&& tcp_pool_data, ClientCodecPtr&& client_codec)
+      : UpstreamConnection(std::move(tcp_pool_data), std::move(client_codec)) {
+    client_codec_->setCodecCallbacks(*this);
   }
 
   // ResponseDecoderCallback
@@ -137,7 +137,7 @@ private:
 
 class UpstreamRequest : public LinkedObject<UpstreamRequest>,
                         public Envoy::Event::DeferredDeletable,
-                        public RequestEncoderCallback,
+                        public EncodingCallbacks,
                         Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr generic_upstream);
@@ -218,8 +218,6 @@ public:
     callbacks_ = &callbacks;
     // Set handler for following request frames.
     callbacks_->setRequestFramesHandler(*this);
-
-    request_encoder_ = callbacks_->downstreamCodec().requestEncoder();
   }
   FilterStatus onStreamDecoded(StreamRequest& request) override;
 
@@ -261,8 +259,6 @@ private:
   bool request_stream_end_{};
 
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;
-
-  RequestEncoderPtr request_encoder_;
 
   std::list<UpstreamRequestPtr> upstream_requests_;
 
