@@ -19,7 +19,7 @@ services:
     build:
       context: ./proc
       dockerfile: ../../shared/node/Dockerfile
-      target: node-http-auth
+      target: node-http-proc
     volumes:
     - ./users.json:/etc/users.json
     environment:
@@ -27,13 +27,16 @@ services:
 
   ext_authz-grpc-service:
     build:
-      context: proc
+      context: ./proc
       dockerfile: ../../shared/golang/Dockerfile
-      target: golang-grpc-auth
+      target: golang-grpc-proc
     volumes:
     - ./users.json:/etc/users.json
 
   upstream-service:
     build:
-      context: ../shared/golang/Dockerfile
-      target: golan-target-service
+      context: ./upstream
+      dockerfile: ../../shared/golang/Dockerfile
+      target: golang-ext-proc-upstream
+    environment:
+    - GO_APP_NAME=upstream

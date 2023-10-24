@@ -76,3 +76,13 @@ RUN go mod download \
 FROM os-base as golang-lrs
 COPY --from=golang-lrs-builder /go/bin/load-reporting-service /usr/local/bin/load-reporting-service
 CMD ["load-reporting-service"]
+
+# Ext Proc stage with an explicit name
+FROM golang:1.21.2-bullseye as golang-ext-proc
+
+# Copy your Go code and build your application here
+COPY ./path/to/ext_proc/app /app
+RUN make -C "/app"
+
+# Rest of the Dockerfile
+
