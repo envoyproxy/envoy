@@ -119,6 +119,7 @@ jobs:
         version="0.5.0.$(date '+%Y%m%d')"
         python mobile/ci/sonatype_nexus_upload.py \
           --profile_id=$SONATYPE_PROFILE_ID \
+          --artifact_id=envoy \
           --version=$version \
           --files \
             envoy.aar \
@@ -235,6 +236,7 @@ jobs:
         version="0.5.0.$(date '+%Y%m%d')"
         python mobile/ci/sonatype_nexus_upload.py \
           --profile_id=$SONATYPE_PROFILE_ID \
+          --artifact_id=envoy-xds \
           --version=$version \
           --files \
             envoy_xds.aar \
