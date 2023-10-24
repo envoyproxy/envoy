@@ -13,6 +13,10 @@ bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
     return false;
   }
 
+#ifdef MAGLEV_LB_FORCE_ORIGINAL_IMPL
+  return false;
+#endif
+
   if (num_hosts > MaglevTable::MaxNumberOfHostsForCompactMaglev) {
     return false;
   }

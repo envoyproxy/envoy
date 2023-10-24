@@ -23,6 +23,23 @@ envoy_cc_library(
     ],
 )
 
+# This library target is for tests especially x86 coverage
+# which would in use the compact representation.
+envoy_cc_library(
+    name = "maglev_lb_force_original_impl_lib",
+    srcs = ["maglev_lb.cc"],
+    hdrs = ["maglev_lb.h"],
+    copts = ["-DMAGLEV_LB_FORCE_ORIGINAL_IMPL"],
+    deps = [
+        "//envoy/upstream:load_balancer_interface",
+        "//source/common/common:bit_array_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/upstream:thread_aware_lb_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
