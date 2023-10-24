@@ -17,7 +17,7 @@ services:
 
   ext_authz-http-service:
     build:
-      context: ./auth
+      context: ./proc
       dockerfile: ../../shared/node/Dockerfile
       target: node-http-auth
     volumes:
@@ -27,7 +27,7 @@ services:
 
   ext_authz-grpc-service:
     build:
-      context: auth
+      context: proc
       dockerfile: ../../shared/golang/Dockerfile
       target: golang-grpc-auth
     volumes:
