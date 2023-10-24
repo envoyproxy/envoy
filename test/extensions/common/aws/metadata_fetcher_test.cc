@@ -33,13 +33,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-MATCHER_P(OptionsHasRetryPolicy, expectedValue, "") {
-  *result_listener << "\nexpected is retry_policy present: \"" << expectedValue
-                   << "\" but got is retry_policy present: \"" << arg.retry_policy.has_value()
-                   << "\"\n";
-  return ExplainMatchResult(expectedValue, arg.retry_policy.has_value(), result_listener);
-}
-
 MATCHER_P(OptionsHasBufferBodyForRetry, expectedValue, "") {
   *result_listener << "\nexpected { buffer_body_for_retry: \"" << expectedValue
                    << "\"} but got {buffer_body_for_retry: \"" << arg.buffer_body_for_retry
@@ -47,29 +40,41 @@ MATCHER_P(OptionsHasBufferBodyForRetry, expectedValue, "") {
   return ExplainMatchResult(expectedValue, arg.buffer_body_for_retry, result_listener);
 }
 
-MATCHER_P(OptionsRetryPolicyHasNumRetries, expectedRetries, "") {
+MATCHER_P(NumRetries, expectedRetries, "") {
   *result_listener << "\nexpected { num_retries: \"" << expectedRetries
-                   << "\"} but got {num_retries: \""
-                   << arg.retry_policy.value().num_retries().value() << "\"}\n";
-  return ExplainMatchResult(expectedRetries, arg.retry_policy.value().num_retries().value(),
-                            result_listener);
+                   << "\"} but got {num_retries: \"" << arg.num_retries().value() << "\"}\n";
+  return ExplainMatchResult(expectedRetries, arg.num_retries().value(), result_listener);
 }
 
-MATCHER_P(OptionsRetryPolicyHasPerTryTimeout, expectedTimeout, "") {
+MATCHER_P(PerTryTimeout, expectedTimeout, "") {
   *result_listener << "\nexpected { per_try_timeout: \"" << expectedTimeout
-                   << "\"} but got { per_try_timeout: \""
-                   << arg.retry_policy.value().per_try_timeout().seconds() << "\"}\n";
-  return ExplainMatchResult(expectedTimeout, arg.retry_policy.value().per_try_timeout().seconds(),
-                            result_listener);
+                   << "\"} but got { per_try_timeout: \"" << arg.per_try_timeout().seconds()
+                   << "\"}\n";
+  return ExplainMatchResult(expectedTimeout, arg.per_try_timeout().seconds(), result_listener);
 }
 
-MATCHER_P(OptionsRetryPolicyHasPerTryIdleTimeout, expectedIdleTimeout, "") {
+MATCHER_P(PerTryIdleTimeout, expectedIdleTimeout, "") {
   *result_listener << "\nexpected { per_try_idle_timeout: \"" << expectedIdleTimeout
                    << "\"} but got { per_try_idle_timeout: \""
-                   << arg.retry_policy.value().per_try_idle_timeout().seconds() << "\"}\n";
-  return ExplainMatchResult(expectedIdleTimeout,
-                            arg.retry_policy.value().per_try_idle_timeout().seconds(),
+                   << arg.per_try_idle_timeout().seconds() << "\"}\n";
+  return ExplainMatchResult(expectedIdleTimeout, arg.per_try_idle_timeout().seconds(),
                             result_listener);
+}
+
+MATCHER_P(RetryOnModes, expectedModes, "") {
+  const std::string& retry_on = arg.retry_on();
+  std::set<std::string> retry_on_modes = absl::StrSplit(retry_on, ',');
+  *result_listener << "\nexpected retry_on modes doesn't match "
+                   << "received { retry_on modes: \"" << retry_on << "\"}\n";
+  return ExplainMatchResult(expectedModes, retry_on_modes, result_listener);
+}
+
+MATCHER_P(OptionsHasRetryPolicy, policyMatcher, "") {
+  if (!arg.retry_policy.has_value()) {
+    *result_listener << "Expected options to have retry policy, but it was unset";
+    return false;
+  }
+  return ExplainMatchResult(policyMatcher, arg.retry_policy.value(), result_listener);
 }
 
 class MetadataFetcherTest : public testing::Test {
@@ -248,23 +253,15 @@ TEST_F(MetadataFetcherTest, TestDefaultRetryPolicy) {
   MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "200", "not_empty");
   MockMetadataReceiver receiver;
 
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
-              send_(_, _,
-                    AllOf(OptionsHasRetryPolicy(true), OptionsHasBufferBodyForRetry(true),
-                          OptionsRetryPolicyHasNumRetries(3), OptionsRetryPolicyHasPerTryTimeout(5),
-                          OptionsRetryPolicyHasPerTryIdleTimeout(1))))
-      .WillOnce(Invoke(
-          [](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
-             const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-            const std::string& retry_on = options.retry_policy.value().retry_on();
-            std::set<std::string> retry_on_modes = absl::StrSplit(retry_on, ',');
-
-            EXPECT_THAT(retry_on_modes,
-                        UnorderedElementsAre("5xx", "gateway-error", "connect-failure",
-                                             "refused-stream", "reset"));
-            return nullptr;
-          }));
-
+  EXPECT_CALL(
+      mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+      send_(_, _,
+            AllOf(OptionsHasBufferBodyForRetry(true),
+                  OptionsHasRetryPolicy(AllOf(
+                      NumRetries(3), PerTryTimeout(5), PerTryIdleTimeout(1),
+                      RetryOnModes(UnorderedElementsAre("5xx", "gateway-error", "connect-failure",
+                                                        "refused-stream", "reset")))))))
+      .WillOnce(Return(nullptr));
   // Act
   fetcher_->fetch(message, parent_span_, receiver);
 }
