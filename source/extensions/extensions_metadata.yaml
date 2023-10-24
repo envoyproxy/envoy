@@ -185,6 +185,13 @@ envoy.credentials.bearer_token:
   status: alpha
   type_urls:
   - envoy.extensions.credentials.bearer_token.v3.BearerToken
+envoy.credentials.generic:
+  categories:
+  - envoy.credentials
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.credentials.generic.v3.Generic
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
