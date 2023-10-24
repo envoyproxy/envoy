@@ -35,6 +35,11 @@ removed_config_or_runtime:
     Removed the deprecated ``envoy.reloadable_features.validate_detailed_override_host_statuses``
     runtime flag and legacy code path.
 
+- area: grpc
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.service_sanitize_non_utf8_strings``
+    runtime flag and legacy code path.
+
 new_features:
 
 deprecated:
