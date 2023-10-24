@@ -26,6 +26,11 @@ removed_config_or_runtime:
     Removed the deprecated ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent``
     runtime flag and legacy code path.
 
+- area: upstream
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.validate_detailed_override_host_statuses``
+    runtime flag and legacy code path.
+
 new_features:
 
 deprecated:
