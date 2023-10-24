@@ -147,7 +147,8 @@ void DubboResponse::refreshGenericStatus() {
 
 DubboCodecBase::DubboCodecBase(Common::Dubbo::DubboCodecPtr codec) : codec_(std::move(codec)) {}
 
-ResponsePtr DubboMessageCreator::response(Status status, const Request& origin_request) {
+ResponsePtr DubboServerCodec::respond(Status status, absl::string_view,
+                                      const Request& origin_request) {
   const auto* typed_request = dynamic_cast<const DubboRequest*>(&origin_request);
   ASSERT(typed_request != nullptr);
 

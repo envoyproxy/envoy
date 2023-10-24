@@ -211,6 +211,7 @@ private:
   EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
 
+  bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
   std::atomic<bool> shutdown_{false};
