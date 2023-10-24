@@ -27,10 +27,16 @@ import (
 )
 
 var httpFilterConfigFactoryAndParser = sync.Map{}
+var httpManagedFilterConfigFactoryAndParser = sync.Map{}
 
 type filterConfigFactoryAndParser struct {
 	configFactory api.StreamFilterConfigFactory
 	configParser  api.StreamFilterConfigParser
+}
+
+type managedFilterConfigFactoryAndParser struct {
+	filterConfigFactoryAndParser
+	configFactory api.StreamManagedFilterConfigFactory
 }
 
 // Register config factory and config parser for the specified plugin.
@@ -41,6 +47,16 @@ func RegisterHttpFilterConfigFactoryAndParser(name string, factory api.StreamFil
 		panic("config factory should not be nil")
 	}
 	httpFilterConfigFactoryAndParser.Store(name, &filterConfigFactoryAndParser{factory, parser})
+}
+
+func RegisterHttpManagedFilterConfigFactoryAndParser(name string, factory api.StreamManagedFilterConfigFactory, parser api.StreamFilterConfigParser) {
+	if factory == nil {
+		panic("config factory should not be nil")
+	}
+	httpManagedFilterConfigFactoryAndParser.Store(name, &managedFilterConfigFactoryAndParser{
+		filterConfigFactoryAndParser{nil, parser},
+		factory,
+	})
 }
 
 func getOrCreateHttpFilterFactory(name string, configId uint64) api.StreamFilterFactory {
@@ -79,13 +95,13 @@ type filterManagerConfig struct {
 }
 
 func (p *filterManagerConfigParser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
-	conf := &filterManagerConfig{
-		current: []*filterConfig{},
-	}
 	configStruct := &FilterManagerConfig{}
 
 	// No configuration
 	if any.GetTypeUrl() == "" {
+		conf := &filterManagerConfig{
+			current: []*filterConfig{},
+		}
 		return conf, nil
 	}
 
@@ -94,10 +110,13 @@ func (p *filterManagerConfigParser) Parse(any *anypb.Any, callbacks api.ConfigCa
 	}
 
 	protos := configStruct.GetConfigs()
+	conf := &filterManagerConfig{
+		current: make([]*filterConfig, 0, len(protos)),
+	}
 	for _, proto := range protos {
 		name := proto.Name
-		if v, ok := httpFilterConfigFactoryAndParser.Load(name); ok {
-			plugin := v.(*filterConfigFactoryAndParser)
+		if v, ok := httpManagedFilterConfigFactoryAndParser.Load(name); ok {
+			plugin := v.(*managedFilterConfigFactoryAndParser)
 			config, err := plugin.configParser.Parse(proto.Config, nil)
 			if err != nil {
 				return nil, fmt.Errorf("%w during parsing plugin %s in filtermanager", err, name)
@@ -116,8 +135,6 @@ func (p *filterManagerConfigParser) Parse(any *anypb.Any, callbacks api.ConfigCa
 }
 
 func (p *filterManagerConfigParser) Merge(parent interface{}, child interface{}) interface{} {
-	childConfig := child.(*filterManagerConfig)
-
 	// TODO: We have considered to implemented a Merge Policy between the LDS's filter & RDS's per route
 	// config. A thought is to reuse the current Merge method. For example, considering we have
 	// LDS:
@@ -129,12 +146,12 @@ func (p *filterManagerConfigParser) Merge(parent interface{}, child interface{})
 	// we will call plugin A's Merge method, which will produce `pet: [cat, dog]` or `pet: dog`.
 	// As there is no real world use case for the Merge feature, I decide to delay its implementation
 	// to avoid premature design.
-	newConfig := *childConfig
-	return &newConfig
+	return child
 }
 
 type filterManager struct {
 	filters []api.StreamFilter
+	names   []string
 
 	callbacks api.FilterCallbackHandler
 }
@@ -146,19 +163,21 @@ func filterManagerConfigFactory(c interface{}) api.StreamFilterFactory {
 	}
 
 	newConfig := conf.current
-	factories := make([]api.StreamFilterFactory, len(newConfig))
+	factories := make([]api.StreamManagedFilterFactory, len(newConfig))
+	names := make([]string, len(factories))
 	for i, fc := range newConfig {
-		var factory api.StreamFilterConfigFactory
+		var factory api.StreamManagedFilterConfigFactory
 		name := fc.Name
-		if v, ok := httpFilterConfigFactoryAndParser.Load(name); ok {
-			plugin := v.(*filterConfigFactoryAndParser)
+		names[i] = name
+		if v, ok := httpManagedFilterConfigFactoryAndParser.Load(name); ok {
+			plugin := v.(*managedFilterConfigFactoryAndParser)
 			factory = plugin.configFactory
 			config := fc.parsedConfig
 			factories[i] = factory(config)
 
 		} else {
 			api.LogErrorf("plugin %s not found, pass through by default", name)
-			factory = PassThroughFactory
+			factory = ManagedPassThroughFactory
 			factories[i] = factory(nil)
 		}
 	}
@@ -170,6 +189,7 @@ func filterManagerConfigFactory(c interface{}) api.StreamFilterFactory {
 		}
 		return &filterManager{
 			callbacks: callbacks,
+			names:     names,
 			filters:   filters,
 		}
 	}
@@ -185,10 +205,7 @@ func (m *filterManager) DecodeHeaders(header api.RequestHeaderMap, endStream boo
 			// to return api.Running and resume inside the filter. We
 			// treat api.Running as api.Continue here.
 			status := f.DecodeHeaders(header, endStream)
-			if status != api.Running && status != api.Continue {
-				if status != api.LocalReply {
-					m.callbacks.Continue(status)
-				}
+			if status == api.LocalReply {
 				return
 			}
 		}
@@ -198,16 +215,43 @@ func (m *filterManager) DecodeHeaders(header api.RequestHeaderMap, endStream boo
 	return api.Running
 }
 
+func (m *filterManager) notifyUnsupportedStatus(name string, status api.StatusType) (willReturn bool) {
+	if status == api.Running || status == api.Continue {
+		return false
+	}
+
+	// status == StopXXX
+	if len(m.filters) == 1 {
+		// just use the status as the final result
+		m.callbacks.Continue(status)
+		return true
+	}
+	// If we have multiple filters, we can't implement the StopXXX semantics without
+	// managing the buffer at Go's side. For example, considering we have two filters:
+	// - Compress (return Continue to process streamingly)
+	// - Rewrite (return StopAndBuffer to process the whole data)
+	//
+	// If we return StopAndBuffer as final result, the next time filter Compress will get the
+	// whole data, which is unwanted.
+	// However, managing the buffer at Go's side is inefficient, which will double the memory
+	// usage at least.
+
+	m.callbacks.Log(api.Error,
+		fmt.Sprintf("unsupported status %s returned from filter %s, ignored", status.String(), name))
+	return false
+}
+
 func (m *filterManager) DecodeData(buf api.BufferInstance, endStream bool) api.StatusType {
 	go func() {
 		defer m.callbacks.RecoverPanic()
 
-		for _, f := range m.filters {
+		for i, f := range m.filters {
 			status := f.DecodeData(buf, endStream)
-			if status != api.Running && status != api.Continue {
-				if status != api.LocalReply {
-					m.callbacks.Continue(status)
-				}
+			if status == api.LocalReply {
+				return
+			}
+
+			if m.notifyUnsupportedStatus(m.names[i], status) {
 				return
 			}
 		}
@@ -223,10 +267,7 @@ func (m *filterManager) DecodeTrailers(trailer api.RequestTrailerMap) api.Status
 
 		for _, f := range m.filters {
 			status := f.DecodeTrailers(trailer)
-			if status != api.Running && status != api.Continue {
-				if status != api.LocalReply {
-					m.callbacks.Continue(status)
-				}
+			if status == api.LocalReply {
 				return
 			}
 		}
@@ -242,10 +283,7 @@ func (m *filterManager) EncodeHeaders(header api.ResponseHeaderMap, endStream bo
 
 		for _, f := range m.filters {
 			status := f.EncodeHeaders(header, endStream)
-			if status != api.Running && status != api.Continue {
-				if status != api.LocalReply {
-					m.callbacks.Continue(status)
-				}
+			if status == api.LocalReply {
 				return
 			}
 		}
@@ -259,10 +297,9 @@ func (m *filterManager) EncodeData(buf api.BufferInstance, endStream bool) api.S
 	go func() {
 		defer m.callbacks.RecoverPanic()
 
-		for _, f := range m.filters {
+		for i, f := range m.filters {
 			status := f.EncodeData(buf, endStream)
-			if status != api.Running && status != api.Continue {
-				m.callbacks.Continue(status)
+			if m.notifyUnsupportedStatus(m.names[i], status) {
 				return
 			}
 		}
@@ -277,11 +314,7 @@ func (m *filterManager) EncodeTrailers(trailer api.ResponseTrailerMap) api.Statu
 		defer m.callbacks.RecoverPanic()
 
 		for _, f := range m.filters {
-			status := f.EncodeTrailers(trailer)
-			if status != api.Running && status != api.Continue {
-				m.callbacks.Continue(status)
-				return
-			}
+			f.EncodeTrailers(trailer)
 		}
 		m.callbacks.Continue(api.Continue)
 	}()

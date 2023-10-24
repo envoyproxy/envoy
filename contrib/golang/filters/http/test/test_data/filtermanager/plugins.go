@@ -70,8 +70,8 @@ func (p *parser) Merge(parent interface{}, child interface{}) interface{} {
 	return child
 }
 
-func addHeaderConfigFactory(c interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
+func addHeaderConfigFactory(c interface{}) api.StreamManagedFilterFactory {
+	return func(callbacks api.ManagedFilterCallbackHandler) api.StreamFilter {
 		return &addHeaderFilter{
 			callbacks: callbacks,
 			config:    c.(*config),
@@ -81,7 +81,7 @@ func addHeaderConfigFactory(c interface{}) api.StreamFilterFactory {
 
 type addHeaderFilter struct {
 	api.PassThroughStreamFilter
-	callbacks api.FilterCallbackHandler
+	callbacks api.ManagedFilterCallbackHandler
 	config    *config
 }
 
@@ -99,8 +99,8 @@ func (f *addHeaderFilter) EncodeHeaders(header api.ResponseHeaderMap, endStream 
 	return api.Continue
 }
 
-func setBodyConfigFactory(c interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
+func setBodyConfigFactory(c interface{}) api.StreamManagedFilterFactory {
+	return func(callbacks api.ManagedFilterCallbackHandler) api.StreamFilter {
 		return &setBodyFilter{
 			callbacks: callbacks,
 			config:    c.(*config),
@@ -110,7 +110,7 @@ func setBodyConfigFactory(c interface{}) api.StreamFilterFactory {
 
 type setBodyFilter struct {
 	api.PassThroughStreamFilter
-	callbacks api.FilterCallbackHandler
+	callbacks api.ManagedFilterCallbackHandler
 	config    *config
 }
 
@@ -130,8 +130,8 @@ func (f *setBodyFilter) EncodeData(buf api.BufferInstance, endStream bool) api.S
 	return api.Continue
 }
 
-func localReplyConfigFactory(c interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
+func localReplyConfigFactory(c interface{}) api.StreamManagedFilterFactory {
+	return func(callbacks api.ManagedFilterCallbackHandler) api.StreamFilter {
 		return &localReplyFilter{
 			callbacks: callbacks,
 			config:    c.(*config),
@@ -141,7 +141,7 @@ func localReplyConfigFactory(c interface{}) api.StreamFilterFactory {
 
 type localReplyFilter struct {
 	api.PassThroughStreamFilter
-	callbacks api.FilterCallbackHandler
+	callbacks api.ManagedFilterCallbackHandler
 	config    *config
 }
 
@@ -177,8 +177,8 @@ func (f *localReplyFilter) EncodeHeaders(api.ResponseHeaderMap, bool) api.Status
 	return api.Continue
 }
 
-func nonblockingConfigFactory(interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
+func nonblockingConfigFactory(interface{}) api.StreamManagedFilterFactory {
+	return func(callbacks api.ManagedFilterCallbackHandler) api.StreamFilter {
 		return &nonblockingFilter{
 			callbacks: callbacks,
 		}
@@ -187,7 +187,7 @@ func nonblockingConfigFactory(interface{}) api.StreamFilterFactory {
 
 type nonblockingFilter struct {
 	api.PassThroughStreamFilter
-	callbacks api.FilterCallbackHandler
+	callbacks api.ManagedFilterCallbackHandler
 }
 
 func (f *nonblockingFilter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
@@ -213,8 +213,8 @@ func (f *nonblockingFilter) EncodeHeaders(header api.ResponseHeaderMap, endStrea
 	return api.Running
 }
 
-func panicConfigFactory(interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
+func panicConfigFactory(interface{}) api.StreamManagedFilterFactory {
+	return func(callbacks api.ManagedFilterCallbackHandler) api.StreamFilter {
 		return &panicFilter{
 			callbacks: callbacks,
 		}
@@ -223,15 +223,15 @@ func panicConfigFactory(interface{}) api.StreamFilterFactory {
 
 type panicFilter struct {
 	api.PassThroughStreamFilter
-	callbacks api.FilterCallbackHandler
+	callbacks api.ManagedFilterCallbackHandler
 }
 
 func (f *panicFilter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
 	panic("ouch")
 }
 
-func stopConfigFactory(interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
+func stopConfigFactory(interface{}) api.StreamManagedFilterFactory {
+	return func(callbacks api.ManagedFilterCallbackHandler) api.StreamFilter {
 		return &stopFilter{
 			callbacks: callbacks,
 		}
@@ -240,7 +240,7 @@ func stopConfigFactory(interface{}) api.StreamFilterFactory {
 
 type stopFilter struct {
 	api.PassThroughStreamFilter
-	callbacks api.FilterCallbackHandler
+	callbacks api.ManagedFilterCallbackHandler
 }
 
 func (f *stopFilter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
@@ -262,8 +262,8 @@ func (f *stopFilter) EncodeData(buf api.BufferInstance, endStream bool) api.Stat
 	return api.StopNoBuffer
 }
 
-func logConfigFactory(interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
+func logConfigFactory(interface{}) api.StreamManagedFilterFactory {
+	return func(callbacks api.ManagedFilterCallbackHandler) api.StreamFilter {
 		return &logFilter{
 			callbacks: callbacks,
 		}
@@ -272,7 +272,7 @@ func logConfigFactory(interface{}) api.StreamFilterFactory {
 
 type logFilter struct {
 	api.PassThroughStreamFilter
-	callbacks api.FilterCallbackHandler
+	callbacks api.ManagedFilterCallbackHandler
 }
 
 func (f *logFilter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
@@ -322,11 +322,11 @@ func (f *logFilter) OnDestroy(reason api.DestroyReason) {
 }
 
 func RegisterManagedFilters() {
-	http.RegisterHttpFilterConfigFactoryAndParser("addHeader", addHeaderConfigFactory, &parser{})
-	http.RegisterHttpFilterConfigFactoryAndParser("setBody", setBodyConfigFactory, &parser{})
-	http.RegisterHttpFilterConfigFactoryAndParser("localReply", localReplyConfigFactory, &parser{})
-	http.RegisterHttpFilterConfigFactoryAndParser("nonblocking", nonblockingConfigFactory, &parser{})
-	http.RegisterHttpFilterConfigFactoryAndParser("panic", panicConfigFactory, &parser{})
-	http.RegisterHttpFilterConfigFactoryAndParser("stop", stopConfigFactory, &parser{})
-	http.RegisterHttpFilterConfigFactoryAndParser("log", logConfigFactory, &parser{})
+	http.RegisterHttpManagedFilterConfigFactoryAndParser("addHeader", addHeaderConfigFactory, &parser{})
+	http.RegisterHttpManagedFilterConfigFactoryAndParser("setBody", setBodyConfigFactory, &parser{})
+	http.RegisterHttpManagedFilterConfigFactoryAndParser("localReply", localReplyConfigFactory, &parser{})
+	http.RegisterHttpManagedFilterConfigFactoryAndParser("nonblocking", nonblockingConfigFactory, &parser{})
+	http.RegisterHttpManagedFilterConfigFactoryAndParser("panic", panicConfigFactory, &parser{})
+	http.RegisterHttpManagedFilterConfigFactoryAndParser("stop", stopConfigFactory, &parser{})
+	http.RegisterHttpManagedFilterConfigFactoryAndParser("log", logConfigFactory, &parser{})
 }

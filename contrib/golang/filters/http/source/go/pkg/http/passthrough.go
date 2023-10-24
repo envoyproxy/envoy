@@ -23,13 +23,16 @@ import (
 
 type passThroughFilter struct {
 	api.PassThroughStreamFilter
-	callbacks api.FilterCallbackHandler
 }
 
 func PassThroughFactory(interface{}) api.StreamFilterFactory {
 	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &passThroughFilter{
-			callbacks: callbacks,
-		}
+		return &passThroughFilter{}
+	}
+}
+
+func ManagedPassThroughFactory(interface{}) api.StreamManagedFilterFactory {
+	return func(callbacks api.ManagedFilterCallbackHandler) api.StreamFilter {
+		return &passThroughFilter{}
 	}
 }

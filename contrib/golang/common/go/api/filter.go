@@ -109,6 +109,8 @@ type StreamFilterConfigParser interface {
 
 type StreamFilterConfigFactory func(config interface{}) StreamFilterFactory
 type StreamFilterFactory func(callbacks FilterCallbackHandler) StreamFilter
+type StreamManagedFilterConfigFactory func(config interface{}) StreamManagedFilterFactory
+type StreamManagedFilterFactory func(callbacks ManagedFilterCallbackHandler) StreamFilter
 
 // stream info
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
@@ -148,10 +150,8 @@ type StreamFilterCallbacks interface {
 	StreamInfo() StreamInfo
 }
 
-type FilterCallbacks interface {
+type ManagedFilterCallbacks interface {
 	StreamFilterCallbacks
-	// Continue or SendLocalReply should be last API invoked, no more code after them.
-	Continue(StatusType)
 	SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
@@ -167,8 +167,20 @@ type FilterCallbacks interface {
 	// TODO add more for filter callbacks
 }
 
+type FilterCallbacks interface {
+	// Currently, ManagedFilterCallbacks is the base of FilterCallbacks. We may split these
+	// two interface in the future.
+	ManagedFilterCallbacks
+	// Continue or SendLocalReply should be last API invoked, no more code after them.
+	Continue(StatusType)
+}
+
 type FilterCallbackHandler interface {
 	FilterCallbacks
+}
+
+type ManagedFilterCallbackHandler interface {
+	ManagedFilterCallbacks
 }
 
 type DynamicMetadata interface {

@@ -17,6 +17,8 @@
 
 package api
 
+import "fmt"
+
 // ****************** filter status start ******************//
 type StatusType int
 
@@ -28,6 +30,25 @@ const (
 	StopAndBufferWatermark StatusType = 4
 	StopNoBuffer           StatusType = 5
 )
+
+func (s StatusType) String() string {
+	switch s {
+	case Running:
+		return "Running"
+	case LocalReply:
+		return "LocalReply"
+	case Continue:
+		return "Continue"
+	case StopAndBuffer:
+		return "StopAndBuffer"
+	case StopAndBufferWatermark:
+		return "StopAndBufferWatermark"
+	case StopNoBuffer:
+		return "StopNoBuffer"
+	default:
+		return fmt.Sprintf("StatusType(%d)", s)
+	}
+}
 
 // header status
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/http/filter.h

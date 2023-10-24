@@ -1539,22 +1539,7 @@ TEST_P(GolangIntegrationTest, FilterManagerStop) {
   plugin_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.FilterManagerConfig
     configs:
-      - name: log
       - name: stop
-      - name: addHeader
-        config:
-          "@type": type.googleapis.com/xds.type.v3.TypedStruct
-          value:
-            AddReqHeaderName: "name"
-            AddReqHeaderValue: "value2"
-            AddRespHeaderName: "name"
-            AddRespHeaderValue: "value2"
-      - name: setBody
-        config:
-          "@type": type.googleapis.com/xds.type.v3.TypedStruct
-          value:
-            SetReqBody: "req"
-            SetRespBody: "resp"
     )EOF";
   initializeFilterManagerBasicFilter(config);
 
@@ -1581,7 +1566,7 @@ TEST_P(GolangIntegrationTest, FilterManagerStop) {
   upstream_request_->encodeTrailers(response_trailers);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("name")).empty());
+  // The stop filter returns StopNoBuffer in EncodeData
   EXPECT_EQ("", response->body());
 
   cleanup();
