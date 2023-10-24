@@ -24,7 +24,7 @@ jobs:
     steps:
     - name: Fetch token for app auth
       id: appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.27
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
