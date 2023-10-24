@@ -510,7 +510,11 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
   if (clear_hop_by_hop) {
     response_headers.removeTransferEncoding();
-    if (protocol != Protocol::Http11) {
+    if (protocol == Protocol::Http11) {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.retain_keepalive_header_http11")) {
+        response_headers.removeKeepAlive();
+      }
+    } else {
       response_headers.removeKeepAlive();
     }
     response_headers.removeProxyConnection();

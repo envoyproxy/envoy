@@ -83,6 +83,7 @@ public:
    *
    * @param response_headers the headers to mutate.
    * @param request_headers the request headers.
+   * @param protocol response http protocol
    * @param the configuration for the HCM, which affects request ID headers.
    * @param via the via header to append, if any.
    * @param stream_info a reference to the filter manager stream info.

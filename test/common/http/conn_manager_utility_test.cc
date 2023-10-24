@@ -2266,5 +2266,23 @@ TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersForHttp1
   EXPECT_FALSE(response_headers.has("proxy-connection"));
 }
 
+TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyResponseHeadersForHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
+  Http::TestRequestHeaderMapImpl request_headers{{}};
+  Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60, max=1000"},
+                                                   {"proxy-connection", "proxy-header"}};
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
+                                                  Protocol::Http11, config_, "",
+                                                  connection_.stream_info_, node_id_);
+
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
+
+  EXPECT_FALSE(response_headers.has("keep-alive"));
+  EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
 } // namespace Http
 } // namespace Envoy
