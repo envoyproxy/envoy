@@ -62,7 +62,6 @@ message JsonToMetadata {
   }
 
   message Selector {
-    // TODO(kuochunghsu): Explore matchers for array handling.
     oneof selector {
       // key to match
       string key = 1 [(validate.rules).string = {min_len: 1}];

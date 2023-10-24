@@ -29,6 +29,9 @@ concurrency:
   group: ${{ github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
+env:
+  COMMITTER_NAME: dependency-envoy[bot]
+  COMMITTER_EMAIL: 148525496+dependency-envoy[bot]@users.noreply.github.com
 
 jobs:
   update_bazel:
@@ -40,13 +43,13 @@ jobs:
     steps:
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.0.25
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.0.27
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         app_key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: version
       name: Shorten (possible) SHA
-      uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.0.25
+      uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.0.27
       with:
         string: ${{ inputs.version }}
         length: 7
@@ -61,13 +64,13 @@ jobs:
         TARGET: ${{ inputs.task == 'bazel' && 'update' || 'api-update' }}
         TASK: ${{ inputs.task == 'bazel' && 'bazel' || 'api/bazel' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.0.25
+    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.0.27
       name: Upload diff
       with:
         name: ${{ inputs.dependency }}-${{ steps.version.outputs.string }}
     - name: Create a PR
       if: ${{ inputs.pr }}
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.25
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.27
       with:
         base: main
         body: |
@@ -76,8 +79,12 @@ jobs:
           ${{ inputs.pr_message }}
         branch: >-
           dependency/${{ inputs.task }}/${{ inputs.dependency }}/${{ steps.version.outputs.string }}
-        committer-name: publish-envoy[bot]
-        committer-email: 140627008+publish-envoy[bot]@users.noreply.github.com
+        commit-message: |
+          ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}` -> ${{ steps.version.outputs.string }}
+
+          Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
         title: >-
           ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}`
           -> ${{ steps.version.outputs.string }}
@@ -90,7 +97,7 @@ jobs:
     steps:
     - name: Fetch token for app auth
       id: appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.23
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.27
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
@@ -130,7 +137,7 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.0.23
+      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.0.27
       with:
         images: |
            sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
@@ -159,13 +166,17 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.23
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.27
       with:
         base: main
         body: Created by Envoy dependency bot
         branch: dependency-envoy/build-image/latest
-        committer-name: publish-envoy[bot]
-        committer-email: 140627008+publish-envoy[bot]@users.noreply.github.com
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+        commit-message: |
+          deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`
+
+          Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
         title: 'deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`'
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
         working-directory: envoy
