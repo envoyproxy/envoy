@@ -13,7 +13,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 /**
- * @brief A strig key-value map that stores the resource attributes.
+ * @brief A string key-value map that stores the resource attributes.
  */
 using ResourceAttributes = std::map<std::string, std::string>;
 
