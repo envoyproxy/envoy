@@ -40,7 +40,9 @@ void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> spa
       new_span.setTag(attribute.first, attribute.second);
     }
   }
-  new_span.setTracestate(sampling_result.tracestate);
+  if (!sampling_result.tracestate.empty()) {
+    new_span.setTracestate(sampling_result.tracestate);
+  }
 }
 
 } // namespace

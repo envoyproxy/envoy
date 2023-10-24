@@ -35,3 +35,17 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "always_on_sampler_integration_test",
+    srcs = [
+        "always_on_sampler_integration_test.cc",
+    ],
+    extension_names = ["envoy.tracers.opentelemetry.samplers.always_on"],
+    deps = [
+        "//source/exe:main_common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)

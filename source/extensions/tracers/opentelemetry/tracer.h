@@ -116,8 +116,6 @@ public:
 
   ::opentelemetry::proto::trace::v1::Span::SpanKind spankind() const { return span_.kind(); }
 
-  std::string tracestate() const { return span_.trace_state(); }
-
   /**
    * Sets the span's id.
    */
@@ -134,7 +132,7 @@ public:
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
-  std::string tracestate() { return span_.trace_state(); }
+  std::string tracestate() const { return span_.trace_state(); }
 
   /**
    * Sets the span's tracestate.
