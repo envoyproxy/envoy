@@ -7,6 +7,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
+#include "source/common/protobuf/protobuf.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 #include "direct_response_testing.h"
@@ -182,6 +184,8 @@ public:
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
+  // Sets the node.metadata field in the Bootstrap configuration.
+  EngineBuilder& setNodeMetadata(ProtobufWkt::Struct node_metadata);
 #ifdef ENVOY_GOOGLE_GRPC
   // Sets the xDS configuration for the Envoy Mobile engine.
   //
@@ -198,7 +202,7 @@ public:
   EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
 #endif
-  EngineBuilder& addPlatformFilter(std::string name);
+  EngineBuilder& addPlatformFilter(const std::string& name);
 
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
@@ -244,6 +248,7 @@ private:
   bool platform_certificates_validation_on_ = false;
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
+  absl::optional<ProtobufWkt::Struct> node_metadata_ = absl::nullopt;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
 

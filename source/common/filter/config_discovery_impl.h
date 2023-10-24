@@ -128,7 +128,7 @@ public:
     if (default_configuration_) {
       auto status = onConfigUpdate(*default_configuration_, "", nullptr);
       if (!status.ok()) {
-        throw EnvoyException(std::string(status.message()));
+        throwEnvoyExceptionOrPanic(std::string(status.message()));
       }
     }
   }

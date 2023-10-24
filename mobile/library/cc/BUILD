@@ -22,6 +22,7 @@ envoy_cc_library(
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
         "@envoy//source/common/common:assert_lib",
+        "@envoy//source/common/protobuf",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/compression/brotli/decompressor/v3:pkg_cc_proto",

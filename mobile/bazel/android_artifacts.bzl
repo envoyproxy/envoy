@@ -1,7 +1,7 @@
 load("@build_bazel_rules_android//android:rules.bzl", "android_binary")
 load("@envoy_mobile//bazel:dokka.bzl", "sources_javadocs")
-load("@rules_java//java:defs.bzl", "java_binary")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
+load("@rules_java//java:defs.bzl", "java_binary")
 
 # This file is based on https://github.com/aj-michael/aar_with_jni which is
 # subject to the following copyright and license:

@@ -11,9 +11,9 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
 
 #include "absl/strings/escaping.h"
-#include "span_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,7 +33,7 @@ struct OpenTelemetryTracerStats {
  */
 class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
-  Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
+  Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const std::string& service_name);
 
@@ -57,7 +57,7 @@ private:
    */
   void flushSpans();
 
-  OpenTelemetryGrpcTraceExporterPtr exporter_;
+  OpenTelemetryTraceExporterPtr exporter_;
   Envoy::TimeSource& time_source_;
   Random::RandomGenerator& random_;
   std::vector<::opentelemetry::proto::trace::v1::Span> span_buffer_;

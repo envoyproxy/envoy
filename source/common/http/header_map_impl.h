@@ -501,6 +501,7 @@ public:
   void setByKey(absl::string_view key, absl::string_view val) override;
   void setByReferenceKey(absl::string_view key, absl::string_view val) override;
   void setByReference(absl::string_view key, absl::string_view val) override;
+  void removeByKey(absl::string_view key) override;
 
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the

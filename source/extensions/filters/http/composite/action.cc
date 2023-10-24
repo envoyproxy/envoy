@@ -42,29 +42,29 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
             composite_action.typed_config());
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         composite_action.typed_config().typed_config(), validation_visitor, factory);
+ Envoy::Http::FilterFactoryCb callback = nullptr;
 
-    Envoy::Http::FilterFactoryCb callback = nullptr;
+  // First, try to create the filter factory creation function from factory context (if exists).
+  if (context.factory_context_.has_value()) {
+    callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
+                                                    context.factory_context_.value());
+  }
 
-    // First, try to create the filter factory creation function from factory context (if exists).
-    if (context.factory_context_.has_value()) {
-      callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
-                                                      context.factory_context_.value());
-    }
+  // If above failed, try to create the filter factory creation function from server factory
+  // context (if exists).
+  if (callback == nullptr && context.server_factory_context_.has_value()) {
+    callback = factory.createFilterFactoryFromProtoWithServerContext(
+        *message, context.stat_prefix_, context.server_factory_context_.value());
+  }
 
-    // If above failed, try to create the filter factory creation function from server factory
-    // context (if exists).
-    if (callback == nullptr && context.server_factory_context_.has_value()) {
-      callback = factory.createFilterFactoryFromProtoWithServerContext(
-          *message, context.stat_prefix_, context.server_factory_context_.value());
-    }
+  if (callback == nullptr) {
+    throwEnvoyExceptionOrPanic("Failed to get filter factory creation function");
+  }
 
-    if (callback == nullptr) {
-      throw EnvoyException("Failed to get filter factory creation function");
-    }
-
-    return [cb = std::move(callback)]() -> Matcher::ActionPtr {
-      return std::make_unique<ExecuteFilterAction>(cb);
-    };
+  return [cb = std::move(callback)]() -> Matcher::ActionPtr {
+    return std::make_unique<ExecuteFilterAction>(cb);
+  };
+  
   }
 }
 

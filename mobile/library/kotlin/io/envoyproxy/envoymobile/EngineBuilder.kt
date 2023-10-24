@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import com.google.protobuf.Struct
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
@@ -205,6 +206,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var nodeRegion: String = ""
   private var nodeZone: String = ""
   private var nodeSubZone: String = ""
+  private var nodeMetadata: Struct = Struct.getDefaultInstance()
   private var xdsBuilder: XdsBuilder? = null
 
   /**
@@ -637,6 +639,17 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   }
 
   /**
+   * Sets the node.metadata field in the Bootstrap configuration.
+   *
+   * @param metadata the metadata of the node.
+   * @return this builder.
+   */
+  fun setNodeMetadata(metadata: Struct): EngineBuilder {
+    this.nodeMetadata = metadata
+    return this
+  }
+
+  /**
    * Sets the xDS configuration for the Envoy Mobile engine.
    *
    * @param xdsBuilder The XdsBuilder instance from which to construct the xDS configuration.
@@ -729,6 +742,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         nodeRegion,
         nodeZone,
         nodeSubZone,
+        nodeMetadata,
         xdsBuilder?.cdsResourcesLocator,
         xdsBuilder?.cdsTimeoutInSeconds ?: 0,
         xdsBuilder?.enableCds ?: false,
