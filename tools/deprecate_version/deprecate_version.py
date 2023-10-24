@@ -114,8 +114,8 @@ def create_issues(access_token, runtime_and_pr):
 
     if get_confirmation():
         print('Creating issues...')
-        issue_created = False
         for title, body, login in issues:
+            issue_created = False
             try:
                 # for setec backports, we may not find a user, which would make
                 # create_issue crash.
