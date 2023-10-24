@@ -94,7 +94,7 @@ class RepoNotifier(runner.Runner):
                 pull["draft"] or pull["user"]["login"] == "dependabot[bot]"
                 or self.is_waiting(pull))
             if skip:
-                print("Skipping ", pull["title"], " ", pull["url"])
+                self.log.notice(f"Skipping {pull['title']} {pull['url']}")
                 continue
             yield pull
 
