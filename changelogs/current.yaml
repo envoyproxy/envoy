@@ -8,9 +8,32 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: xds
+  change: |
+    Fixed a bug (https://github.com/envoyproxy/envoy/issues/27702) that caused ADS initialization
+    to fail on the first attempt and set a back-off retry interval of up to 1 second, if ADS is
+    using an Envoy Cluster for the backend. The issue was fixed to ensure that ADS initialization
+    happens after the Envoy Cluster it depends upon has been properly initialized. ADS that does
+    not depend on an Envoy Cluster (i.e. GoogleGrpc) is not affected by this change.
+- area: grpc
+  change: |
+    Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
+- area: router
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent``
+    runtime flag and legacy code path.
+
+- area: upstream
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.validate_detailed_override_host_statuses``
+    runtime flag and legacy code path.
 
 new_features:
 - area: stats

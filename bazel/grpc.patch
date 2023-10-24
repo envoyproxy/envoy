@@ -23,4 +23,17 @@ index 1bb970e049..81265483e9 100644
 +        "-layering_check",
      ],
  )
-
+ 
+diff --git a/src/core/lib/channel/channel_args.h b/src/core/lib/channel/channel_args.h
+index 38bb070213..b53086e680 100644
+--- a/src/core/lib/channel/channel_args.h
++++ b/src/core/lib/channel/channel_args.h
+@@ -284,7 +284,7 @@ class ChannelArgs {
+ 
+   class Value {
+    public:
+-    explicit Value(int n) : rep_(reinterpret_cast<void*>(n), &int_vtable_) {}
++    explicit Value(int n) : rep_(reinterpret_cast<void*>(static_cast<intptr_t>(n)), &int_vtable_) {}
+     explicit Value(std::string s)
+         : rep_(RefCountedString::Make(s).release(), &string_vtable_) {}
+     explicit Value(Pointer p) : rep_(std::move(p)) {}

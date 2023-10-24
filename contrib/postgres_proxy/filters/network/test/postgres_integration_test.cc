@@ -610,12 +610,12 @@ TEST_P(UpstreamAndDownstreamSSLIntegrationTest, ServerAgreesForSSL) {
   // Reply to Envoy with 'S' and attach TLS socket to upstream.
   upstream_data.add("S");
   ASSERT_TRUE(fake_upstream_connection_->write(upstream_data.toString()));
+  fake_upstream_connection_->clearData();
 
   config_factory_.recv_sync_.WaitForNotification();
   enableTLSOnFakeUpstream();
   config_factory_.proceed_sync_.Notify();
 
-  fake_upstream_connection_->clearData();
   ASSERT_TRUE(fake_upstream_connection_->waitForData(data.length(), &rcvd));
   // Make sure that upstream received initial postgres request, which
   // triggered upstream SSL negotiation and TLS handshake.

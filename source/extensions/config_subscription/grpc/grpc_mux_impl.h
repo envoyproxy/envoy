@@ -284,6 +284,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
 
+  bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
   std::atomic<bool> shutdown_{false};
