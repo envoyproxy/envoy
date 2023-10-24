@@ -23,8 +23,9 @@ envoy_cc_library(
     ],
 )
 
-# This library target is for tests especially x86 coverage
-# which would in use the compact representation.
+# This library target is for testing especially x86 coverage
+# which will use the compact representation unless we force the
+# original implementation.
 envoy_cc_library(
     name = "maglev_lb_force_original_impl_lib",
     srcs = ["maglev_lb.cc"],
