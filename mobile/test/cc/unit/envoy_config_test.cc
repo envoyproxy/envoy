@@ -503,6 +503,19 @@ TEST(TestConfig, SetNodeLocality) {
   EXPECT_EQ(bootstrap->node().locality().sub_zone(), sub_zone);
 }
 
+TEST(TestConfig, SetNodeMetadata) {
+  ProtobufWkt::Struct node_metadata;
+  (*node_metadata.mutable_fields())["string_field"].set_string_value("some_string");
+  (*node_metadata.mutable_fields())["bool_field"].set_bool_value(true);
+  (*node_metadata.mutable_fields())["number_field"].set_number_value(3.14);
+  EngineBuilder engine_builder;
+  engine_builder.setNodeMetadata(node_metadata);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_EQ(bootstrap->node().metadata().fields().at("string_field").string_value(), "some_string");
+  EXPECT_EQ(bootstrap->node().metadata().fields().at("bool_field").bool_value(), true);
+  EXPECT_EQ(bootstrap->node().metadata().fields().at("number_field").number_value(), 3.14);
+}
+
 #ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, AddCdsLayer) {
   XdsBuilder xds_builder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);

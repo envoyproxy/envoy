@@ -46,7 +46,8 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
                                    Server::ComponentFactory& component_factory,
                                    std::unique_ptr<Server::Platform> platform_impl,
                                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                                   std::unique_ptr<ProcessContext> process_context)
+                                   std::unique_ptr<ProcessContext> process_context,
+                                   CreateInstanceFunction createInstance)
     : platform_impl_(std::move(platform_impl)), options_(options),
       component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
@@ -71,7 +72,6 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          log_lock, options_.logFormatEscaped(),
                                                          options_.enableFineGrainLogging());
@@ -84,11 +84,10 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
-    server_ = std::make_unique<Server::InstanceImpl>(
-        *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
-        *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
-        platform_impl_->threadFactory(), platform_impl_->fileSystem(), std::move(process_context));
-
+    server_ = createInstance(*init_manager_, options_, time_system, listener_hooks, *restarter_,
+                             *stats_store_, access_log_lock, component_factory,
+                             std::move(random_generator), *tls_, platform_impl_->threadFactory(),
+                             platform_impl_->fileSystem(), std::move(process_context), nullptr);
     break;
   }
   case Server::Mode::Validate:
@@ -136,7 +135,7 @@ void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_gen
       }
 
       if (restarter == nullptr) {
-        throw EnvoyException("unable to select a dynamic base id");
+        throwEnvoyExceptionOrPanic("unable to select a dynamic base id");
       }
 
       restarter_.swap(restarter);

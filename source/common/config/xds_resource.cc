@@ -104,6 +104,10 @@ std::string XdsResourceIdentifier::encodeUrl(const xds::core::v3::ResourceLocato
 
 namespace {
 
+void throwDecodeExceptionOrPanic(std::string message) {
+  throwExceptionOrPanic(XdsResourceIdentifier::DecodeException, message);
+}
+
 void decodePath(absl::string_view path, std::string* resource_type, std::string& id) {
   // This is guaranteed by Http::Utility::extractHostPathFromUrn.
   ASSERT(absl::StartsWith(path, "/"));
@@ -112,8 +116,7 @@ void decodePath(absl::string_view path, std::string* resource_type, std::string&
   if (resource_type != nullptr) {
     *resource_type = std::string(path_components[0]);
     if (resource_type->empty()) {
-      throw XdsResourceIdentifier::DecodeException(
-          fmt::format("Resource type missing from {}", path));
+      throwDecodeExceptionOrPanic(fmt::format("Resource type missing from {}", path));
     }
     id_it = std::next(id_it);
   }
@@ -140,8 +143,7 @@ void decodeFragment(
     } else if (absl::StartsWith(fragment_component, "entry=")) {
       directives.Add()->set_entry(PercentEncoding::decode(fragment_component.substr(6)));
     } else {
-      throw XdsResourceIdentifier::DecodeException(
-          fmt::format("Unknown fragment component {}", fragment_component));
+      throwDecodeExceptionOrPanic(fmt::format("Unknown fragment component {}", fragment_component));
       ;
     }
   }
@@ -151,8 +153,7 @@ void decodeFragment(
 
 xds::core::v3::ResourceName XdsResourceIdentifier::decodeUrn(absl::string_view resource_urn) {
   if (!hasXdsTpScheme(resource_urn)) {
-    throw XdsResourceIdentifier::DecodeException(
-        fmt::format("{} does not have an xdstp: scheme", resource_urn));
+    throwDecodeExceptionOrPanic(fmt::format("{} does not have an xdstp: scheme", resource_urn));
   }
   absl::string_view host, path;
   Http::Utility::extractHostPathFromUri(resource_urn, host, path);
@@ -187,7 +188,8 @@ xds::core::v3::ResourceLocator XdsResourceIdentifier::decodeUrl(absl::string_vie
     decodePath(path, nullptr, *decoded_resource_locator.mutable_id());
     return decoded_resource_locator;
   } else {
-    throw XdsResourceIdentifier::DecodeException(
+    throwExceptionOrPanic(
+        XdsResourceIdentifier::DecodeException,
         fmt::format("{} does not have a xdstp:, http: or file: scheme", resource_url));
   }
   decoded_resource_locator.set_authority(PercentEncoding::decode(host));

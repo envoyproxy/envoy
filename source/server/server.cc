@@ -339,8 +339,8 @@ void registerCustomInlineHeadersFromBootstrap(
   for (const auto& inline_header : bootstrap.inline_headers()) {
     const Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
     if (!canBeRegisteredAsInlineHeader(lower_case_name)) {
-      throw EnvoyException(fmt::format("Header {} cannot be registered as an inline header.",
-                                       inline_header.inline_header_name()));
+      throwEnvoyExceptionOrPanic(fmt::format("Header {} cannot be registered as an inline header.",
+                                             inline_header.inline_header_name()));
     }
     switch (inline_header.inline_header_type()) {
     case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_HEADER:
@@ -377,8 +377,9 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
   // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
-    throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
-                         "should be non-empty");
+    throwEnvoyExceptionOrPanic(
+        "At least one of --config-path or --config-yaml or Options::configProto() "
+        "should be non-empty");
   }
 
   if (!config_path.empty()) {
@@ -386,7 +387,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
 #else
     if (!config_path.empty()) {
-      throw EnvoyException("Cannot load from file with YAML disabled\n");
+      throwEnvoyExceptionOrPanic("Cannot load from file with YAML disabled\n");
     }
     UNREFERENCED_PARAMETER(api);
 #endif
@@ -398,7 +399,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
 #else
-    throw EnvoyException("Cannot load from YAML with YAML disabled\n");
+    throwEnvoyExceptionOrPanic("Cannot load from YAML with YAML disabled\n");
 #endif
   }
   if (config_proto.ByteSizeLong() != 0) {
@@ -449,7 +450,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   tracing_session_ = perfetto::Tracing::NewTrace();
   tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
   if (tracing_fd_ == -1) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
   }
   // Configure the tracing session.
@@ -516,7 +517,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     version_int = bootstrap_.stats_server_version_override().value();
   } else {
     if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+      throwEnvoyExceptionOrPanic("compiled GIT SHA is invalid. Invalid build.");
     }
   }
   server_stats_->version_.set(version_int);
@@ -691,7 +692,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   if (initial_config.admin().address()) {
     if (!admin_) {
-      throw EnvoyException("Admin address configured but admin support compiled out");
+      throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
     }
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
                               initial_config.admin().address(),

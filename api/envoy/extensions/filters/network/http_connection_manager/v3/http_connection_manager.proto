@@ -1132,7 +1132,7 @@ message ScopedRds {
   string srds_resources_locator = 2;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
@@ -1169,6 +1169,20 @@ message HttpFilter {
   // filter but otherwise accept the config.
   // Otherwise, clients that do not support this filter must reject the config.
   bool is_optional = 6;
+
+  // If true, the filter is disabled by default and must be explicitly enabled by setting
+  // per filter configuration in the route configuration.
+  //
+  // A disabled filter will be treated as enabled in the following cases:
+  //
+  // 1. Valid per filter configuration is configured in the ``typed_per_filter_config`` of route config.
+  // 2. :ref:`FilterConfig <envoy_v3_api_msg_config.route.v3.FilterConfig>` is configured in the
+  //    ``typed_per_filter_config`` of route config and the
+  //    :ref:`disabled of FilterConfig <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>`
+  //    is set to false.
+  //
+  // Terminal filters (e.g. ``envoy.filters.http.router``) cannot be marked as disabled.
+  bool disabled = 7;
 }
 
 message RequestIDExtension {
