@@ -12,8 +12,18 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+/**
+ * @brief A strig key-value map that stores the resource attributes.
+ */
 using ResourceAttributes = std::map<std::string, std::string>;
 
+/**
+ * @brief A Resource represents the entity producing telemetry as Attributes.
+ * For example, a process producing telemetry that is running in a container on Kubernetes
+ * has a Pod name, it is in a namespace and possibly is part of a Deployment which also has a name.
+ * See:
+ * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.26.0/specification/resource/sdk.md
+ */
 struct Resource {
   std::string schemaUrl_{""};
   ResourceAttributes attributes_{};
