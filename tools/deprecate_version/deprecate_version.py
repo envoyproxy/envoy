@@ -120,8 +120,8 @@ def create_issues(access_token, runtime_and_pr):
                 # for setec backports, we may not find a user, which would make
                 # create_issue crash.
                 if login:
-                  repo.create_issue(title, body=body, assignees=[login], labels=labels)
-                  issue_created = True;
+                    repo.create_issue(title, body=body, assignees=[login], labels=labels)
+                    issue_created = True
             except github.GithubException as e:
                 print((
                     'unable to assign issue %s to %s. Add them to the Envoy proxy org'
