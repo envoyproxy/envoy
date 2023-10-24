@@ -28,7 +28,7 @@ jobs:
         - data-plane-api
         - mobile-website
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.18
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.27
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main
