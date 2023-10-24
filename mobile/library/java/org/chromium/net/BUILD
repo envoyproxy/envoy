@@ -29,5 +29,6 @@ android_binary(
     deps = [
         ":net",
         "//library/java/org/chromium/net/impl:cronvoy",
+        artifact("com.google.protobuf:protobuf-javalite"),
     ],
 )
