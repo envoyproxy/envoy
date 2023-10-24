@@ -207,14 +207,6 @@ def _cc_deps():
     external_http_archive("com_google_protoconverter")
     external_http_archive("com_google_protofieldextraction")
     external_http_archive("ocp")
-    native.bind(
-        name = "path_matcher",
-        actual = "@grpc_httpjson_transcoding//src:path_matcher",
-    )
-    native.bind(
-        name = "grpc_transcoding",
-        actual = "@grpc_httpjson_transcoding//src:transcoding",
-    )
 
 def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using

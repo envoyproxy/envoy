@@ -129,9 +129,14 @@ def envoy_copts(repository, test = False):
            envoy_select_signal_trace(["-DENVOY_HANDLE_SIGNALS"], repository) + \
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
+_BINDS = {
+    "grpc_transcoding": "@grpc_httpjson_transcoding//src:transcoding",
+    "path_matcher": "@grpc_httpjson_transcoding//src:path_matcher",
+}
+
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
-    return "//external:%s" % dep
+    return _BINDS.get(dep, "//external:%s" % dep)
 
 def envoy_linkstatic():
     return select({
