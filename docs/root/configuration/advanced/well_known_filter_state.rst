@@ -57,7 +57,7 @@ The following list of filter state objects are consumed by Envoy extensions:
   per-connection bases. Accepts values "true" and "false".
 
 ``envoy.filters.listener.local_replay_owner``
-  :ref:`Information of the filter sending local replay` contains the information to identify the filter
+  Information of the filter sending local replay contains the information to identify the filter
    generating the local replay from the filter chain. Fields:
 
   * ``filter_config_name``: config_name from context;
