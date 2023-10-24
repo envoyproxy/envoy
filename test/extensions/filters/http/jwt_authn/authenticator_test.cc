@@ -155,13 +155,12 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
   EXPECT_EQ(headers.get_("x-jwt-bool-claim"), "true");
   EXPECT_EQ(headers.get_("x-jwt-int-claim"), "9999");
 
-  // This check verifies whether the claim with the allow_serialize_object value set is
+  // This check verifies whether the claim with non-primitive type are
   // successfully serialized and added to headers.
   std::string expected_json = "[\"str1\",\"str2\"]";
 
   ASSERT_EQ(headers.get_("x-jwt-claim-object-key"),
             Envoy::Base64::encode(expected_json.data(), expected_json.size()));
-  EXPECT_EQ(headers.get_("x-jwt-claim-primitive-key"), "9999");
 }
 
 // This test verifies when wrong claim is passed in claim_to_headers

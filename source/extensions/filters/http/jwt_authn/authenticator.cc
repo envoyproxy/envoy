@@ -84,8 +84,7 @@ private:
   void startVerify();
 
   // Copy the JWT Claim to HTTP Header
-  void addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name,
-                           const bool allow_serialize_object = false);
+  void addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name);
 
   // The jwks cache object.
   JwksCache& jwks_cache_;
@@ -301,8 +300,7 @@ void AuthenticatorImpl::verifyKey() {
 }
 
 void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
-                                            const std::string& header_name,
-                                            const bool allow_serialize_object) {
+                                            const std::string& header_name) {
   StructUtils payload_getter(jwt_->payload_pb_);
   const ProtobufWkt::Value* claim_value;
   const auto status = payload_getter.GetValue(claim_name, claim_value);
@@ -321,13 +319,6 @@ void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
     case Envoy::ProtobufWkt::Value::kStructValue:
       ABSL_FALLTHROUGH_INTENDED;
     case Envoy::ProtobufWkt::Value::kListValue: {
-      if (!allow_serialize_object) {
-        ENVOY_LOG(debug,
-                  "[jwt_auth] claim : {} is an object type but allow_serialize_object is not set",
-                  claim_name);
-        break;
-      }
-
       std::string output;
       auto status = claim_value->has_struct_value()
                         ? ProtobufUtil::MessageToJsonString(claim_value->struct_value(), &output)
@@ -338,6 +329,8 @@ void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
       break;
     }
     default:
+      ENVOY_LOG(debug, "[jwt_auth] claim : {} is of an unknown type '{}'", claim_name,
+                claim_value->kind_case());
       break;
     }
 
@@ -367,8 +360,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
 
   // Copy JWT claim to header
   for (const auto& header_and_claim : provider.claim_to_headers()) {
-    addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name(),
-                        header_and_claim.allow_serialize_object());
+    addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
   }
 
   if (!provider.forward()) {

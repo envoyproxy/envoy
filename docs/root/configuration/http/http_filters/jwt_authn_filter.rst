@@ -276,9 +276,8 @@ The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt
         claim_name: nested.claim.key
       - header_name: x-jwt-tenants
         claim_name: tenants
-        allow_serialize_object: true
 
-JWT claim ("sub", "nested.claim.key" and "tenants") will be added to HTTP headers as following format:
+In this example the `tenants` claim is an object, therefore the JWT claim ("sub", "nested.claim.key" and "tenants") will be added to HTTP headers as following format:
 
 .. code-block::
 

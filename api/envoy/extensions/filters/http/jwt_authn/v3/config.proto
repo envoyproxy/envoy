@@ -762,9 +762,4 @@ message JwtClaimToHeader {
   // String separated with "." in case of nested claims. The nested claim name must use dot "." to separate
   // the JSON name path.
   string claim_name = 2 [(validate.rules).string = {min_len: 1}];
-
-  // If the claim name refers to an object type (e.g. tenants: {"key": {}}), this field can be used to
-  // return the value serialized as JSON (base64 encoded). Note that if the claim refers to a field of
-  // any primitive type, this flag will be ignored.
-  bool allow_serialize_object = 3;
 }

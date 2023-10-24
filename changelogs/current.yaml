@@ -22,9 +22,7 @@ removed_config_or_runtime:
 new_features:
 - area: jwt
   change: |
-    Added a new field ``allow_serialize_object`` on
-    :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>`
-    to serialize custom claim objects from JWT tokens. When set to true, the filter will serialize the
-    claim as JSON and encode it to Base64.
+    The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
+    These claims will be serialized as JSON and encoded as Base64.
 
 deprecated:

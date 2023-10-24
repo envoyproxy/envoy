@@ -99,10 +99,6 @@ providers:
       claim_name: "nested.nested-2.key-4"
     - header_name: "x-jwt-claim-object-key"
       claim_name: "nested.nested-2.key-5"
-      allow_serialize_object: true
-    - header_name: "x-jwt-claim-primitive-key"
-      claim_name: "nested.nested-2.key-4"
-      allow_serialize_object: true
 rules:
 - match:
     path: "/"
