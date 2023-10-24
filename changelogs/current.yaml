@@ -22,6 +22,11 @@ bug_fixes:
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+- area: upstream
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.validate_detailed_override_host_statuses``
+    runtime flag and legacy code path.
+
 new_features:
 
 deprecated:
