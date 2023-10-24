@@ -53,7 +53,7 @@ OptRef<Network::Connection> GenericUpstream::connection() {
 BoundGenericUpstream::BoundGenericUpstream(const CodecFactory& codec_factory,
                                            Envoy::Upstream::TcpPoolData&& tcp_pool_data,
                                            Network::Connection& downstream_connection)
-    : GenericUpstream(std::move(tcp_pool_data), codec_factory.responseDecoder()),
+    : GenericUpstream(std::move(tcp_pool_data), codec_factory.createClientCodec()),
       downstream_connection_(downstream_connection) {
 
   connection_event_watcher_ = std::make_unique<EventWatcher>(*this);
@@ -231,7 +231,7 @@ void BoundGenericUpstream::onDecodingFailure() {
 
 OwnedGenericUpstream::OwnedGenericUpstream(const CodecFactory& codec_factory,
                                            Envoy::Upstream::TcpPoolData&& tcp_pool_data)
-    : GenericUpstream(std::move(tcp_pool_data), codec_factory.responseDecoder()) {}
+    : GenericUpstream(std::move(tcp_pool_data), codec_factory.createClientCodec()) {}
 
 void OwnedGenericUpstream::insertUpstreamRequest(uint64_t, UpstreamRequest* pending_request) {
   upstream_request_ = pending_request;
@@ -348,8 +348,8 @@ void UpstreamRequest::deferredDelete() {
 
 void UpstreamRequest::sendRequestStartToUpstream() {
   request_stream_header_sent_ = true;
-
-  parent_.request_encoder_->encode(*parent_.request_stream_, *this);
+  ASSERT(generic_upstream_ != nullptr);
+  generic_upstream_->clientCodec()->encode(*parent_.request_stream_, *this);
 }
 
 void UpstreamRequest::sendRequestFrameToUpstream() {
@@ -363,7 +363,8 @@ void UpstreamRequest::sendRequestFrameToUpstream() {
     auto frame = std::move(parent_.request_stream_frames_.front());
     parent_.request_stream_frames_.pop_front();
 
-    parent_.request_encoder_->encode(*frame, *this);
+    ASSERT(generic_upstream_ != nullptr);
+    generic_upstream_->clientCodec()->encode(*frame, *this);
   }
 }
 

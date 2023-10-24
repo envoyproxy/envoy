@@ -60,6 +60,7 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = ["quiche_time_utils_impl.h"],
     external_deps = [
         "abseil_base",
+        "abseil_optional",
         "abseil_time",
     ],
 )

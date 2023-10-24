@@ -95,7 +95,7 @@ jobs:
     steps:
     - if: ${{ inputs.cache_build_image }}
       name: Restore Docker cache (${{ inputs.cache_build_image }})
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.27
       with:
         image_tag: ${{ inputs.cache_build_image }}
 
@@ -108,7 +108,7 @@ jobs:
     - if: ${{ steps.context.outputs.use_appauth == 'true' }}
       name: Fetch token for app auth
       id: appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.27
       with:
         app_id: ${{ secrets.app_id }}
         key: ${{ secrets.app_key }}
@@ -138,7 +138,7 @@ jobs:
       run: git config --global --add safe.directory /__w/envoy/envoy
 
     - if: ${{ inputs.diskspace_hack }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.27
     - run: |
         echo "disk space at beginning of build:"
         df -h
@@ -146,7 +146,7 @@ jobs:
 
     - if: ${{ inputs.run_pre }}
       name: Run pre action ${{ inputs.run_pre && format('({0})', inputs.run_pre) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.27
       with:
         uses: ${{ inputs.run_pre }}
         with: ${{ inputs.run_pre_with }}
@@ -170,7 +170,7 @@ jobs:
 
     - if: ${{ inputs.run_post }}
       name: Run post action ${{ inputs.run_pre && format('({0})', inputs.run_post) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.18
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.27
       with:
         uses: ${{ inputs.run_post }}
         with: ${{ inputs.run_post_with }}

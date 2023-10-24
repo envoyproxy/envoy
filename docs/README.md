@@ -8,6 +8,8 @@ In both cases, the generated output can be found in `generated/docs`.
 
 If you have an [existing Envoy development environment](https://github.com/envoyproxy/envoy/tree/main/bazel#quick-start-bazel-build-for-developers), you should have the necessary dependencies and requirements and be able to build the documentation directly.
 
+If using the Docker build container, you can run:
+
 ```bash
 ./ci/do_ci.sh docs
 ```
@@ -17,6 +19,12 @@ set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
 
 ```bash
 SPHINX_SKIP_CONFIG_VALIDATION=true ./ci/do_ci.sh docs
+```
+
+If not using the Docker build container, you can run:
+
+```bash
+bazel run --//tools/tarball:target=//docs:html //tools/tarball:unpack "$PWD"/generated/docs/
 ```
 
 ## Using the Docker build container to build the documentation
