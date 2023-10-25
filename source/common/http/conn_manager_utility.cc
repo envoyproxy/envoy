@@ -91,12 +91,18 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (!Utility::isUpgrade(request_headers)) {
-    request_headers.removeConnection();
+    if (protocol == Protocol::Http11) {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.retain_keepalive_header_http11")) {
+        request_headers.removeConnection();
+      }
+    } else {
+        request_headers.removeConnection();
+    }
     request_headers.removeUpgrade();
   }
 
   // Clean proxy headers.
-   if (protocol == Protocol::Http11) {
+  if (protocol == Protocol::Http11) {
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.retain_keepalive_header_http11")) {
       request_headers.removeKeepAlive();
     }
