@@ -388,7 +388,8 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
 void javaByteArrayToProto(JNIEnv* env, jbyteArray source, Envoy::Protobuf::MessageLite* dest) {
   jbyte* bytes = env->GetByteArrayElements(source, /* isCopy= */ nullptr);
   jsize size = env->GetArrayLength(source);
-  ASSERT(dest->ParseFromArray(bytes, size));
+  bool success = dest->ParseFromArray(bytes, size);
+  RELEASE_ASSERT(success, "Failed to parse protobuf message.");
   env->ReleaseByteArrayElements(source, bytes, 0);
 }
 
