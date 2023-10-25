@@ -51,6 +51,7 @@ android_library(
         "//library/java/io/envoyproxy/envoymobile/utilities",
         "//library/java/org/chromium/net",
         "//library/java/org/chromium/net/urlconnection",
+        "@maven//:com_google_protobuf_protobuf_javalite",
         artifact("androidx.annotation:annotation"),
     ],
 )

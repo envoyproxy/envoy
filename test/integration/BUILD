@@ -523,7 +523,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    shard_count = 8,
+    shard_count = 10,
     tags = [
         "cpu:3",
     ],
@@ -722,7 +722,7 @@ envoy_cc_test(
     ]),
     deps = [
         ":http_integration_lib",
-        "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:set_route_filter_lib",
     ],
 )
 

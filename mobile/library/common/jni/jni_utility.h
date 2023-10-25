@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "source/common/protobuf/protobuf.h"
+
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/types/c_types.h"
 #include "library/common/types/managed_envoy_headers.h"
@@ -118,6 +120,9 @@ void JavaArrayOfByteToString(JNIEnv* env, jbyteArray jbytes, std::string* out);
 
 std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray array,
                                                       std::string& cluster_out);
+
+/** Parses the proto from Java's byte array and stores the output into `dest` proto. */
+void javaByteArrayToProto(JNIEnv* env, jbyteArray source, Envoy::Protobuf::MessageLite* dest);
 
 // Helper functions for JNI's `Call<Type>Method` with proper exception handling in order to satisfy
 // -Xcheck:jni.

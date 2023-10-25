@@ -1,0 +1,17 @@
+diff --git a/sources/ippcp/crypto_mb/src/common/ifma_cvt52.c b/sources/ippcp/crypto_mb/src/common/ifma_cvt52.c
+index 1099518..7526fdc 100644
+--- a/sources/ippcp/crypto_mb/src/common/ifma_cvt52.c
++++ b/sources/ippcp/crypto_mb/src/common/ifma_cvt52.c
+@@ -168,12 +168,6 @@ __INLINE void transform_8sb_to_mb8(U64 out_mb8[], int bitLen, int8u *inp[8], int
+    }
+ }
+
+-#ifdef OPENSSL_IS_BORINGSSL
+-static int BN_bn2lebinpad(const BIGNUM *a, unsigned char *to, int tolen) {
+-    return BN_bn2le_padded(to, tolen, a);
+-}
+-#endif
+-
+ #ifndef BN_OPENSSL_DISABLE
+ // Convert BIGNUM into MB8(Radix=2^52) format
+ // Returns bitmask of succesfully converted values
