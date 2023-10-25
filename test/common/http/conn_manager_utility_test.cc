@@ -142,11 +142,11 @@ public:
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
   // convoluted way to force tests to check both the final downstream address as well as whether
   // the request is internal/external, given the importance of these two pieces of data.
-  MutateRequestRet callMutateRequestHeaders(RequestHeaderMap& headers, Protocol) {
+  MutateRequestRet callMutateRequestHeaders(RequestHeaderMap& headers, Protocol protocol) {
     MutateRequestRet ret;
     NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
     const auto result = ConnectionManagerUtility::mutateRequestHeaders(
-        headers, connection_, config_, route_config_, local_info_, mock_stream_info);
+        headers, protocol, connection_, config_, route_config_, local_info_, mock_stream_info);
     ret.downstream_address_ = result.final_remote_address->asString();
     ret.reject_request_ = result.reject_request;
     ret.trace_reason_ =
@@ -2282,6 +2282,28 @@ TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyResponseHeadersForHttp1
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyRequestHeadersForHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
+  Http::TestRequestHeaderMapImpl request_headers{{"keep-alive", "timeout=60, max=1000"}};
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
+  callMutateRequestHeaders(request_headers, Protocol::Http11);
+  EXPECT_FALSE(request_headers.has("keep-alive"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyRequestHeadersForHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.retain_keepalive_header_http11", "true"}});
+  Http::TestRequestHeaderMapImpl request_headers{{"keep-alive", "timeout=60, max=1000"}};
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
+  callMutateRequestHeaders(request_headers, Protocol::Http11);
+  EXPECT_TRUE(request_headers.has("keep-alive"));
 }
 
 } // namespace Http
