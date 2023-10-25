@@ -97,6 +97,8 @@ providers:
       claim_name: "nested.nested-2.key-3"
     - header_name: "x-jwt-int-claim"
       claim_name: "nested.nested-2.key-4"
+    - header_name: "x-jwt-claim-object-key"
+      claim_name: "nested.nested-2.key-5"
 rules:
 - match:
     path: "/"

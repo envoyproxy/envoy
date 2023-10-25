@@ -35,6 +35,10 @@ inputs:
   command_ci:
     type: string
     default: ./ci/do_ci.sh
+  catch-errors:
+    type: boolean
+    default: false
+
 
   env:
     type: string
@@ -72,17 +76,31 @@ runs:
       fi
 
       if [[ -n "${{ inputs.command_prefix }}" ]]; then
-          ${{ inputs.command_prefix }} '${{ inputs.command_ci }} ${{ inputs.target }}'
+          COMMAND=(
+              ${{ inputs.command_prefix }}
+              '${{ inputs.command_ci }} ${{ inputs.target }}')
       else
-          ${{ inputs.command_ci }} ${{ inputs.target }}
+          COMMAND=(
+              ${{ inputs.command_ci }}
+              ${{ inputs.target }})
       fi
-
       if [[ ${{ github.event_name }} == "pull_request" ]]; then
           export BAZEL_FAKE_SCM_REVISION=e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9
           export CI_TARGET_BRANCH="${{ github.event.base.ref }}"
       else
           export CI_TARGET_BRANCH="${{ github.ref }}"
       fi
+      TMP_OUTPUT=$(mktemp)
+      "${COMMAND[@]}" 2> >(tee "$TMP_OUTPUT") || {
+          OUTPUT="$(cat "$TMP_OUTPUT" | sed 's/\n/%0A/g')"
+          rm -rf "$TMP_OUTPUT"
+          echo ":error: ${OUTPUT}"
+          if [[ ${{ inputs.catch-errors }} == "false" ]]; then
+              exit 1
+          fi
+
+      }
+      rm -rf "$TMP_OUTPUT"
     shell: bash
     env:
       GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
