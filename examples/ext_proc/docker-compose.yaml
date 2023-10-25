@@ -19,7 +19,7 @@ services:
     build:
       context: ./proc
       dockerfile: ../../shared/node/Dockerfile
-      target: node-http-proc
+      target: node-http-auth
     volumes:
     - ./users.json:/etc/users.json
     environment:
@@ -38,5 +38,3 @@ services:
       context: ./upstream
       dockerfile: ../../shared/golang/Dockerfile
       target: golang-ext-proc-upstream
-    environment:
-    - GO_APP_NAME=upstream

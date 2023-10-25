@@ -77,12 +77,23 @@ FROM os-base as golang-lrs
 COPY --from=golang-lrs-builder /go/bin/load-reporting-service /usr/local/bin/load-reporting-service
 CMD ["load-reporting-service"]
 
-# Ext Proc stage with an explicit name
-FROM golang:1.21.2-bullseye as golang-ext-proc
+FROM golang-base as golang-base-ext-proc
+ARG GO_APP=.
+ARG GO_APP_NAME=grpc-service
+RUN echo "COPY $GO_APP -> ${GO_APP_NAME} ..."
+COPY "$GO_APP" /app
 
-# Copy your Go code and build your application here
-COPY ./path/to/ext_proc/app /app
-RUN make -C "/app"
 
-# Rest of the Dockerfile
+FROM golang-base-ext-proc as golang-grpc-ext-proc
+RUN make -C "/app/${GO_APP_NAME}"
 
+
+FROM os-base as golang-grpc-proc
+COPY --from=golang-grpc-ext-proc /app/grpc-service/server /app/server
+CMD ["/app/server"]
+
+FROM golang-base as golang-ext-proc-upstream
+COPY . /app
+WORKDIR /app/service
+RUN go build -o service
+CMD ["/app/service"]
