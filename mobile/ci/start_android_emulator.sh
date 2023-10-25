@@ -5,7 +5,9 @@ set -e
 check_emulator_status() {
     while true; do
         if grep -q "Running on a system with less than 6 logical cores. Setting number of virtual cores to 1" nohup.out; then
-            echo "Starting an emulator on this machine is likely to fail, please run /retest"
+            echo "=================================================================================="
+            echo "ERROR: Starting an emulator on this machine is likely to fail, please run /retest"
+            echo "=================================================================================="
             exit 1
         elif grep -q "Boot completed" nohup.out; then
             break
