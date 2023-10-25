@@ -17,7 +17,7 @@ index efc3d8e7f..746ad4851 100644
  ################################################################################
 
 -ZLIB_DEPS = ["@zlib//:zlib"]
-+ZLIB_DEPS = ["//external:zlib"]
++ZLIB_DEPS = ["@envoy//bazel/foreign_cc:zlib"]
 
  ################################################################################
  # Protobuf Runtime Library

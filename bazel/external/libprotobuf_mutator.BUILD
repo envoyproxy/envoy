@@ -14,5 +14,5 @@ cc_library(
     include_prefix = "libprotobuf_mutator",
     includes = ["."],
     visibility = ["//visibility:public"],
-    deps = ["//external:protobuf"],
+    deps = ["@com_google_protobuf//:protobuf"],
 )

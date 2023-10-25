@@ -17,6 +17,10 @@ envoy_cc_library(
     hdrs = [
         "header_validator.h",
     ],
+    external_deps = [
+        "abseil_node_hash_map",
+        "abseil_node_hash_set",
+    ],
     visibility = [
         "//test/common/http/http1:__subpackages__",
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
@@ -26,8 +30,6 @@ envoy_cc_library(
         ":path_normalizer",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
-        "//external:abseil_node_hash_map",
-        "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
@@ -90,6 +92,9 @@ envoy_cc_library(
     hdrs = [
         "http1_header_validator.h",
     ],
+    external_deps = [
+        "abseil_node_hash_set",
+    ],
     visibility = [
         "//test/common/http:__subpackages__",
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
@@ -98,7 +103,6 @@ envoy_cc_library(
         ":header_validator_common",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
-        "//external:abseil_node_hash_set",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
@@ -114,6 +118,10 @@ envoy_cc_library(
     hdrs = [
         "http2_header_validator.h",
     ],
+    external_deps = [
+        "abseil_node_hash_map",
+        "abseil_node_hash_set",
+    ],
     visibility = [
         "//test/common/http/http2:__subpackages__",
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
@@ -122,8 +130,6 @@ envoy_cc_library(
         ":header_validator_common",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
-        "//external:abseil_node_hash_map",
-        "//external:abseil_node_hash_set",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",

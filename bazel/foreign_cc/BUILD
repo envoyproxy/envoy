@@ -285,8 +285,8 @@ envoy_cmake(
     deps = [
         ":ares",
         ":nghttp2",
-        "//external:ssl",
-        "//external:zlib",
+        "@envoy//bazel:boringssl",
+        "@envoy//bazel/foreign_cc:zlib",
     ],
 )
 

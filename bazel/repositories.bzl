@@ -812,6 +812,12 @@ def _v8():
         patch_args = ["-p1"],
     )
 
+    # Required by proxy-wasm-cpp-host
+    native.bind(
+        name = "wee8",
+        actual = "@v8//:wee8",
+    )
+
 def _com_googlesource_chromium_base_trace_event_common():
     external_http_archive(
         name = "com_googlesource_chromium_base_trace_event_common",
@@ -932,6 +938,12 @@ def _upb():
         name = "upb",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:upb.patch"],
+    )
+
+    # Needed by grpc
+    native.bind(
+        name = "upb_lib",
+        actual = "@upb//:upb",
     )
 
 def _proxy_wasm_cpp_sdk():

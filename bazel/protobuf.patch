@@ -106,7 +106,7 @@ diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.b
      ] + select({
          "//build_defs:config_msvc": [],
 -        "//conditions:default": ["@zlib//:zlib"],
-+        "//conditions:default": ["//external:zlib"],
++        "//conditions:default": ["@envoy//bazel/foreign_cc:zlib"],
      }),
  )
 

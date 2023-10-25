@@ -54,8 +54,10 @@ envoy_cc_test_library(
         "test_resume_call_cpp.cc",
     ],
     copts = ["-DNULL_PLUGIN=1"],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",

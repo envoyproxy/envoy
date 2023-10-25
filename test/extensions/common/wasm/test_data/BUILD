@@ -13,8 +13,8 @@ envoy_package()
 wasm_rust_binary(
     name = "test_rust.wasm",
     srcs = ["test_rust.rs"],
-    rustc_flags = ["-Clink-arg=-zstack-size=32768"],
     precompile = envoy_select_wasm_v8_bool(),
+    rustc_flags = ["-Clink-arg=-zstack-size=32768"],
 )
 
 envoy_cc_test_library(
@@ -24,8 +24,10 @@ envoy_cc_test_library(
         "test_cpp_null_plugin.cc",
     ],
     copts = ["-DNULL_PLUGIN=1"],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
@@ -40,8 +42,10 @@ envoy_cc_test_library(
         "test_context_cpp_null_plugin.cc",
     ],
     copts = ["-DNULL_PLUGIN=1"],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
@@ -57,8 +61,10 @@ envoy_cc_test_library(
         "test_restriction_cpp_null_plugin.cc",
     ],
     copts = ["-DNULL_PLUGIN=1"],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",

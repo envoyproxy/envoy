@@ -70,6 +70,11 @@ envoy_cc_extension(
             "-DWASM_USE_CEL_PARSER",
         ],
     }),
+    external_deps = [
+        "zlib",
+        "abseil_base",
+        "abseil_node_hash_map",
+    ],
     visibility = [
         "//source/extensions:__subpackages__",
         "//test/extensions:__subpackages__",
@@ -79,9 +84,6 @@ envoy_cc_extension(
         ":wasm_hdr",
         ":wasm_runtime_factory_interface",
         "//envoy/server:lifecycle_notifier_interface",
-        "//external:abseil_base",
-        "//external:abseil_node_hash_map",
-        "//external:zlib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:safe_memcpy_lib",
