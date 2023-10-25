@@ -38,9 +38,9 @@ message ProcessingMode {
   // When body mutation by external processor is enabled, ext_proc filter will always remove
   // the content length header in three cases below because content length can not be guaranteed
   // to be set correctly:
-  // STREAMED BodySendMode: header processing completes before body mutation comes back.
-  // BUFFERED_PARTIAL BodySendMode: body is buffered and could be injected in different phases.
-  // BUFFERED BodySendMode + SKIP HeaderSendMode: header processing (e.g., update content-length) is skipped.
+  // 1) STREAMED BodySendMode: header processing completes before body mutation comes back.
+  // 2) BUFFERED_PARTIAL BodySendMode: body is buffered and could be injected in different phases.
+  // 3) BUFFERED BodySendMode + SKIP HeaderSendMode: header processing (e.g., update content-length) is skipped.
   //
   // In Envoy's http1 codec implementation, removing content length will enable chunked transfer
   // encoding whenever feasible. The recipient (either client or server) must be able
