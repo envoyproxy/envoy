@@ -346,6 +346,11 @@ EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zo
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setNodeMetadata(ProtobufWkt::Struct node_metadata) {
+  node_metadata_ = std::move(node_metadata);
+  return *this;
+}
+
 #ifdef ENVOY_GOOGLE_GRPC
 EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
   xds_builder_ = std::move(xds_builder);
@@ -871,6 +876,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     node->mutable_locality()->set_region(node_locality_->region);
     node->mutable_locality()->set_zone(node_locality_->zone);
     node->mutable_locality()->set_sub_zone(node_locality_->sub_zone);
+  }
+  if (node_metadata_.has_value()) {
+    *node->mutable_metadata() = *node_metadata_;
   }
   ProtobufWkt::Struct& metadata = *node->mutable_metadata();
   (*metadata.mutable_fields())["app_id"].set_string_value(app_id_);

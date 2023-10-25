@@ -268,9 +268,6 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
 
 // Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
 TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
-  return; // TODO(alyssawilk) debug
-#endif
   if (version_ != Network::Address::IpVersion::v4) {
     // Loopback resolves to a v4 address.
     return;

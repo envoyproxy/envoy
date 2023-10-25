@@ -385,6 +385,14 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
   return ret;
 }
 
+void javaByteArrayToProto(JNIEnv* env, jbyteArray source, Envoy::Protobuf::MessageLite* dest) {
+  jbyte* bytes = env->GetByteArrayElements(source, /* isCopy= */ nullptr);
+  jsize size = env->GetArrayLength(source);
+  bool success = dest->ParseFromArray(bytes, size);
+  RELEASE_ASSERT(success, "Failed to parse protobuf message.");
+  env->ReleaseByteArrayElements(source, bytes, 0);
+}
+
 #define DEFINE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                    \
   JNI_TYPE call##JAVA_TYPE##Method(JNIEnv* env, jobject object, jmethodID method_id, ...) {        \
     va_list args;                                                                                  \
