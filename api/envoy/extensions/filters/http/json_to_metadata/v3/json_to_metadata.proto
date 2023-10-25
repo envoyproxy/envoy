@@ -111,7 +111,7 @@ message JsonToMetadata {
     bool allow_empty_content_type = 3;
   }
 
-  // At lease one of request_rules and response_rules must be provided.
+  // At least one of request_rules and response_rules must be provided.
   // Rules to match json body of requests.
   MatchRules request_rules = 1;
 

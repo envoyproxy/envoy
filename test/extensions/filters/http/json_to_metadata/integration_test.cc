@@ -152,15 +152,15 @@ TEST_P(JsonToMetadataIntegrationTest, Basic) {
 
   runTest(incoming_headers_, request_body_, response_headers_, response_body_);
 
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_invalid_json_body")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.invalid_json_body")->value());
 
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_invalid_json_body")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.invalid_json_body")->value());
 }
 
 TEST_P(JsonToMetadataIntegrationTest, BasicOneChunk) {
@@ -168,15 +168,15 @@ TEST_P(JsonToMetadataIntegrationTest, BasicOneChunk) {
 
   runTest(incoming_headers_, request_body_, response_headers_, response_body_, 1);
 
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_invalid_json_body")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.invalid_json_body")->value());
 
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_invalid_json_body")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.invalid_json_body")->value());
 }
 
 TEST_P(JsonToMetadataIntegrationTest, Trailer) {
@@ -184,15 +184,15 @@ TEST_P(JsonToMetadataIntegrationTest, Trailer) {
 
   runTest(incoming_headers_, request_body_, response_headers_, response_body_, 5, true);
 
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_invalid_json_body")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.invalid_json_body")->value());
 
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_invalid_json_body")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.invalid_json_body")->value());
 }
 
 TEST_P(JsonToMetadataIntegrationTest, MismatchedContentType) {
@@ -208,15 +208,15 @@ TEST_P(JsonToMetadataIntegrationTest, MismatchedContentType) {
 
   runTest(incoming_headers, request_body_, response_headers, response_body_);
 
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_success")->value());
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_invalid_json_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.success")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.invalid_json_body")->value());
 
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_success")->value());
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_invalid_json_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.success")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.invalid_json_body")->value());
 }
 
 TEST_P(JsonToMetadataIntegrationTest, NoBody) {
@@ -224,15 +224,15 @@ TEST_P(JsonToMetadataIntegrationTest, NoBody) {
 
   runTest(incoming_headers_, "", response_headers_, "");
 
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_mismatched_content_type")->value());
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_invalid_json_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.mismatched_content_type")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.invalid_json_body")->value());
 
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_mismatched_content_type")->value());
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp_no_body")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_invalid_json_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp.no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.invalid_json_body")->value());
 }
 
 TEST_P(JsonToMetadataIntegrationTest, InvalidJson) {
@@ -240,15 +240,15 @@ TEST_P(JsonToMetadataIntegrationTest, InvalidJson) {
 
   runTest(incoming_headers_, "it's not a json body", response_headers_, "it's not a json body");
 
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_no_body")->value());
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq_invalid_json_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.no_body")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq.invalid_json_body")->value());
 
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp_no_body")->value());
-  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp_invalid_json_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.no_body")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp.invalid_json_body")->value());
 }
 
 } // namespace

@@ -85,7 +85,8 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
     Stats::Scope& scope)
-    : stats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata."))},
+    : rqstats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
+      respstats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.resp"))},
       request_rules_(generateRules(proto_config.request_rules().rules())),
       response_rules_(generateRules(proto_config.response_rules().rules())),
       request_allow_content_types_(
@@ -300,14 +301,13 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
 }
 
 void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
-                         bool should_clear_route_cache, Stats::Counter& success,
-                         Stats::Counter& no_body, Stats::Counter& non_json,
+                         bool should_clear_route_cache, JsonToMetadataStats& stats,
                          Http::StreamFilterCallbacks& filter_callback,
                          bool& processing_finished_flag) {
   // In case we have trailers but no body.
   if (!body || body->length() == 0) {
     handleAllOnMissing(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
-    no_body.inc();
+    stats.no_body_.inc();
     return;
   }
 
@@ -315,7 +315,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
       Json::Factory::loadFromStringNoThrow(body->toString());
   if (!result.ok()) {
     ENVOY_LOG(debug, result.status().message());
-    non_json.inc();
+    stats.invalid_json_body_.inc();
     handleAllOnError(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
     return;
   }
@@ -330,7 +330,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
         "Apply on_missing for all rules on a valid application/json body but not a json object.");
     handleAllOnMissing(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
     // This JSON body is valid and successfully parsed.
-    success.inc();
+    stats.success_.inc();
     return;
   }
 
@@ -359,7 +359,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
       handleOnMissing(rule, struct_map, filter_callback);
     }
   }
-  success.inc();
+  stats.success_.inc();
 
   finalizeDynamicMetadata(filter_callback, should_clear_route_cache, struct_map,
                           processing_finished_flag);
@@ -367,16 +367,12 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
 
 void Filter::processRequestBody() {
   processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(), true,
-              config_->stats().rq_success_, config_->stats().rq_no_body_,
-              config_->stats().rq_invalid_json_body_, *decoder_callbacks_,
-              request_processing_finished_);
+              config_->rqstats(), *decoder_callbacks_, request_processing_finished_);
 }
 
 void Filter::processResponseBody() {
   processBody(encoder_callbacks_->encodingBuffer(), config_->responseRules(), false,
-              config_->stats().resp_success_, config_->stats().resp_no_body_,
-              config_->stats().resp_invalid_json_body_, *encoder_callbacks_,
-              response_processing_finished_);
+              config_->respstats(), *encoder_callbacks_, response_processing_finished_);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
@@ -385,14 +381,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
   if (!config_->requestContentTypeAllowed(headers.getContentTypeValue())) {
     request_processing_finished_ = true;
-    config_->stats().rq_mismatched_content_type_.inc();
+    config_->rqstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (end_stream) {
     handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_,
                        request_processing_finished_);
-    config_->stats().rq_no_body_.inc();
+    config_->rqstats().no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
   return Http::FilterHeadersStatus::StopIteration;
@@ -404,14 +400,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
   if (!config_->responseContentTypeAllowed(headers.getContentTypeValue())) {
     response_processing_finished_ = true;
-    config_->stats().resp_mismatched_content_type_.inc();
+    config_->respstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (end_stream) {
     handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_,
                        response_processing_finished_);
-    config_->stats().resp_no_body_.inc();
+    config_->respstats().no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
   return Http::FilterHeadersStatus::StopIteration;
@@ -432,7 +428,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
         decoder_callbacks_->decodingBuffer()->length() == 0) {
       handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_,
                          request_processing_finished_);
-      config_->stats().rq_no_body_.inc();
+      config_->rqstats().no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
     processRequestBody();
@@ -457,7 +453,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
         encoder_callbacks_->encodingBuffer()->length() == 0) {
       handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_,
                          response_processing_finished_);
-      config_->stats().resp_no_body_.inc();
+      config_->respstats().no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
     processResponseBody();

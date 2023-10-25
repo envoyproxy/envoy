@@ -167,10 +167,10 @@ TEST_F(FilterTest, BasicStringMatch) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, BasicResponseStringMatch) {
@@ -191,10 +191,10 @@ TEST_F(FilterTest, BasicResponseStringMatch) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testResponseWithBody(response_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, BasicBoolMatch) {
@@ -213,10 +213,10 @@ TEST_F(FilterTest, BasicBoolMatch) {
                          })));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, BasicIntegerMatch) {
@@ -235,10 +235,10 @@ TEST_F(FilterTest, BasicIntegerMatch) {
                          })));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, BasicDoubleMatch) {
@@ -257,10 +257,10 @@ TEST_F(FilterTest, BasicDoubleMatch) {
                          })));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, TrailerSupport) {
@@ -289,10 +289,10 @@ request_rules:
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, ResponseTrailerSupport) {
@@ -321,10 +321,10 @@ response_rules:
   Http::TestResponseTrailerMapImpl trailers{{"some", "trailer"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, StringToString) {
@@ -348,10 +348,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, StringToNumber) {
@@ -379,10 +379,10 @@ request_rules:
                          })));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, BadStringToNumber) {
@@ -414,10 +414,10 @@ request_rules:
                          })));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, NumberToString) {
@@ -441,10 +441,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, NumberToNumber) {
@@ -472,10 +472,10 @@ request_rules:
                          })));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, IntegerToString) {
@@ -499,10 +499,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, IntegerToNumber) {
@@ -530,10 +530,10 @@ request_rules:
                          })));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, BoolToString) {
@@ -557,10 +557,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, BoolToNumber) {
@@ -588,10 +588,10 @@ request_rules:
                          })));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, OnPresentWithValueSet) {
@@ -615,10 +615,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, NoApplyOnMissingWhenPayloadIsPresent) {
@@ -647,10 +647,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata(_, _)).Times(0);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, DefaultNamespaceTest) {
@@ -673,10 +673,10 @@ request_rules:
               setDynamicMetadata("envoy.filters.http.json_to_metadata", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, DecodeTwoDataStreams) {
@@ -704,10 +704,10 @@ TEST_F(FilterTest, DecodeTwoDataStreams) {
   testRequestWithBody(request_body1, false, Http::FilterDataStatus::StopIterationAndBuffer);
   testRequestWithBody(request_body2);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, EncodeTwoDataStreams) {
@@ -735,10 +735,10 @@ TEST_F(FilterTest, EncodeTwoDataStreams) {
   testResponseWithBody(response_body1, false, Http::FilterDataStatus::StopIterationAndBuffer);
   testResponseWithBody(response_body2);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, SecondLayerMatch) {
@@ -767,10 +767,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, OnMissingFirstLayer) {
@@ -800,10 +800,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata(_, _)).Times(0);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, OnMissingSecondLayer) {
@@ -833,10 +833,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata(_, _)).Times(0);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, OnMissingForArray) {
@@ -866,10 +866,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata(_, _)).Times(0);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, OnMissingSecondLayerString) {
@@ -900,10 +900,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, NoRequestContentType) {
@@ -916,10 +916,10 @@ TEST_F(FilterTest, NoRequestContentType) {
             filter_->decodeHeaders(mismatched_incoming_headers, false));
   testRequestWithBody("{}");
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, MismatchedRequestContentType) {
@@ -932,10 +932,10 @@ TEST_F(FilterTest, MismatchedRequestContentType) {
             filter_->decodeHeaders(mismatched_incoming_headers, false));
   testRequestWithBody("Peter picked a peck of pickled peppers");
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, NoRequestBody) {
@@ -943,10 +943,10 @@ TEST_F(FilterTest, NoRequestBody) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers_, true));
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, NoResponseBody) {
@@ -954,10 +954,10 @@ TEST_F(FilterTest, NoResponseBody) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, EmptyPayloadValue) {
@@ -968,10 +968,10 @@ TEST_F(FilterTest, EmptyPayloadValue) {
 
   testRequestWithBody("");
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, ResponseEmptyPayloadValue) {
@@ -982,10 +982,10 @@ TEST_F(FilterTest, ResponseEmptyPayloadValue) {
 
   testResponseWithBody("");
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, InvalidJsonPayload) {
@@ -1009,10 +1009,10 @@ TEST_F(FilterTest, InvalidJsonPayload) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 1);
 }
 
 TEST_F(FilterTest, OnMissingQuotedString) {
@@ -1026,10 +1026,10 @@ TEST_F(FilterTest, OnMissingQuotedString) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, OnMissingQuotedJsonObject) {
@@ -1044,10 +1044,10 @@ TEST_F(FilterTest, OnMissingQuotedJsonObject) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, OnMissingPureNumber) {
@@ -1061,10 +1061,10 @@ TEST_F(FilterTest, OnMissingPureNumber) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 // TODO(kuochunghsu): Planned to support trimming.
@@ -1081,10 +1081,10 @@ TEST_F(FilterTest, InvalidJsonForAdditionalPrefixSuffix) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 1);
 }
 
 TEST_F(FilterTest, EmptyStringValue) {
@@ -1112,10 +1112,10 @@ request_rules:
   Buffer::OwnedImpl buffer(request_body);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, PayloadValueTooLong) {
@@ -1145,10 +1145,10 @@ request_rules:
   Buffer::OwnedImpl buffer(request_body);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, PayloadValueTooLongValueTypeString) {
@@ -1179,10 +1179,10 @@ request_rules:
   Buffer::OwnedImpl buffer(request_body);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, MissingMetadataKeyAndFallbackValue) {
@@ -1203,10 +1203,10 @@ TEST_F(FilterTest, MissingMetadataKeyAndFallbackValue) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, MissingMetadataKeyWithNoFallbackValue) {
@@ -1237,10 +1237,10 @@ request_rules:
   EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(0);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, MissingMetadataKeyWithExistingMetadata) {
@@ -1265,10 +1265,10 @@ TEST_F(FilterTest, MissingMetadataKeyWithExistingMetadata) {
   EXPECT_CALL(stream_info_, setDynamicMetadata(_, _)).Times(0);
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, MultipleRules) {
@@ -1298,10 +1298,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, MultipleRulesInSamePath) {
@@ -1331,10 +1331,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("another.namespace", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, MultipleRulesSecondLayer) {
@@ -1374,10 +1374,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, CustomRequestAllowContentTypeAccepted) {
@@ -1404,10 +1404,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, CustomResponseAllowContentTypeAccepted) {
@@ -1434,10 +1434,10 @@ response_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testResponseWithBody(response_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, CustomRequestAllowContentTypeRejected) {
@@ -1456,10 +1456,10 @@ request_rules:
 
   testRequestWithBody("{}");
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, CustomResponseAllowContentTypeRejected) {
@@ -1478,10 +1478,10 @@ response_rules:
 
   testResponseWithBody("{}");
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, RequestAllowEmptyContentType) {
@@ -1506,10 +1506,10 @@ request_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, ResponseAllowEmptyContentType) {
@@ -1534,10 +1534,10 @@ response_rules:
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testResponseWithBody(response_body);
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 1);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, RequestBodyWithResponseRule) {
@@ -1560,10 +1560,10 @@ response_rules:
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, ResponseBodyWithRequestRule) {
@@ -1586,10 +1586,10 @@ request_rules:
   Http::TestResponseTrailerMapImpl trailers{{"some", "trailer"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
 
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 0);
-  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
 } // namespace JsonToMetadata

@@ -24,14 +24,10 @@ namespace JsonToMetadata {
  * All stats for the Json to Metadata filter. @see stats_macros.h
  */
 #define ALL_JSON_TO_METADATA_FILTER_STATS(COUNTER)                                                 \
-  COUNTER(rq_success)                                                                              \
-  COUNTER(rq_mismatched_content_type)                                                              \
-  COUNTER(rq_no_body)                                                                              \
-  COUNTER(rq_invalid_json_body)                                                                    \
-  COUNTER(resp_success)                                                                            \
-  COUNTER(resp_mismatched_content_type)                                                            \
-  COUNTER(resp_no_body)                                                                            \
-  COUNTER(resp_invalid_json_body)
+  COUNTER(success)                                                                              \
+  COUNTER(mismatched_content_type)                                                              \
+  COUNTER(no_body)                                                                              \
+  COUNTER(invalid_json_body)                                                                    \
 
 /**
  * Wrapper struct for Json to Metadata filter stats. @see stats_macros.h
@@ -65,7 +61,8 @@ public:
       const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
       Stats::Scope& scope);
 
-  JsonToMetadataStats& stats() { return stats_; }
+  JsonToMetadataStats& rqstats() { return rqstats_; }
+  JsonToMetadataStats& respstats() { return respstats_; }
   // True if we have rules for requests
   bool doRequest() const { return !request_rules_.empty(); }
   bool doResponse() const { return !response_rules_.empty(); }
@@ -79,7 +76,8 @@ private:
   Rules generateRules(const ProtobufRepeatedRule& proto_rule) const;
   absl::flat_hash_set<std::string> generateAllowContentTypes(
       const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types) const;
-  JsonToMetadataStats stats_;
+  JsonToMetadataStats rqstats_;
+  JsonToMetadataStats respstats_;
   const Rules request_rules_;
   const Rules response_rules_;
   const absl::flat_hash_set<std::string> request_allow_content_types_;
@@ -127,8 +125,7 @@ private:
                         bool& processing_finished_flag);
   // Parse the body while we have the whole json.
   void processBody(const Buffer::Instance* body, const Rules& rules, bool should_clear_route_cache,
-                   Stats::Counter& success, Stats::Counter& no_body, Stats::Counter& non_json,
-                   Http::StreamFilterCallbacks& filter_callback, bool& processing_finished_flag);
+                   JsonToMetadataStats& stats, Http::StreamFilterCallbacks& filter_callback, bool& processing_finished_flag);
   void processRequestBody();
   void processResponseBody();
 
