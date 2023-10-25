@@ -45,6 +45,9 @@ on:
       command_ci:
         type: string
         default: ./ci/do_ci.sh
+      catch-errors:
+        type: boolean
+        default: false
 
       diskspace_hack:
         type: boolean
@@ -165,6 +168,7 @@ jobs:
         bazel_rbe_jobs: ${{ inputs.bazel_rbe_jobs }}
         command_prefix: ${{ inputs.command_prefix }}
         command_ci: ${{ inputs.command_ci }}
+        catch-errors: ${{ inputs.catch-errors }}
         env: ${{ inputs.env }}
         GITHUB_TOKEN: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
