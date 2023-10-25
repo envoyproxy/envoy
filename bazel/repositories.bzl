@@ -137,7 +137,9 @@ envoy_entry_point(
     args = [
         "release",
         PATH,
+        "--release-message-path=$(location @envoy//changelogs:summary)",
     ],
+    data = ["@envoy//changelogs:summary"],
     pkg = "envoy.base.utils",
     script = "envoy.project",
     init_data = [":__init__.py"],
