@@ -115,6 +115,7 @@ MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {
 }
 
 MATCHER(DnsHostInfoAddressIsNull, "") { return arg->address() == nullptr; }
+MATCHER(DnsHostInfoFirstResolveCompleteTrue, "") { return arg->firstResolveComplete() == false; }
 
 void verifyCaresDnsConfigAndUnpack(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
@@ -125,6 +126,30 @@ void verifyCaresDnsConfigAndUnpack(
       typed_dns_resolver_config.typed_config().type_url(),
       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
   typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+}
+
+TEST_F(DnsCacheImplTest, DnsFirstResolveComplete) {
+  Network::DnsResolver::ResolveCb resolve_cb;
+  std::string hostname = "bar.baz.com:443";
+  EXPECT_CALL(*resolver_, resolve("bar.baz.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, DnsHostInfoFirstResolveCompleteTrue()));
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("bar.baz.com:443",
+                                      DnsHostInfoEquals("10.0.0.1:443", "bar.baz.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Success));
+
+  initialize({"bar.baz.com:443"});
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse({"10.0.0.1"}));
+  checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  auto result = dns_cache_->loadDnsCacheEntry("bar.baz.com", 443, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+  EXPECT_EQ(result.handle_, nullptr);
+  EXPECT_NE(absl::nullopt, result.host_info_);
 }
 
 TEST_F(DnsCacheImplTest, PreresolveSuccess) {

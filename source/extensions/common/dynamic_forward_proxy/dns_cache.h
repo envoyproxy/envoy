@@ -45,6 +45,8 @@ public:
    */
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
+  virtual bool firstResolveComplete() const PURE;
+
   /**
    * Returns the host's currently resolved address. These addresses may change periodically due to
    * async re-resolution.

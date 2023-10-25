@@ -401,6 +401,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    primary_host_info->host_info_->setFirstResolveComplete();
     address_changed = true;
     stats_.host_address_changed_.inc();
   }
