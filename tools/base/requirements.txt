@@ -204,7 +204,7 @@ aioquic==0.9.21 \
     --hash=sha256:c627ed67f008cc020e67e20872c844c60c2dcc45d73e6f1d035c399c2953a974 \
     --hash=sha256:efbf4de92df68d11a42909b4750430a61380d32e2b5d5da1525f6e482a09f60c \
     --hash=sha256:f6d9f6f1f778875fc8bd06b387b5916f48f610a698eee31385688ab8ba696fcf
-    # via -r tools/base/requirements.in
+    # via -r requirements.in
 aiosignal==1.3.1 \
     --hash=sha256:54cd96e15e1649b75d6c87526a6ff0b6c1b0dd3459f43d9ca11d48c339b68cfc \
     --hash=sha256:f8376fb07dd1e86a584e4fcdec80b36b7f81aac666ebc724e2c090300dd83b17
@@ -1229,6 +1229,7 @@ sphinx==7.2.2 \
     #   envoy-docs-sphinx-runner
     #   sphinx-copybutton
     #   sphinx-rtd-theme
+    #   sphinxcontrib-devhelp
     #   sphinxcontrib-googleanalytics
     #   sphinxcontrib-httpdomain
     #   sphinxcontrib-jquery
@@ -1247,9 +1248,9 @@ sphinxcontrib-applehelp==1.0.4 \
     # via
     #   -r requirements.in
     #   sphinx
-sphinxcontrib-devhelp==1.0.2 \
-    --hash=sha256:8165223f9a335cc1af7ffe1ed31d2871f325254c0423bc0c4c7cd1c1e4734a2e \
-    --hash=sha256:ff7f1afa7b9642e7060379360a67e9c41e8f3121f2ce9164266f61b9f4b338e4
+sphinxcontrib-devhelp==1.0.5 \
+    --hash=sha256:63b41e0d38207ca40ebbeabcf4d8e51f76c03e78cd61abe118cf4435c73d4212 \
+    --hash=sha256:fe8009aed765188f08fcaadbb3ea0d90ce8ae2d76710b7e29ea7d047177dae2f
     # via
     #   -r requirements.in
     #   sphinx
