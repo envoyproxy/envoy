@@ -99,7 +99,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       span_ = parent_.callbacks()->activeSpan().spawnChild(
           tracing_config.value().get(),
           absl::StrCat("router ", parent.cluster()->observabilityName(), " egress"),
-          parent.timeSource().systemTime());
+          parent_.callbacks()->dispatcher().timeSource().systemTime());
       if (parent.attemptCount() != 1) {
         // This is a retry request, add this metadata to span.
         span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attemptCount() - 1));
@@ -119,7 +119,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  stream_info_.route_ = parent.callbacks()->route();
+  stream_info_.route_ = parent_.callbacks()->route();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
@@ -133,10 +133,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   // Set up the upstream filter manager.
   filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
-      *filter_manager_callbacks_, parent_.callbacks()->dispatcher(),
-      parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
-      parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
-      *parent_.cluster(), *this);
+      *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), connection(),
+      parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
+      parent_.callbacks()->decoderBufferLimit(), *parent_.cluster(), *this);
   // Attempt to create custom cluster-specified filter chain
   bool created = parent_.cluster()->createFilterChain(*filter_manager_,
                                                       /*only_create_if_configured=*/true);
@@ -339,7 +338,7 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   }
 }
 
-const Route& UpstreamRequest::route() const { return *parent_.route(); }
+const Route& UpstreamRequest::route() const { return *parent_.callbacks()->route(); }
 
 OptRef<const Network::Connection> UpstreamRequest::connection() const {
   return parent_.callbacks()->connection();
@@ -355,11 +354,12 @@ void UpstreamRequest::maybeEndDecode(bool end_stream) {
   }
 }
 
-void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host,
+                                             bool pool_success) {
   StreamInfo::UpstreamInfo& upstream_info = *streamInfo().upstreamInfo();
   upstream_info.setUpstreamHost(host);
   upstream_host_ = host;
-  parent_.onUpstreamHostSelected(host);
+  parent_.onUpstreamHostSelected(host, pool_success);
 }
 
 void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
@@ -549,7 +549,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
 
   // Mimic an upstream reset.
-  onUpstreamHostSelected(host);
+  onUpstreamHostSelected(host, false);
   onResetStream(reset_reason, transport_failure_reason);
 }
 
@@ -567,22 +567,9 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 
-  if (parent_.requestVcluster()) {
-    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
-    // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
-    // here.
-    parent_.requestVcluster()->stats().upstream_rq_total_.inc();
-  }
-  if (parent_.routeStatsContext().has_value()) {
-    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
-    // callback. Hence, the upstream request increases the route level upstream_rq_total_ stat
-    // here.
-    parent_.routeStatsContext()->stats().upstream_rq_total_.inc();
-  }
-
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  onUpstreamHostSelected(host);
+  onUpstreamHostSelected(host, true);
 
   if (protocol) {
     stream_info_.protocol(protocol.value());
@@ -652,7 +639,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
-  const auto* route_entry = parent_.route()->routeEntry();
+  const auto* route_entry = route().routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
                                    route_entry->appendXfh());
@@ -734,14 +721,6 @@ void UpstreamRequest::readDisableOrDefer(bool disable) {
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.upstream_);
-
-  // There are two states we should get this callback in: 1) the watermark was
-  // hit due to writes from a different filter instance over a shared
-  // downstream connection, or 2) the watermark was hit due to THIS filter
-  // instance writing back the "winning" upstream request. In either case we
-  // can disable reads from upstream.
-  ASSERT(!parent_.parent_.finalUpstreamRequest() ||
-         &parent_ == parent_.parent_.finalUpstreamRequest());
   parent_.readDisableOrDefer(true);
 }
 
@@ -751,32 +730,12 @@ void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark
 }
 
 void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
-  // If there is only one upstream request, we can be assured that
-  // disabling reads will not slow down other upstream requests. If we've
-  // already seen the full downstream request (downstream_end_stream_) then
-  // disabling reads is a noop.
-  // This assert condition must be true because
-  // parent_.upstreamRequests().size() can only be greater than 1 in the
-  // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
-  // the per try timeout timer is started only after downstream_end_stream_
-  // is true.
-  ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->trafficStats()->upstream_flow_control_backed_up_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
   ++downstream_data_disabled_;
 }
 
 void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
-  // If there is only one upstream request, we can be assured that
-  // disabling reads will not overflow any write buffers in other upstream
-  // requests. If we've already seen the full downstream request
-  // (downstream_end_stream_) then enabling reads is a noop.
-  // This assert condition must be true because
-  // parent_.upstreamRequests().size() can only be greater than 1 in the
-  // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
-  // the per try timeout timer is started only after downstream_end_stream_
-  // is true.
-  ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
   parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
   ASSERT(downstream_data_disabled_ != 0);

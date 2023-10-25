@@ -299,6 +299,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/http:stateful_session_interface",
         "//envoy/local_info:local_info_interface",
+        "//envoy/router:router_filter_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
