@@ -120,7 +120,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
         return EnvoyStatus.ENVOY_SUCCESS;
       }
     } catch (Throwable throwable) {
-      // TODO: Need to have a way to log the exception somewhere.
+      throw throwable;
     }
     return EnvoyStatus.ENVOY_FAILURE;
   }

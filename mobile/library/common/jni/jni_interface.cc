@@ -1363,6 +1363,13 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     }
     builder.setXds(std::move(xds_builder));
   }
+#else
+  std::string native_xds_address = getCppString(env, xds_address);
+  if (!native_xds_address.empty()) {
+    throwException(env, "java/lang/UnsupportedOperationException",
+                   "This library does not support xDS. Please use "
+                   "io.envoyproxy.envoymobile:envoy-xds instead.");
+  }
 #endif
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
