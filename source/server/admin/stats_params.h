@@ -69,7 +69,7 @@ struct StatsParams {
   std::string filter_string_;
   std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
-  Utility::HistogramEmitMode histogram_emit_mode_{Utility::HistogramEmitMode::Histogram};
+  Utility::HistogramMode histogram_mode_{Utility::HistogramMode::Histogram};
   Http::Utility::QueryParams query_;
 };
 

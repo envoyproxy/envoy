@@ -275,7 +275,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramReportedAsSummaryNoValues) {
 
   addHistogram(histogram);
   StatsParams params = StatsParams();
-  params.histogram_emit_mode_ = Utility::HistogramEmitMode::Summary;
+  params.histogram_mode_ = Utility::HistogramMode::Summary;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
       counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
@@ -314,7 +314,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramReportedAsSummary) {
 
   addHistogram(histogram);
   StatsParams params = StatsParams();
-  params.histogram_emit_mode_ = Utility::HistogramEmitMode::Summary;
+  params.histogram_mode_ = Utility::HistogramMode::Summary;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
       counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
@@ -333,66 +333,6 @@ envoy_histogram1{quantile="0.999"} 1088.900000000001
 envoy_histogram1{quantile="1"} 1100
 envoy_histogram1_sum{} 22050
 envoy_histogram1_count{} 1110
-)EOF";
-
-  EXPECT_EQ(expected_output, response.toString());
-}
-TEST_F(PrometheusStatsFormatterTest, HistogramReportedAsBothSummaryAndHistogram) {
-  Stats::CustomStatNamespacesImpl custom_namespaces;
-  HistogramWrapper h1_cumulative;
-  h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
-
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
-  StatsParams params = StatsParams();
-  params.histogram_emit_mode_ = static_cast<Utility::HistogramEmitMode>(
-      Utility::HistogramEmitMode::Summary | Utility::HistogramEmitMode::Histogram);
-  // params.histogram_emit_mode_ = Utility::HistogramEmitMode::Histogram;
-  Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
-  EXPECT_EQ(2UL, size);
-  EXPECT_EQ(3UL, params.histogram_emit_mode_);
-
-  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 summary
-envoy_histogram1{quantile="0"} 0
-envoy_histogram1{quantile="0.25"} 0
-envoy_histogram1{quantile="0.5"} 0
-envoy_histogram1{quantile="0.75"} 0
-envoy_histogram1{quantile="0.9"} 0
-envoy_histogram1{quantile="0.95"} 0
-envoy_histogram1{quantile="0.99"} 0
-envoy_histogram1{quantile="0.995"} 0
-envoy_histogram1{quantile="0.999"} 0
-envoy_histogram1{quantile="1"} 0
-envoy_histogram1_sum{} 0
-envoy_histogram1_count{} 0
-# TYPE envoy_histogram1 histogram
-envoy_histogram1_bucket{le="0.5"} 0
-envoy_histogram1_bucket{le="1"} 0
-envoy_histogram1_bucket{le="5"} 0
-envoy_histogram1_bucket{le="10"} 0
-envoy_histogram1_bucket{le="25"} 0
-envoy_histogram1_bucket{le="50"} 0
-envoy_histogram1_bucket{le="100"} 0
-envoy_histogram1_bucket{le="250"} 0
-envoy_histogram1_bucket{le="500"} 0
-envoy_histogram1_bucket{le="1000"} 0
-envoy_histogram1_bucket{le="2500"} 0
-envoy_histogram1_bucket{le="5000"} 0
-envoy_histogram1_bucket{le="10000"} 0
-envoy_histogram1_bucket{le="30000"} 0
-envoy_histogram1_bucket{le="60000"} 0
-envoy_histogram1_bucket{le="300000"} 0
-envoy_histogram1_bucket{le="600000"} 0
-envoy_histogram1_bucket{le="1800000"} 0
-envoy_histogram1_bucket{le="3600000"} 0
-envoy_histogram1_bucket{le="+Inf"} 0
-envoy_histogram1_sum{} 0
-envoy_histogram1_count{} 0
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());

@@ -28,7 +28,11 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     response.add(status.message());
     return Http::Code::BadRequest;
   }
-  histogram_emit_mode_ = Utility::histogramEmitModeParam(query_);
+  status = Utility::histogramModeParam(query_, histogram_mode_);
+  if (!status.ok()) {
+    response.add(status.message());
+    return Http::Code::BadRequest;
+  }
 
   auto parse_type = [](absl::string_view str, StatsType& type) {
     if (str == StatLabels::Gauges) {

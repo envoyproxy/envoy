@@ -45,24 +45,25 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
   }
   return absl::OkStatus();
 }
-
-// Helper method to get the histogram_emit_mode parameter.
-Utility::HistogramEmitMode histogramEmitModeParam(const Http::Utility::QueryParams& params) {
+// Helper method to get the histogram_mode parameter. Returns an error if histogram_mode query
+// param is found and the value is not "histogram", "summary", or "none".
+absl::Status histogramModeParam(const Http::Utility::QueryParams& params,
+                                HistogramMode& histogram_mode) {
   absl::optional<std::string> histogram_emit_mode_query_param =
       queryParam(params, "histogram_emit_mode");
-  Utility::HistogramEmitMode histogram_emit_mode = Utility::HistogramEmitMode::Histogram;
+  histogram_mode = Utility::HistogramMode::Histogram;
   if (histogram_emit_mode_query_param.has_value()) {
-    histogram_emit_mode = static_cast<HistogramEmitMode>(0);
-    if (histogram_emit_mode_query_param.value().find("histogram") != std::string::npos) {
-      histogram_emit_mode =
-          static_cast<HistogramEmitMode>(histogram_emit_mode | HistogramEmitMode::Histogram);
-    }
-    if (histogram_emit_mode_query_param.value().find("summary") != std::string::npos) {
-      histogram_emit_mode =
-          static_cast<HistogramEmitMode>(histogram_emit_mode | HistogramEmitMode::Summary);
+    if (histogram_emit_mode_query_param.value() == "histogram") {
+      histogram_mode = HistogramMode::Histogram;
+    } else if (histogram_emit_mode_query_param.value() == "summary") {
+      histogram_mode = HistogramMode::Summary;
+    } else if (histogram_emit_mode_query_param.value() == "none") {
+      histogram_mode = HistogramMode::None;
+    } else {
+      return absl::InvalidArgumentError("usage: /stats?histogram_mode=(histogram|summary|none)\n");
     }
   }
-  return histogram_emit_mode;
+  return absl::OkStatus();
 }
 
 // Helper method to get the format parameter.

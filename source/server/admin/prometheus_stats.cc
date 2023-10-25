@@ -316,13 +316,17 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count += outputStatType<Stats::TextReadout>(
       response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
-  if (params.histogram_emit_mode_ & Utility::HistogramEmitMode::Summary) {
-    metric_name_count += outputStatType<Stats::ParentHistogram>(
-        response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
-  }
-  if (params.histogram_emit_mode_ & Utility::HistogramEmitMode::Histogram) {
+  switch (params.histogram_mode_) {
+  case Utility::HistogramMode::Histogram:
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
+    break;
+  case Utility::HistogramMode::Summary:
+    metric_name_count += outputStatType<Stats::ParentHistogram>(
+        response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
+    break;
+  case Utility::HistogramMode::None:
+    break;
   }
 
   return metric_name_count;
