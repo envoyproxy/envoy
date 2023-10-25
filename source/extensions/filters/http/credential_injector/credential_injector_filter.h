@@ -33,7 +33,7 @@ using Envoy::Extensions::Credentials::Common::CredentialInjectorSharedPtr;
  */
 class FilterConfig {
 public:
-  FilterConfig(CredentialInjectorSharedPtr, bool overrite, const std::string& stats_prefix,
+  FilterConfig(CredentialInjectorSharedPtr, bool overwrite, const std::string& stats_prefix,
                Stats::Scope& scope);
   CredentialInjectorStats& stats() { return stats_; }
 
@@ -44,7 +44,7 @@ public:
   // Inject configured credential to the HTTP request header.
   // Return true if the credential has been successful injected into the header.
   bool injectCredential(Http::RequestHeaderMap& headers) {
-    return injector_->inject(headers, overrite_);
+    return injector_->inject(headers, overwrite_);
   }
 
 private:
@@ -54,7 +54,7 @@ private:
   }
 
   CredentialInjectorSharedPtr injector_;
-  bool overrite_;
+  bool overwrite_;
   CredentialInjectorStats stats_;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

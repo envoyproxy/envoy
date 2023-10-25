@@ -15,19 +15,11 @@ namespace BearerToken {
 
 using envoy::extensions::credentials::bearer_token::v3::BearerToken;
 
-namespace {
-
-const std::string& BearerTokenExtensionName() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.credentials.bearer_token");
-}
-
-} // namespace
-
 class BearerTokenCredentialInjectorFactory
-    : public Common::CredentailInjectorFactoryBase<BearerToken> {
+    : public Common::CredentialInjectorFactoryBase<BearerToken> {
 public:
   BearerTokenCredentialInjectorFactory()
-      : CredentailInjectorFactoryBase(BearerTokenExtensionName()) {}
+      : CredentialInjectorFactoryBase("envoy.credentials.bearer_token") {}
 
 private:
   Common::CredentialInjectorSharedPtr

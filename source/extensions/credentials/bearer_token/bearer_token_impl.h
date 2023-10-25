@@ -62,7 +62,7 @@ public:
     return nullptr;
   };
 
-  bool inject(Http::RequestHeaderMap& headers, bool overrite) override;
+  bool inject(Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
   SecretReaderSharedPtr secret_reader_;

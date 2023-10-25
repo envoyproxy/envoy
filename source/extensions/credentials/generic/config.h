@@ -15,17 +15,9 @@ namespace Generic {
 
 using envoy::extensions::credentials::generic::v3::Generic;
 
-namespace {
-
-const std::string& GenericExtensionName() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.credentials.generic");
-}
-
-} // namespace
-
-class GenericCredentialInjectorFactory : public Common::CredentailInjectorFactoryBase<Generic> {
+class GenericCredentialInjectorFactory : public Common::CredentialInjectorFactoryBase<Generic> {
 public:
-  GenericCredentialInjectorFactory() : CredentailInjectorFactoryBase(GenericExtensionName()) {}
+  GenericCredentialInjectorFactory() : CredentialInjectorFactoryBase("envoy.credentials.generic") {}
 
 private:
   Common::CredentialInjectorSharedPtr

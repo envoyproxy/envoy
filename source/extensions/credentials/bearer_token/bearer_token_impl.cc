@@ -7,8 +7,8 @@ namespace Extensions {
 namespace Credentials {
 namespace BearerToken {
 
-bool BearerTokenCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overrite) {
-  if (!overrite && !headers.get(Http::LowerCaseString("Authorization")).empty()) {
+bool BearerTokenCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
+  if (!overwrite && !headers.get(Http::LowerCaseString("Authorization")).empty()) {
     return false;
   }
 

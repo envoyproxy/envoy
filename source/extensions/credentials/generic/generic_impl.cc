@@ -5,8 +5,8 @@ namespace Extensions {
 namespace Credentials {
 namespace Generic {
 
-bool GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overrite) {
-  if (!overrite && !headers.get(Http::LowerCaseString(header_)).empty()) {
+bool GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
+  if (!overwrite && !headers.get(Http::LowerCaseString(header_)).empty()) {
     return false;
   }
 

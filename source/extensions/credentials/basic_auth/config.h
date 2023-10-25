@@ -15,17 +15,10 @@ namespace BasicAuth {
 
 using envoy::extensions::credentials::basic_auth::v3::BasicAuth;
 
-namespace {
-
-const std::string& basicAuthExtensionName() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.credentials.basic_auth");
-}
-
-} // namespace
-
-class BasicAuthCredentialInjectorFactory : public Common::CredentailInjectorFactoryBase<BasicAuth> {
+class BasicAuthCredentialInjectorFactory : public Common::CredentialInjectorFactoryBase<BasicAuth> {
 public:
-  BasicAuthCredentialInjectorFactory() : CredentailInjectorFactoryBase(basicAuthExtensionName()) {}
+  BasicAuthCredentialInjectorFactory()
+      : CredentialInjectorFactoryBase("envoy.credentials.basic_auth") {}
 
 private:
   Common::CredentialInjectorSharedPtr

@@ -11,7 +11,7 @@ namespace Credentials {
 namespace Common {
 
 template <class ConfigProto>
-class CredentailInjectorFactoryBase : public NamedCredentialInjectorConfigFactory {
+class CredentialInjectorFactoryBase : public NamedCredentialInjectorConfigFactory {
 public:
   CredentialInjectorSharedPtr
   createCredentialInjectorFromProto(const Protobuf::Message& proto_config,
@@ -29,7 +29,7 @@ public:
   std::string name() const override { return name_; }
 
 protected:
-  CredentailInjectorFactoryBase(const std::string& name) : name_(name) {}
+  CredentialInjectorFactoryBase(const std::string& name) : name_(name) {}
 
 private:
   virtual CredentialInjectorSharedPtr

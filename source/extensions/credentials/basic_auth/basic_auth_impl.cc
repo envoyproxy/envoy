@@ -7,13 +7,13 @@ namespace Extensions {
 namespace Credentials {
 namespace BasicAuth {
 
-bool BasicAuthCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overrite) {
-  if (!overrite && !headers.get(Http::LowerCaseString("Authorization")).empty()) {
+bool BasicAuthCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
+  if (!overwrite && !headers.get(Http::LowerCaseString("Authorization")).empty()) {
     return false;
   }
 
-  std::string username_password = username_ + ":" + secret_reader_->password();
-  std::string encoded = Base64::encode(username_password.c_str(), username_password.size());
+  const std::string username_password = username_ + ":" + secret_reader_->password();
+  const std::string encoded = Base64::encode(username_password.c_str(), username_password.size());
   headers.setCopy(Http::LowerCaseString("Authorization"), "Basic " + encoded);
   return true;
 }

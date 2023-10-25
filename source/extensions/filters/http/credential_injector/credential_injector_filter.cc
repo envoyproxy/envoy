@@ -7,9 +7,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CredentialInjector {
 
-FilterConfig::FilterConfig(CredentialInjectorSharedPtr credential_injector, bool overrite,
+FilterConfig::FilterConfig(CredentialInjectorSharedPtr credential_injector, bool overwrite,
                            const std::string& stats_prefix, Stats::Scope& scope)
-    : injector_(credential_injector), overrite_(overrite),
+    : injector_(credential_injector), overwrite_(overwrite),
       stats_(generateStats(stats_prefix + "credential_injector.", scope)) {}
 
 CredentialInjectorFilter::CredentialInjectorFilter(FilterConfigSharedPtr config)

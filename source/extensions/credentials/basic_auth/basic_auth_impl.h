@@ -61,7 +61,7 @@ public:
     return nullptr;
   };
 
-  bool inject(Http::RequestHeaderMap& headers, bool overrite) override;
+  bool inject(Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
   std::string username_;
