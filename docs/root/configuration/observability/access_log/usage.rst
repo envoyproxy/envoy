@@ -511,8 +511,11 @@ UDP
   TCP/UDP
     Not implemented ("-")
 
+.. _config_access_log_format_upstream_host:
+
 %UPSTREAM_HOST%
-  Upstream host URL (e.g., tcp://ip:port for TCP connections).
+  Upstream host URL (e.g., tcp://ip:port for TCP connections). Identical to the :ref:`UPSTREAM_REMOTE_ADDRESS
+  <config_access_log_format_upstream_remote_address>` value.
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
@@ -530,9 +533,11 @@ UDP
   Local port of the upstream connection.
   IP addresses are the only address type with a port component.
 
+.. _config_access_log_format_upstream_remote_address:
+
 %UPSTREAM_REMOTE_ADDRESS%
   Remote address of the upstream connection. If the address is an IP address it includes both
-  address and port.
+  address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value.
 
 %UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
   Remote address of the upstream connection, without any port component.
@@ -880,7 +885,7 @@ UDP
 
 .. _config_access_log_format_filter_state:
 
-%FILTER_STATE(KEY:F):Z%
+%FILTER_STATE(KEY:F:FIELD?):Z%
   HTTP
     :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
     look up the filter state object. The serialized proto will be logged as JSON string if possible.
@@ -889,6 +894,8 @@ UDP
     F is an optional parameter used to indicate which method FilterState uses for serialization.
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to 'FIELD'.
 
   TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
@@ -900,7 +907,7 @@ UDP
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
-%UPSTREAM_FILTER_STATE(KEY:F):Z%
+%UPSTREAM_FILTER_STATE(KEY:F:FIELD?):Z%
   HTTP
     Extracts filter state from upstream components like cluster or transport socket extensions.
 
@@ -911,6 +918,8 @@ UDP
     F is an optional parameter used to indicate which method FilterState uses for serialization.
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to 'FIELD'.
 
   TCP/UDP
     Not implemented.

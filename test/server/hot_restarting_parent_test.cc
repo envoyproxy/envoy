@@ -7,6 +7,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
+#include "test/server/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -20,10 +21,20 @@ namespace {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+class MockHotRestartMessageSender : public HotRestartMessageSender {
+public:
+  MOCK_METHOD(void, sendHotRestartMessage, (envoy::HotRestartMessage && msg));
+};
+
 class HotRestartingParentTest : public testing::Test {
 public:
+  Network::Address::InstanceConstSharedPtr ipv4_test_addr_1_ =
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:12345");
+  Network::Address::InstanceConstSharedPtr ipv4_test_addr_2_ =
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:54321");
   NiceMock<MockInstance> server_;
-  HotRestartingParent::Internal hot_restarting_parent_{&server_};
+  MockHotRestartMessageSender message_sender_;
+  HotRestartingParent::Internal hot_restarting_parent_{&server_, message_sender_};
 };
 
 TEST_F(HotRestartingParentTest, ShutdownAdmin) {
@@ -288,7 +299,7 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     Stats::Gauge& g2 = child_store.rootScope()->gaugeFromStatName(
         dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate);
 
-    HotRestartingChild hot_restarting_child(0, 0, "@envoy_domain_socket", 0);
+    HotRestartingChild hot_restarting_child(0, 0, testDomainSocketName(), 0);
     hot_restarting_child.mergeParentStats(child_store, stats_proto);
     EXPECT_EQ(1, c1.value());
     EXPECT_EQ(1, c2.value());
@@ -297,9 +308,38 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
   }
 }
 
+MATCHER_P(UdpPacketHandlerPtrIs, expected_handler, "") {
+  bool matched = arg->non_dispatched_udp_packet_handler_.ptr() == expected_handler;
+  if (!matched) {
+    *result_listener << "\n&non_dispatched_udp_packet_handler_ == "
+                     << arg->non_dispatched_udp_packet_handler_.ptr()
+                     << "\nexpected_handler == " << expected_handler;
+  }
+  return matched;
+}
+
 TEST_F(HotRestartingParentTest, DrainListeners) {
-  EXPECT_CALL(server_, drainListeners());
+  EXPECT_CALL(server_, drainListeners(UdpPacketHandlerPtrIs(&hot_restarting_parent_)));
   hot_restarting_parent_.drainListeners();
+}
+
+TEST_F(HotRestartingParentTest, UdpPacketIsForwarded) {
+  uint32_t worker_index = 12; // arbitrary index
+  Network::UdpRecvData packet;
+  std::string msg = "hello";
+  packet.addresses_.local_ = ipv4_test_addr_1_;
+  packet.addresses_.peer_ = ipv4_test_addr_2_;
+  packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(msg);
+  packet.receive_time_ = MonotonicTime(std::chrono::microseconds(1234567890));
+  envoy::HotRestartMessage expected_msg;
+  auto* expected_packet = expected_msg.mutable_request()->mutable_forwarded_udp_packet();
+  expected_packet->set_local_addr("udp://127.0.0.1:12345");
+  expected_packet->set_peer_addr("udp://127.0.0.1:54321");
+  expected_packet->set_payload(msg);
+  expected_packet->set_receive_time_epoch_microseconds(1234567890);
+  expected_packet->set_worker_index(worker_index);
+  EXPECT_CALL(message_sender_, sendHotRestartMessage(ProtoEq(expected_msg)));
+  hot_restarting_parent_.handle(worker_index, packet);
 }
 
 } // namespace

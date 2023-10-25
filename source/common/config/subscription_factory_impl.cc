@@ -63,15 +63,15 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                             api_config_source);
-    Utility::checkTransportVersion(api_config_source);
+    THROW_IF_NOT_OK(Utility::checkTransportVersion(api_config_source));
     switch (api_config_source.api_type()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC:
-      throw EnvoyException("Unsupported config source AGGREGATED_GRPC");
+      throwEnvoyExceptionOrPanic("Unsupported config source AGGREGATED_GRPC");
     case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC:
-      throw EnvoyException("Unsupported config source AGGREGATED_DELTA_GRPC");
+      throwEnvoyExceptionOrPanic("Unsupported config source AGGREGATED_DELTA_GRPC");
     case envoy::config::core::v3::ApiConfigSource::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           "REST_LEGACY no longer a supported ApiConfigSource. "
           "Please specify an explicit supported api_type in the following config:\n" +
           config.DebugString());
@@ -86,7 +86,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       break;
     }
     if (subscription_type.empty()) {
-      throw EnvoyException("Invalid API config source API type");
+      throwEnvoyExceptionOrPanic("Invalid API config source API type");
     }
     break;
   }
@@ -95,13 +95,13 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     break;
   }
   default:
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         "Missing config source specifier in envoy::config::core::v3::ConfigSource");
   }
   ConfigSubscriptionFactory* factory =
       Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "Didn't find a registered config subscription factory implementation for name: '{}'",
         subscription_type));
   }
@@ -113,7 +113,7 @@ SubscriptionPtr createFromFactoryOrThrow(ConfigSubscriptionFactory::Subscription
   ConfigSubscriptionFactory* factory =
       Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "Didn't find a registered config subscription factory implementation for name: '{}'",
         subscription_type));
   }
@@ -153,7 +153,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   }
   case xds::core::v3::ResourceLocator::XDSTP: {
     if (resource_type != collection_locator.resource_type()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("xdstp:// type does not match {} in {}", resource_type,
                       Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
     }
@@ -179,8 +179,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                                         "envoy.config_subscription.aggregated_grpc_collection");
       }
       default:
-        throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
-                                         api_config_source.DebugString()));
+        throwEnvoyExceptionOrPanic(fmt::format("Unknown xdstp:// transport API type in {}",
+                                               api_config_source.DebugString()));
       }
     }
     case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
@@ -191,14 +191,15 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
       return createFromFactoryOrThrow(data, "envoy.config_subscription.ads_collection");
     }
     default:
-      throw EnvoyException("Missing or not supported config source specifier in "
-                           "envoy::config::core::v3::ConfigSource for a collection. Only ADS and "
-                           "gRPC in delta-xDS mode are supported.");
+      throwEnvoyExceptionOrPanic(
+          "Missing or not supported config source specifier in "
+          "envoy::config::core::v3::ConfigSource for a collection. Only ADS and "
+          "gRPC in delta-xDS mode are supported.");
     }
   }
   default:
     // TODO(htuch): Implement HTTP semantics for collection ResourceLocators.
-    throw EnvoyException("Unsupported code path");
+    throwEnvoyExceptionOrPanic("Unsupported code path");
   }
 }
 

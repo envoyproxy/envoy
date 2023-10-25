@@ -121,10 +121,6 @@ TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(FilterIntegrationTest, AddBodyToRequestAndWaitForIt) {
-  // Make sure one end to end test verifies the old path with runtime singleton,
-  // to check for regressions.
-  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "false");
-
   prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");
@@ -188,15 +184,9 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(40, 58, 40, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(0, 58, 0, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                         BytesCountExpectation(40, 58, 40, 58),
+                                         BytesCountExpectation(7, 10, 7, 8));
   }
 }
 
@@ -1249,10 +1239,6 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
 }
 
 TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeFilter) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {
-    return;
-  }
   prependFilter(R"EOF(
   name: assert-non-reentrant-filter
   )EOF");

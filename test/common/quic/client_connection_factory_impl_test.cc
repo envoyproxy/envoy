@@ -32,6 +32,8 @@ protected:
     auto* protocol_options = cluster_->http3_options_.mutable_quic_protocol_options();
     protocol_options->mutable_max_concurrent_streams()->set_value(43);
     protocol_options->mutable_initial_stream_window_size()->set_value(65555);
+    protocol_options->set_connection_options("5RTO,ACKD");
+    protocol_options->set_client_connection_options("6RTO,AKD4");
     quic_info_ = createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
     EXPECT_EQ(quic_info_->quic_config_.max_time_before_crypto_handshake(),
               quic::QuicTime::Delta::FromSeconds(10));
@@ -41,6 +43,21 @@ protected:
               protocol_options->max_concurrent_streams().value());
     EXPECT_EQ(quic_info_->quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
               protocol_options->initial_stream_window_size().value());
+    EXPECT_EQ(2, quic_info_->quic_config_.SendConnectionOptions().size());
+    std::string quic_copts = "";
+    for (auto& copt : quic_info_->quic_config_.SendConnectionOptions()) {
+      quic_copts.append(quic::QuicTagToString(copt));
+    }
+    EXPECT_EQ(quic_copts, "5RTOACKD");
+    EXPECT_EQ(
+        2, quic_info_->quic_config_.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT)
+               .size());
+    std::string quic_ccopts = "";
+    for (auto& ccopt :
+         quic_info_->quic_config_.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT)) {
+      quic_ccopts.append(quic::QuicTagToString(ccopt));
+    }
+    EXPECT_EQ(quic_ccopts, "6RTOAKD4");
 
     test_address_ = Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));

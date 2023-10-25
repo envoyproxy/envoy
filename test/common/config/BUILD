@@ -77,7 +77,7 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "subscription_test_harness",
-    srcs = ["subscription_test_harness.h"],
+    hdrs = ["subscription_test_harness.h"],
     deps = [
         "//source/common/config:utility_lib",
         "//test/mocks/stats:stats_mocks",

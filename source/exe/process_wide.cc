@@ -31,9 +31,13 @@ ProcessWide::ProcessWide(bool validate_proto_descriptors) {
     // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
     // edge case where something does init/destroy/init/destroy.
     Event::Libevent::Global::initialize();
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     if (validate_proto_descriptors) {
       Envoy::Server::validateProtoDescriptors();
     }
+#else
+    UNREFERENCED_PARAMETER(validate_proto_descriptors);
+#endif
     Http::Http2::initializeNghttp2Logging();
 
     // We do not initialize Google gRPC here -- we instead instantiate

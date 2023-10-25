@@ -135,25 +135,25 @@ TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversionWithUhvOverride
                                      {":path", "/path\\with%5Cback%5Cslashes"},
                                      {":scheme", "http"},
                                      {":authority", "host"}});
-#ifdef ENVOY_ENABLE_UHV
-  // By default Envoy disconnects connection on protocol errors
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ != Http::CodecType::HTTP2) {
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("400", response->headers().getStatusValue());
+  if (use_universal_header_validator_) {
+    // By default Envoy disconnects connection on protocol errors
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    if (downstream_protocol_ != Http::CodecType::HTTP2) {
+      ASSERT_TRUE(response->complete());
+      EXPECT_EQ("400", response->headers().getStatusValue());
+    } else {
+      ASSERT_TRUE(response->reset());
+      EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    }
   } else {
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    waitForNextUpstreamRequest();
+
+    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5Cback%5Cslashes");
+
+    // Send a headers only response.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
   }
-#else
-  waitForNextUpstreamRequest();
-
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5Cback%5Cslashes");
-
-  // Send a headers only response.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-#endif
 }
 
 // By default the `allow_non_compliant_characters_in_path` == true and UHV behaves just like legacy
@@ -222,11 +222,11 @@ TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreservedWithUhvOverr
                                      {":authority", "host"}});
   waitForNextUpstreamRequest();
 
-#ifdef ENVOY_ENABLE_UHV
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3Bmixed%5Ccase%FEsequences");
-#else
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3bmixed%5Ccase%Fesequences");
-#endif
+  if (use_universal_header_validator_) {
+    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3Bmixed%5Ccase%FEsequences");
+  } else {
+    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3bmixed%5Ccase%Fesequences");
+  }
   // Send a headers only response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -375,25 +375,25 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsRejectedWithUhvO
                                      {":path", "/path%Z%30with%XYbad%7Jencoding%A"},
                                      {":scheme", "http"},
                                      {":authority", "host"}});
-#ifdef ENVOY_ENABLE_UHV
-  // By default Envoy disconnects connection on protocol errors
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ != Http::CodecType::HTTP2) {
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("400", response->headers().getStatusValue());
+  if (use_universal_header_validator_) {
+    // By default Envoy disconnects connection on protocol errors
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    if (downstream_protocol_ != Http::CodecType::HTTP2) {
+      ASSERT_TRUE(response->complete());
+      EXPECT_EQ("400", response->headers().getStatusValue());
+    } else {
+      ASSERT_TRUE(response->reset());
+      EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    }
   } else {
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    waitForNextUpstreamRequest();
+
+    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z0with%XYbad%7Jencoding%A");
+
+    // Send a headers only response.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
   }
-#else
-  waitForNextUpstreamRequest();
-
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z0with%XYbad%7Jencoding%A");
-
-  // Send a headers only response.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-#endif
 }
 
 // By default the `uhv_allow_malformed_url_encoding` == true and UHV behaves just like legacy path
@@ -455,20 +455,20 @@ TEST_P(DownstreamUhvIntegrationTest, UhvAllowsPercent00WithOverride) {
                                      {":path", "/path%00/to/something"},
                                      {":scheme", "http"},
                                      {":authority", "host"}});
-#ifdef ENVOY_ENABLE_UHV
-  waitForNextUpstreamRequest();
+  if (use_universal_header_validator_) {
+    waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%00/to/something");
+    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%00/to/something");
 
-  // Send a headers only response.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-#else
-  // In legacy mode %00 in URL path always causes request to be rejected
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("400", response->headers().getStatusValue());
-#endif
+    // Send a headers only response.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+  } else {
+    // In legacy mode %00 in URL path always causes request to be rejected
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+  }
 }
 
 } // namespace Envoy

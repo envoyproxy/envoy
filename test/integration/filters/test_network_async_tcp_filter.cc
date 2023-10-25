@@ -51,7 +51,7 @@ public:
 
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     stats_.on_data_.inc();
-    ENVOY_LOG_MISC(debug, "Downstream onData: {}, length: {} back to down", data.toString(),
+    ENVOY_LOG_MISC(debug, "Downstream onData: {}, length: {} sending to upstream", data.toString(),
                    data.length());
     client_->write(data, end_stream);
 
@@ -71,16 +71,45 @@ public:
 
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
+    downstream_callbacks_ = std::make_unique<DownstreamCallbacks>(*this);
     read_callbacks_->connection().enableHalfClose(true);
+    read_callbacks_->connection().addConnectionCallbacks(*downstream_callbacks_);
   }
 
 private:
+  struct DownstreamCallbacks : public Envoy::Network::ConnectionCallbacks {
+    explicit DownstreamCallbacks(TestNetworkAsyncTcpFilter& parent) : parent_(parent) {}
+    ~DownstreamCallbacks() override = default;
+    void onEvent(Network::ConnectionEvent event) override {
+      ENVOY_LOG_MISC(debug, "tcp client test filter downstream callback onEvent: {}",
+                     static_cast<int>(event));
+      if (event != Network::ConnectionEvent::RemoteClose) {
+        return;
+      }
+
+      ENVOY_LOG_MISC(debug, "tcp client test filter downstream detected close type: {}.",
+                     static_cast<int>(parent_.read_callbacks_->connection().detectedCloseType()));
+
+      if (parent_.read_callbacks_->connection().detectedCloseType() ==
+          Network::DetectedCloseType::RemoteReset) {
+        parent_.client_->close(Network::ConnectionCloseType::AbortReset);
+      } else {
+        parent_.client_->close(Network::ConnectionCloseType::NoFlush);
+      }
+    };
+
+    void onAboveWriteBufferHighWatermark() override{};
+    void onBelowWriteBufferLowWatermark() override{};
+
+    TestNetworkAsyncTcpFilter& parent_;
+  };
+
   struct RequestAsyncCallbacks : public Tcp::AsyncTcpClientCallbacks {
     RequestAsyncCallbacks(TestNetworkAsyncTcpFilter& parent) : parent_(parent) {}
 
     void onData(Buffer::Instance& data, bool end_stream) override {
       parent_.stats_.on_receive_async_data_.inc();
-      ENVOY_LOG_MISC(debug, "Async onData from peer: {}, length: {} back to down", data.toString(),
+      ENVOY_LOG_MISC(debug, "async onData from peer: {}, length: {} back to down", data.toString(),
                      data.length());
       parent_.read_callbacks_->connection().write(data, end_stream);
       if (end_stream) {
@@ -89,7 +118,22 @@ private:
     }
 
     // Network::ConnectionCallbacks
-    void onEvent(Network::ConnectionEvent) override{};
+    void onEvent(Network::ConnectionEvent event) override {
+      ENVOY_LOG_MISC(debug, "tcp client test filter upstream callback onEvent: {}",
+                     static_cast<int>(event));
+      if (event != Network::ConnectionEvent::RemoteClose) {
+        return;
+      }
+
+      ENVOY_LOG_MISC(debug, "tcp client test filter upstream detected close type: {}.",
+                     static_cast<int>(parent_.client_->detectedCloseType()));
+
+      if (parent_.client_->detectedCloseType() == Network::DetectedCloseType::RemoteReset) {
+        parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
+      } else {
+        parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      }
+    };
 
     void onAboveWriteBufferHighWatermark() override {
       parent_.read_callbacks_->connection().readDisable(true);
@@ -110,6 +154,7 @@ private:
   Tcp::AsyncTcpClientPtr client_;
   absl::string_view cluster_name_;
   std::unique_ptr<RequestAsyncCallbacks> request_callbacks_;
+  std::unique_ptr<DownstreamCallbacks> downstream_callbacks_;
   Upstream::ClusterManager& cluster_manager_;
   Tcp::AsyncTcpClientOptionsConstSharedPtr options_;
 };

@@ -167,6 +167,7 @@ envoy_cc_library(
     name = "watchdog_interface",
     hdrs = ["watchdog.h"],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/thread:thread_interface",
     ],
 )

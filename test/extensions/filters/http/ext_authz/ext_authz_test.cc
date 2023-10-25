@@ -58,8 +58,8 @@ public:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, *stats_store_.rootScope(), runtime_, http_context_,
-                                   "ext_authz_prefix", bootstrap_));
+    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(), runtime_,
+                                             http_context_, "ext_authz_prefix", bootstrap_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -363,6 +363,7 @@ TEST_F(HttpFilterTest, ErrorOpen) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: true
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -400,6 +401,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: true
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -433,13 +435,9 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), "true");
 }
 
-// Test when failure_mode_allow is set with runtime flag closed and the response from the
+// Test when failure_mode_allow is set with header add closed and the response from the
 // authorization service is Error that the request is allowed to continue.
-TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add", "false"}});
-
+TEST_F(HttpFilterTest, ErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
@@ -448,6 +446,7 @@ TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: false
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -474,13 +473,9 @@ TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
   EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), EMPTY_STRING);
 }
 
-// Test when failure_mode_allow is set with runtime flag closed and the response from the
+// Test when failure_mode_allow is set with header add closed and the response from the
 // authorization service is an immediate Error that the request is allowed to continue.
-TEST_F(HttpFilterTest, ImmediateErrorOpenWithRuntimeFlagClose) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add", "false"}});
-
+TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
@@ -489,6 +484,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithRuntimeFlagClose) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: false
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -2266,6 +2262,14 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {
   const std::string original_path{"/users?leave-me=alone"};
   const std::string expected_path{"/users?leave-me=alone"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{"remove-me"};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithRepeatedUnmodifiedQueryParameters) {
+  const std::string original_path{"/users?leave-me=alone&leave-me=in-peace"};
+  const std::string expected_path{"/users?leave-me=alone&leave-me=in-peace"};
   const Http::Utility::QueryParamsVector add_me{};
   const std::vector<std::string> remove_me{"remove-me"};
   queryParameterTest(original_path, expected_path, add_me, remove_me);

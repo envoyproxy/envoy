@@ -64,8 +64,7 @@ consecutive 5xx) or at a specified interval (for example in the case of periodic
 ejection algorithm works as follows:
 
 #. A host is determined to be an outlier.
-#. If no hosts have been ejected, Envoy will eject the host immediately. Otherwise, it checks to make
-   sure the number of ejected hosts is below the allowed threshold (specified via the
+#. It checks to make sure the number of ejected hosts is below the allowed threshold (specified via the
    :ref:`outlier_detection.max_ejection_percent<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>`
    setting). If the number of ejected hosts is above the threshold, the host is not ejected.
 #. The host is ejected for some number of milliseconds. Ejection means that the host is marked
@@ -204,8 +203,11 @@ For gRPC requests, the outlier detection will use the HTTP status mapped from th
 
 .. note::
 
-  If :ref: `active health <arch_overview_health_checking>` is also configured, a successful active health check unejects the host and
-  clears all outlier detection counters.
+  If :ref:`active health checking <arch_overview_health_checking>` is also configured, a successful active health check unejects the host and
+  clears all outlier detection counters. If your active health check is not validating data plane traffic then in situations where
+  active health checking passes but the traffic is failing, the endpoint will be unejected prematurely. To disable this option then set
+  :ref:`outlier_detection.successful_active_health_check_uneject_host<envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
+  configuration flag to ``false``.
 
 .. _arch_overview_outlier_detection_logging:
 

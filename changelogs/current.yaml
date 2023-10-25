@@ -5,36 +5,53 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: quic
+- area: local_rate_limit
   change: |
-    Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
-    ``envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header`` to false.
+    Added new configuration field :ref:`rate_limited_as_resource_exhausted
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limited_as_resource_exhausted>`
+    to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: connection limit
+- area: xds
   change: |
-    fixed a use-after-free bug in the connection limit filter.
-- area: subset load balancer
+    Fixed a bug (https://github.com/envoyproxy/envoy/issues/27702) that caused ADS initialization
+    to fail on the first attempt and set a back-off retry interval of up to 1 second, if ADS is
+    using an Envoy Cluster for the backend. The issue was fixed to ensure that ADS initialization
+    happens after the Envoy Cluster it depends upon has been properly initialized. ADS that does
+    not depend on an Envoy Cluster (i.e. GoogleGrpc) is not affected by this change.
+- area: grpc
   change: |
-    Fixed a bug where
-    :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
-    :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
-    values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
+    Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.expand_agnostic_stream_lifetime`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
+- area: maglev
+  change: |
+    Removed ``envoy.reloadable_features.allow_compact_maglev`` and legacy code paths.
+- area: router
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent``
+    runtime flag and legacy code path.
+- area: upstream
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.validate_detailed_override_host_statuses``
+    runtime flag and legacy code path.
+- area: grpc
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.service_sanitize_non_utf8_strings``
+    runtime flag and legacy code path.
 
 new_features:
-- area: access_log
+- area: jwt
   change: |
-    added %RESPONSE_FLAGS_LONG% substitution string, that will output a pascal case string representing the resonse flags.
-    The output response flags will correspond with %RESPONSE_FLAGS%, only with a long textual string representation.
-- area: extension_discovery_service
-  change: |
-    added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
-- area: extension_discovery_service
-  change: |
-    added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
+    The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
+    These claims will be serialized as JSON and encoded as Base64.
 
 deprecated:

@@ -2,6 +2,9 @@ name: Envoy CI
 
 on:
   workflow_call:
+    secrets:
+      app_id:
+      app_key:
     inputs:
       target:
         required: true
@@ -92,43 +95,50 @@ jobs:
     steps:
     - if: ${{ inputs.cache_build_image }}
       name: Restore Docker cache (${{ inputs.cache_build_image }})
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.10
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.27
       with:
         image_tag: ${{ inputs.cache_build_image }}
 
-    # If the run is "trusted" (ie has access to secrets) then it should
-    # **not** set the ref and should use the code of the calling context.
-    - if: ${{ inputs.repo_ref && inputs.trusted }}
+    - name: Check workflow context
+      id: context
       run: |
-        echo '`repo_ref` should not be set for trusted CI runs'
-        exit 1
+        if [[ "${{ inputs.trusted }}" != "false" && -n "${{ secrets.app_id }}" && -n "${{ secrets.app_key }}" ]]; then
+            echo "use_appauth=true" >> $GITHUB_OUTPUT
+        fi
+    - if: ${{ steps.context.outputs.use_appauth == 'true' }}
+      name: Fetch token for app auth
+      id: appauth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.27
+      with:
+        app_id: ${{ secrets.app_id }}
+        key: ${{ secrets.app_key }}
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
-        fetch-depth: ${{ inputs.repo_fetch_depth }}
+        fetch-depth: ${{ ! inputs.trusted && inputs.repo_fetch_depth || 0 }}
         # WARNING: This allows untrusted code to run!!!
         #  If this is set, then anything before or after in the job should be regarded as
         #  compromised.
         ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
+        token: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
+
+    # If we are in a trusted CI run then the provided commit _must_ be either the latest for
+    # this branch, or an antecdent.
+    - run: |
+        if ! git merge-base --is-ancestor "${{ inputs.repo_ref }}" HEAD; then
+            echo "Provided Envoy ref (${{ inputs.repo_ref }}) is not an ancestor of current branch" >&2
+            exit 1
+        fi
+        git checkout "${{ inputs.repo_ref }}"
+      if: ${{ inputs.trusted }}
+      name: Check provided ref
+
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
 
     - if: ${{ inputs.diskspace_hack }}
-      name: Cruft removal
-      run: |
-        echo "Disk space before cruft removal"
-        df -h
-
-        TO_REMOVE=(
-            /opt/hostedtoolcache
-            /usr/local/lib/android
-            /usr/local/.ghcup)
-
-        for removal in "${TO_REMOVE[@]}"; do
-            echo "Removing: ${removal} ..."
-            sudo rm -rf "$removal"
-        done
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.27
     - run: |
         echo "disk space at beginning of build:"
         df -h
@@ -136,7 +146,7 @@ jobs:
 
     - if: ${{ inputs.run_pre }}
       name: Run pre action ${{ inputs.run_pre && format('({0})', inputs.run_pre) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.27
       with:
         uses: ${{ inputs.run_pre }}
         with: ${{ inputs.run_pre_with }}
@@ -156,11 +166,11 @@ jobs:
         command_prefix: ${{ inputs.command_prefix }}
         command_ci: ${{ inputs.command_ci }}
         env: ${{ inputs.env }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
     - if: ${{ inputs.run_post }}
       name: Run post action ${{ inputs.run_pre && format('({0})', inputs.run_post) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.27
       with:
         uses: ${{ inputs.run_post }}
         with: ${{ inputs.run_post_with }}

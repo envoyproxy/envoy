@@ -1,11 +1,11 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -96,6 +96,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:matchers_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -335,7 +336,7 @@ envoy_cc_library(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/common/upstream:upstream_http_factory_context_lib",
+        "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",

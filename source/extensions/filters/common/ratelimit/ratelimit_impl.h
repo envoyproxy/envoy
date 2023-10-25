@@ -50,13 +50,15 @@ public:
 
   static void createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
                             const std::string& domain,
-                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors);
+                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                            uint32_t hits_addend);
 
   // Filters::Common::RateLimit::Client
   void cancel() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
              const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
+             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
+             uint32_t hits_addend = 0) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -79,7 +81,7 @@ private:
  * Builds the rate limit client.
  */
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
-                          const envoy::config::core::v3::GrpcService& grpc_service,
+                          const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                           const std::chrono::milliseconds timeout);
 
 } // namespace RateLimit

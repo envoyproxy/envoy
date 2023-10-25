@@ -16,6 +16,13 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.opencensus",
 ]
 
+NO_HTTP3_SKIP_TARGETS = [
+    "envoy.quic.crypto_stream.server.quiche",
+    "envoy.quic.deterministic_connection_id_generator",
+    "envoy.quic.crypto_stream.server.quiche",
+    "envoy.quic.proof_source.filter_chain",
+]
+
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
 def _build_all_content(exclude = []):
@@ -108,13 +115,14 @@ envoy_entry_point(
     name = "get_project_json",
     pkg = "envoy.base.utils",
     script = "envoy.project_data",
+    init_data = [":__init__.py"],
 )
 
 genrule(
     name = "project",
     outs = ["project.json"],
     cmd = """
-    $(location :get_project_json) . > $@
+    $(location :get_project_json) $$(dirname $(location @envoy//:VERSION.txt)) > $@
     """,
     tools = [
         ":get_project_json",
@@ -132,6 +140,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -142,6 +151,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -152,6 +162,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -162,6 +173,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -172,6 +184,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 ''')
@@ -254,8 +267,9 @@ def envoy_dependencies(skip_targets = []):
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_github_axboe_liburing()
+    _com_github_bazel_buildtools()
     _com_github_c_ares_c_ares()
-    _com_github_circonus_labs_libcircllhist()
+    _com_github_openhistogram_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_trace_cpp()
     _com_github_mirror_tclap()
@@ -317,6 +331,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    _com_github_maxmind_libmaxminddb()
 
     # TODO(keith): Remove patch when we update rules_pkg
     external_http_archive(
@@ -324,7 +339,12 @@ def envoy_dependencies(skip_targets = []):
         patches = ["@envoy//bazel:rules_pkg.patch"],
     )
     external_http_archive("com_github_aignas_rules_shellcheck")
-    external_http_archive("aspect_bazel_lib")
+    external_http_archive(
+        "aspect_bazel_lib",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:aspect.patch"],
+    )
+
     _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
@@ -370,14 +390,14 @@ def _boringssl_fips():
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
     )
 
-def _com_github_circonus_labs_libcircllhist():
+def _com_github_openhistogram_libcircllhist():
     external_http_archive(
-        name = "com_github_circonus_labs_libcircllhist",
+        name = "com_github_openhistogram_libcircllhist",
         build_file = "@envoy//bazel/external:libcircllhist.BUILD",
     )
     native.bind(
         name = "libcircllhist",
-        actual = "@com_github_circonus_labs_libcircllhist//:libcircllhist",
+        actual = "@com_github_openhistogram_libcircllhist//:libcircllhist",
     )
 
 def _com_github_axboe_liburing():
@@ -387,7 +407,14 @@ def _com_github_axboe_liburing():
     )
     native.bind(
         name = "uring",
-        actual = "@envoy//bazel/foreign_cc:liburing",
+        actual = "@envoy//bazel/foreign_cc:liburing_linux",
+    )
+
+def _com_github_bazel_buildtools():
+    # TODO(phlax): Add binary download
+    #  cf: https://github.com/bazelbuild/buildtools/issues/367
+    external_http_archive(
+        name = "com_github_bazelbuild_buildtools",
     )
 
 def _com_github_c_ares_c_ares():
@@ -455,6 +482,10 @@ def _com_github_google_benchmark():
     external_http_archive(
         name = "com_github_google_benchmark",
     )
+    external_http_archive(
+        name = "libpfm",
+        build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
+    )
     native.bind(
         name = "benchmark",
         actual = "@com_github_google_benchmark//:benchmark",
@@ -492,7 +523,10 @@ def _com_github_intel_ipp_crypto_crypto_mb():
         # to create dynamic *.so library target. Linker fails when linking
         # with boringssl_fips library. Envoy uses only static library
         # anyways, so created dynamic library would not be used anyways.
-        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch",
+            "@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch",
+        ],
         patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
     )
@@ -767,6 +801,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/base",
     )
     native.bind(
+        name = "abseil_btree",
+        actual = "@com_google_absl//absl/container:btree",
+    )
+    native.bind(
         name = "abseil_flat_hash_map",
         actual = "@com_google_absl//absl/container:flat_hash_map",
     )
@@ -967,7 +1005,10 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
 def _v8():
     external_http_archive(
         name = "v8",
-        patches = ["@envoy//bazel:v8.patch"],
+        patches = [
+            "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_include.patch",
+        ],
         patch_args = ["-p1"],
     )
     native.bind(
@@ -1281,7 +1322,7 @@ filegroup(
     srcs = glob([
         "dlb/libdlb/**",
     ]),
-    visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
+    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
 )
 """,
     )
@@ -1377,3 +1418,13 @@ def _is_linux_s390x(ctxt):
 
 def _is_linux_x86_64(ctxt):
     return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")
+
+def _com_github_maxmind_libmaxminddb():
+    external_http_archive(
+        name = "com_github_maxmind_libmaxminddb",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "maxmind",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux",
+    )

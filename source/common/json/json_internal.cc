@@ -25,6 +25,7 @@ namespace Json {
 namespace Nlohmann {
 
 namespace {
+
 /**
  * Internal representation of Object.
  */
@@ -133,9 +134,11 @@ private:
   bool isType(Type type) const { return type == type_; }
   void checkType(Type type) const {
     if (!isType(type)) {
-      throw Exception(fmt::format(
-          "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
-          line_number_start_, typeAsString(type), typeAsString(type_)));
+      throwExceptionOrPanic(
+          Exception,
+          fmt::format(
+              "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
+              line_number_start_, typeAsString(type), typeAsString(type_)));
     }
   }
 
@@ -188,8 +191,9 @@ public:
   }
   bool number_unsigned(uint64_t value) override {
     if (value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
-      throw Exception(fmt::format("JSON value from line {} is larger than int64_t (not supported)",
-                                  line_number_));
+      throwExceptionOrPanic(
+          Exception, fmt::format("JSON value from line {} is larger than int64_t (not supported)",
+                                 line_number_));
     }
     return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
   }
@@ -411,8 +415,9 @@ bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Boolean)) {
-    throw Exception(fmt::format("key '{}' missing or not a boolean from lines {}-{}", name,
-                                line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not a boolean from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
   return value_itr->second->booleanValue();
 }
@@ -430,8 +435,9 @@ double Field::getDouble(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Double)) {
-    throw Exception(fmt::format("key '{}' missing or not a double from lines {}-{}", name,
-                                line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not a double from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
   return value_itr->second->doubleValue();
 }
@@ -449,8 +455,9 @@ int64_t Field::getInteger(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Integer)) {
-    throw Exception(fmt::format("key '{}' missing or not an integer from lines {}-{}", name,
-                                line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not an integer from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
   return value_itr->second->integerValue();
 }
@@ -467,7 +474,7 @@ int64_t Field::getInteger(const std::string& name, int64_t default_value) const 
 ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) const {
   auto result = getObjectNoThrow(name, allow_empty);
   if (!result.ok()) {
-    throw Exception(std::string(result.status().message()));
+    throwExceptionOrPanic(Exception, std::string(result.status().message()));
   }
 
   return result.value();
@@ -500,8 +507,9 @@ std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name,
     if (allow_empty && value_itr == value_.object_value_.end()) {
       return {};
     }
-    throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
-                                line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not an array from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
 
   std::vector<FieldSharedPtr> array_value = value_itr->second->arrayValue();
@@ -512,8 +520,9 @@ std::string Field::getString(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::String)) {
-    throw Exception(fmt::format("key '{}' missing or not a string from lines {}-{}", name,
-                                line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not a string from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
   return value_itr->second->stringValue();
 }
@@ -535,16 +544,18 @@ std::vector<std::string> Field::getStringArray(const std::string& name, bool all
     if (allow_empty && value_itr == value_.object_value_.end()) {
       return string_array;
     }
-    throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
-                                line_number_start_, line_number_end_));
+    throwExceptionOrPanic(Exception,
+                          fmt::format("key '{}' missing or not an array from lines {}-{}", name,
+                                      line_number_start_, line_number_end_));
   }
 
   std::vector<FieldSharedPtr> array = value_itr->second->arrayValue();
   string_array.reserve(array.size());
   for (const auto& element : array) {
     if (!element->isType(Type::String)) {
-      throw Exception(fmt::format("JSON array '{}' from line {} does not contain all strings", name,
-                                  line_number_start_));
+      throwExceptionOrPanic(Exception,
+                            fmt::format("JSON array '{}' from line {} does not contain all strings",
+                                        name, line_number_start_));
     }
     string_array.push_back(element->stringValue());
   }
@@ -568,7 +579,8 @@ bool Field::empty() const {
   } else if (isType(Type::Array)) {
     return value_.array_value_.empty();
   } else {
-    throw Exception(
+    throwExceptionOrPanic(
+        Exception,
         fmt::format("Json does not support empty() on types other than array and object"));
   }
 }
@@ -589,7 +601,9 @@ void Field::iterate(const ObjectCallback& callback) const {
   }
 }
 
-void Field::validateSchema(const std::string&) const { throw Exception("not implemented"); }
+void Field::validateSchema(const std::string&) const {
+  throwExceptionOrPanic(Exception, "not implemented");
+}
 
 bool ObjectHandler::start_object(std::size_t) {
   FieldSharedPtr object = Field::createObject();
@@ -723,10 +737,50 @@ absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   auto result = loadFromStringNoThrow(json);
   if (!result.ok()) {
-    throw Exception(std::string(result.status().message()));
+    throwExceptionOrPanic(Exception, std::string(result.status().message()));
   }
 
   return result.value();
+}
+
+FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value);
+FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct);
+
+FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value) {
+  switch (protobuf_value.kind_case()) {
+  case ProtobufWkt::Value::kStringValue:
+    return Field::createValue(protobuf_value.string_value());
+  case ProtobufWkt::Value::kNumberValue:
+    return Field::createValue(protobuf_value.number_value());
+  case ProtobufWkt::Value::kBoolValue:
+    return Field::createValue(protobuf_value.bool_value());
+  case ProtobufWkt::Value::kNullValue:
+    return Field::createNull();
+  case ProtobufWkt::Value::kListValue: {
+    FieldSharedPtr array = Field::createArray();
+    for (const auto& list_value : protobuf_value.list_value().values()) {
+      array->append(loadFromProtobufValueInternal(list_value));
+    }
+    return array;
+  }
+  case ProtobufWkt::Value::kStructValue:
+    return loadFromProtobufStructInternal(protobuf_value.struct_value());
+  default:
+    throwExceptionOrPanic(Exception, "Protobuf value case not implemented");
+  }
+}
+
+FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct) {
+  auto root = Field::createObject();
+  for (const auto& field : protobuf_struct.fields()) {
+    root->insert(field.first, loadFromProtobufValueInternal(field.second));
+  }
+
+  return root;
+}
+
+ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct) {
+  return loadFromProtobufStructInternal(protobuf_struct);
 }
 
 std::string Factory::serialize(absl::string_view str) {

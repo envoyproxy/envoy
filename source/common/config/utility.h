@@ -102,7 +102,7 @@ public:
   /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
    * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
-   * default value of 0s will be returned.
+   * default value of 15s will be returned.
    */
   static std::chrono::milliseconds
   configSourceInitialFetchTimeout(const envoy::config::core::v3::ConfigSource& config_source);
@@ -181,9 +181,9 @@ public:
   /**
    * Validate transport_api_version field in ApiConfigSource.
    * @param api_config_source the config source to extract transport API version from.
-   * @throws DeprecatedMajorVersionException when the transport version is disabled.
+   * @returns a failure status when the transport version is disabled.
    */
-  template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
+  template <class Proto> static absl::Status checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
@@ -194,8 +194,9 @@ public:
           "see the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      throw DeprecatedMajorVersionException(warning);
+      return absl::InvalidArgumentError(warning);
     }
+    return absl::OkStatus();
   }
 
   /**
@@ -329,9 +330,9 @@ public:
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
     static const std::string& typed_struct_type =
-        xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+        xds::type::v3::TypedStruct::default_instance().GetTypeName();
     static const std::string& legacy_typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+        udpa::type::v1::TypedStruct::default_instance().GetTypeName();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
@@ -380,7 +381,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+    RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
     translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
     return config;
@@ -404,7 +405,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+    RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
     translateOpaqueConfig(typed_config, validation_visitor, *config);
     return config;

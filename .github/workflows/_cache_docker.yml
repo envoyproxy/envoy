@@ -37,7 +37,7 @@ jobs:
   docker:
     runs-on: ubuntu-22.04
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.0.10
+    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.0.27
       name: Prime Docker cache (${{ inputs.image_repo }}:${{ inputs.image_tag }}@sha256:${{ inputs.image_sha }})
       with:
         image_tag: "${{ inputs.image_repo }}:${{ inputs.image_tag }}@sha256:${{ inputs.image_sha }}"

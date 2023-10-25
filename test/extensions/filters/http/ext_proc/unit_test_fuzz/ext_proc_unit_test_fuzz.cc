@@ -30,6 +30,12 @@ public:
     ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
     ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(1024));
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(1024));
+    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
+        .WillByDefault(
+            Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
+    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+        .WillByDefault(
+            Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -81,7 +87,7 @@ DEFINE_PROTO_FUZZER(
   EXPECT_CALL(*client, start(_, _, _))
       .WillRepeatedly(Invoke(
           [&](ExternalProcessing::ExternalProcessorCallbacks&,
-              const envoy::config::core::v3::GrpcService&,
+              const Grpc::GrpcServiceConfigWithHashKey&,
               const StreamInfo::StreamInfo&) -> ExternalProcessing::ExternalProcessorStreamPtr {
             auto stream = std::make_unique<MockStream>();
             EXPECT_CALL(*stream, send(_, _))

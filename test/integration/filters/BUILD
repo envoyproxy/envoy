@@ -15,6 +15,11 @@ envoy_proto_library(
 )
 
 envoy_proto_library(
+    name = "add_header_filter_proto",
+    srcs = ["add_header_filter.proto"],
+)
+
+envoy_proto_library(
     name = "test_listener_filter_proto",
     srcs = ["test_listener_filter.proto"],
 )
@@ -32,6 +37,7 @@ envoy_cc_test_library(
         "//envoy/network:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/router:string_accessor_lib",
     ],
 )
 
@@ -55,6 +61,7 @@ envoy_cc_test_library(
     name = "add_header_filter_config_lib",
     srcs = ["add_header_filter.cc"],
     deps = [
+        ":add_header_filter_proto_cc_proto",
         ":common_lib",
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -480,6 +487,7 @@ envoy_cc_test_library(
         ":set_response_code_filter_config_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
+        "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
@@ -907,27 +915,6 @@ envoy_cc_test_library(
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
-)
-
-envoy_proto_library(
-    name = "header_to_filter_state_proto",
-    srcs = ["header_to_filter_state.proto"],
-)
-
-envoy_cc_test_library(
-    name = "header_to_filter_state_lib",
-    srcs = [
-        "header_to_filter_state.cc",
-    ],
-    deps = [
-        ":header_to_filter_state_proto_cc_proto",
-        "//envoy/http:filter_interface",
-        "//envoy/registry",
-        "//envoy/server:filter_config_interface",
-        "//source/common/router:string_accessor_lib",
-        "//source/extensions/filters/http/common:factory_base_lib",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
 

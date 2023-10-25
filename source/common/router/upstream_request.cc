@@ -94,8 +94,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
       upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")) {
-  if (parent_.config().start_child_span_) {
-    if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+  if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+    if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
           tracing_config.value().get(),
           absl::StrCat("router ", parent.cluster()->observabilityName(), " egress"),
@@ -123,6 +123,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
+  stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
       parent_.callbacks()->streamInfo().upstreamClusterInfo();
   if (cluster_info.has_value()) {
@@ -283,7 +284,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
-  stream_info_.response_code_ = static_cast<uint32_t>(response_code);
+  stream_info_.setResponseCode(static_cast<uint32_t>(response_code));
 
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());

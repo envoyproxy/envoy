@@ -25,9 +25,9 @@ public:
   MockSubscriptionCallbacks();
   ~MockSubscriptionCallbacks() override;
 
-  MOCK_METHOD(void, onConfigUpdate,
+  MOCK_METHOD(absl::Status, onConfigUpdate,
               (const std::vector<DecodedResourceRef>& resources, const std::string& version_info));
-  MOCK_METHOD(void, onConfigUpdate,
+  MOCK_METHOD(absl::Status, onConfigUpdate,
               (const std::vector<DecodedResourceRef>& added_resources,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                const std::string& system_version_info));

@@ -55,19 +55,19 @@ affected files manually or run the provided formatting script.
 
 To run the format fix script directly:
 
-```
-./tools/code_format/check_format.py fix && ./tools/code_format/format_python_tools.sh fix
+```console
+bazel run //tools/code_format:check_format -- fix && bazel run //tools/code:check -- fix -s main -v warn
 ```
 
 To run the format fix script under Docker:
 
-```
+```console
 ./ci/run_envoy_docker.sh './ci/do_ci.sh format'
 ```
 
 To run clang-tidy under Docker, run the following (this creates a full
 compilation db and takes a long time):
 
-```
-./ci/run_envoy_docker.sh ci/do_ci.sh bazel.clang_tidy
+```console
+./ci/run_envoy_docker.sh ci/do_ci.sh clang_tidy
 ```

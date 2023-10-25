@@ -63,7 +63,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
   const int rc = Api::OsSysCallsSingleton::get().close(fd_).return_value_;
   SET_SOCKET_INVALID(fd_);
-  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  return {static_cast<unsigned long>(rc), Api::IoError::none()};
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,

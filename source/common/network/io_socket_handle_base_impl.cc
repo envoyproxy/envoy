@@ -88,8 +88,8 @@ Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::localAddress() {
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
-    throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
-                                     errorDetails(result.errno_)));
+    throwEnvoyExceptionOrPanic(fmt::format("getsockname failed for '{}': ({}) {}", fd_,
+                                           result.errno_, errorDetails(result.errno_)));
   }
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
@@ -102,18 +102,20 @@ Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::peerAddress() {
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
-  if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
+  if (static_cast<unsigned int>(ss_len) >=
+          (offsetof(sockaddr_storage, ss_family) + sizeof(ss.ss_family)) &&
+      ss.ss_family == AF_UNIX) {
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other
     // mechanisms to hide things, of which there are many).
     ss_len = sizeof(ss);
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
     if (result.return_value_ != 0) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }

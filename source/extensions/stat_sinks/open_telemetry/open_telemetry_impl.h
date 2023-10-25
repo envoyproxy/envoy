@@ -41,12 +41,14 @@ public:
   bool reportHistogramsAsDeltas() { return report_histograms_as_deltas_; }
   bool emitTagsAsAttributes() { return emit_tags_as_attributes_; }
   bool useTagExtractedName() { return use_tag_extracted_name_; }
+  const std::string& statPrefix() { return stat_prefix_; }
 
 private:
   const bool report_counters_as_deltas_;
   const bool report_histograms_as_deltas_;
   const bool emit_tags_as_attributes_;
   const bool use_tag_extracted_name_;
+  const std::string stat_prefix_;
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;

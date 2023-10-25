@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/registry/registry.h"
 

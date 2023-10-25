@@ -115,7 +115,7 @@ public:
   std::string category() const override { return "envoy.filters.http.upstream"; }
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::UpstreamHttpFactoryContext&) override {
+                               Server::Configuration::UpstreamFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
     };

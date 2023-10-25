@@ -7,11 +7,11 @@
 
 #include "source/common/protobuf/utility.h"
 
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Server {
-namespace {
 
 inline envoy::config::listener::v3::Listener parseListenerFromV3Yaml(const std::string& yaml) {
   envoy::config::listener::v3::Listener listener;
@@ -19,6 +19,10 @@ inline envoy::config::listener::v3::Listener parseListenerFromV3Yaml(const std::
   return listener;
 }
 
-} // namespace
+inline std::string testDomainSocketName() {
+  return absl::StrCat(TestEnvironment::unixDomainSocketDirectory(), "/",
+                      TestUtility::uniqueFilename("envoy_domain_socket"));
+}
+
 } // namespace Server
 } // namespace Envoy

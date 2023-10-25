@@ -1148,13 +1148,16 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
-TEST(HeaderIsValidTest, IsConnectUdp) {
-  EXPECT_TRUE(
-      HeaderUtility::isConnectUdp(Http::TestRequestHeaderMapImpl{{"upgrade", "connect-udp"}}));
+TEST(HeaderIsValidTest, IsConnectUdpRequest) {
+  EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
+      Http::TestRequestHeaderMapImpl{{"upgrade", "connect-udp"}}));
+  // Should use case-insensitive comparison for the upgrade values.
+  EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
+      Http::TestRequestHeaderMapImpl{{"upgrade", "CONNECT-UDP"}}));
   // Extended CONNECT requests should be normalized to HTTP/1.1.
-  EXPECT_FALSE(HeaderUtility::isConnectUdp(
+  EXPECT_FALSE(HeaderUtility::isConnectUdpRequest(
       Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":protocol", "connect-udp"}}));
-  EXPECT_FALSE(HeaderUtility::isConnectUdp(Http::TestRequestHeaderMapImpl{}));
+  EXPECT_FALSE(HeaderUtility::isConnectUdpRequest(Http::TestRequestHeaderMapImpl{}));
 }
 
 TEST(HeaderIsValidTest, IsConnectResponse) {

@@ -8,12 +8,45 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/upstream/thread_aware_lb_impl.h"
 
 namespace Envoy {
 namespace Upstream {
+
+using RingHashLbProto = envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash;
+using ClusterProto = envoy::config::cluster::v3::Cluster;
+using LegacyRingHashLbProto = ClusterProto::RingHashLbConfig;
+
+/**
+ * Load balancer config that used to wrap legacy ring hash config.
+ */
+class LegacyRingHashLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  LegacyRingHashLbConfig(const ClusterProto& cluster);
+
+  OptRef<const LegacyRingHashLbProto> lbConfig() const {
+    if (lb_config_.has_value()) {
+      return lb_config_.value();
+    }
+    return {};
+  };
+
+private:
+  absl::optional<LegacyRingHashLbProto> lb_config_;
+};
+
+/**
+ * Load balancer config that used to wrap typed ring hash config.
+ */
+class TypedRingHashLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  TypedRingHashLbConfig(const RingHashLbProto& lb_config);
+
+  const RingHashLbProto lb_config_;
+};
 
 /**
  * All ring hash load balancer stats. @see stats_macros.h

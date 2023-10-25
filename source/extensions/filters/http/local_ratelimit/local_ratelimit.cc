@@ -33,8 +33,13 @@ FilterConfig::FilterConfig(
       tokens_per_fill_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1)),
       descriptors_(config.descriptors()),
       rate_limit_per_connection_(config.local_rate_limit_per_downstream_connection()),
+      always_consume_default_token_bucket_(
+          config.has_always_consume_default_token_bucket()
+              ? config.always_consume_default_token_bucket().value()
+              : true),
       rate_limiter_(new Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
-          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_)),
+          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_,
+          always_consume_default_token_bucket_)),
       local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()
@@ -54,7 +59,11 @@ FilterConfig::FilterConfig(
       has_descriptors_(!config.descriptors().empty()),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
-      vh_rate_limits_(config.vh_rate_limits()) {
+      vh_rate_limits_(config.vh_rate_limits()),
+      rate_limited_grpc_status_(
+          config.rate_limited_as_resource_exhausted()
+              ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
+              : absl::nullopt) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -142,7 +151,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       [this, config](Http::HeaderMap& headers) {
         config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
       },
-      absl::nullopt, "local_rate_limited");
+      config->rateLimitedGrpcStatus(), "local_rate_limited");
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
 
   return Http::FilterHeadersStatus::StopIteration;
@@ -208,7 +217,8 @@ const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConne
   if (typed_state == nullptr) {
     auto limiter = std::make_shared<PerConnectionRateLimiter>(
         config->fillInterval(), config->maxTokens(), config->tokensPerFill(),
-        decoder_callbacks_->dispatcher(), config->descriptors());
+        decoder_callbacks_->dispatcher(), config->descriptors(),
+        config->consumeDefaultTokenBucket());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::StateType::ReadOnly,

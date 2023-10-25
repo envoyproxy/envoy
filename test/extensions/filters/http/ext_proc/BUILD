@@ -118,11 +118,12 @@ envoy_extension_cc_test(
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "cpu:3",
     ],
     deps = [
+        ":logging_test_filter_lib",
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
@@ -270,5 +271,29 @@ envoy_extension_cc_test(
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "logging_test_filter_proto",
+    srcs = ["logging_test_filter.proto"],
+)
+
+envoy_extension_cc_test_library(
+    name = "logging_test_filter_lib",
+    srcs = [
+        "logging_test_filter.cc",
+    ],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        ":logging_test_filter_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/test_common:utility_lib",
     ],
 )

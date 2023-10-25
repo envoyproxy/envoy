@@ -31,9 +31,12 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::v3::
     return std::make_shared<const PresentMatcher>(v.present_match());
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kListMatch:
     return std::make_shared<const ListMatcher>(v.list_match());
-  default:
-    throw EnvoyException("Uncaught default");
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kOrMatch:
+    return std::make_shared<const OrMatcher>(v.or_match());
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
+    break; // Fall through to PANIC.
   }
+  PANIC("unexpected");
 }
 
 bool NullMatcher::match(const ProtobufWkt::Value& value) const {
@@ -82,6 +85,22 @@ bool ListMatcher::match(const ProtobufWkt::Value& value) const {
       if (oneof_value_matcher_->match(lv)) {
         return true;
       }
+    }
+  }
+  return false;
+}
+
+OrMatcher::OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher) {
+  or_matchers_.reserve(matcher.value_matchers().size());
+  for (const auto& or_matcher : matcher.value_matchers()) {
+    or_matchers_.push_back(ValueMatcher::create(or_matcher));
+  }
+}
+
+bool OrMatcher::match(const ProtobufWkt::Value& value) const {
+  for (const auto& or_matcher : or_matchers_) {
+    if (or_matcher->match(value)) {
+      return true;
     }
   }
   return false;

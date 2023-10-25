@@ -1,4 +1,8 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
     "envoy_cc_library",
@@ -7,10 +11,6 @@ load(
     "envoy_cc_win32_library",
     "envoy_package",
     "envoy_pch_library",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -207,14 +207,17 @@ envoy_cc_library(
         "json_escape_string.h",
         "logger.h",
     ],
-    external_deps = ["abseil_synchronization"],
+    external_deps = [
+        "abseil_synchronization",
+        "abseil_flat_hash_map",
+    ],
     deps = [
         ":base_logger_lib",
         ":fmt_lib",
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
-        "//source/common/protobuf:protobuf",
+        "//source/common/protobuf",
     ] + select({
         "//bazel:android_logger": ["logger_impl_lib_android"],
         "//conditions:default": ["logger_impl_lib_standard"],
@@ -226,6 +229,7 @@ envoy_cc_library(
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
     external_deps = [
+        "abseil_strings",
         "spdlog",
     ],
 )
@@ -456,6 +460,7 @@ envoy_cc_library(
         ":assert_lib",
         ":hash_lib",
         ":non_copyable",
+        "//envoy/common:exception_lib",
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
         "//source/common/singleton:const_singleton",

@@ -94,6 +94,7 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   use_lds_ = false;
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
+  memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
 
   builder_.addLogLevel(getPlatformLogLevelFromOptions());
   // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
@@ -105,7 +106,10 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
-  stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  {
+    absl::MutexLock l(&engine_lock_);
+    stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  }
 
   stream_prototype_->setOnHeaders(
       [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
@@ -119,6 +123,7 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+        memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
         if (expect_data_streams_) {
           validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
         }
@@ -170,7 +175,10 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
   builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
-  engine_ = builder_.build();
+  {
+    absl::MutexLock l(&engine_lock_);
+    engine_ = builder_.build();
+  }
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -180,9 +188,12 @@ void BaseClientIntegrationTest::TearDown() {
   }
   test_server_.reset();
   fake_upstreams_.clear();
-  if (engine_) {
-    engine_->terminate();
-    engine_.reset();
+  {
+    absl::MutexLock l(&engine_lock_);
+    if (engine_) {
+      engine_->terminate();
+      engine_.reset();
+    }
   }
   stream_.reset();
   stream_prototype_.reset();
@@ -199,16 +210,6 @@ void BaseClientIntegrationTest::createEnvoy() {
     if (upstream->localAddress()->ip()) {
       ports.push_back(upstream->localAddress()->ip()->port());
     }
-  }
-
-  if (override_builder_config_) {
-    finalizeConfigWithPorts(config_helper_, ports, use_lds_);
-    ASSERT_FALSE(config_helper_.bootstrap().has_admin())
-        << "Bootstrap config should not have `admin` configured in Envoy Mobile";
-    builder_.setOverrideConfig(
-        std::make_unique<envoy::config::bootstrap::v3::Bootstrap>(config_helper_.bootstrap()));
-  } else {
-    ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }
 
   absl::Notification engine_running;
