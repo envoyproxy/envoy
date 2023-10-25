@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         ":metric_impl_lib",
         ":stat_merger_lib",
+        "//envoy/stats:sink_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:thread_annotations",

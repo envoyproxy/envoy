@@ -56,6 +56,10 @@ removed_config_or_runtime:
     runtime flag and legacy code path.
 
 new_features:
+- area: stats
+  change: |
+    added :ref:`per_endpoint_stats <envoy_v3_api_field_config.cluster.v3.TrackClusterStats.per_endpoint_stats>` to get some metrics
+    for each endpoint in a cluster.
 - area: jwt
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
