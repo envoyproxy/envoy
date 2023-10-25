@@ -49,15 +49,15 @@ removed_config_or_runtime:
     runtime flag and legacy code path.
 
 new_features:
-- area: jwt
-  change: |
-    The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
-    These claims will be serialized as JSON and encoded as Base64.
 - area: admin
   change: |
     Added a new ``histogram_emit_mode`` query parameter to the ``/stats/prometheus`` endpoint to control how histograms
     are reported. Supported modes are ``histogram`` and ``summary``, referring to the corresponding prometheus metric
     types.
+- area: jwt
+  change: |
+    The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
+    These claims will be serialized as JSON and encoded as Base64.
 
 
 deprecated:
