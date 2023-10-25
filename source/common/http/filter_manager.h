@@ -36,7 +36,8 @@ class DownstreamFilterManager;
 
 struct ActiveStreamFilterBase;
 
-constexpr absl::string_view FS_LOCAL_REPLAY_KEY = "envoy.filters.listener.local_replay_owner";
+constexpr absl::string_view FS_LOCAL_REPLAY_KEY =
+    "envoy.filters.network.http_connection_manager.local_reply_owner";
 class LocalReplyOwnerType : public StreamInfo::FilterState::Object {
 public:
   LocalReplyOwnerType(const std::string& filter_config_name, const std::string& details)
