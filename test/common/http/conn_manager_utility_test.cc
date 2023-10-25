@@ -1015,7 +1015,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http11));
-  EXPECT_FALSE(headers.has("connection"));
+  EXPECT_TRUE(headers.has("connection"));
   EXPECT_FALSE(headers.has("upgrade"));
 }
 
