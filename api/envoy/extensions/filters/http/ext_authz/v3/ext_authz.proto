@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 21]
+// [#next-free-field: 23]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -119,6 +119,18 @@ message ExtAuthz {
   // the protobuf message definition in order to do a safe parsing.
   //
   repeated string typed_metadata_context_namespaces = 16;
+
+  // Specifies a list of route metadata namespaces whose values, if present, will be passed to the
+  // ext_authz service at :ref:`route_metadata_context <envoy_v3_api_field_service.auth.v3.AttributeContext.route_metadata_context>` in
+  // :ref:`CheckRequest <envoy_v3_api_field_service.auth.v3.CheckRequest.attributes>`.
+  // :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is passed as an opaque ``protobuf::Struct``.
+  repeated string route_metadata_context_namespaces = 21;
+
+  // Specifies a list of route metadata namespaces whose values, if present, will be passed to the
+  // ext_authz service at :ref:`route_metadata_context <envoy_v3_api_field_service.auth.v3.AttributeContext.route_metadata_context>` in
+  // :ref:`CheckRequest <envoy_v3_api_field_service.auth.v3.CheckRequest.attributes>`.
+  // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` is passed as an ``protobuf::Any``.
+  repeated string route_typed_metadata_context_namespaces = 22;
 
   // Specifies if the filter is enabled.
   //
