@@ -53,3 +53,4 @@ jobs:
       managed: ${{ matrix.managed }}
       cache_build_image: ${{ needs.env.outputs.build_image_ubuntu }}
       repo_ref: ${{ github.event.pull_request.head.sha  }}
+      catch-errors: true
