@@ -319,7 +319,7 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferBytesOverflow) {
   EXPECT_FALSE(filter_config_->bufferEnabled());
 }
 
-TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithDnsLookupFailure) {
+TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithContinueFilterChainFailure) {
   FilterConfig config;
   config.mutable_buffer_options();
   setup(config);
@@ -338,9 +338,9 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithDnsLookupFailure) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 
-  EXPECT_CALL(callbacks_, continueFilterChain());
+  // Session is removed and no longer valid, no datagrams will be injected.
+  EXPECT_CALL(callbacks_, continueFilterChain()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, injectDatagramToFilterChain(_)).Times(0);
-
   filter_->onLoadDnsCacheComplete(nullptr);
 
   EXPECT_CALL(*handle, onDestroy());
