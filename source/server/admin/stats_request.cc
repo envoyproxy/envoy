@@ -222,6 +222,10 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
 }
 
 void StatsRequest::renderPerHostMetrics(Buffer::Instance& response) {
+  // This code does not adhere to the streaming contract, but there isn't a good way to stream
+  // these. There isn't a shared pointer to hold, so there's no way to safely pause iteration here
+  // without copying all of the data somewhere. But copying all of the data would be more expensive
+  // than generating it all in one batch here.
   Upstream::HostUtility::forEachHostMetric(
       cluster_manager_,
       [&](Stats::PrimitiveCounterSnapshot&& metric) {
