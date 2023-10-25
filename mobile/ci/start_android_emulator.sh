@@ -5,7 +5,7 @@ set -e
 check_emulator_status() {
     while true; do
         if grep -q "Running on a system with less than 6 logical cores. Setting number of virtual cores to 1" nohup.out; then
-            echo "Starting an emulator will likely to fail, please run /retest"
+            echo "Starting an emulator on this machine is likely to fail, please run /retest"
             exit 1
         elif grep -q "Boot completed" nohup.out; then
             break
@@ -14,8 +14,8 @@ check_emulator_status() {
     done
 }
 
-echo "y" | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install 'system-images;android-30;google_apis;x86_64' --channel=3
-echo "no" | "${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager" create avd -n test_android_emulator -k 'system-images;android-30;google_apis;x86_64' --device pixel_4 --force
+echo "y" | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install 'system-images;android-30;google_atd;x86_64' --channel=3
+echo "no" | "${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager" create avd -n test_android_emulator -k 'system-images;android-30;google_atd;x86_64' --device pixel_4 --force
 "${ANDROID_HOME}"/emulator/emulator -accel-check
 # This is only available on macOS.
 if [[ -n $(which system_profiler) ]]; then
