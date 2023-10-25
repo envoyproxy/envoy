@@ -360,10 +360,7 @@ public:
 
   void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override{};
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override{};
-  const Stats::TagVector& fixedTags() override {
-    static const Stats::TagVector empty;
-    return empty;
-  }
+  const Stats::TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(Stats::TagVector); }
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
