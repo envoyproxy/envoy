@@ -1,10 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+date: October 25, 2023
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: local_rate_limit
   change: |
     Added new configuration field :ref:`rate_limited_as_resource_exhausted
@@ -12,7 +8,6 @@ minor_behavior_changes:
     to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: xds
   change: |
     Fixed a bug (https://github.com/envoyproxy/envoy/issues/27702) that caused ADS initialization
@@ -25,7 +20,6 @@ bug_fixes:
     Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
     Removed ``envoy.reloadable_features.expand_agnostic_stream_lifetime`` and legacy code paths.
@@ -53,5 +47,3 @@ new_features:
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
     These claims will be serialized as JSON and encoded as Base64.
-
-deprecated:
