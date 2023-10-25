@@ -2306,5 +2306,14 @@ TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyRequestHeadersForHttp11
   EXPECT_TRUE(request_headers.has("keep-alive"));
 }
 
+// Make sure we don't remove connection headers for http11 keep-alive
+TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeaderHttp11) {
+  TestRequestHeaderMapImpl headers{{"connection", "keep-alive"}};
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http11));
+  EXPECT_EQ("keep-alive", headers.get_("connection"));
+}
+
 } // namespace Http
 } // namespace Envoy
