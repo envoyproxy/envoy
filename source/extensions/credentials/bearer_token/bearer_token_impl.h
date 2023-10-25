@@ -26,7 +26,7 @@ public:
   bool inject(Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
-  Common::SecretReaderSharedPtr secret_reader_;
+  const Common::SecretReaderSharedPtr secret_reader_;
 };
 
 } // namespace BearerToken

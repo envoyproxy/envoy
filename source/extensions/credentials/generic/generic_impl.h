@@ -26,8 +26,8 @@ public:
   bool inject(Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
-  std::string header_;
-  Common::SecretReaderSharedPtr secret_reader_;
+  const std::string header_;
+  const Common::SecretReaderSharedPtr secret_reader_;
 };
 
 } // namespace Generic
