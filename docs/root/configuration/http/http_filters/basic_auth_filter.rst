@@ -3,14 +3,14 @@
 Basic Auth
 ==========
 
-This HTTP filter can be used to authenticate user credentials in the HTTP Authentication heaer defined
+This HTTP filter can be used to authenticate user credentials in the HTTP Authentication header defined
 in `RFC7617 <https://tools.ietf.org/html/rfc7617>`.
 
 The filter will extract the username and password from the HTTP Authentication header and verify them
 against the configured username and password list.
 
 If the username and password are valid, the request will be forwared to the next filter in the filter chains.
-If they're invalid or not provided in the HTTP request, the rqeust will be denied with a 401 Unauthorized response.
+If they're invalid or not provided in the HTTP request, the request will be denied with a 401 Unauthorized response.
 
 Configuration
 -------------
