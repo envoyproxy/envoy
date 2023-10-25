@@ -12,8 +12,7 @@ bool BearerTokenCredentialInjector::inject(Http::RequestHeaderMap& headers, bool
     return false;
   }
 
-  headers.setCopy(Http::LowerCaseString("Authorization"),
-                  "Bearer " + secret_reader_->bearer_token());
+  headers.setCopy(Http::LowerCaseString("Authorization"), "Bearer " + secret_reader_->credential());
   return true;
 }
 

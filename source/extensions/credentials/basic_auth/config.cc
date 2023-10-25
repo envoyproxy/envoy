@@ -9,21 +9,6 @@ namespace Extensions {
 namespace Credentials {
 namespace BasicAuth {
 
-namespace {
-Secret::GenericSecretConfigProviderSharedPtr
-secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-                Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
-                Init::Manager& init_manager) {
-  if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory, init_manager);
-  } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
-  }
-}
-} // namespace
-
 Common::CredentialInjectorSharedPtr
 BasicAuthCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
     const BasicAuth& config, Server::Configuration::FactoryContext& context) {
@@ -31,13 +16,14 @@ BasicAuthCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
   auto& cluster_manager = context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
-  auto secret_provider_password = secretsProvider(password_secret, secret_manager,
-                                                  transport_socket_factory, context.initManager());
+  auto secret_provider_password = Common::secretsProvider(
+      password_secret, secret_manager, transport_socket_factory, context.initManager());
   if (secret_provider_password == nullptr) {
     throw EnvoyException("invalid password secret configuration");
   }
 
-  auto secret_reader = std::make_shared<SDSSecretReader>(secret_provider_password, context.api());
+  auto secret_reader =
+      std::make_shared<Common::SDSSecretReader>(secret_provider_password, context.api());
   return std::make_shared<BasicAuthCredentialInjector>(config.username(), secret_reader);
 }
 

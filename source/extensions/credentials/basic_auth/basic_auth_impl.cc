@@ -12,7 +12,7 @@ bool BasicAuthCredentialInjector::inject(Http::RequestHeaderMap& headers, bool o
     return false;
   }
 
-  const std::string username_password = username_ + ":" + secret_reader_->password();
+  const std::string username_password = username_ + ":" + secret_reader_->credential();
   const std::string encoded = Base64::encode(username_password.c_str(), username_password.size());
   headers.setCopy(Http::LowerCaseString("Authorization"), "Basic " + encoded);
   return true;

@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//source/common/config:datasource_lib",
         "//source/extensions/credentials/common:credential_interface",
+        "//source/extensions/credentials/common:secret_reader_lib",
     ],
 )
 
@@ -27,6 +28,7 @@ envoy_cc_extension(
         ":bearer_token_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/credentials/common:credential_factory_base_lib",
+        "//source/extensions/credentials/common:secret_reader_lib",
         "@envoy_api//envoy/extensions/credentials/bearer_token/v3:pkg_cc_proto",
     ],
 )
