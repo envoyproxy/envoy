@@ -770,6 +770,12 @@ modify different aspects of the server:
     Text readout stats create a new label value every time the value
     of the text readout stat changes, which could create an unbounded number of time series.
 
+  .. http:get:: /stats?format=prometheus&histogram_emit_mode=histogram,summary
+
+  Optional ``histogram_emit_mode`` query parameter is used to control how histogram metrics get reported.
+  By default, histograms get reported as the "histogram" prometheus metric type, but can also be used to
+  emit prometheus "summary" metrics with the histogram quantile values.
+
 .. http:get:: /stats/recentlookups
 
   This endpoint helps Envoy developers debug potential contention
