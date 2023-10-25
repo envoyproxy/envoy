@@ -44,10 +44,15 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
 
   auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
 
+#ifdef WIN32
+  EXPECT_THROW_WITH_MESSAGE(detector->detect(), EnvoyException,
+                            "Environment variable doesn't exist: OTEL_RESOURCE_ATTRIBUTES");
+#else
   EXPECT_THROW_WITH_MESSAGE(detector->detect(), EnvoyException,
                             "The OpenTelemetry environment resource detector is configured but the "
                             "'OTEL_RESOURCE_ATTRIBUTES'"
                             " environment variable is empty.");
+#endif
 }
 
 // Test detector with valid values in the env variable
