@@ -271,9 +271,10 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 }
 
 void Filter::onInitFailure(UpstreamFailureReason reason) {
-  // Guard against cases where ODCDS fails, and the filter has not attempted to
-  // create a connection to the upstream as it is not known what the upstream
-  // should be.
+  // If ODCDS fails, the filter will not attempt to create a connection to
+  // upstream, as it does not have an assigned upstream. As such the filter will
+  // not have started attempting to connect to an upstream and there is no
+  // connection pool callback latency to record.
   if (initial_upstream_connection_start_time_.has_value()) {
     getStreamInfo().upstreamInfo()->upstreamTiming().recordConnectionPoolCallbackLatency(
         initial_upstream_connection_start_time_.value(),
