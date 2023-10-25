@@ -94,7 +94,7 @@ runs:
       "${COMMAND[@]}" 2> >(tee "$TMP_OUTPUT") || {
           OUTPUT=$(cat "$TMP_OUTPUT")
           rm -rf "$TMP_OUTPUT"
-          echo ":error: ${OUTPUT}"
+          echo ":error: ${OUTPUT}" >&2
           if [[ ${{ inputs.catch-errors }} == "false" ]]; then
               exit 1
           fi
