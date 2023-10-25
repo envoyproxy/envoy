@@ -24,10 +24,10 @@ namespace JsonToMetadata {
  * All stats for the Json to Metadata filter. @see stats_macros.h
  */
 #define ALL_JSON_TO_METADATA_FILTER_STATS(COUNTER)                                                 \
-  COUNTER(success)                                                                              \
-  COUNTER(mismatched_content_type)                                                              \
-  COUNTER(no_body)                                                                              \
-  COUNTER(invalid_json_body)                                                                    \
+  COUNTER(success)                                                                                 \
+  COUNTER(mismatched_content_type)                                                                 \
+  COUNTER(no_body)                                                                                 \
+  COUNTER(invalid_json_body)
 
 /**
  * Wrapper struct for Json to Metadata filter stats. @see stats_macros.h
@@ -125,7 +125,8 @@ private:
                         bool& processing_finished_flag);
   // Parse the body while we have the whole json.
   void processBody(const Buffer::Instance* body, const Rules& rules, bool should_clear_route_cache,
-                   JsonToMetadataStats& stats, Http::StreamFilterCallbacks& filter_callback, bool& processing_finished_flag);
+                   JsonToMetadataStats& stats, Http::StreamFilterCallbacks& filter_callback,
+                   bool& processing_finished_flag);
   void processRequestBody();
   void processResponseBody();
 

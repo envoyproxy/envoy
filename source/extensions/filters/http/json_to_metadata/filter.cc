@@ -85,8 +85,10 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
     Stats::Scope& scope)
-    : rqstats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
-      respstats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.resp"))},
+    : rqstats_{ALL_JSON_TO_METADATA_FILTER_STATS(
+          POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
+      respstats_{
+          ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.resp"))},
       request_rules_(generateRules(proto_config.request_rules().rules())),
       response_rules_(generateRules(proto_config.response_rules().rules())),
       request_allow_content_types_(
