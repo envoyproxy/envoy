@@ -64,5 +64,11 @@ new_features:
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
     These claims will be serialized as JSON and encoded as Base64.
+- area: tcp_proxy
+  change: |
+    added support to TCP Proxy for recording the latency in ``UpstreamTiming`` from when the first
+    initial connection to the upstream cluster was attempted to when either the
+    connection was successfully established or the filiter failed to initialize
+    any connection to the upstream.
 
 deprecated:
