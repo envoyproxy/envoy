@@ -92,7 +92,7 @@ runs:
       fi
       TMP_OUTPUT=$(mktemp)
       "${COMMAND[@]}" 2> >(tee "$TMP_OUTPUT") || {
-          OUTPUT=$(cat "$TMP_OUTPUT" | sed 's/\n/%0A/g'))
+          OUTPUT="$(cat "$TMP_OUTPUT" | sed 's/\n/%0A/g')"
           rm -rf "$TMP_OUTPUT"
           echo ":error: ${OUTPUT}"
           if [[ ${{ inputs.catch-errors }} == "false" ]]; then
