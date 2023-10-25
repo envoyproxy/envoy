@@ -21,13 +21,6 @@ namespace OpenTelemetry {
 
 const std::string kOtelResourceAttributesEnv = "OTEL_RESOURCE_ATTRIBUTES";
 
-class EnvironmentResourceDetectorTest : public testing::Test {
-public:
-  ~EnvironmentResourceDetectorTest() override {
-    TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
-  }
-};
-
 // Test detector when env variable is not present
 TEST(EnvironmentResourceDetectorTest, EnvVariableNotPresent) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
@@ -44,6 +37,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariableNotPresent) {
 TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv); });
 
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig config;
@@ -60,6 +54,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
 TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "key1=val1,key2=val2", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv); });
   ResourceAttributes expected_attributes = {{"key1", "val1"}, {"key2", "val2"}};
 
   Api::ApiPtr api = Api::createApiForTest();
@@ -86,6 +81,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
 TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributesWrongFormat) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "key1=val1,key2val2,key3/val3, , key", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv); });
   ResourceAttributes expected_attributes = {{"key1", "val"}};
 
   Api::ApiPtr api = Api::createApiForTest();
