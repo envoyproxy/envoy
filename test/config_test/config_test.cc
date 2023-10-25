@@ -41,8 +41,8 @@ namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
 OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
-  return Envoy::Server::createTestOptionsImpl("", api.fileSystem().fileReadToEnd(src.configPath()),
-                                              src.localAddressIpVersion());
+  return Envoy::Server::createTestOptionsImpl(
+      "", api.fileSystem().fileReadToEnd(src.configPath()).value(), src.localAddressIpVersion());
 }
 
 static std::vector<absl::string_view> unsuported_win32_configs = {
@@ -65,7 +65,7 @@ public:
       return api_->threadFactory();
     }));
     ON_CALL(file_system_, fileReadToEnd(_))
-        .WillByDefault(Invoke([&](const std::string& file) -> std::string {
+        .WillByDefault(Invoke([&](const std::string& file) -> absl::StatusOr<std::string> {
           return api_->fileSystem().fileReadToEnd(file);
         }));
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
@@ -126,9 +126,9 @@ public:
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context)
-                -> std::vector<Network::FilterFactoryCb> {
+                -> Filter::NetworkFilterFactoriesList {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, context);
+                  filters, context, network_config_provider_manager_);
             }));
     ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
         .WillByDefault(Return(&tcp_listener_config_provider_manager_));
@@ -181,6 +181,7 @@ public:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
+  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 

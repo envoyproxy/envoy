@@ -18,9 +18,9 @@ load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
 
 # go version for rules_go
-GO_VERSION = "1.18"
+GO_VERSION = "1.20"
 
-JQ_VERSION = "1.6"
+JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
 
 def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION):

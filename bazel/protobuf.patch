@@ -5,7 +5,7 @@ index 0f6e41e3a..c0d2bbccf 100644
 @@ -454,14 +454,79 @@ cc_library(
      visibility = ["//visibility:public"],
  )
- 
+
 +# Envoy: Patch
 +
  cc_binary(
@@ -16,7 +16,7 @@ index 0f6e41e3a..c0d2bbccf 100644
      visibility = ["//visibility:public"],
      deps = ["//src/google/protobuf/compiler:protoc_lib"],
  )
- 
+
 +# Lifted from `rules_proto`
 +config_setting(
 +    name = "linux-aarch_64",
@@ -89,8 +89,8 @@ index e7555ee10..a93beb1c5 100644
 +++ b/python/google/protobuf/__init__.py
 @@ -31,3 +31,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
- 
- __version__ = '4.23.1'
+
+ __version__ = '4.23.4'
 +
 +
 +if __name__ != '__main__':
@@ -109,7 +109,7 @@ diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.b
 +        "//conditions:default": ["//external:zlib"],
      }),
  )
- 
+
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
 --- a/src/google/protobuf/port_def.inc	2023-06-27 01:17:34.917105764 +0000
 +++ b/src/google/protobuf/port_def.inc	2023-06-27 01:18:12.069060142 +0000
@@ -138,11 +138,38 @@ diff --git a/src/google/protobuf/map_field.h b/src/google/protobuf/map_field.h
 --- a/src/google/protobuf/map_field.h	2023-06-30 17:14:18.934528580 +0000
 +++ b/src/google/protobuf/map_field.h	2023-06-30 17:14:52.098500807 +0000
 @@ -345,7 +345,7 @@
- 
+
   protected:
    // "protected" stops users from deleting a `MapFieldBase *`
 -  ~MapFieldBase();
 +  virtual ~MapFieldBase();
- 
+
   public:
    // Returns reference to internal repeated field. Data written using
+diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
+--- a/src/google/protobuf/compiler/BUILD.bazel
++++ b/src/google/protobuf/compiler/BUILD.bazel
+@@ -306,7 +306,7 @@
+     srcs = ["retention.cc"],
+     hdrs = ["retention.h"],
+     include_prefix = "google/protobuf/compiler",
+-    visibility = ["//src/google/protobuf:__subpackages__"],
++    visibility = ["//visibility:public"],
+     deps = [
+         "//src/google/protobuf:protobuf_nowkt",
+         "@com_google_absl//absl/types:span",
+
+diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
+index 1c6a24945..c27d0bf2a 100644
+--- a/src/google/protobuf/port_def.inc
++++ b/src/google/protobuf/port_def.inc
+@@ -1062,6 +1062,9 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
+ #pragma warning(disable: 4125)
+ #endif
+
++#if defined(__GNUC__)
++#pragma GCC diagnostic ignored "-Wundef"
++#endif
+ #if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
+ #define PROTOBUF_DEBUG true
+ #else

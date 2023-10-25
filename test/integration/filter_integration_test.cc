@@ -121,10 +121,6 @@ TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(FilterIntegrationTest, AddBodyToRequestAndWaitForIt) {
-  // Make sure one end to end test verifies the old path with runtime singleton,
-  // to check for regressions.
-  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "false");
-
   prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");
@@ -188,19 +184,15 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(40, 58, 40, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(0, 58, 0, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                         BytesCountExpectation(40, 58, 40, 58),
+                                         BytesCountExpectation(7, 10, 7, 8));
   }
 }
 
-TEST_P(FilterIntegrationTest, RoundTripTimeForUpstreamConnection) {
+TEST_P(FilterIntegrationTest, RoundTripTimeForDownstreamConnection) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.refresh_rtt_after_request", "true");
+
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
   )EOF");
@@ -208,19 +200,39 @@ TEST_P(FilterIntegrationTest, RoundTripTimeForUpstreamConnection) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Send a headers only request.
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
+  // Send first request.
+  {
+    // Send a headers only request.
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
 
-  // Make sure that the body was injected to the request.
-  EXPECT_TRUE(upstream_request_->complete());
+    // Make sure that the body was injected to the request.
+    EXPECT_TRUE(upstream_request_->complete());
 
-  // Send a headers only response.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
+    // Send a headers only response.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
 
-  // Make sure that round trip time was populated
-  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
+    // Make sure that round trip time was populated
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
+  }
+
+  // Send second request.
+  {
+    // Send a headers only request.
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+
+    // Make sure that the body was injected to the request.
+    EXPECT_TRUE(upstream_request_->complete());
+
+    // Send a headers only response.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+
+    // Make sure that round trip time was populated
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
+  }
 }
 
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
@@ -669,7 +681,7 @@ name: passthrough-filter
   verifyUpStreamRequestAfterStopAllFilter();
 }
 
-// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
+// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(FilterIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
   prependFilter(R"EOF(
@@ -1227,10 +1239,6 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
 }
 
 TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeFilter) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {
-    return;
-  }
   prependFilter(R"EOF(
   name: assert-non-reentrant-filter
   )EOF");

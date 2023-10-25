@@ -59,6 +59,10 @@ public:
     }
     close(type);
   }
+
+  Network::DetectedCloseType detectedCloseType() const override {
+    return Network::DetectedCloseType::Normal;
+  }
   Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   // No-op. TCP_NODELAY doesn't apply to UDP.
@@ -173,6 +177,8 @@ protected:
                               quic::ConnectionCloseSource source,
                               const quic::ParsedQuicVersion& version);
 
+  // Apply delay close policy if there is any.
+  void maybeApplyDelayedClose();
   void closeConnectionImmediately() override;
 
   virtual bool hasDataToWrite() PURE;

@@ -27,7 +27,6 @@
 using namespace std::chrono_literals;
 using ::Envoy::AccessLog::FilterPtr;
 using ::Envoy::AccessLog::MockFilter;
-using envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig;
 using opentelemetry::proto::common::v1::AnyValue;
 using opentelemetry::proto::common::v1::KeyValueList;
 using opentelemetry::proto::logs::v1::LogRecord;
@@ -108,7 +107,7 @@ TEST_F(AccessLogTest, Marshalling) {
   stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
   stream_info.protocol_ = Http::Protocol::Http10;
   stream_info.addBytesReceived(10);
-  stream_info.response_code_ = 200;
+  stream_info.setResponseCode(200);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-header", "test-request-header"},

@@ -197,13 +197,15 @@ void SslSocket::onSuccess(SSL* ssl) {
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
-void SslSocket::onFailure(bool syscall_error_occurred) { drainErrorQueue(syscall_error_occurred); }
+void SslSocket::onFailure() { drainErrorQueue(); }
 
 PostIoAction SslSocket::doHandshake() { return info_->doHandshake(); }
 
-void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
+void SslSocket::drainErrorQueue() {
   bool saw_error = false;
   bool saw_counted_error = false;
+  bool new_ssl_failure_format = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.ssl_transport_failure_reason_format");
   while (uint64_t err = ERR_get_error()) {
     if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
       if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
@@ -221,31 +223,24 @@ void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
     saw_error = true;
 
     if (failure_reason_.empty()) {
-      failure_reason_ = "TLS error:";
+      failure_reason_ = new_ssl_failure_format ? "TLS_error:" : "TLS error:";
     }
-    failure_reason_.append(absl::StrCat(" ", err, ":",
-                                        absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
-                                        absl::NullSafeStringView(ERR_func_error_string(err)), ":",
-                                        absl::NullSafeStringView(ERR_reason_error_string(err))));
-  }
 
-  if (syscall_error_occurred) {
-    if (failure_reason_.empty()) {
-      failure_reason_ = "TLS error:";
-    }
-    failure_reason_.append(
-        "SSL_ERROR_SYSCALL error has occured, which indicates the operation failed externally to "
-        "the library. This is typically |errno| but may be something custom if using a custom "
-        "|BIO|. It may also be signaled if the transport returned EOF, in which case the "
-        "operation's return value will be zero.");
-    saw_error = true;
+    absl::StrAppend(&failure_reason_, new_ssl_failure_format ? "|" : " ", err, ":",
+                    absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
+                    absl::NullSafeStringView(ERR_func_error_string(err)), ":",
+                    absl::NullSafeStringView(ERR_reason_error_string(err)));
   }
 
   if (!failure_reason_.empty()) {
+    if (new_ssl_failure_format) {
+      absl::StrAppend(&failure_reason_, ":TLS_error_end");
+    }
     ENVOY_CONN_LOG(debug, "remote address:{},{}", callbacks_->connection(),
                    callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
                    failure_reason_);
   }
+
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }

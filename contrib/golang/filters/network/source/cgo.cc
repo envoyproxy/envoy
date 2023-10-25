@@ -23,6 +23,16 @@ std::string copyGoString(void* str) {
   return std::string{go_str->p, size_t(go_str->n)};
 }
 
+// The returned absl::string_view only refer to the GoString, won't copy the string content into
+// C++, should not use it after the current cgo call returns.
+absl::string_view referGoString(void* str) {
+  if (str == nullptr) {
+    return "";
+  }
+  auto go_str = reinterpret_cast<GoString*>(str);
+  return {go_str->p, static_cast<size_t>(go_str->n)};
+}
+
 enum class ConnectionInfoType {
   LocalAddr,
   RemoteAddr,
@@ -72,7 +82,7 @@ void envoyGoFilterDownstreamFinalize(void* f, int reason) {
   auto* wrapper = reinterpret_cast<FilterWrapper*>(f);
   FilterWeakPtr& weak_ptr = wrapper->filter_ptr_;
   if (FilterSharedPtr filter = weak_ptr.lock()) {
-    // make sure that the deconstructor is also executed by envoy wrk thread.
+    // make sure that the deconstructor is also executed by envoy work thread.
     filter->dispatcher()->post([wrapper] { delete wrapper; });
   } else {
     // the Filter is already deleted, just release the wrapper.
@@ -106,10 +116,11 @@ CAPIStatus envoyGoFilterDownstreamInfo(void* f, int info_type, void* ret) {
 // Upstream
 //
 
-void* envoyGoFilterUpstreamConnect(void* library_id, void* addr) {
+void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, uint64_t conn_id) {
   std::string id = copyGoString(library_id);
   auto dynamic_lib = Dso::DsoManager<Dso::NetworkFilterDsoImpl>::getDsoByID(id);
-  UpstreamConnPtr conn_ptr = std::make_shared<UpstreamConn>(copyGoString(addr), dynamic_lib);
+  UpstreamConnPtr conn_ptr =
+      std::make_shared<UpstreamConn>(copyGoString(addr), dynamic_lib, conn_id);
   // the upstream connect wrapper will be deleted by envoyGoFilterUpstreamFinalize
   UpstreamConnWrapper* wrapper = new UpstreamConnWrapper(conn_ptr);
   conn_ptr->setWrapper(wrapper);
@@ -146,7 +157,7 @@ void envoyGoFilterUpstreamFinalize(void* u, int reason) {
   UNREFERENCED_PARAMETER(reason);
   auto* wrapper = reinterpret_cast<UpstreamConnWrapper*>(u);
   UpstreamConnPtr& conn_ptr = wrapper->conn_ptr_;
-  // make sure that the deconstructor is also executed by envoy wrk thread
+  // make sure that the deconstructor is also executed by envoy work thread
   conn_ptr->dispatcher()->post([wrapper] { delete wrapper; });
 }
 
@@ -167,6 +178,29 @@ CAPIStatus envoyGoFilterUpstreamInfo(void* u, int info_type, void* ret) {
   goStr->p = wrapper->str_value_.data();
   goStr->n = wrapper->str_value_.length();
   return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus envoyGoFilterSetFilterState(void* f, void* key, void* value, int state_type,
+                                       int life_span, int stream_sharing) {
+  auto* wrapper = reinterpret_cast<FilterWrapper*>(f);
+  FilterWeakPtr& weak_ptr = wrapper->filter_ptr_;
+  if (FilterSharedPtr f = weak_ptr.lock()) {
+    auto key_str = referGoString(key);
+    auto value_str = referGoString(value);
+    return f->setFilterState(key_str, value_str, state_type, life_span, stream_sharing);
+  }
+  return CAPIStatus::CAPIFilterIsGone;
+}
+
+CAPIStatus envoyGoFilterGetFilterState(void* f, void* key, void* value) {
+  auto* wrapper = reinterpret_cast<FilterWrapper*>(f);
+  FilterWeakPtr& weak_ptr = wrapper->filter_ptr_;
+  if (FilterSharedPtr f = weak_ptr.lock()) {
+    auto key_str = referGoString(key);
+    auto value_str = reinterpret_cast<GoString*>(value);
+    return f->getFilterState(key_str, value_str);
+  }
+  return CAPIStatus::CAPIFilterIsGone;
 }
 
 } // extern "C"

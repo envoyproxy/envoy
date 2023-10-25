@@ -1,1 +1,1 @@
-FROM apache/skywalking-oap-server:latest@sha256:d6e31cfa23bd8f0fd2a69e1fa9b80199f28a44eab514076e02b332fed1064f41
+FROM apache/skywalking-oap-server:latest@sha256:bb29cafa89438686eb888f2bc3ba92d38e1bebb64957ff7c53e631bc550ac739

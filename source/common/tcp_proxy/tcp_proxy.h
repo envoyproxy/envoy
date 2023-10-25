@@ -374,6 +374,7 @@ class PerConnectionCluster : public StreamInfo::FilterState::Object {
 public:
   PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
+  absl::optional<std::string> serializeAsString() const override { return cluster_; }
   static const std::string& key();
 
 private:
@@ -420,6 +421,10 @@ public:
   }
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
+  }
+
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &read_callbacks_->connection().streamInfo();
   }
 
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {

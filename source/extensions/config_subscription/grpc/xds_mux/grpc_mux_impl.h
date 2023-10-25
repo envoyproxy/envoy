@@ -21,6 +21,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/grpc/common.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_stream.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
@@ -59,14 +60,8 @@ class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
                     public ShutdownableMux,
                     Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
-              const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
-              Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
-              XdsConfigTrackerOptRef xds_config_tracker,
-              XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
-              const std::string& target_xds_authority = "");
+  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, GrpcMuxContext& grpc_mux_context,
+              bool skip_subsequent_node);
 
   ~GrpcMuxImpl() override;
 
@@ -106,6 +101,10 @@ public:
   void onDiscoveryResponse(std::unique_ptr<RS>&& message,
                            ControlPlaneStats& control_plane_stats) override {
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
+  }
+
+  EdsResourcesCacheOptRef edsResourcesCache() override {
+    return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
   GrpcStream<RQ, RS>& grpcStreamForTest() { return grpc_stream_; }
@@ -209,8 +208,10 @@ private:
   CustomConfigValidatorsPtr config_validators_;
   XdsConfigTrackerOptRef xds_config_tracker_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
+  EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
 
+  bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
   std::atomic<bool> shutdown_{false};
@@ -220,11 +221,7 @@ class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptio
                                         envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
-  GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-               const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
-               const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
-               bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-               BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker);
+  GrpcMuxDelta(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -235,13 +232,7 @@ class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionSt
                                        envoy::service::discovery::v3::DiscoveryRequest,
                                        envoy::service::discovery::v3::DiscoveryResponse> {
 public:
-  GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-              const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
-              bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-              BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
-              XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
-              const std::string& target_xds_authority = "");
+  GrpcMuxSotw(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -267,6 +258,8 @@ public:
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
+
+  EdsResourcesCacheOptRef edsResourcesCache() override { return {}; }
 };
 
 } // namespace XdsMux

@@ -133,17 +133,9 @@ uint64_t fractionalPercentDenominatorToInt(
 
 namespace Envoy {
 
-/**
- * Exception class for rejecting a deprecated major version.
- */
-class DeprecatedMajorVersionException : public EnvoyException {
-public:
-  DeprecatedMajorVersionException(const std::string& message) : EnvoyException(message) {}
-};
-
 class MissingFieldException : public EnvoyException {
 public:
-  MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
+  MissingFieldException(const std::string& message);
 };
 
 class TypeUtil {
@@ -170,6 +162,7 @@ public:
   template <class ProtoType>
   static std::size_t hash(const Protobuf::RepeatedPtrField<ProtoType>& source) {
     std::string text;
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     {
       Protobuf::TextFormat::Printer printer;
       printer.SetExpandAny(true);
@@ -182,6 +175,11 @@ public:
         absl::StrAppend(&text, text_message);
       }
     }
+#else
+    for (const auto& message : source) {
+      absl::StrAppend(&text, message.SerializeAsString());
+    }
+#endif
     return HashUtil::xxHash64(text);
   }
 
@@ -198,7 +196,7 @@ public:
     std::transform(repeated_field.begin(), repeated_field.end(), std::back_inserter(ret_container),
                    [](const ProtoType& proto_message) -> std::unique_ptr<const Protobuf::Message> {
                      Protobuf::Message* clone = proto_message.New();
-                     clone->MergeFrom(proto_message);
+                     clone->CheckTypeAndMergeFrom(proto_message);
                      return std::unique_ptr<const Protobuf::Message>(clone);
                    });
     return ret_container;
@@ -207,7 +205,7 @@ public:
 
 class ProtoValidationException : public EnvoyException {
 public:
-  ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
+  ProtoValidationException(const std::string& message);
 };
 
 /**
@@ -352,6 +350,17 @@ public:
   }
 
   /**
+   * Convert from a typed message into a google.protobuf.Any. This should be used
+   * instead of the inbuilt PackTo, as PackTo is not available with lite protos.
+   *
+   * @param any_message destination google.protobuf.Any.
+   * @param message source to pack from.
+   *
+   * @throw EnvoyException if the message does not unpack.
+   */
+  static void packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message);
+
+  /**
    * Convert from google.protobuf.Any to a typed message. This should be used
    * instead of the inbuilt UnpackTo as it performs validation of results.
    *
@@ -446,10 +455,12 @@ public:
    */
   static inline std::string getStringField(const Protobuf::Message& message,
                                            const std::string& field_name) {
-    const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
+    const Protobuf::Descriptor* descriptor = reflectable_message->GetDescriptor();
     const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
-    const Protobuf::Reflection* reflection = message.GetReflection();
-    return reflection->GetString(message, name_field);
+    const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
+    return reflection->GetString(*reflectable_message, name_field);
+    return name_field->name();
   }
 
 #ifdef ENVOY_ENABLE_YAML

@@ -1,0 +1,19 @@
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-go
+      args:
+        ENVOY_VARIANT: contrib-dev
+    depends_on:
+    - echo_service
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+
+  echo_service:
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
+    hostname: echo_service

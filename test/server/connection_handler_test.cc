@@ -50,7 +50,9 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
+class ConnectionHandlerTest : public testing::Test,
+                              protected Logger::Loggable<Logger::Id::main>,
+                              public Event::TestUsingSimulatedTime {
 public:
   ConnectionHandlerTest()
       : handler_(new ConnectionHandlerImpl(dispatcher_, 0)),
@@ -61,7 +63,7 @@ public:
         .WillByDefault(ReturnPointee(std::shared_ptr<Network::DownstreamTransportSocketFactory>{
             Network::Test::createRawBufferDownstreamSocketFactory()}));
     ON_CALL(*filter_chain_, networkFilterFactories)
-        .WillByDefault(ReturnPointee(std::make_shared<std::vector<Network::FilterFactoryCb>>()));
+        .WillByDefault(ReturnPointee(std::make_shared<Filter::NetworkFilterFactoriesList>()));
     ON_CALL(*listener_filter_matcher_, matches(_)).WillByDefault(Return(false));
   }
 
@@ -319,34 +321,26 @@ public:
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
         .WillOnce(Return(listeners_.back()->sockets_[0]));
     if (socket_type == Network::Socket::Type::Stream) {
-      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
-          .WillOnce(Invoke(
-              [listener, listener_callbacks](Network::SocketSharedPtr&&,
-                                             Network::TcpListenerCallbacks& cb, Runtime::Loader&,
-                                             const Network::ListenerConfig&) -> Network::Listener* {
-                if (listener_callbacks != nullptr) {
-                  *listener_callbacks = &cb;
-                }
-                return listener;
-              }));
+      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
+          .WillOnce(Invoke([listener, listener_callbacks](
+                               Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
+                               Runtime::Loader&, const Network::ListenerConfig&,
+                               Server::ThreadLocalOverloadStateOptRef) -> Network::Listener* {
+            if (listener_callbacks != nullptr) {
+              *listener_callbacks = &cb;
+            }
+            return listener;
+          }));
     } else {
-      EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
-          .WillOnce(
-              Invoke([listener, &test_listener = listeners_.back()](
-                         Network::SocketSharedPtr&& socket,
-                         Network::UdpListenerCallbacks& udp_listener_callbacks,
-                         const envoy::config::core::v3::UdpSocketConfig&) -> Network::UdpListener* {
-                test_listener->udp_listener_callback_map_.emplace(
-                    socket->connectionInfoProvider().localAddress()->asString(),
-                    &udp_listener_callbacks);
-                return dynamic_cast<Network::UdpListener*>(listener);
-              }));
+      delete listener;
       if (address == nullptr) {
         listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
-            local_address_->asString(), std::make_unique<Network::UdpListenerWorkerRouterImpl>(1));
+            local_address_->asString(),
+            std::make_unique<NiceMock<Network::MockUdpListenerWorkerRouter>>());
       } else {
         listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
-            address->asString(), std::make_unique<Network::UdpListenerWorkerRouterImpl>(1));
+            address->asString(),
+            std::make_unique<NiceMock<Network::MockUdpListenerWorkerRouter>>());
       }
     }
 
@@ -388,11 +382,12 @@ public:
       test_listener_raw_ptr->sockets_[i]->connection_info_provider_->setLocalAddress(addresses[i]);
 
       if (socket_type == Network::Socket::Type::Stream) {
-        EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+        EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
             .WillOnce(
                 Invoke([i, &mock_listeners, &listener_callbacks_map](
                            Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                           Runtime::Loader&, const Network::ListenerConfig&) -> Network::Listener* {
+                           Runtime::Loader&, const Network::ListenerConfig&,
+                           Server::ThreadLocalOverloadStateOptRef) -> Network::Listener* {
                   auto listener_callbacks_iter = listener_callbacks_map.find(
                       socket->connectionInfoProvider().localAddress()->asString());
                   EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
@@ -401,20 +396,9 @@ public:
                 }))
             .RetiresOnSaturation();
       } else {
-        EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
-            .WillOnce(Invoke(
-                [i, &mock_listeners, &test_listener = listeners_.back()](
-                    Network::SocketSharedPtr&& socket,
-                    Network::UdpListenerCallbacks& udp_listener_callbacks,
-                    const envoy::config::core::v3::UdpSocketConfig&) -> Network::UdpListener* {
-                  test_listener->udp_listener_callback_map_.emplace(
-                      socket->connectionInfoProvider().localAddress()->asString(),
-                      &udp_listener_callbacks);
-                  return dynamic_cast<Network::UdpListener*>(mock_listeners[i]);
-                }))
-            .RetiresOnSaturation();
         listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
-            addresses[i]->asString(), std::make_unique<Network::MockUdpListenerWorkerRouter>());
+            addresses[i]->asString(),
+            std::make_unique<NiceMock<Network::MockUdpListenerWorkerRouter>>());
       }
 
       if (disable_listener) {
@@ -630,17 +614,17 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 }
 
@@ -676,18 +660,18 @@ TEST_F(ConnectionHandlerTest, RemoveListenerWithMultiAddrs) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList()).Times(2);
   handler_->removeListeners(1);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 }
 
@@ -814,10 +798,10 @@ TEST_F(ConnectionHandlerTest, StopAndDisableStoppedListener) {
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   // Test stop a stopped listener.
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   // Test disable a stopped listener.
   handler_->disableListeners();
@@ -1156,7 +1140,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   // This emulated the case of update listener in-place. Stop the old listener and
   // add the new listener.
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
+  handler_->stopListeners(2, {});
   handler_->addListener(absl::nullopt, *test_listener3, runtime_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
@@ -1220,7 +1204,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
 
   // Stop the listener2.
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
+  handler_->stopListeners(2, {});
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1280,7 +1264,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
 
   // Stop the listener2.
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
+  handler_->stopListeners(2, {});
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -2122,8 +2106,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(io_handle, recv(_, _, _))
-      .WillOnce(Return(ByMove(
-          Api::IoCallUint64Result(max_size, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(max_size, Api::IoError::none()))));
   EXPECT_CALL(*test_filter, onData(_))
       .WillOnce(Invoke([](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
         return Network::FilterStatus::Continue;
@@ -2229,25 +2212,30 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilter) {
   InSequence s;
 
   auto listener = new NiceMock<Network::MockUdpListener>();
+  EXPECT_CALL(*listener, onDestroy());
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, nullptr, nullptr, nullptr, nullptr,
                   Network::Socket::Type::Datagram, std::chrono::milliseconds());
-  EXPECT_CALL(factory_, createUdpListenerFilterChain(_, _))
-      .WillOnce(Invoke([&](Network::UdpListenerFilterManager&,
-                           Network::UdpReadFilterCallbacks&) -> bool { return true; }));
   EXPECT_CALL(test_listener->socketFactory(), localAddress())
       .WillRepeatedly(ReturnRef(local_address_));
+
+  Network::UdpListenerCallbacks* callbacks = nullptr;
+  auto udp_listener_worker_router = static_cast<Network::MockUdpListenerWorkerRouter*>(
+      test_listener->udp_listener_config_->listener_worker_router_map_
+          .find(local_address_->asString())
+          ->second.get());
+  EXPECT_CALL(*udp_listener_worker_router, registerWorkerForListener(_))
+      .WillOnce(Invoke([&](Network::UdpListenerCallbacks& cb) -> void {
+        EXPECT_CALL(*udp_listener_worker_router, unregisterWorkerForListener(_));
+        callbacks = &cb;
+      }));
 
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
   // Make sure these calls don't crash.
   Network::UdpRecvData data;
-  test_listener->udp_listener_callback_map_.find(local_address_->asString())
-      ->second->onData(std::move(data));
-  test_listener->udp_listener_callback_map_.find(local_address_->asString())
-      ->second->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
-
-  EXPECT_CALL(*listener, onDestroy());
+  callbacks->onData(std::move(data));
+  callbacks->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
 }
 
 TEST_F(ConnectionHandlerTest, UdpListenerWorkerRouterWithMultipleAddresses) {
@@ -2287,6 +2275,8 @@ TEST_F(ConnectionHandlerTest, UdpListenerWorkerRouterWithMultipleAddresses) {
   EXPECT_CALL(*udp_listener_worker_router2, unregisterWorkerForListener(_));
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
+  delete mock_listeners[0];
+  delete mock_listeners[1];
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
@@ -2403,7 +2393,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(listener_tag);
+  handler_->stopListeners(listener_tag, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   EXPECT_CALL(*access_log_, log(_, _, _, _, _));
@@ -2455,18 +2445,18 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveListener) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 }
 
@@ -2487,7 +2477,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv6AnyAddressWithIpv4CompatListe
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
@@ -2516,7 +2506,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv4CompatAddressListener) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
@@ -2559,7 +2549,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
 
   // Remove Listener1 first.
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
@@ -2570,7 +2560,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
 
   // Now remove Listener2.
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
+  handler_->stopListeners(2, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(2);
@@ -2639,7 +2629,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
   EXPECT_CALL(*listener, onDestroy());
 }
 
-// The read_filter should be deleted before the udp_listener is deleted.
+// Tests shutdown does not cause problems.
 TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
   InSequence s;
 
@@ -2662,9 +2652,6 @@ TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
 
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
   handler_->stopListeners();
-
-  ASSERT_TRUE(deleted_before_listener_)
-      << "The read_filter_ should be deleted before the udp_listener_ is deleted.";
 }
 
 } // namespace

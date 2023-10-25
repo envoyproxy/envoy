@@ -198,6 +198,9 @@ public:
   MOCK_METHOD(void, healthFlagsSetAll, (uint32_t));
   MOCK_METHOD(Host::Health, coarseHealth, (), (const));
   MOCK_METHOD(Host::HealthStatus, healthStatus, (), (const));
+  MOCK_METHOD(Host::HealthStatus, edsHealthStatus, (), (const));
+  MOCK_METHOD(void, setEdsHealthStatus, (Host::HealthStatus), ());
+
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));

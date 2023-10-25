@@ -126,13 +126,6 @@ public:
   static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
-   * Validates the provided scheme is valid (either http or https)
-   * @param scheme the scheme to validate
-   * @return bool true if the scheme is valid.
-   */
-  static bool schemeIsValid(const absl::string_view scheme);
-
-  /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
@@ -174,7 +167,12 @@ public:
   /**
    * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
    */
-  static bool isConnectUdp(const RequestHeaderMap& headers);
+  static bool isConnectUdpRequest(const RequestHeaderMap& headers);
+
+  /**
+   * @brief a helper function to determine if the headers represent a CONNECT-UDP response.
+   */
+  static bool isConnectUdpResponse(const ResponseHeaderMap& headers);
 
   /**
    * @brief a helper function to determine if the headers represent an accepted CONNECT response.

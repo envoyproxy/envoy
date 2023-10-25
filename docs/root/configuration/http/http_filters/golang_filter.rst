@@ -12,13 +12,6 @@ See the `Envoy's Golang extension proposal documentation
 <https://docs.google.com/document/d/1noApyS0IfmOGmEOHdWk2-BOp0V37zgXMM4MdByr1lQk/edit?usp=sharing>`_
 for more details on the filter's implementation.
 
-.. warning::
-  The Envoy Golang filter is designed to be run with the ``GODEBUG=cgocheck=0`` environment variable set.
-
-  This disables the cgo pointer check.
-
-  Failure to set this environment variable will cause Envoy to crash!
-
 Developing a Go plugin
 ----------------------
 
@@ -136,4 +129,4 @@ Go plugins can also be configured on a
 Complete example
 ----------------
 
-Learn more about building and running a plugin for the Envoy Go filter in the step by step :ref:`Envoy Go Sandbox <install_sandboxes_golang>`.
+Learn more about building and running a plugin for the Envoy Go filter in the step by step :ref:`Envoy Go Sandbox <install_sandboxes_golang_http>`.

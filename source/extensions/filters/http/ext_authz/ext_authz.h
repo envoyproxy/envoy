@@ -60,9 +60,15 @@ public:
                const std::string& stats_prefix, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
+        failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
-        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
+
+        // `pack_as_bytes_` should be true when configured with an http service because there is no
+        // difference to where the body is written in http requests, and a value of false here will
+        // cause non UTF-8 body content to be changed when it doesn't need to.
+        pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
+
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -127,6 +133,8 @@ public:
   bool withRequestBody() const { return max_request_bytes_ > 0; }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
@@ -200,6 +208,7 @@ private:
 
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
+  const bool failure_mode_allow_header_add_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
@@ -314,7 +323,7 @@ private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
-  bool isBufferFull() const;
+  bool isBufferFull(uint64_t num_bytes_processing) const;
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {

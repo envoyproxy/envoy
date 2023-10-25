@@ -58,8 +58,8 @@ public:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, *stats_store_.rootScope(), runtime_, http_context_,
-                                   "ext_authz_prefix", bootstrap_));
+    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(), runtime_,
+                                             http_context_, "ext_authz_prefix", bootstrap_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -363,6 +363,7 @@ TEST_F(HttpFilterTest, ErrorOpen) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: true
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -400,6 +401,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: true
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -433,13 +435,9 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), "true");
 }
 
-// Test when failure_mode_allow is set with runtime flag closed and the response from the
+// Test when failure_mode_allow is set with header add closed and the response from the
 // authorization service is Error that the request is allowed to continue.
-TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add", "false"}});
-
+TEST_F(HttpFilterTest, ErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
@@ -448,6 +446,7 @@ TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: false
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -474,13 +473,9 @@ TEST_F(HttpFilterTest, ErrorOpenWithRuntimeFlagClose) {
   EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), EMPTY_STRING);
 }
 
-// Test when failure_mode_allow is set with runtime flag closed and the response from the
+// Test when failure_mode_allow is set with header add closed and the response from the
 // authorization service is an immediate Error that the request is allowed to continue.
-TEST_F(HttpFilterTest, ImmediateErrorOpenWithRuntimeFlagClose) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add", "false"}});
-
+TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
   InSequence s;
 
   initialize(R"EOF(
@@ -489,6 +484,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithRuntimeFlagClose) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
+  failure_mode_allow_header_add: false
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -586,6 +582,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -594,17 +592,20 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  data_.add("foo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+  data_.add(buffer1.toString());
 
-  data_.add("bar");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer2("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer2, false));
+  data_.add(buffer2.toString());
 
-  data_.add("barfoo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer3("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer3, false));
+  data_.add(buffer3.toString());
 
-  data_.add("more data after watermark is set is possible");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  Buffer::OwnedImpl buffer4("more data after watermark is set is possible");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer4, true));
 
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 }
@@ -629,6 +630,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -645,24 +648,28 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  data_.add("foo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+  data_.add(buffer1.toString());
 
-  data_.add("bar");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer2("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer2, false));
+  data_.add(buffer2.toString());
 
-  data_.add("barfoo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer3("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer3, false));
+  // data added by the previous decodeData call.
 
-  data_.add("more data after watermark is set is possible");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer4("more data after watermark is set is possible");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer4, false));
+  data_.add(buffer4.toString());
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  data_.add("more data after calling check request");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  Buffer::OwnedImpl buffer5("more data after calling check request");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer5, true));
 
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 }
@@ -686,6 +693,8 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -694,8 +703,9 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  data_.add("foo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+  data_.add(buffer.toString());
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 }
 
@@ -713,6 +723,8 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
@@ -726,10 +738,15 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-  data_.add("foo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
-  data_.add("bar");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+  data_.add(buffer1.toString());
+
+  Buffer::OwnedImpl buffer2("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer2, true));
+  // data added by the previous decodeData call.
+
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 
   EXPECT_EQ(data_.length(), check_request.attributes().request().http().body().size());
@@ -751,6 +768,8 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
@@ -768,10 +787,13 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   uint8_t raw[1] = {0xc0};
   Buffer::OwnedImpl raw_buffer(raw, 1);
 
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(raw_buffer, false));
   data_.add(raw_buffer);
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
-  data_.add(raw_buffer);
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark,
+            filter_->decodeData(raw_buffer, true));
+  // data added by the previous decodeData call.
+
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0, check_request.attributes().request().http().body().size());
@@ -1348,6 +1370,142 @@ TEST_F(HttpFilterTest, MetadataContext) {
 
   EXPECT_EQ(
       0, check_request.attributes().metadata_context().typed_filter_metadata().count("rock.bass"));
+}
+
+// Verifies that specified connection metadata is passed along in the check request
+TEST_F(HttpFilterTest, ConnectionMetadataContext) {
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  metadata_context_namespaces:
+  - connection.and.request.have.data
+  - connection.has.data
+  - request.has.data
+  - neither.have.data
+  - untyped.and.typed.connection.data
+  - typed.connection.data
+  - untyped.connection.data
+  typed_metadata_context_namespaces:
+  - untyped.and.typed.connection.data
+  - typed.connection.data
+  - untyped.connection.data
+  )EOF");
+
+  const std::string request_yaml = R"EOF(
+  filter_metadata:
+    connection.and.request.have.data:
+      data: request
+    request.has.data:
+      data: request
+  )EOF";
+
+  const std::string connection_yaml = R"EOF(
+  filter_metadata:
+    connection.and.request.have.data:
+      data: connection_untyped
+    connection.has.data:
+      data: connection_untyped
+    untyped.and.typed.connection.data:
+      data: connection_untyped
+    untyped.connection.data:
+      data: connection_untyped
+    not.selected.data:
+      data: connection_untyped
+  typed_filter_metadata:
+    untyped.and.typed.connection.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+    typed.connection.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+    not.selected.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+  )EOF";
+
+  prepareCheck();
+
+  envoy::config::core::v3::Metadata request_metadata, connection_metadata;
+  TestUtility::loadFromYaml(request_yaml, request_metadata);
+  TestUtility::loadFromYaml(connection_yaml, connection_metadata);
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(request_metadata));
+  connection_.stream_info_.metadata_ = connection_metadata;
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+
+  filter_->decodeHeaders(request_headers_, false);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+
+  EXPECT_EQ("request", check_request.attributes()
+                           .metadata_context()
+                           .filter_metadata()
+                           .at("connection.and.request.have.data")
+                           .fields()
+                           .at("data")
+                           .string_value());
+
+  EXPECT_EQ("request", check_request.attributes()
+                           .metadata_context()
+                           .filter_metadata()
+                           .at("request.has.data")
+                           .fields()
+                           .at("data")
+                           .string_value());
+
+  EXPECT_EQ("connection_untyped", check_request.attributes()
+                                      .metadata_context()
+                                      .filter_metadata()
+                                      .at("connection.has.data")
+                                      .fields()
+                                      .at("data")
+                                      .string_value());
+
+  EXPECT_EQ("connection_untyped", check_request.attributes()
+                                      .metadata_context()
+                                      .filter_metadata()
+                                      .at("untyped.and.typed.connection.data")
+                                      .fields()
+                                      .at("data")
+                                      .string_value());
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count(
+                   "neither.have.data"));
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count(
+                   "not.selected.data"));
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count(
+                   "typed.connection.data"));
+
+  helloworld::HelloRequest hello;
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("typed.connection.data")
+      .UnpackTo(&hello);
+  EXPECT_EQ("connection_typed", hello.name());
+
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("untyped.and.typed.connection.data")
+      .UnpackTo(&hello);
+  EXPECT_EQ("connection_typed", hello.name());
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
+                   "untyped.connection.data"));
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
+                   "not.selected.data"));
 }
 
 // Test that filter can be disabled via the filter_enabled field.
@@ -2104,6 +2262,14 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {
   const std::string original_path{"/users?leave-me=alone"};
   const std::string expected_path{"/users?leave-me=alone"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{"remove-me"};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithRepeatedUnmodifiedQueryParameters) {
+  const std::string original_path{"/users?leave-me=alone&leave-me=in-peace"};
+  const std::string expected_path{"/users?leave-me=alone&leave-me=in-peace"};
   const Http::Utility::QueryParamsVector add_me{};
   const std::vector<std::string> remove_me{"remove-me"};
   queryParameterTest(original_path, expected_path, add_me, remove_me);

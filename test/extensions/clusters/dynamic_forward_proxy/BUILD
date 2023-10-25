@@ -14,15 +14,13 @@ envoy_package()
 envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
-    args = [
-        # Force creation of c-ares DnsResolverImpl when running test on macOS.
-        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
-    ],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",

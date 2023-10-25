@@ -122,6 +122,9 @@ protected:
       }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
+      Network::DetectedCloseType detectedCloseType() const override {
+        return Network::DetectedCloseType::Normal;
+      };
       Event::Dispatcher& dispatcher() const override { return dispatcher_; }
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}
@@ -209,8 +212,8 @@ public:
           http_connection_manager_(parent.http_connection_manager_factory_(read_callbacks_)) {}
     ~ApiListenerWrapper() override;
 
-    Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
-                                    bool is_internally_created = false) override;
+    Http::RequestDecoderHandlePtr newStreamHandle(Http::ResponseEncoder& response_encoder,
+                                                  bool is_internally_created = false) override;
 
     SyntheticReadCallbacks& readCallbacks() { return read_callbacks_; }
 

@@ -17,21 +17,6 @@ using Envoy::Api::SysCallSizeResult;
 namespace Envoy {
 
 namespace {
-/**
- * On different platforms the sockaddr struct for unix domain
- * sockets is different. We use this function to get the
- * length of the platform specific struct.
- */
-constexpr socklen_t udsAddressLength() {
-#if defined(__APPLE__)
-  return sizeof(sockaddr);
-#elif defined(WIN32)
-  return sizeof(sockaddr_un);
-#else
-  return sizeof(sa_family_t);
-#endif
-}
-
 constexpr int messageTypeContainsIP() {
 #ifdef IP_RECVDSTADDR
   return IP_RECVDSTADDR;
@@ -77,7 +62,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
   const int rc = Api::OsSysCallsSingleton::get().close(fd_).return_value_;
   SET_SOCKET_INVALID(fd_);
-  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  return {static_cast<unsigned long>(rc), Api::IoError::none()};
 }
 
 bool IoSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
@@ -234,6 +219,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    if (result.return_value_ < 0 && result.errno_ == SOCKET_ERROR_INVAL) {
+      ENVOY_LOG(error, fmt::format("EINVAL error. Socket is open: {}, IPv{}.", isOpen(),
+                                   self_ip->version() == Address::IpVersion::v6 ? 6 : 4));
+    }
     return sysCallResultToIoCallResult(result);
   }
 }
@@ -553,8 +542,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
-    throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
-                                     errorDetails(result.errno_)));
+    throwEnvoyExceptionOrPanic(fmt::format("getsockname failed for '{}': ({}) {}", fd_,
+                                           result.errno_, errorDetails(result.errno_)));
   }
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
@@ -567,18 +556,20 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
-  if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
+  if (static_cast<unsigned int>(ss_len) >=
+          (offsetof(sockaddr_storage, ss_family) + sizeof(ss.ss_family)) &&
+      ss.ss_family == AF_UNIX) {
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other
     // mechanisms to hide things, of which there are many).
     ss_len = sizeof(ss);
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
     if (result.return_value_ != 0) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }

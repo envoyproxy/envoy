@@ -5,7 +5,6 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/tcp/conn_pool.h"
@@ -14,10 +13,9 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/http/headers.h"
 #include "source/common/memory/utils.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
@@ -38,7 +36,7 @@ class UpstreamConn : public Tcp::ConnectionPool::Callbacks,
                      Logger::Loggable<Logger::Id::golang> {
 public:
   UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_lib,
-               Event::Dispatcher* dispatcher = nullptr);
+               unsigned long long int go_conn_id, Event::Dispatcher* dispatcher = nullptr);
   ~UpstreamConn() override {
     if (handler_) {
       handler_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
@@ -63,7 +61,7 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
 
   // Upstream::LoadBalancerContextBase
-  const Http::RequestHeaderMap* downstreamHeaders() const override { return header_map_.get(); };
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_.get(); }
 
   void connect();
   void write(Buffer::Instance& buf, bool end_stream);
@@ -97,9 +95,10 @@ private:
   }
 
   Dso::NetworkFilterDsoPtr dynamic_lib_{nullptr};
+  unsigned long long int go_conn_id_{0};
   UpstreamConnWrapper* wrapper_{nullptr};
   Event::Dispatcher* dispatcher_{nullptr};
-  std::unique_ptr<Http::RequestHeaderMapImpl> header_map_{nullptr};
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_{nullptr};
   Tcp::ConnectionPool::ConnectionDataPtr conn_{nullptr};
   Upstream::HostDescriptionConstSharedPtr host_{nullptr};
   Tcp::ConnectionPool::Cancellable* handler_{nullptr};

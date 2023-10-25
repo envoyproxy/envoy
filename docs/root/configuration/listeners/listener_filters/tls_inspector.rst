@@ -44,7 +44,7 @@ This filter has a statistics tree rooted at *tls_inspector* with the following s
     - Description
 
   * - client_hello_too_large
-    - counter
+    - Counter
     - total unreasonably large client hello received
 
   * - tls_found

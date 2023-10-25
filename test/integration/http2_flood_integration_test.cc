@@ -51,6 +51,7 @@ std::string testParamsToString(
 // destructor stops Envoy the SocketInterfaceSwap destructor needs to run after it. This order of
 // multiple inheritance ensures that SocketInterfaceSwap destructor runs after
 // Http2FrameIntegrationTest destructor completes.
+// TODO(#28841) parameterize to run with and without UHV
 class Http2FloodMitigationTest
     : public SocketInterfaceSwap,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http2Impl, bool>>,
@@ -70,6 +71,13 @@ public:
     setupHttp2ImplOverrides(std::get<1>(GetParam()));
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       deferredProcessing(GetParam()) ? "true" : "false");
+  }
+
+  void enableUhvRuntimeFeature() {
+#ifdef ENVOY_ENABLE_UHV
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                      "true");
+#endif
   }
 
 protected:
@@ -1113,6 +1121,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
+  enableUhvRuntimeFeature();
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
 
@@ -1232,6 +1241,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
+  enableUhvRuntimeFeature();
   initializeUpstreamFloodTest();
   // Send client request which will send an upstream request.
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1254,6 +1264,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
+  enableUhvRuntimeFeature();
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
@@ -1568,5 +1579,63 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamStormOnDownstreamCloseRegressi
   // Verify that the upstream connections are still active.
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
 }
+
+// This test validates fix for memory leak in nghttp2 that occurs when
+// nghttp2 processes RST_STREAM and GO_AWAY in the same I/O operation.
+// Max concurrent request should be limited to 1.
+// nghttp2 leaks HEADERS frame and bookkeeping structure.
+// The failure occurs in the ASAN build only due to leak checker.
+#ifndef WIN32
+// Windows does not support override of the socket connect() call
+TEST_P(Http2FloodMitigationTest, GoAwayAfterRequestReset) {
+  if (std::get<1>(GetParam()) != Http2Impl::Nghttp2) {
+    return;
+  }
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  // Limit concurrent requests to the upstream to 1
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options =
+        protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    http_protocol_options->mutable_max_concurrent_streams()->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response_1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // After we've got the first request at the upstream, make the connect() call return EAGAIN (and
+  // never connect). This will make the second request to hang in Envoy waiting for either the first
+  // connection to free up capacity (i.e. finish with the first request) or the second connection to
+  // connect, which will never happen.
+  auto* upstream = fake_upstreams_.front().get();
+  write_matcher_->setDestinationPort(upstream->localAddress()->ip()->port());
+  write_matcher_->setConnectBlock(true);
+
+  auto response_2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The RST_STREAM will cause the capacity to free up on the first connection and the second
+  // request to be scheduled on the first connection.
+  // The GOAWAY frame will cause nghttp2 to not send any more requests. Without the fix this
+  // leaks scheduled request and it is detected by ASAN run.
+  const auto rst_stream = Http2Frame::makeResetStreamFrame(Http2Frame::makeClientStreamId(0),
+                                                           Http2Frame::ErrorCode::NoError);
+  const auto go_away = Http2Frame::makeEmptyGoAwayFrame(0, Http2Frame::ErrorCode::NoError);
+  std::string buf(static_cast<std::string>(rst_stream));
+  buf.append(static_cast<std::string>(go_away));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, buf));
+
+  ASSERT_TRUE(response_1->waitForEndStream());
+  ASSERT_TRUE(response_2->waitForEndStream());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  EXPECT_EQ("503", response_1->headers().getStatusValue());
+  EXPECT_EQ("503", response_2->headers().getStatusValue());
+}
+#endif
 
 } // namespace Envoy

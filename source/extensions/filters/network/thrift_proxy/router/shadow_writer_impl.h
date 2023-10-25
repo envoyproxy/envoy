@@ -257,9 +257,10 @@ public:
   // Router::ShadowWriter
   Upstream::ClusterManager& clusterManager() override { return cm_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  absl::optional<std::reference_wrapper<ShadowRouterHandle>>
-  submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
-         TransportType original_transport, ProtocolType original_protocol) override;
+  OptRef<ShadowRouterHandle> submit(const std::string& cluster_name,
+                                    MessageMetadataSharedPtr metadata,
+                                    TransportType original_transport,
+                                    ProtocolType original_protocol) override;
 
 private:
   friend class ShadowRouterImpl;

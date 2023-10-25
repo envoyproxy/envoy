@@ -35,8 +35,10 @@ TEST(MutationUtils, TestBuildHeaders) {
   headers.addCopy(LowerCaseString("x-number"), 9999);
 
   envoy::config::core::v3::HeaderMap proto_headers;
-  std::vector<Matchers::StringMatcherPtr> header_matchers;
-  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
+  // Neither allow_headers nor disallow_headers is set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"},
                                           {":path", "/foo/the/bar?size=123"},
@@ -301,17 +303,19 @@ TEST(MutationUtils, TestAllowHeadersExactCaseSensitive) {
   };
 
   envoy::config::core::v3::HeaderMap proto_headers;
-  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  // allow_headers is set. disallow_headers is not.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
   envoy::type::matcher::v3::StringMatcher string_matcher;
   string_matcher.set_exact(":method");
-  header_matchers.push_back(
+  allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher));
   string_matcher.set_exact(":Path");
-  header_matchers.push_back(
+  allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher));
-  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}};
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
@@ -325,19 +329,86 @@ TEST(MutationUtils, TestAllowHeadersExactIgnoreCase) {
       {"x-something-else", "yes"},
   };
   envoy::config::core::v3::HeaderMap proto_headers;
-  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  // allow_headers is set. disallow_headers is not.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
   envoy::type::matcher::v3::StringMatcher string_matcher;
   string_matcher.set_exact(":method");
-  header_matchers.push_back(
+  allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher));
   string_matcher.set_exact(":Path");
   string_matcher.set_ignore_case(true);
-  header_matchers.push_back(
+  allow_headers.push_back(
       std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher));
-  MutationUtils::headersToProto(headers, header_matchers, proto_headers);
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST(MutationUtils, TestBothAllowAndDisallowHeadersSet) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // Both allow_headers and disallow_headers are set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+
+  // Set allow_headers.
+  string_matcher.set_exact(":method");
+  allow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":path");
+  allow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+
+  // Set disallow_headers
+  string_matcher.set_exact(":method");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{":path", "/foo/the/bar?size=123"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // allow_headers not set. disallow_headers set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+
+  // Set disallow_headers.
+  string_matcher.set_exact(":method");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":path");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{"content-type", "text/plain; encoding=UTF8"},
+                                          {"x-something-else", "yes"}};
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
 

@@ -21,7 +21,9 @@ std::string genSoPath(std::string name) {
 TEST(DsoInstanceTest, SimpleAPI) {
   auto path = genSoPath("simple.so");
   HttpFilterDsoPtr dso(new HttpFilterDsoImpl(path));
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 100), 100);
+  httpConfig* config = new httpConfig();
+  config->config_len = 100;
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(config), 100);
 }
 
 TEST(DsoManagerTest, Pub) {
@@ -41,7 +43,9 @@ TEST(DsoManagerTest, Pub) {
     // get after load http filter dso
     dso = DsoManager<HttpFilterDsoImpl>::getDsoByPluginName(plugin_name);
     EXPECT_NE(dso, nullptr);
-    EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 200), 200);
+    httpConfig* config = new httpConfig();
+    config->config_len = 200;
+    EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(config), 200);
 
     // second time load http filter dso
     dso = DsoManager<HttpFilterDsoImpl>::load(id, path, plugin_name);
@@ -87,18 +91,20 @@ TEST(DsoInstanceTest, BadSo) {
 TEST(DsoInstanceTest, RemovePluginConfig) {
   auto path = genSoPath("simple.so");
   HttpFilterDsoPtr dso(new HttpFilterDsoImpl(path));
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 300);
+  httpConfig* config = new httpConfig();
+  config->config_len = 300;
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(config), 300);
   // new again, return 0, since it's already existing
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 0);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(config), 0);
 
   // remove it
-  dso->envoyGoFilterDestroyHttpPluginConfig(300);
+  dso->envoyGoFilterDestroyHttpPluginConfig(300, 0);
   // new again, after removed.
-  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0, 0, 300), 300);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(config), 300);
 
   // remove twice should be ok
-  dso->envoyGoFilterDestroyHttpPluginConfig(300);
-  dso->envoyGoFilterDestroyHttpPluginConfig(300);
+  dso->envoyGoFilterDestroyHttpPluginConfig(300, 0);
+  dso->envoyGoFilterDestroyHttpPluginConfig(300, 0);
 }
 
 } // namespace

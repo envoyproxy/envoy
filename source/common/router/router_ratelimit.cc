@@ -257,8 +257,8 @@ QueryParameterValueMatchAction::QueryParameterValueMatchAction(
 bool QueryParameterValueMatchAction::populateDescriptor(
     RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
     const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo&) const {
-  Http::Utility::QueryParams query_parameters =
-      Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
+  Http::Utility::QueryParamsMulti query_parameters =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
   if (expect_match_ ==
       ConfigUtility::matchQueryParams(query_parameters, action_query_parameters_)) {
     descriptor_entry = {descriptor_key_, descriptor_value_};
@@ -334,7 +334,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       if (producer) {
         actions_.emplace_back(std::move(producer));
       } else {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             absl::StrCat("Rate limit descriptor extension failed: ", action.extension().name()));
       }
       break;
@@ -348,7 +348,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
           new QueryParameterValueMatchAction(action.query_parameter_value_match()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
-      throw EnvoyException("invalid config");
+      throwEnvoyExceptionOrPanic("invalid config");
     }
   }
   if (config.has_limit()) {
@@ -359,7 +359,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::
         OVERRIDE_SPECIFIER_NOT_SET:
-      throw EnvoyException("invalid config");
+      throwEnvoyExceptionOrPanic("invalid config");
     }
   }
 }

@@ -290,7 +290,9 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
     auto* health_check = message->add_cluster_health_checks();
     health_check->set_cluster_name("anna" + std::to_string(i));
     for (int j = 0; j < 3; j++) {
-      auto* address = health_check->add_locality_endpoints()->add_endpoints()->mutable_address();
+      auto* locality_endpoints = health_check->add_locality_endpoints();
+      locality_endpoints->mutable_locality()->set_zone(std::to_string(j));
+      auto* address = locality_endpoints->add_endpoints()->mutable_address();
       address->mutable_socket_address()->set_address("127.0.0." + std::to_string(i));
       address->mutable_socket_address()->set_port_value(1234 + j);
     }
@@ -1208,7 +1210,9 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenCreate) {
   auto* health_check = message->add_cluster_health_checks();
   health_check->set_cluster_name("anna");
   for (int i = 0; i < 3; i++) {
-    auto* endpoint = health_check->add_locality_endpoints()->add_endpoints();
+    auto* locality_endpoints = health_check->add_locality_endpoints();
+    locality_endpoints->mutable_locality()->set_zone(std::to_string(i));
+    auto* endpoint = locality_endpoints->add_endpoints();
     endpoint->mutable_health_check_config()->set_port_value(4321 + i);
     auto* address = endpoint->mutable_address();
     address->mutable_socket_address()->set_address("127.0.0.1");

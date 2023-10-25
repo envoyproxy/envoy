@@ -18,6 +18,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:dump_state_utils",
+        "//source/common/common:empty_string",
         "//source/common/network:socket_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -42,6 +43,7 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/http:default_server_string_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

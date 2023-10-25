@@ -58,7 +58,7 @@ To use :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_reso
 Statistics
 ----------
 
-The dynamic forward proxy DNS cache outputs statistics in the dns_cache.<dns_cache_name>.*
+The dynamic forward proxy DNS cache outputs statistics in the ``dns_cache.<dns_cache_name>.``
 namespace.
 
 .. csv-table::
@@ -75,7 +75,7 @@ namespace.
   num_hosts, Gauge, Number of hosts that are currently in the cache.
   dns_rq_pending_overflow, Counter, Number of dns pending request overflow.
 
-The dynamic forward proxy DNS cache circuit breakers outputs statistics in the dns_cache.<dns_cache_name>.circuit_breakers*
+The dynamic forward proxy DNS cache circuit breakers outputs statistics in the ``dns_cache.<dns_cache_name>.circuit_breakers``
 namespace.
 
 .. csv-table::

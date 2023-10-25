@@ -8,70 +8,48 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-class MockRequestDecoderCallback : public RequestDecoderCallback {
+class MockServerCodecCallbacks : public ServerCodecCallbacks {
 public:
-  MOCK_METHOD(void, onDecodingSuccess, (RequestPtr request, ExtendedOptions));
+  MOCK_METHOD(void, onDecodingSuccess, (StreamFramePtr request));
   MOCK_METHOD(void, onDecodingFailure, ());
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
+  MOCK_METHOD(OptRef<Network::Connection>, connection, ());
 };
 
-class MockResponseDecoderCallback : public ResponseDecoderCallback {
+class MockClientCodecCallbacks : public ClientCodecCallbacks {
 public:
-  MOCK_METHOD(void, onDecodingSuccess, (ResponsePtr response, ExtendedOptions));
+  MOCK_METHOD(void, onDecodingSuccess, (StreamFramePtr response));
   MOCK_METHOD(void, onDecodingFailure, ());
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
+  MOCK_METHOD(OptRef<Network::Connection>, connection, ());
 };
 
-class MockRequestEncoderCallback : public RequestEncoderCallback {
+class MockEncodingCallbacks : public EncodingCallbacks {
 public:
-  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer));
+  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer, bool end_stream));
 };
 
-/**
- * Encoder callback of Response.
- */
-class MockResponseEncoderCallback : public ResponseEncoderCallback {
+class MockServerCodec : public ServerCodec {
 public:
-  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer));
+  MOCK_METHOD(void, setCodecCallbacks, (ServerCodecCallbacks & callbacks));
+  MOCK_METHOD(void, decode, (Buffer::Instance & buffer, bool end_stream));
+  MOCK_METHOD(void, encode, (const StreamFrame&, EncodingCallbacks& callbacks));
+  MOCK_METHOD(ResponsePtr, respond, (Status status, absl::string_view, const Request&));
 };
 
-class MockRequestDecoder : public RequestDecoder {
+class MockClientCodec : public ClientCodec {
 public:
-  MOCK_METHOD(void, setDecoderCallback, (RequestDecoderCallback & callback));
-  MOCK_METHOD(void, decode, (Buffer::Instance & buffer));
-};
-
-class MockResponseDecoder : public ResponseDecoder {
-public:
-  MOCK_METHOD(void, setDecoderCallback, (ResponseDecoderCallback & callback));
-  MOCK_METHOD(void, decode, (Buffer::Instance & buffer));
-};
-
-class MockRequestEncoder : public RequestEncoder {
-public:
-  MOCK_METHOD(void, encode, (const Request&, RequestEncoderCallback& callback));
-};
-
-class MockResponseEncoder : public ResponseEncoder {
-public:
-  MOCK_METHOD(void, encode, (const Response&, ResponseEncoderCallback& callback));
-};
-
-class MockMessageCreator : public MessageCreator {
-public:
-  MOCK_METHOD(ResponsePtr, response, (Status status, const Request&));
+  MOCK_METHOD(void, setCodecCallbacks, (ClientCodecCallbacks & callbacks));
+  MOCK_METHOD(void, decode, (Buffer::Instance & buffer, bool end_stream));
+  MOCK_METHOD(void, encode, (const StreamFrame&, EncodingCallbacks& callbacks));
 };
 
 class MockCodecFactory : public CodecFactory {
 public:
   MockCodecFactory();
 
-  MOCK_METHOD(RequestDecoderPtr, requestDecoder, (), (const));
-  MOCK_METHOD(ResponseDecoderPtr, responseDecoder, (), (const));
-  MOCK_METHOD(RequestEncoderPtr, requestEncoder, (), (const));
-  MOCK_METHOD(ResponseEncoderPtr, responseEncoder, (), (const));
-  MOCK_METHOD(MessageCreatorPtr, messageCreator, (), (const));
-  MOCK_METHOD(ProtocolOptions, protocolOptions, (), (const));
+  MOCK_METHOD(ServerCodecPtr, createServerCodec, (), (const));
+  MOCK_METHOD(ClientCodecPtr, createClientCodec, (), (const));
 };
 
 class MockProxyFactory : public ProxyFactory {

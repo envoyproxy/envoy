@@ -14,9 +14,10 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
 
-absl::optional<std::reference_wrapper<ShadowRouterHandle>>
-ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
-                         TransportType original_transport, ProtocolType original_protocol) {
+OptRef<ShadowRouterHandle> ShadowWriterImpl::submit(const std::string& cluster_name,
+                                                    MessageMetadataSharedPtr metadata,
+                                                    TransportType original_transport,
+                                                    ProtocolType original_protocol) {
   auto shadow_router = std::make_unique<ShadowRouterImpl>(*this, cluster_name, metadata,
                                                           original_transport, original_protocol);
   const bool created = shadow_router->createUpstreamRequest();

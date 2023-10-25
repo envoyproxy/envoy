@@ -41,11 +41,6 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
 
   stats_gatherer_ = new QuicStatsGatherer(&filterManagerConnection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
-  // TODO(https://github.com/envoyproxy/envoy/issues/23564): Remove this line when the QUICHE is
-  // updated with a more reasonable default expiry time for QUIC Datagrams.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
-    SetMaxDatagramTimeInQueue(::quic::QuicTime::Delta::FromMilliseconds(100));
-  }
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -222,6 +217,10 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
+  if (read_side_closed()) {
+    return;
+  }
+
   if (!headers_decompressed() || header_list.empty()) {
     onStreamError(absl::nullopt);
     return;
@@ -271,8 +270,13 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
       (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
-       Http::HeaderUtility::isConnectUdp(*headers))) {
+       Http::HeaderUtility::isConnectUdpRequest(*headers))) {
     useCapsuleProtocol();
+    // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it bypass
+    // the default Datagram queue.
+    if (Http::HeaderUtility::isConnectUdpRequest(*headers)) {
+      session()->SetForceFlushForDefaultQueue(true);
+    }
   }
 #endif
 
@@ -559,15 +563,14 @@ bool EnvoyQuicServerStream::hasPendingData() {
 }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-// TODO(https://github.com/envoyproxy/envoy/issues/23564): Make the stream use Capsule Protocol
-// for CONNECT-UDP support when the headers contain "Capsule-Protocol: ?1" or "Upgrade:
-// connect-udp".
 void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   ASSERT(request_decoder_ != nullptr);
   http_datagram_handler_->setStreamDecoder(request_decoder_);
 }
 #endif
+
+void EnvoyQuicServerStream::OnInvalidHeaders() { onStreamError(absl::nullopt); }
 
 } // namespace Quic
 } // namespace Envoy

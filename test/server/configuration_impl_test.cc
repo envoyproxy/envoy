@@ -37,11 +37,13 @@ namespace {
 
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
-  std::vector<Network::FilterFactoryCb> factories;
+  Filter::NetworkFilterFactoriesList factories;
   ReadyWatcher watcher;
   Network::FilterFactoryCb factory = [&](Network::FilterManager&) -> void { watcher.ready(); };
-  factories.push_back(factory);
-  factories.push_back(factory);
+  factories.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(factory));
+  factories.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(factory));
 
   EXPECT_CALL(watcher, ready()).Times(2);
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(true));
@@ -50,7 +52,7 @@ TEST(FilterChainUtility, buildFilterChain) {
 
 TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
   Network::MockConnection connection;
-  std::vector<Network::FilterFactoryCb> factories;
+  Filter::NetworkFilterFactoriesList factories;
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(false));
   EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), false);
 }

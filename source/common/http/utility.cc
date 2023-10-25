@@ -32,6 +32,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
@@ -66,10 +67,8 @@ absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
     bool remove_port = !new_port.empty();
 
     if (new_scheme != request_protocol) {
-      remove_port |=
-          (request_protocol == Http::Headers::get().SchemeValues.Https) && request_port == ":443";
-      remove_port |=
-          (request_protocol == Http::Headers::get().SchemeValues.Http) && request_port == ":80";
+      remove_port |= Http::Utility::schemeIsHttps(request_protocol) && request_port == ":443";
+      remove_port |= Http::Utility::schemeIsHttp(request_protocol) && request_port == ":80";
     }
 
     if (remove_port) {
@@ -123,15 +122,16 @@ void validateCustomSettingsParameters(
     switch (it.identifier().value()) {
     case http2::adapter::ENABLE_PUSH:
       if (it.value().value() == 1) {
-        throw EnvoyException("server push is not supported by Envoy and can not be enabled via a "
-                             "SETTINGS parameter.");
+        throwEnvoyExceptionOrPanic(
+            "server push is not supported by Envoy and can not be enabled via a "
+            "SETTINGS parameter.");
       }
       break;
     case http2::adapter::ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the
       // use of a primitive type (bool).
-      throw EnvoyException("the \"allow_connect\" SETTINGS parameter must only be configured "
-                           "through the named field");
+      throwEnvoyExceptionOrPanic("the \"allow_connect\" SETTINGS parameter must only be configured "
+                                 "through the named field");
     case http2::adapter::HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         parameter_collisions.push_back("hpack_table_size");
@@ -154,12 +154,12 @@ void validateCustomSettingsParameters(
   }
 
   if (!custom_parameter_collisions.empty()) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "inconsistent HTTP/2 custom SETTINGS parameter(s) detected; identifiers = {{{}}}",
         absl::StrJoin(custom_parameter_collisions, ",")));
   }
   if (!parameter_collisions.empty()) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "the {{{}}} HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
         "custom parameters",
         absl::StrJoin(parameter_collisions, ",")));
@@ -505,6 +505,16 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   return parseParameters(url, start, /*decode_params=*/false);
 }
 
+Utility::QueryParamsMulti Utility::QueryParamsMulti::parseQueryString(absl::string_view url) {
+  size_t start = url.find('?');
+  if (start == std::string::npos) {
+    return {};
+  }
+
+  start++;
+  return Utility::QueryParamsMulti::parseParameters(url, start, /*decode_params=*/false);
+}
+
 Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
@@ -514,6 +524,17 @@ Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
 
   start++;
   return parseParameters(url, start, /*decode_params=*/true);
+}
+
+Utility::QueryParamsMulti
+Utility::QueryParamsMulti::parseAndDecodeQueryString(absl::string_view url) {
+  size_t start = url.find('?');
+  if (start == std::string::npos) {
+    return {};
+  }
+
+  start++;
+  return Utility::QueryParamsMulti::parseParameters(url, start, /*decode_params=*/true);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
@@ -548,6 +569,57 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
   return params;
 }
 
+Utility::QueryParamsMulti Utility::QueryParamsMulti::parseParameters(absl::string_view data,
+                                                                     size_t start,
+                                                                     bool decode_params) {
+  QueryParamsMulti params;
+
+  while (start < data.size()) {
+    size_t end = data.find('&', start);
+    if (end == std::string::npos) {
+      end = data.size();
+    }
+    absl::string_view param(data.data() + start, end - start);
+
+    const size_t equal = param.find('=');
+    if (equal != std::string::npos) {
+      const auto param_name = StringUtil::subspan(data, start, start + equal);
+      const auto param_value = StringUtil::subspan(data, start + equal + 1, end);
+      params.add(decode_params ? PercentEncoding::decode(param_name) : param_name,
+                 decode_params ? PercentEncoding::decode(param_value) : param_value);
+    } else {
+      const auto param_name = StringUtil::subspan(data, start, end);
+      params.add(decode_params ? PercentEncoding::decode(param_name) : param_name, "");
+    }
+
+    start = end + 1;
+  }
+
+  return params;
+}
+
+void Utility::QueryParamsMulti::remove(absl::string_view key) { this->data_.erase(key); }
+
+void Utility::QueryParamsMulti::add(absl::string_view key, absl::string_view value) {
+  auto result = this->data_.emplace(std::string(key), std::vector<std::string>{std::string(value)});
+  if (!result.second) {
+    result.first->second.push_back(std::string(value));
+  }
+}
+
+void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_view value) {
+  this->data_[key] = std::vector<std::string>{std::string(value)};
+}
+
+absl::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
+  auto it = this->data_.find(key);
+  if (it == this->data_.end()) {
+    return std::nullopt;
+  }
+
+  return absl::optional<std::string>{it->second.at(0)};
+}
+
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   absl::string_view path_str = path.getStringView();
   size_t query_offset = path_str.find('?');
@@ -561,8 +633,7 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 std::string Utility::stripQueryString(const HeaderString& path) {
   absl::string_view path_str = path.getStringView();
   size_t query_offset = path_str.find('?');
-  return std::string(path_str.data(),
-                     query_offset != path_str.npos ? query_offset : path_str.size());
+  return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
 std::string Utility::replaceQueryString(const HeaderString& path,
@@ -572,6 +643,16 @@ std::string Utility::replaceQueryString(const HeaderString& path,
   if (!params.empty()) {
     const auto new_query_string = Http::Utility::queryParamsToString(params);
     absl::StrAppend(&new_path, new_query_string);
+  }
+
+  return new_path;
+}
+
+std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) {
+  std::string new_path{Http::Utility::stripQueryString(path)};
+
+  if (!this->data_.empty()) {
+    absl::StrAppend(&new_path, this->toString());
   }
 
   return new_path;
@@ -1023,6 +1104,18 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
   return out;
 }
 
+std::string Utility::QueryParamsMulti::toString() {
+  std::string out;
+  std::string delim = "?";
+  for (const auto& p : this->data_) {
+    for (const auto& v : p.second) {
+      absl::StrAppend(&out, delim, p.first, "=", v);
+      delim = "&";
+    }
+  }
+  return out;
+}
+
 const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
   case Http::StreamResetReason::LocalConnectionFailure:
@@ -1328,7 +1421,7 @@ void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+      throwEnvoyExceptionOrPanic("max_interval must be greater than or equal to the base_interval");
     }
   }
 }
@@ -1387,6 +1480,24 @@ Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
                                 // Http::Code::RequestTimeout is more expensive because HTTP1 client
                                 // cannot use the connection any more.
                                 : Http::Code::RequestTimeout;
+}
+
+bool Utility::schemeIsValid(const absl::string_view scheme) {
+  return schemeIsHttp(scheme) || schemeIsHttps(scheme);
+}
+
+bool Utility::schemeIsHttp(const absl::string_view scheme) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
+    return scheme == Headers::get().SchemeValues.Http;
+  }
+  return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Http);
+}
+
+bool Utility::schemeIsHttps(const absl::string_view scheme) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
+    return scheme == Headers::get().SchemeValues.Https;
+  }
+  return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Https);
 }
 
 std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redirect_config,

@@ -81,7 +81,7 @@ public:
     EXPECT_NE(absl::nullopt, router_handle);
     EXPECT_CALL(connection, write(_, false));
 
-    auto& request_owner = router_handle.value().get().requestOwner();
+    auto& request_owner = router_handle->requestOwner();
     runRequestMethods(request_owner);
 
     // The following is a no-op, since no callbacks are pending.
@@ -332,7 +332,7 @@ TEST_F(ShadowWriterTest, SubmitConnectionNotReady) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_NE(absl::nullopt, router_handle);
-  EXPECT_TRUE(router_handle.value().get().waitingForConnection());
+  EXPECT_TRUE(router_handle->waitingForConnection());
 
   EXPECT_EQ(
       1UL,
@@ -367,7 +367,7 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   EXPECT_NE(absl::nullopt, router_handle);
 
   // Write before connection is ready.
-  auto& request_owner = router_handle.value().get().requestOwner();
+  auto& request_owner = router_handle->requestOwner();
   runRequestMethods(request_owner);
 
   NiceMock<Network::MockClientConnection> connection;
@@ -408,7 +408,7 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolFailure) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_NE(absl::nullopt, router_handle);
-  router_handle.value().get().requestOwner().messageEnd();
+  router_handle->requestOwner().messageEnd();
 }
 
 TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamDataReplySuccess) {

@@ -4,6 +4,7 @@
 
 #include "envoy/common/random_generator.h"
 #include "envoy/common/token_bucket.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -11,9 +12,11 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/grpc/common.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_stream.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
@@ -31,12 +34,7 @@ class NewGrpcMuxImpl
       public GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse>,
       Logger::Loggable<Logger::Id::config> {
 public:
-  NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-                 const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
-                 const RateLimitSettings& rate_limit_settings,
-                 const LocalInfo::LocalInfo& local_info,
-                 CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
-                 XdsConfigTrackerOptRef xds_config_tracker);
+  NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context);
 
   ~NewGrpcMuxImpl() override;
 
@@ -57,6 +55,10 @@ public:
 
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
+
+  EdsResourcesCacheOptRef edsResourcesCache() override {
+    return makeOptRefFromPtr(eds_resources_cache_.get());
+  }
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
@@ -86,9 +88,15 @@ public:
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher,
                       CustomConfigValidators& config_validators,
-                      XdsConfigTrackerOptRef xds_config_tracker)
-        : watch_map_(use_namespace_matching, type_url, config_validators),
-          sub_state_(type_url, watch_map_, local_info, dispatcher, xds_config_tracker) {}
+                      XdsConfigTrackerOptRef xds_config_tracker,
+                      EdsResourcesCacheOptRef eds_resources_cache)
+        : watch_map_(use_namespace_matching, type_url, config_validators, eds_resources_cache),
+          sub_state_(type_url, watch_map_, local_info, dispatcher, xds_config_tracker) {
+      // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
+      ASSERT(
+          !eds_resources_cache.has_value() ||
+          (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()));
+    }
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -182,7 +190,9 @@ private:
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   Event::Dispatcher& dispatcher_;
   XdsConfigTrackerOptRef xds_config_tracker_;
+  EdsResourcesCachePtr eds_resources_cache_;
 
+  bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
   std::atomic<bool> shutdown_{false};

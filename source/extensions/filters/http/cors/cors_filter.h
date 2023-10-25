@@ -105,7 +105,7 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   absl::InlinedVector<const Envoy::Router::CorsPolicy*, 2> policies_;
   bool is_cors_request_{};
-  const Http::HeaderEntry* origin_{};
+  std::string latched_origin_;
 
   CorsFilterConfigSharedPtr config_;
 };

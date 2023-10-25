@@ -438,6 +438,7 @@ message Admin {
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
+// [#next-free-field: 6]
 message ClusterManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.ClusterManager";
@@ -478,6 +479,11 @@ message ClusterManager {
   // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
   // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
   core.v3.ApiConfigSource load_stats_config = 4;
+
+  // Whether the ClusterManager will create clusters on the worker threads
+  // inline during requests. This will save memory and CPU cycles in cases where
+  // there are lots of inactive clusters and > 1 worker thread.
+  bool enable_deferred_cluster_creation = 5;
 }
 
 // Allows you to specify different watchdog configs for different subsystems.

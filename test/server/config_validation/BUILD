@@ -1,6 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_cc_test_library", "envoy_package", "envoy_proto_library")
-load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
 
@@ -87,9 +87,9 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "config_fuzz_test",
+    size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
-    shard_count = 4,
     deps = [
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
@@ -115,6 +115,7 @@ envoy_cc_test_library(
     hdrs = ["xds_verifier.h"],
     deps = [
         ":xds_fuzz_proto_cc_proto",
+        "//envoy/common:exception_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -157,6 +158,7 @@ envoy_cc_test_library(
 
 envoy_cc_fuzz_test(
     name = "xds_fuzz_test",
+    size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
     deps = [

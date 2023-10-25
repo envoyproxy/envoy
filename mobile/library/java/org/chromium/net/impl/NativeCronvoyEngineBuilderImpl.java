@@ -4,6 +4,7 @@ import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVeri
 
 import android.content.Context;
 import androidx.annotation.VisibleForTesting;
+import com.google.protobuf.Struct;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
@@ -31,7 +32,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
 
   // TODO(refactor) move unshared variables into their specific methods.
   private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
-  private final EnvoyLogger mEnvoyLogger = null;
   private final EnvoyEventTracker mEnvoyEventTracker = null;
   private String mGrpcStatsDomain = null;
   private int mConnectTimeoutSeconds = 30;
@@ -105,12 +105,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return new CronvoyUrlRequestContext(this);
   }
 
-  EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning) {
-    AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, mEnvoyLogger,
+  EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning, EnvoyLogger envoyLogger,
+                           String logLevel) {
+    AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger,
                                                      mEnvoyEventTracker, mEnableProxying);
     AndroidJniLibrary.load(getContext());
     AndroidNetworkMonitor.load(getContext(), engine);
-    engine.runWithConfig(createEnvoyConfiguration(), getLogLevel());
+    engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;
   }
 
@@ -125,15 +126,18 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), mEnableGzipDecompression, brotliEnabled(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
+        quicClientConnectionOptions(), quicHints(), mEnableGzipDecompression, brotliEnabled(),
         mEnableSocketTag, mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
         mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
         mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, statSinks, runtimeGuards, mEnablePlatformCertificatesValidation,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
-        /*xdsPort=*/0, /*xdsJwtToken=*/"", /*xdsJwtTokenLifetime=*/0, /*xdsSslRootCerts=*/"",
-        mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, /*cdsResourcesLocator=*/"",
+        /*xdsPort=*/0, /*xdsAuthenticationHeader=*/"", /*xdsAuthenticationToken=*/"",
+        /*xdsJwtToken=*/"", /*xdsJwtTokenLifetime=*/0, /*xdsSslRootCerts=*/"",
+        /*xdsSni=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, Struct.getDefaultInstance(),
+        /*cdsResourcesLocator=*/"",
         /*cdsTimeoutSeconds=*/0, /*enableCds=*/false);
   }
 }

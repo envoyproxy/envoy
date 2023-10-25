@@ -47,7 +47,6 @@ envoy_extension_cc_test(
         "filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    shard_count = 2,
     tags = [
         "cpu:3",
         "skip_on_windows",

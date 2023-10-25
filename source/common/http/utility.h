@@ -749,6 +749,25 @@ struct RedirectConfig {
   const bool strip_query_;
 };
 
+/**
+ * Validates the provided scheme is valid (either http or https)
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is valid.
+ */
+bool schemeIsValid(const absl::string_view scheme);
+
+/**
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is http.
+ */
+bool schemeIsHttp(const absl::string_view scheme);
+
+/**
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is https.
+ */
+bool schemeIsHttps(const absl::string_view scheme);
+
 /*
  * Compute new path based on RedirectConfig.
  */
