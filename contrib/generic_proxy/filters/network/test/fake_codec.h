@@ -75,7 +75,7 @@ public:
     Status status_;
   };
 
-  class FakeRequestDecoder : public RequestDecoder {
+  class FakeServerCodec : public ServerCodec {
   public:
     bool parseRequestBody() {
       std::string body(message_size_.value(), 0);
@@ -120,8 +120,8 @@ public:
       return true;
     }
 
-    void setDecoderCallback(RequestDecoderCallback& callback) override { callback_ = &callback; }
-    void decode(Buffer::Instance& buffer) override {
+    void setCodecCallbacks(ServerCodecCallbacks& callback) override { callback_ = &callback; }
+    void decode(Buffer::Instance& buffer, bool) override {
       buffer_.move(buffer);
       while (true) {
         if (!message_size_.has_value()) {
@@ -145,12 +145,39 @@ public:
       }
     }
 
+    void encode(const StreamFrame& response, EncodingCallbacks& callback) override {
+      const FakeResponse* typed_response = dynamic_cast<const FakeResponse*>(&response);
+      ASSERT(typed_response != nullptr);
+
+      std::string body;
+      body.reserve(512);
+      body = typed_response->protocol_ + "|" + std::string(typed_response->status_.message()) + "|";
+      for (const auto& pair : typed_response->data_) {
+        body += pair.first + ":" + pair.second + ";";
+      }
+      // Additional 4 bytes for status.
+      encoding_buffer_.writeBEInt<uint32_t>(body.size() + 4);
+      encoding_buffer_.writeBEInt<uint32_t>(
+          static_cast<int32_t>(typed_response->status_.raw_code()));
+      encoding_buffer_.add(body);
+
+      callback.onEncodingSuccess(encoding_buffer_, response.frameFlags().endStream());
+    }
+
+    ResponsePtr respond(Status status, absl::string_view, const Request&) override {
+      auto response = std::make_unique<FakeResponse>();
+      response->status_ = status;
+      response->protocol_ = "fake_protocol_for_test";
+      return response;
+    }
+
     absl::optional<uint32_t> message_size_;
     Buffer::OwnedImpl buffer_;
-    RequestDecoderCallback* callback_{};
+    Buffer::OwnedImpl encoding_buffer_;
+    ServerCodecCallbacks* callback_{};
   };
 
-  class FakeResponseDecoder : public ResponseDecoder {
+  class FakeClientCodec : public ClientCodec {
   public:
     bool parseResponseBody() {
       int32_t status_code = buffer_.peekBEInt<int32_t>();
@@ -198,8 +225,8 @@ public:
       return true;
     }
 
-    void setDecoderCallback(ResponseDecoderCallback& callback) override { callback_ = &callback; }
-    void decode(Buffer::Instance& buffer) override {
+    void setCodecCallbacks(ClientCodecCallbacks& callback) override { callback_ = &callback; }
+    void decode(Buffer::Instance& buffer, bool) override {
       buffer_.move(buffer);
       while (true) {
         if (!message_size_.has_value()) {
@@ -229,14 +256,7 @@ public:
       }
     }
 
-    absl::optional<uint32_t> message_size_;
-    Buffer::OwnedImpl buffer_;
-    ResponseDecoderCallback* callback_{};
-  };
-
-  class FakeRequestEncoder : public RequestEncoder {
-  public:
-    void encode(const StreamFrame& request, RequestEncoderCallback& callback) override {
+    void encode(const StreamFrame& request, EncodingCallbacks& callback) override {
       const FakeRequest* typed_request = dynamic_cast<const FakeRequest*>(&request);
       ASSERT(typed_request != nullptr);
 
@@ -247,53 +267,20 @@ public:
       for (const auto& pair : typed_request->data_) {
         body += pair.first + ":" + pair.second + ";";
       }
-      buffer_.writeBEInt<uint32_t>(body.size());
-      buffer_.add(body);
+      encoding_buffer_.writeBEInt<uint32_t>(body.size());
+      encoding_buffer_.add(body);
 
-      callback.onEncodingSuccess(buffer_, request.frameFlags().endStream());
+      callback.onEncodingSuccess(encoding_buffer_, request.frameFlags().endStream());
     }
 
+    absl::optional<uint32_t> message_size_;
     Buffer::OwnedImpl buffer_;
+    Buffer::OwnedImpl encoding_buffer_;
+    ClientCodecCallbacks* callback_{};
   };
 
-  class FakeResponseEncoder : public ResponseEncoder {
-  public:
-    void encode(const StreamFrame& response, ResponseEncoderCallback& callback) override {
-      const FakeResponse* typed_response = dynamic_cast<const FakeResponse*>(&response);
-      ASSERT(typed_response != nullptr);
-
-      std::string body;
-      body.reserve(512);
-      body = typed_response->protocol_ + "|" + std::string(typed_response->status_.message()) + "|";
-      for (const auto& pair : typed_response->data_) {
-        body += pair.first + ":" + pair.second + ";";
-      }
-      // Additional 4 bytes for status.
-      buffer_.writeBEInt<uint32_t>(body.size() + 4);
-      buffer_.writeBEInt<uint32_t>(static_cast<int32_t>(typed_response->status_.raw_code()));
-      buffer_.add(body);
-
-      callback.onEncodingSuccess(buffer_, response.frameFlags().endStream());
-    }
-
-    Buffer::OwnedImpl buffer_;
-  };
-
-  class FakeMessageCreator : public MessageCreator {
-  public:
-    ResponsePtr response(Status status, const Request&) override {
-      auto response = std::make_unique<FakeResponse>();
-      response->status_ = status;
-      response->protocol_ = "fake_protocol_for_test";
-      return response;
-    }
-  };
-
-  RequestDecoderPtr requestDecoder() const override;
-  ResponseDecoderPtr responseDecoder() const override;
-  RequestEncoderPtr requestEncoder() const override;
-  ResponseEncoderPtr responseEncoder() const override;
-  MessageCreatorPtr messageCreator() const override;
+  ServerCodecPtr createServerCodec() const override;
+  ClientCodecPtr createClientCodec() const override;
 };
 
 class FakeStreamCodecFactoryConfig : public CodecFactoryConfig {

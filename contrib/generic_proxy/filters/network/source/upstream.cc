@@ -44,15 +44,14 @@ void UpstreamConnection::cleanUp(bool close_connection) {
   }
 }
 
-void UpstreamConnection::onUpstreamData(Buffer::Instance& data, bool) {
+void UpstreamConnection::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!is_cleaned_up_);
-  ASSERT(response_decoder_ != nullptr);
 
   if (data.length() == 0) {
     return;
   }
 
-  response_decoder_->decode(data);
+  client_codec_->decode(data, end_stream);
 }
 
 void UpstreamConnection::onPoolFailure(ConnectionPool::PoolFailureReason reason,
