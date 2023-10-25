@@ -4,6 +4,12 @@ permissions:
   contents: read
 
 on:
+  push:
+    branches:
+    - main
+    - release/v*
+    paths:
+    - VERSION.txt
   release:
     types:
     - published
@@ -164,6 +170,56 @@ jobs:
 
 
   ## Triggered actions
+
+  # On release commit landing (ie VERSION.txt changed)
+  reopen_branch:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push'
+    name: Reopen branch
+    steps:
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.1
+      with:
+        app-id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+        app-key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+    - id: branch
+      run: |
+        SUFFIX=$(cut -d- -f2 < VERSION.txt)
+        if [[ "$SUFFIX" == "dev" ]]; then
+            echo "isdev=true" >> $GITHUB_OUTPUT
+        else
+            echo "isdev=false" >> $GITHUB_OUTPUT
+        fi
+        BRANCHNAME="${GITHUB_REF_NAME#release/}"
+        echo "name=${BRANCHNAME}" >> $GITHUB_OUTPUT
+        echo "full_name=release/dev/${BRANCHNAME}" >> $GITHUB_OUTPUT
+    - name: Reopen branch
+      if: ${{ steps.branch.outputs.isdev != 'true' }}
+      uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.3
+      with:
+        command: bazel run @envoy_repo//:dev --config=ci ${{ github.ref_name != 'main' && '--patch' || '' }}
+    - id: dev
+      name: Get version
+      run: |
+        VERSION=$(cat VERSION.txt | cut -d- -f1)
+        echo "version=v${VERSION}" >> $GITHUB_OUTPUT
+    - name: Create a PR
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.3
+      with:
+        base: ${{ github.ref_name }}
+        commit: false
+        body: |
+          Created by Envoy publish bot for @${{ github.actor }}
+        branch: ${{ steps.branch.outputs.full_name }}
+        diff-upload: dev-${{ steps.branch.outputs.name }}
+        diff-show: true
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+        title: >-
+          ${{ steps.branch.outputs.name != 'main' && '[${{ steps.branch.outputs.name }}]' || '' }}
+          repo: Dev v${{ steps.dev.outputs.version }}
 
   # On release to `main`:
   # - fork the branch to a release branch
