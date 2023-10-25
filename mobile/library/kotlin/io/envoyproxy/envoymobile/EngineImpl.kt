@@ -33,7 +33,7 @@ constructor(
         envoyEngine.runWithConfig(envoyConfiguration, logLevel.level)
       }
     if (envoyStatus == EnvoyStatus.ENVOY_FAILURE) {
-      throw RuntimeException("Unable to start Envoy.")
+      throw IllegalStateException("Unable to start Envoy.")
     }
   }
 
