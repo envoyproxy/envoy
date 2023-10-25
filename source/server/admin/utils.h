@@ -15,6 +15,11 @@ namespace Utility {
 
 enum class HistogramBucketsMode { NoBuckets, Cumulative, Disjoint, Detailed };
 
+enum HistogramEmitMode : unsigned long {
+  Summary = (1u << 0),
+  Histogram = (1u << 1),
+};
+
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 
 bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
@@ -22,6 +27,8 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
 
 absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
                                    HistogramBucketsMode& histogram_buckets_mode);
+
+HistogramEmitMode histogramEmitModeParam(const Http::Utility::QueryParams& params);
 
 absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params);
 

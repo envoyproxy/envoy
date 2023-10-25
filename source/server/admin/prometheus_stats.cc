@@ -1,5 +1,7 @@
 #include "source/server/admin/prometheus_stats.h"
 
+#include <cmath>
+
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
@@ -7,6 +9,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
+#include "utils.h"
 
 namespace Envoy {
 namespace Server {
@@ -228,6 +231,35 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   return output;
 };
 
+/*
+ * Returns the prometheus output for a summary. The output is a multi-line string (with embedded
+ * newlines) that contains all the individual quantile values and sum/count for a single histogram
+ * (metric_name plus all tags).
+ */
+std::string generateSummaryOutput(const Stats::ParentHistogram& histogram,
+                                  const std::string& prefixed_tag_extracted_name) {
+  const std::string tags = PrometheusStatsFormatter::formattedTags(histogram.tags());
+  const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
+
+  const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
+  Stats::ConstSupportedBuckets& supported_quantiles = stats.supportedQuantiles();
+  const std::vector<double>& computed_quantiles = stats.computedQuantiles();
+  std::string output;
+  for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+    double quantile = supported_quantiles[i];
+    double value = computed_quantiles[i];
+    output.append(fmt::format("{0}{{{1}quantile=\"{2}\"}} {3}\n", prefixed_tag_extracted_name,
+                              hist_tags, quantile, std::isnan(value) ? 0 : value));
+  }
+
+  output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,
+                            stats.sampleSum()));
+  output.append(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags,
+                            stats.sampleCount()));
+
+  return output;
+};
+
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -284,8 +316,14 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count += outputStatType<Stats::TextReadout>(
       response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::ParentHistogram>(
-      response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
+  if (params.histogram_emit_mode_ & Utility::HistogramEmitMode::Summary) {
+    metric_name_count += outputStatType<Stats::ParentHistogram>(
+        response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
+  }
+  if (params.histogram_emit_mode_ & Utility::HistogramEmitMode::Histogram) {
+    metric_name_count += outputStatType<Stats::ParentHistogram>(
+        response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
+  }
 
   return metric_name_count;
 }

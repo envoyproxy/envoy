@@ -1,5 +1,7 @@
 #include "source/server/admin/stats_params.h"
 
+#include "utils.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -26,6 +28,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     response.add(status.message());
     return Http::Code::BadRequest;
   }
+  histogram_emit_mode_ = Utility::histogramEmitModeParam(query_);
 
   auto parse_type = [](absl::string_view str, StatsType& type) {
     if (str == StatLabels::Gauges) {
