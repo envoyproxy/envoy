@@ -1356,7 +1356,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
     const auto mutate_result = ConnectionManagerUtility::mutateRequestHeaders(
-        *request_headers_, connection_manager_.read_callbacks_->connection(),
+        *request_headers_, connection_manager_.codec_->protocol(),
+        connection_manager_.read_callbacks_->connection(),
         connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_,
         filter_manager_.streamInfo());
 

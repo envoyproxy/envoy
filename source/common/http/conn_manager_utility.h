@@ -68,6 +68,7 @@ public:
    *         options for rejecting the request.
    */
   static MutateRequestHeadersResult mutateRequestHeaders(RequestHeaderMap& request_headers,
+                                                         Protocol protocol,
                                                          Network::Connection& connection,
                                                          ConnectionManagerConfig& config,
                                                          const Router::Config& route_config,
