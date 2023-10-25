@@ -15,25 +15,6 @@
 namespace Envoy {
 namespace Network {
 
-namespace {
-
-/**
- * On different platforms the sockaddr struct for unix domain
- * sockets is different. We use this function to get the
- * length of the platform specific struct.
- */
-constexpr socklen_t udsAddressLength() {
-#if defined(__APPLE__)
-  return sizeof(sockaddr);
-#elif defined(WIN32)
-  return sizeof(sockaddr_un);
-#else
-  return sizeof(sa_family_t);
-#endif
-}
-
-} // namespace
-
 IoSocketHandleBaseImpl::IoSocketHandleBaseImpl(os_fd_t fd, bool socket_v6only,
                                                absl::optional<int> domain)
     : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
