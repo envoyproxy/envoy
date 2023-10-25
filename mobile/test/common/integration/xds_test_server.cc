@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "source/common/event/libevent.h"
 #include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
@@ -17,10 +18,14 @@ namespace Envoy {
 XdsTestServer::XdsTestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),
       version_(Network::Address::IpVersion::v4),
-      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(api_->allocateDispatcher("test_thread",
-                                           Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
-      upstream_config_(time_system_) {
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>), upstream_config_(time_system_) {
+  if (!Envoy::Event::Libevent::Global::initialized()) {
+    // Required by the Dispatcher.
+    Envoy::Event::Libevent::Global::initialize();
+  }
+  dispatcher_ =
+      api_->allocateDispatcher("test_thread", Buffer::WatermarkFactoryPtr{mock_buffer_factory_});
+
   ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
