@@ -80,24 +80,27 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
   const uint64_t starting_response_length = response.length();
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
-      // In the case of filtering by type, we need to call this before checking for
-      // no stats in the phase, and then after that this function returns without the normal
-      // advancing to the next phase.
-      if (params_.type_ != StatsType::All && phase_ == Phase::CountersAndGauges) {
-        renderPerHostMetrics(response);
-      }
-
-      if (phase_stat_count_ == 0) {
-        render_->noStats(response, phase_string_);
-      } else {
-        phase_stat_count_ = 0;
-      }
-
       if (params_.type_ != StatsType::All) {
+        if (phase_ == Phase::CountersAndGauges) {
+          // In the case of filtering by type, we need to call this before checking for
+          // no stats in the phase, and then after that this function returns without the normal
+          // advancing to the next phase.
+          renderPerHostMetrics(response);
+        }
+
+        if (phase_stat_count_ == 0) {
+          render_->noStats(response, phase_string_);
+        }
+
         render_->finalize(response);
         return false;
       }
 
+      if (phase_stat_count_ == 0) {
+        render_->noStats(response, phase_string_);
+      }
+
+      phase_stat_count_ = 0;
       switch (phase_) {
       case Phase::TextReadouts:
         phase_ = Phase::CountersAndGauges;
