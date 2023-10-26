@@ -466,9 +466,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
 
   this->streamInfo().filterState()->setData(
-      FS_LOCAL_REPLAY_KEY,
-      std::make_shared<LocalReplyOwnerType>(this->filter_context_.config_name,
-                                            std::string(details)),
+      FS_LOCAL_REPLAY_KEY, std::make_shared<LocalReplyOwnerType>(this->filter_context_.config_name),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::FilterChain);
 
   parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
@@ -1727,9 +1725,7 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
 
   this->streamInfo().filterState()->setData(
-      FS_LOCAL_REPLAY_KEY,
-      std::make_shared<LocalReplyOwnerType>(this->filter_context_.config_name,
-                                            std::string(details)),
+      FS_LOCAL_REPLAY_KEY, std::make_shared<LocalReplyOwnerType>(this->filter_context_.config_name),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::FilterChain);
 
   parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);

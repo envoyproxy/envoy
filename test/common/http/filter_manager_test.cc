@@ -26,6 +26,8 @@ using testing::InSequence;
 using testing::Return;
 
 namespace Envoy {
+
+using Protobuf::util::MessageDifferencer;
 namespace Http {
 namespace {
 class FilterManagerTest : public testing::Test {
@@ -120,11 +122,16 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
 
   ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
       FS_LOCAL_REPLAY_KEY));
-  EXPECT_EQ(filter_manager_->streamInfo()
-                .filterState()
-                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
-                ->serializeAsString(),
-            "filter1|details");
+
+  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY);
+
+  EXPECT_EQ(fs_value->serializeAsString(), "filter1");
+
+  auto expected = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *expected->mutable_fields();
+  *fields["filter_config_name"].mutable_string_value() = "filter1";
+  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
 }
@@ -190,11 +197,16 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
 
   ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
       FS_LOCAL_REPLAY_KEY));
-  EXPECT_EQ(filter_manager_->streamInfo()
-                .filterState()
-                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
-                ->serializeAsString(),
-            "filter2|details");
+
+  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY);
+
+  EXPECT_EQ(fs_value->serializeAsString(), "filter2");
+
+  auto expected = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *expected->mutable_fields();
+  *fields["filter_config_name"].mutable_string_value() = "filter2";
+  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
 }
@@ -259,11 +271,16 @@ TEST_F(FilterManagerTest, OnLocalReply) {
 
   ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
       FS_LOCAL_REPLAY_KEY));
-  EXPECT_EQ(filter_manager_->streamInfo()
-                .filterState()
-                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
-                ->serializeAsString(),
-            "configName1|details");
+
+  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY);
+
+  EXPECT_EQ(fs_value->serializeAsString(), "configName1");
+
+  auto expected = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *expected->mutable_fields();
+  *fields["filter_config_name"].mutable_string_value() = "configName1";
+  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
 }
@@ -333,11 +350,15 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
 
   ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
       FS_LOCAL_REPLAY_KEY));
-  EXPECT_EQ(filter_manager_->streamInfo()
-                .filterState()
-                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
-                ->serializeAsString(),
-            "configName1|details2");
+  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY);
+
+  EXPECT_EQ(fs_value->serializeAsString(), "configName1");
+
+  auto expected = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *expected->mutable_fields();
+  *fields["filter_config_name"].mutable_string_value() = "configName1";
+  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
 }
@@ -646,11 +667,15 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
   EXPECT_THAT(*filter_manager_->streamInfo().responseCodeDetails(), "bad_metadata");
   ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
       FS_LOCAL_REPLAY_KEY));
-  EXPECT_EQ(filter_manager_->streamInfo()
-                .filterState()
-                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
-                ->serializeAsString(),
-            "filter1|bad_metadata");
+  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY);
+
+  EXPECT_EQ(fs_value->serializeAsString(), "filter1");
+
+  auto expected = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *expected->mutable_fields();
+  *fields["filter_config_name"].mutable_string_value() = "filter1";
+  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
 }
@@ -778,11 +803,15 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
 
   ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
       FS_LOCAL_REPLAY_KEY));
-  EXPECT_EQ(filter_manager_->streamInfo()
-                .filterState()
-                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
-                ->serializeAsString(),
-            "filter2|bad_metadata");
+  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY);
+
+  EXPECT_EQ(fs_value->serializeAsString(), "filter2");
+
+  auto expected = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *expected->mutable_fields();
+  *fields["filter_config_name"].mutable_string_value() = "filter2";
+  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
 }

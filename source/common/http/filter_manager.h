@@ -40,25 +40,20 @@ constexpr absl::string_view FS_LOCAL_REPLAY_KEY =
     "envoy.filters.network.http_connection_manager.local_reply_owner";
 class LocalReplyOwnerType : public StreamInfo::FilterState::Object {
 public:
-  LocalReplyOwnerType(const std::string& filter_config_name, const std::string& details)
-      : filter_config_name(filter_config_name), details(details) {}
+  LocalReplyOwnerType(const std::string& filter_config_name)
+      : filter_config_name(filter_config_name) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto message = std::make_unique<ProtobufWkt::Struct>();
     auto& fields = *message->mutable_fields();
     *fields["filter_config_name"].mutable_string_value() = filter_config_name;
-    *fields["details"].mutable_string_value() = details;
-
     return message;
   }
 
-  absl::optional<std::string> serializeAsString() const override {
-    return filter_config_name + "|" + details;
-  }
+  absl::optional<std::string> serializeAsString() const override { return filter_config_name; }
 
 private:
   const std::string filter_config_name;
-  const std::string details;
 };
 
 /**
