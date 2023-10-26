@@ -910,7 +910,7 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamEvent(Network::Connection
       event == Network::ConnectionEvent::LocalClose) {
     upstream_.reset();
 
-  if (!connecting || !establishUpstreamConnection()) {
+    if (!connecting || !establishUpstreamConnection()) {
       cluster_.removeSession(this);
     }
   }
