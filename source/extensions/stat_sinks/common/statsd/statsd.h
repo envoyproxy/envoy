@@ -85,10 +85,10 @@ private:
   void flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const;
   void writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer, const std::string& data) const;
 
-  template <typename ValueType>
-  const std::string buildMessage(const Stats::Metric& metric, ValueType value,
+  template <class StatType, typename ValueType>
+  const std::string buildMessage(const StatType& metric, ValueType value,
                                  const std::string& type) const;
-  const std::string getName(const Stats::Metric& metric) const;
+  template <class StatType> const std::string getName(const StatType& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
   const ThreadLocal::SlotPtr tls_;

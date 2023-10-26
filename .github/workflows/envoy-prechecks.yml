@@ -16,6 +16,7 @@ on:
     - 'WORKSPACE'
     - '.github/workflows/envoy-prechecks.yml'
     - '.github/workflows/_*.yml'
+    - '.github/actions/do_ci/action.yml'
 
 concurrency:
   group: ${{ github.event.inputs.head_ref || github.run_id }}-${{ github.workflow }}
@@ -53,3 +54,4 @@ jobs:
       managed: ${{ matrix.managed }}
       cache_build_image: ${{ needs.env.outputs.build_image_ubuntu }}
       repo_ref: ${{ github.event.pull_request.head.sha  }}
+      catch-errors: true

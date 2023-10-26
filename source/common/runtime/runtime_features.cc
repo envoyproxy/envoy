@@ -62,6 +62,7 @@ RUNTIME_GUARD(envoy_reloadable_features_initialize_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_keep_endpoint_active_hc_status_on_locality_update);
 RUNTIME_GUARD(envoy_reloadable_features_locality_routing_use_new_routing_logic);
 RUNTIME_GUARD(envoy_reloadable_features_lowercase_scheme);
+RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_make_token_cookie_httponly);
@@ -120,8 +121,6 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
-// TODO(wbpcode): enable by default after a complete deprecation period.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 // TODO(pksohn): enable after fixing https://github.com/envoyproxy/envoy/issues/29930
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 

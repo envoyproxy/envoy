@@ -2,6 +2,13 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: http
+  change: |
+    Flip runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to true. Name downgrading in the
+    per filter config searching will be disabled by default. This behavior can be temporarily reverted by setting
+    the flag to false explicitly.
+    See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
+    issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
 
 minor_behavior_changes:
 - area: upstream
@@ -62,9 +69,26 @@ new_features:
     instead of using :ref:`choice_count
     <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     to select the hosts.
+- area: stats
+  change: |
+    added :ref:`per_endpoint_stats <envoy_v3_api_field_config.cluster.v3.TrackClusterStats.per_endpoint_stats>` to get some metrics
+    for each endpoint in a cluster.
+
 - area: jwt
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
     These claims will be serialized as JSON and encoded as Base64.
+- area: tcp_proxy
+  change: |
+    added support to TCP Proxy for recording the latency in ``UpstreamTiming`` from when the first
+    initial connection to the upstream cluster was attempted to when either the
+    connection was successfully established or the filiter failed to initialize
+    any connection to the upstream.
+- area: ratelimit
+  change: |
+    Ratelimit supports setting the HTTP status that is returned to the client when the ratelimit server
+    returns an error or cannot be reached with :ref:`status_on_error
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.status_on_error>`
+    configuration flag.
 
 deprecated:
