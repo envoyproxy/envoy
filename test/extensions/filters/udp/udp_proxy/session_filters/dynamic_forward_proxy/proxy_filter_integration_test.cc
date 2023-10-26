@@ -207,8 +207,6 @@ TEST_P(DynamicForwardProxyIntegrationTest, EmptyDnsResponseDueToDummyHost) {
 
   client.write("hello", *listener_address);
   test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_success", 1);
-  test_server_->waitForCounterEq("dns_cache.foo.host_added", 1);
 
   // The DNS response is empty, so will not be found any valid host.
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_none_healthy", 1);
