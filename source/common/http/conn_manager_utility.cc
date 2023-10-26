@@ -106,14 +106,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   }
 
   // Clean proxy headers.
-  if (protocol == Protocol::Http11) {
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.retain_keepalive_header_http11")) {
-      request_headers.removeKeepAlive();
-    }
-  } else {
-    request_headers.removeKeepAlive();
-  }
   request_headers.removeEnvoyInternalRequest();
+  request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
 

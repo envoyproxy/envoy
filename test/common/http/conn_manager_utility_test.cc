@@ -2284,29 +2284,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyResponseHeadersForHttp1
   EXPECT_FALSE(response_headers.has("proxy-connection"));
 }
 
-TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyRequestHeadersForHttp11) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
-  Http::TestRequestHeaderMapImpl request_headers{{"keep-alive", "timeout=60, max=1000"}};
-  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
-  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
-  callMutateRequestHeaders(request_headers, Protocol::Http11);
-  EXPECT_FALSE(request_headers.has("keep-alive"));
-}
-
-TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyRequestHeadersForHttp11) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.retain_keepalive_header_http11", "true"}});
-  Http::TestRequestHeaderMapImpl request_headers{{"keep-alive", "timeout=60, max=1000"}};
-  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
-  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
-  callMutateRequestHeaders(request_headers, Protocol::Http11);
-  EXPECT_TRUE(request_headers.has("keep-alive"));
-}
-
-// Make sure we don't remove connection headers for http11 keep-alive
+// Don't remove connection keep- aliveheaders for http11 as tomcat/java relies on this.
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeaderHttp11) {
   TestRequestHeaderMapImpl headers{{"connection", "keep-alive"}};
 
