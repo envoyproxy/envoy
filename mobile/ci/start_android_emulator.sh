@@ -25,7 +25,7 @@ if [[ -n $(which system_profiler) ]]; then
 fi
 
 # shellcheck disable=SC2094
-nohup "${ANDROID_HOME}/emulator/emulator" -partition-size 1024 -avd test_android_emulator -no-snapshot-load > nohup.out 2>&1 | tail -f nohup.out & {
+nohup "${ANDROID_HOME}/emulator/emulator" -accel on -partition-size 1024 -avd test_android_emulator -no-snapshot-load > nohup.out 2>&1 | tail -f nohup.out & {
     # check_emulator_status
     # shellcheck disable=SC2016
     "${ANDROID_HOME}/platform-tools/adb" wait-for-device shell 'while [[ -z $(getprop sys.boot_completed | tr -d '\''\r'\'') ]]; do sleep 1; done; input keyevent 82'

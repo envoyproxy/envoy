@@ -68,10 +68,10 @@ jobs:
         java-package: jdk
         architecture: x64
         distribution: zulu
-    - run: |
+    - name: 'Install dependencies'
+      run: |
         cd mobile
         ./ci/linux_ci_setup.sh
-      name: 'Install dependencies'
     # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
     - name: Enable KVM group permissions
       run: |
@@ -131,6 +131,12 @@ jobs:
       run: |
         cd mobile
         ./ci/linux_ci_setup.sh
+    # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
+    - name: Enable KVM group permissions
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -184,6 +190,12 @@ jobs:
       run: |
         cd mobile
         ./ci/linux_ci_setup.sh
+    # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
+    - name: Enable KVM group permissions
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -237,6 +249,12 @@ jobs:
       run: |
         cd mobile
         ./ci/linux_ci_setup.sh
+    # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
+    - name: Enable KVM group permissions
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
