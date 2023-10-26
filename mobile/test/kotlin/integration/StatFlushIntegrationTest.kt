@@ -9,12 +9,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.After
-import org.junit.Ignore
 import org.junit.Test
 
-// TODO(abeyad): Fix the test and re-enable.
-// See https://github.com/envoyproxy/envoy/issues/24657.
-@Ignore
 class StatFlushIntegrationTest {
   private var engine: Engine? = null
 
@@ -31,14 +27,15 @@ class StatFlushIntegrationTest {
   @Test
   fun `multiple stat sinks configured`() {
     val countDownLatch = CountDownLatch(1)
-    engine = EngineBuilder()
-      .addLogLevel(LogLevel.DEBUG)
-      // Really high flush interval so it won't trigger during test execution.
-      .addStatsFlushSeconds(100)
-      .addStatsSinks(listOf(statsdSinkConfig(8125), statsdSinkConfig(5000)))
-      .addGrpcStatsDomain("example.com")
-      .setOnEngineRunning { countDownLatch.countDown() }
-      .build()
+    engine =
+      EngineBuilder()
+        .addLogLevel(LogLevel.DEBUG)
+        // Really high flush interval so it won't trigger during test execution.
+        .addStatsFlushSeconds(100)
+        .addStatsSinks(listOf(statsdSinkConfig(8125), statsdSinkConfig(5000)))
+        .addGrpcStatsDomain("example.com")
+        .setOnEngineRunning { countDownLatch.countDown() }
+        .build()
 
     assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
   }
@@ -46,17 +43,16 @@ class StatFlushIntegrationTest {
   @Test
   fun `flush flushes to stats sink`() {
     val countDownLatch = CountDownLatch(1)
-    engine = EngineBuilder()
-      .addLogLevel(LogLevel.DEBUG)
-      // Really high flush interval so it won't trigger during test execution.
-      .addStatsFlushSeconds(100)
-      .addStatsSinks(listOf(statsdSinkConfig(8125), statsdSinkConfig(5000)))
-      .setOnEngineRunning { countDownLatch.countDown() }
-      .build()
+    engine =
+      EngineBuilder()
+        .addLogLevel(LogLevel.DEBUG)
+        // Really high flush interval so it won't trigger during test execution.
+        .addStatsFlushSeconds(100)
+        .addStatsSinks(listOf(statsdSinkConfig(8125), statsdSinkConfig(5000)))
+        .setOnEngineRunning { countDownLatch.countDown() }
+        .build()
 
     assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
-
-    engine!!.pulseClient().counter(Element("foo"), Element("bar")).increment(1)
 
     val statsdServer1 = TestStatsdServer()
     statsdServer1.runAsync(8125)
@@ -64,14 +60,18 @@ class StatFlushIntegrationTest {
     val statsdServer2 = TestStatsdServer()
     statsdServer2.runAsync(5000)
 
+    statsdServer1.setStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+    statsdServer2.setStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+
+    engine!!.pulseClient().counter(Element("foo"), Element("bar")).increment(1)
     engine!!.flushStats()
 
-    statsdServer1.awaitStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
-    statsdServer2.awaitStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+    statsdServer1.awaitStatMatching()
+    statsdServer2.awaitStatMatching()
   }
 
   private fun statsdSinkConfig(port: Int): String {
-return """{ name: envoy.stat_sinks.statsd,
+    return """{ name: envoy.stat_sinks.statsd,
       typed_config: {
         "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
         address: { socket_address: { address: 127.0.0.1, port_value: $port } } } }"""

@@ -113,6 +113,16 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("udp://[a:b:c:d::]:0")->asString());
 }
 
+TEST(NetworkUtility, urlFromDatagramAddress) {
+  // UDP and unix URLs should be reversible with resolveUrl and urlFromDatagramAddress.
+  std::vector<std::string> urls{
+      "udp://[::1]:1", "udp://[a:b:c:d::]:0", "udp://1.2.3.4:1234", "unix://foo", "unix://",
+  };
+  for (const std::string& url : urls) {
+    EXPECT_EQ(url, Utility::urlFromDatagramAddress(*Utility::resolveUrl(url)));
+  }
+}
+
 TEST(NetworkUtility, socketTypeFromUrl) {
   EXPECT_FALSE(Utility::socketTypeFromUrl("foo").ok());
   EXPECT_FALSE(Utility::socketTypeFromUrl("abc://foo").ok());
@@ -323,6 +333,27 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   }
 }
 
+TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddressGetifaddrsFailure) {
+  Api::SysCallIntResult rc;
+  rc.return_value_ = -1;
+  rc.errno_ = 42;
+  testing::StrictMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_)).WillRepeatedly(Return(rc));
+  Address::IpVersion ip_version = GetParam();
+  Address::InstanceConstSharedPtr expected_address;
+  if (ip_version == Address::IpVersion::v6) {
+    expected_address = std::make_shared<Address::Ipv6Instance>("::1");
+  } else {
+    expected_address = std::make_shared<Address::Ipv4Instance>("127.0.0.1");
+  }
+  Address::InstanceConstSharedPtr local_address = Utility::getLocalAddress(ip_version);
+  EXPECT_EQ(ip_version, local_address->ip()->version());
+  EXPECT_NE(nullptr, local_address);
+  EXPECT_EQ(*expected_address, *local_address);
+}
+
 TEST(NetworkUtility, GetOriginalDst) {
   testing::NiceMock<Network::MockConnectionSocket> socket;
 #ifdef SOL_IP
@@ -354,7 +385,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent(Address::IpVersion::v4)).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
@@ -364,7 +395,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   // Non-transparent socket fails to get original dst while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent(Address::IpVersion::v4)).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
@@ -383,7 +414,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent(Address::IpVersion::v6)).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
@@ -393,7 +424,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   // Non-transparent socket fails to get original dst while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent(Address::IpVersion::v6)).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
@@ -562,6 +593,13 @@ TEST(NetworkUtility, ParseProtobufAddress) {
     proto_address.mutable_pipe()->set_path("/tmp/unix-socket");
     EXPECT_EQ("/tmp/unix-socket", Utility::protobufAddressToAddress(proto_address)->asString());
   }
+  {
+    envoy::config::core::v3::Address proto_address;
+    proto_address.mutable_envoy_internal_address()->set_server_listener_name("internal_listener");
+    proto_address.mutable_envoy_internal_address()->set_endpoint_id("12345");
+    EXPECT_EQ("envoy://internal_listener/12345",
+              Utility::protobufAddressToAddress(proto_address)->asString());
+  }
 #if defined(__linux__)
   {
     envoy::config::core::v3::Address proto_address;
@@ -655,9 +693,7 @@ TEST(PortRangeListTest, Errors) {
   }
 }
 
-static Address::Ipv4Instance makeFromPort(uint32_t port) {
-  return Address::Ipv4Instance("0.0.0.0", port);
-}
+static Address::Ipv4Instance makeFromPort(uint32_t port) { return {"0.0.0.0", port}; }
 
 TEST(PortRangeListTest, Normal) {
   {

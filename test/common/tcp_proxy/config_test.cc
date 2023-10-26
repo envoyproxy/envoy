@@ -32,6 +32,173 @@ idle_timeout: 0s
   EXPECT_FALSE(config_obj.sharedConfig()->idleTimeout().has_value());
 }
 
+TEST(ConfigTest, FlushAccessLogOnConnected) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_FALSE(config_obj.sharedConfig()->flushAccessLogOnConnected());
+  }
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        flush_access_log_on_connected: false
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_FALSE(config_obj.sharedConfig()->flushAccessLogOnConnected());
+  }
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        flush_access_log_on_connected: true
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_TRUE(config_obj.sharedConfig()->flushAccessLogOnConnected());
+  }
+}
+
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnConnected)) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      flush_access_log_on_connected: false # deprecated field
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
+    EXPECT_FALSE(config_obj.sharedConfig()->flushAccessLogOnConnected());
+  }
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      flush_access_log_on_connected: true # deprecated field
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
+    EXPECT_TRUE(config_obj.sharedConfig()->flushAccessLogOnConnected());
+  }
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        flush_access_log_on_connected: true
+      flush_access_log_on_connected: true # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
+        EnvoyException,
+        "Only one of flush_access_log_on_connected or access_log_options can be specified.");
+  }
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        flush_access_log_on_connected: true
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
+        EnvoyException,
+        "Only one of access_log_flush_interval or access_log_options can be specified.");
+  }
+}
+
+TEST(ConfigTest, AccessLogFlushInterval) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_FALSE(config_obj.sharedConfig()->accessLogFlushInterval().has_value());
+  }
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        access_log_flush_interval: 1s
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_TRUE(config_obj.sharedConfig()->accessLogFlushInterval().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->accessLogFlushInterval().value());
+  }
+}
+
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogFlushInterval)) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
+    EXPECT_TRUE(config_obj.sharedConfig()->accessLogFlushInterval().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->accessLogFlushInterval().value());
+  }
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        access_log_flush_interval: 1s
+      access_log_flush_interval: 1s # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
+        EnvoyException,
+        "Only one of access_log_flush_interval or access_log_options can be specified.");
+  }
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        access_log_flush_interval: 1s
+      flush_access_log_on_connected: true # deprecated field
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(
+        Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
+        EnvoyException,
+        "Only one of flush_access_log_on_connected or access_log_options can be specified.");
+  }
+}
+
 TEST(ConfigTest, CustomTimeout) {
   const std::string yaml = R"EOF(
 stat_prefix: name
@@ -570,11 +737,14 @@ public:
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
-  void initializeFilter() {
-    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  void initializeFilter() { initializeFilter(filter_callbacks_, connection_); }
+
+  void initializeFilter(Network::MockReadFilterCallbacks& filter_callbacks,
+                        Network::MockConnection& connection) {
+    EXPECT_CALL(filter_callbacks, connection()).WillRepeatedly(testing::ReturnRef(connection));
 
     filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
-    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    filter_->initializeReadFilterCallbacks(filter_callbacks);
   }
 
   Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
@@ -600,26 +770,34 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
     - source_ip: {}
     )EOF";
   setup(yaml);
-  initializeFilter();
 
-  // Ensure there is no remote address (MockStreamInfo sets one by default), and expect no hash.
-  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
-        EXPECT_FALSE(context->computeHashKey().has_value());
-        return absl::nullopt;
-      }));
-  filter_->onNewConnection();
+  {
+    NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+    NiceMock<Network::MockConnection> mock_connection;
+    initializeFilter(filter_callbacks, mock_connection);
+
+    // Ensure there is no remote address (MockStreamInfo sets one by default), and expect no hash.
+    mock_connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+          EXPECT_FALSE(context->computeHashKey().has_value());
+          return absl::nullopt;
+        }));
+    filter_->onNewConnection();
+  }
 
   // Set remote address, and expect a hash.
-  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
-        EXPECT_TRUE(context->computeHashKey().has_value());
-        return absl::nullopt;
-      }));
-  filter_->onNewConnection();
+  {
+    initializeFilter();
+    connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+          EXPECT_TRUE(context->computeHashKey().has_value());
+          return absl::nullopt;
+        }));
+    filter_->onNewConnection();
+  }
 }
 
 // Test TCP proxy using filter state to hash.
@@ -633,26 +811,33 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
       }
     )EOF";
   setup(yaml);
-  initializeFilter();
 
-  // Expect no hash when filter state is unset.
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
-        EXPECT_FALSE(context->computeHashKey().has_value());
-        return absl::nullopt;
-      }));
-  filter_->onNewConnection();
+  {
+    NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+    NiceMock<Network::MockConnection> mock_connection;
+    initializeFilter(filter_callbacks, mock_connection);
+    // Expect no hash when filter state is unset.
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+          EXPECT_FALSE(context->computeHashKey().has_value());
+          return absl::nullopt;
+        }));
+    filter_->onNewConnection();
+  }
 
   // Set filter state, and expect HashableObj's hash is now used.
-  connection_.stream_info_.filter_state_->setData("foo", std::make_unique<HashableObj>(),
-                                                  StreamInfo::FilterState::StateType::ReadOnly,
-                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
-        EXPECT_EQ(31337, context->computeHashKey().value());
-        return absl::nullopt;
-      }));
-  filter_->onNewConnection();
+  {
+    initializeFilter();
+    connection_.stream_info_.filter_state_->setData("foo", std::make_unique<HashableObj>(),
+                                                    StreamInfo::FilterState::StateType::ReadOnly,
+                                                    StreamInfo::FilterState::LifeSpan::FilterChain);
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+          EXPECT_EQ(31337, context->computeHashKey().value());
+          return absl::nullopt;
+        }));
+    filter_->onNewConnection();
+  }
 }
 
 } // namespace

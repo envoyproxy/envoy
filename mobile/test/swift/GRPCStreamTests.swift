@@ -66,23 +66,6 @@ final class GRPCStreamTests: XCTestCase {
     XCTAssertEqual(kMessage1, sentData.subdata(in: 5..<sentData.count))
   }
 
-  func testCloseIsCalledWithEmptyDataFrame() {
-    var closedData: Data?
-    let streamClient = MockStreamClient { stream in
-      stream.onRequestData = { data, endStream in
-        XCTAssertTrue(endStream)
-        closedData = data
-      }
-    }
-
-    GRPCClient(streamClient: streamClient)
-      .newGRPCStreamPrototype()
-      .start()
-      .close()
-
-    XCTAssertEqual(Data(), closedData)
-  }
-
   func testCancelCallsStreamCallback() {
     let expectation = self.expectation(description: "onCancel callback is called")
     let streamClient = MockStreamClient { stream in

@@ -31,11 +31,9 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     upstream_buffer_.move(data);
 
     bool underflow = false;
-    try {
-      underflow = onData();
-    } catch (const AppException&) {
-      return ThriftFilters::ResponseStatus::Reset;
-    } catch (const EnvoyException&) {
+    TRY_NEEDS_AUDIT { underflow = onData(); }
+    END_TRY catch (const AppException&) { return ThriftFilters::ResponseStatus::Reset; }
+    catch (const EnvoyException&) {
       return ThriftFilters::ResponseStatus::Reset;
     }
 
@@ -239,31 +237,39 @@ class ShadowWriterImpl : public ShadowWriter, Logger::Loggable<Logger::Id::thrif
 public:
   ShadowWriterImpl(Upstream::ClusterManager& cm, const RouterStats& stats,
                    Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls)
-      : cm_(cm), stats_(stats), dispatcher_(dispatcher), tls_(tls.allocateSlot()) {
-    tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ActiveRouters>(dispatcher);
-    });
+      : cm_(cm), stats_(stats), dispatcher_(dispatcher), tls_(tls) {
+    tls_.set(
+        [](Event::Dispatcher& dispatcher) { return std::make_shared<ActiveRouters>(dispatcher); });
   }
 
   ~ShadowWriterImpl() override = default;
 
-  void remove(ShadowRouterImpl& router) { tls_->getTyped<ActiveRouters>().remove(router); }
+  void remove(ShadowRouterImpl& router) {
+    // While router is destroyed but the request is in progress. The cleanup
+    // is possibly deferred to tls shutdown, thus leading us to check if
+    // the storage is valid.
+    if (tls_.get().has_value()) {
+      tls_->remove(router);
+    }
+  }
   const RouterStats& stats() { return stats_; }
 
   // Router::ShadowWriter
   Upstream::ClusterManager& clusterManager() override { return cm_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  absl::optional<std::reference_wrapper<ShadowRouterHandle>>
-  submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
-         TransportType original_transport, ProtocolType original_protocol) override;
+  OptRef<ShadowRouterHandle> submit(const std::string& cluster_name,
+                                    MessageMetadataSharedPtr metadata,
+                                    TransportType original_transport,
+                                    ProtocolType original_protocol) override;
 
 private:
   friend class ShadowRouterImpl;
+  friend class ShadowWriterTest;
 
   Upstream::ClusterManager& cm_;
   const RouterStats& stats_;
   Event::Dispatcher& dispatcher_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ActiveRouters> tls_;
 };
 
 } // namespace Router

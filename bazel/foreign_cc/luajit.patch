@@ -149,7 +149,7 @@ index 00000000..1201542c
 +    shutil.copytree(src_dir, os.path.basename(src_dir))
 +    os.chdir(os.path.basename(src_dir))
 +
-+    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.6"
++    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.8"
 +    os.environ["DEFAULT_CC"] = os.environ.get("CC", "")
 +    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
 +    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
@@ -166,7 +166,7 @@ index 00000000..1201542c
 +      with open("clang-asan-blocklist.txt", "w") as f:
 +        f.write("fun:*\n")
 +
-+    os.system('make -j{} V=1 PREFIX="{}" install'.format(os.cpu_count(), args.prefix))
++    os.system('"{}" -j{} V=1 PREFIX="{}" install'.format(os.environ["MAKE"], os.cpu_count(), args.prefix))
 +
 +def win_main():
 +    src_dir = os.path.dirname(os.path.realpath(__file__))

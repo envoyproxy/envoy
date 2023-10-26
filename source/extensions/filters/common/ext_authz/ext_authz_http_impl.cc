@@ -191,7 +191,13 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   callbacks_ = &callbacks;
 
   Http::RequestHeaderMapPtr headers;
-  const uint64_t request_length = request.attributes().request().http().body().size();
+
+  const auto& http_request = request.attributes().request().http();
+  const auto& http_request_body =
+      http_request.body().empty() ? http_request.raw_body() : http_request.body();
+
+  uint64_t request_length = http_request_body.size();
+
   if (request_length > 0) {
     headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
         {{Http::Headers::get().ContentLength, std::to_string(request_length)}});
@@ -199,7 +205,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(lengthZeroHeader());
   }
 
-  for (const auto& header : request.attributes().request().http().headers()) {
+  for (const auto& header : http_request.headers()) {
     const Http::LowerCaseString key{header.first};
 
     // Skip setting content-length header since it is already configured at initialization.
@@ -219,7 +225,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   if (request_length > 0) {
-    message->body().add(request.attributes().request().http().body());
+    message->body().add(http_request_body);
   }
 
   const std::string& cluster = config_->cluster();
@@ -239,6 +245,11 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName())
                        .setSampled(absl::nullopt);
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_authz_http_send_original_xff")) {
+      options.setSendXff(false);
+    }
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }

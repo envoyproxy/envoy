@@ -41,7 +41,8 @@ constexpr unsigned long kPatternMatchingMinVariableNameLen = 1;
 constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        "%"             // pct-encoded
                                        "!$&'()+,;"     // sub-delims excluding *=
-                                       ":@";
+                                       ":@"
+                                       "="; // user included "=" allowed
 
 // Default operator used for the variable when none specified.
 constexpr Operator kDefaultVariableOperator = Operator::PathGlob;
@@ -122,19 +123,19 @@ bool isValidLiteral(absl::string_view literal) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "]+$"));
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(toStringPiece(literal), *literal_regex);
+  return RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidRewriteLiteral(absl::string_view literal) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(toStringPiece(literal), *literal_regex);
+  return RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidVariableName(absl::string_view variable) {
   static const LazyRE2 variable_regex = {"^[a-zA-Z][a-zA-Z0-9_]*$"};
-  return RE2::FullMatch(toStringPiece(variable), *variable_regex);
+  return RE2::FullMatch(variable, *variable_regex);
 }
 
 absl::StatusOr<ParsedResult<Literal>> parseLiteral(absl::string_view pattern) {
@@ -273,7 +274,7 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
   struct ParsedPathPattern parsed_pattern;
 
   static const LazyRE2 printable_regex = {"^/[[:graph:]]*$"};
-  if (!RE2::FullMatch(toStringPiece(path), *printable_regex)) {
+  if (!RE2::FullMatch(path, *printable_regex)) {
     return absl::InvalidArgumentError("Invalid pattern");
   }
 

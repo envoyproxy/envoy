@@ -19,15 +19,14 @@ public:
   void createEnvoy() override {
     sotw_or_delta_ = sotwOrDelta();
     const std::string target_uri = Network::Test::getLoopbackAddressUrlString(ipVersion());
-    builder_.setAggregatedDiscoveryService(target_uri,
-                                           fake_upstreams_[1]->localAddress()->ip()->port());
-
+    Platform::XdsBuilder xds_builder(target_uri, fake_upstreams_[1]->localAddress()->ip()->port());
     std::string cds_resources_locator;
     if (use_xdstp_) {
       cds_namespace_ = "xdstp://" + target_uri + "/envoy.config.cluster.v3.Cluster";
       cds_resources_locator = cds_namespace_ + "/*";
     }
-    builder_.addCdsLayer(cds_resources_locator, /*timeout_seconds=*/1);
+    xds_builder.addClusterDiscoveryService(cds_resources_locator, /*timeout_in_seconds=*/1);
+    builder_.setXds(std::move(xds_builder));
 
     XdsIntegrationTest::createEnvoy();
   }
@@ -41,7 +40,7 @@ protected:
         use_xdstp_ ? cds_namespace_ + "/my_cluster?xds.node.cluster=envoy-mobile" : "my_cluster";
     envoy::config::cluster::v3::Cluster cluster1 = ConfigHelper::buildStaticCluster(
         cluster_name, fake_upstreams_[0]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+        Network::Test::getLoopbackAddressString(ipVersion()));
     initializeXdsStream();
     int cluster_count = getGaugeValue("cluster_manager.active_clusters");
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
@@ -56,9 +55,11 @@ protected:
     // Wait for cluster to be added
     ASSERT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
     ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count + 1));
+    ASSERT_TRUE(waitForGaugeGe("cluster_manager.updated_clusters", 0));
+    ASSERT_TRUE(waitForGaugeGe("cluster_manager.cluster_removed", 0));
   }
 
-  bool use_xdstp_;
+  bool use_xdstp_{false};
   std::string cds_namespace_;
 };
 

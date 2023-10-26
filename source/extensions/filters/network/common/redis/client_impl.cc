@@ -49,6 +49,14 @@ ConfigImpl::ConfigImpl(
     read_policy_ = ReadPolicy::Any;
     break;
   }
+
+  if (config.has_connection_rate_limit()) {
+    connection_rate_limit_enabled_ = true;
+    connection_rate_limit_per_sec_ = config.connection_rate_limit().connection_rate_limit_per_sec();
+  } else {
+    connection_rate_limit_enabled_ = false;
+    connection_rate_limit_per_sec_ = 100;
+  }
 }
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
@@ -153,9 +161,8 @@ void ClientImpl::onConnectOrOpTimeout() {
 }
 
 void ClientImpl::onData(Buffer::Instance& data) {
-  try {
-    decoder_->decode(data);
-  } catch (ProtocolError&) {
+  TRY_NEEDS_AUDIT { decoder_->decode(data); }
+  END_TRY catch (ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
     host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
     host_->stats().rq_error_.inc();

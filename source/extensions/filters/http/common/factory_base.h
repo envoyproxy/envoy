@@ -76,6 +76,23 @@ public:
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
+
+  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContext(
+      const Protobuf::Message& proto_config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& server_context) override {
+    return createFilterFactoryFromProtoWithServerContextTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, server_context.messageValidationVisitor()),
+        stats_prefix, server_context);
+  }
+
+  virtual Envoy::Http::FilterFactoryCb
+  createFilterFactoryFromProtoWithServerContextTyped(const ConfigProto&, const std::string&,
+                                                     Server::Configuration::ServerFactoryContext&) {
+    ExceptionUtil::throwEnvoyException(
+        "Creating filter factory from server factory context is not supported");
+    return nullptr;
+  }
 };
 
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
@@ -87,7 +104,7 @@ public:
       : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
   struct DualInfo {
-    DualInfo(Server::Configuration::UpstreamHttpFactoryContext& context)
+    DualInfo(Server::Configuration::UpstreamFactoryContext& context)
         : init_manager(context.initManager()), scope(context.scope()) {}
     DualInfo(Server::Configuration::FactoryContext& context)
         : init_manager(context.initManager()), scope(context.scope()) {}
@@ -105,9 +122,10 @@ public:
                                              context.getServerFactoryContext());
   }
 
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message& proto_config, const std::string& stats_prefix,
-      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+  Envoy::Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(
             proto_config, context.getServerFactoryContext().messageValidationVisitor()),

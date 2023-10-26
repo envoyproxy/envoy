@@ -37,11 +37,13 @@ public:
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
-  MOCK_METHOD(void, start, (GuardDog & guard_dog, const Event::PostCb& cb));
+  MOCK_METHOD(void, start, (GuardDog & guard_dog, const std::function<void()>& cb));
   MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
-              (Network::ListenerConfig & listener, std::function<void()> completion));
+              (Network::ListenerConfig & listener,
+               const Network::ExtraShutdownListenerOptions& options,
+               std::function<void()> completion));
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));

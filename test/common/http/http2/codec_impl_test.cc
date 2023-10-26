@@ -4,10 +4,12 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_validator_errors.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/codes.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http2/codec_impl.h"
@@ -50,6 +52,64 @@ using testing::StartsWith;
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+namespace {
+
+// Tests in this suite observe request headers produced by the codec
+// by returning a MockRequestDecoder object in the newStream callback.
+// For tests runs with Universal Header Validator (UHV) enabled, some checks and transformations
+// have moved from the codec to UHV, and for tests that verify behaviors that were moved to UHV this
+// shim class is required instead of plain MockRequestDecoder.
+// The shim is transparent when UHV is disabled (header_validator_ == nullptr) and simply defers to
+// the MockRequestDecoder::decodeHeaders() method. With UHV enabled it invokes UHV's
+// validateRequestHeaderMap() method. This will validate and apply transformations expected by the
+// test, before passing it to the base class MockRequestDecoder::decodeHeaders() method. If UHV
+// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error. This
+// class also handles behavior specific to the H/2 codec, where it resets requests with headers
+// containing underscores (when configured), instead of sending 400. See
+// https://github.com/envoyproxy/envoy/issues/24466
+class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
+public:
+  MockRequestDecoderShimWithUhv() = default;
+
+  void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
+    response_encoder_ = response_encoder;
+  }
+  void setHeaderValidator(Http::ServerHeaderValidator* header_validator) {
+    header_validator_ = header_validator;
+  }
+  void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
+    if (header_validator_) {
+      // Header validation is done by the HCM when header map is fully parsed.
+      // This part approximates calling header validation and handling errors, in which case HCM
+      // calls sendLocalReply and closes network connection (based on the
+      // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
+      auto result = header_validator_->validateRequestHeaders(*headers);
+      std::string failure_details(result.details());
+      if (result.ok()) {
+        auto transformation_result = header_validator_->transformRequestHeaders(*headers);
+        if (transformation_result.ok()) {
+          MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
+          return;
+        }
+        failure_details = transformation_result.details();
+      }
+      if (failure_details != UhvResponseCodeDetail::get().InvalidUnderscore) {
+        sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
+                       nullptr, absl::nullopt, failure_details);
+      }
+      response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+      // These tests assume that connection is not closed on protocol errors
+    } else {
+      MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
+    }
+  }
+
+private:
+  Http::ServerHeaderValidator* header_validator_{nullptr};
+  Http::ResponseEncoder* response_encoder_{nullptr};
+};
+} // namespace
 
 enum class Http2Impl {
   Nghttp2,
@@ -197,6 +257,7 @@ public:
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
+          request_decoder_.setResponseEncoder(response_encoder_);
           return request_decoder_;
         }));
 
@@ -339,13 +400,17 @@ public:
   }
 
   void createHeaderValidator() {
+#ifdef ENVOY_ENABLE_UHV
     header_validator_config_.set_headers_with_underscores_action(
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
-    header_validator_ =
-        std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator>(
-            header_validator_config_, Protocol::Http2, server_->http2CodecStats());
+    header_validator_ = std::make_unique<
+        Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator>(
+        header_validator_config_, Protocol::Http2, server_->http2CodecStats(),
+        header_validator_config_overrides_);
+    request_decoder_.setHeaderValidator(header_validator_.get());
+#endif
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -370,7 +435,7 @@ public:
   std::unique_ptr<ConnectionWrapper> server_wrapper_;
   MockResponseDecoder response_decoder_;
   RequestEncoder* request_encoder_;
-  MockRequestDecoder request_decoder_;
+  MockRequestDecoderShimWithUhv request_decoder_;
   ResponseEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
   // Corrupt a metadata frame payload.
@@ -393,7 +458,9 @@ public:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  HeaderValidatorPtr header_validator_;
+  ServerHeaderValidatorPtr header_validator_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
@@ -541,9 +608,11 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
   EXPECT_CALL(client_callbacks_, onGoAway(_));
   server_->shutdownNotice();
   server_->goAway();
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
@@ -900,14 +969,66 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   driveToCompletion();
 }
 
-TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {
   initialize();
+#ifdef ENVOY_ENABLE_UHV
+  // The check for required headers is done by UHV. When UHV is enabled this test
+  // is superseded by CodecClientTest.ResponseHeaderValidationFails and
+  // DownstreamProtocolIntegrationTest.DownstreamRequestWithFaultyFilter tests.
+  return;
+#endif
 
   const auto status = request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true);
   driveToCompletion();
 
   EXPECT_FALSE(status.ok());
   EXPECT_THAT(status.message(), testing::HasSubstr("missing required"));
+}
+
+TEST_P(Http2CodecImplTest, VerifyHeaderMapMaxSizeLimits) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_request_headers{
+      {}, max_request_headers_kb_, max_request_headers_count_};
+  HttpTestUtility::addDefaultHeaders(expected_request_headers);
+  EXPECT_CALL(request_decoder_,
+              decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_request_headers), false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder_->encodeData(hello, false);
+  driveToCompletion();
+
+  TestRequestTrailerMapImpl request_trailers{{"trailing", "header"}};
+  TestRequestTrailerMapImpl expected_request_trailers{
+      {{"trailing", "header"}}, max_request_headers_kb_, max_request_headers_count_};
+  EXPECT_CALL(request_decoder_,
+              decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_request_trailers)));
+  request_encoder_->encodeTrailers(request_trailers);
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_response_headers{
+      {{":status", "200"}}, max_request_headers_kb_, max_request_headers_count_};
+  EXPECT_CALL(response_decoder_,
+              decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_response_headers), false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+  EXPECT_CALL(response_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl world("world");
+  response_encoder_->encodeData(world, false);
+  driveToCompletion();
+
+  TestResponseTrailerMapImpl response_trailers{{"trailing", "header"}};
+  TestResponseTrailerMapImpl expected_response_trailers{
+      {{"trailing", "header"}}, max_request_headers_kb_, max_request_headers_count_};
+  EXPECT_CALL(response_decoder_,
+              decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_response_trailers)));
+  response_encoder_->encodeTrailers(response_trailers);
+  driveToCompletion();
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeaders) {
@@ -1524,10 +1645,18 @@ TEST_P(Http2CodecImplTest, ShouldRestoreCrashDumpInfoWhenHandlingDeferredProcess
 
   process_buffered_data_callback->invokeCallback();
 
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   EXPECT_THAT(ostream.contents(), HasSubstr("Http2::ConnectionImpl "));
   EXPECT_THAT(ostream.contents(),
               HasSubstr("Dumping current stream:\n  stream: \n    ConnectionImpl::StreamImpl"));
   EXPECT_THAT(ostream.contents(), HasSubstr("Network Connection info would be dumped..."));
+}
+
+TEST_P(Http2CodecImplTest, CodecClientEnvoyBugsIfCodecEventCallbacksSet) {
+  initialize();
+
+  EXPECT_ENVOY_BUG(request_encoder_->getStream().registerCodecEventCallbacks(nullptr),
+                   "CodecEventCallbacks for HTTP2 client stream unimplemented.");
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
@@ -2682,17 +2811,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   TestRequestHeaderMapImpl expected_headers(request_headers);
   request_headers.addCopy("bad_header", "something");
-#ifdef ENVOY_ENABLE_UHV
-  // Header validation is done by the HCM when header map is fully parsed.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
-        auto result = header_validator_->validateRequestHeaderMap(*headers);
-        EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
-        ASSERT_TRUE(result.ok());
-      }));
-#else
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
-#endif
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
   EXPECT_EQ(1, server_stats_store_.counter("http2.dropped_headers_with_underscores").value());
@@ -2707,25 +2826,6 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.addCopy("bad_header", "something");
-
-#ifdef ENVOY_ENABLE_UHV
-  // Header validation is done by the HCM when header map is fully parsed.
-  // This callback approximates handling of header validation error, when HCM calls
-  // sendLocalReply and closes network connection (based on the
-  // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this](RequestHeaderMapSharedPtr& headers, bool) -> void {
-        auto result = header_validator_->validateRequestHeaderMap(*headers);
-        ASSERT_FALSE(result.ok());
-        response_encoder_->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
-                                                                   {"connection", "close"},
-                                                                   {"content-length", "0"}},
-                                         true);
-        response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-        server_connection_.state_ = Network::Connection::State::Closing;
-      }));
-  expect_buffered_data_on_teardown_ = true;
-#endif
 
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
@@ -2745,17 +2845,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.addCopy("bad_header", "something");
   TestRequestHeaderMapImpl expected_headers(request_headers);
-#ifdef ENVOY_ENABLE_UHV
-  // Header validation is done by the HCM when header map is fully parsed.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
-        auto result = header_validator_->validateRequestHeaderMap(*headers);
-        EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
-        ASSERT_TRUE(result.ok());
-      }));
-#else
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
-#endif
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
@@ -2892,8 +2982,11 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(client_callbacks_, onGoAway(_));
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
   server_->shutdownNotice();
   server_->goAway();
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 }
@@ -3601,6 +3694,10 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
   client_http2_options_.set_allow_connect(true);
   server_http2_options_.set_allow_connect(true);
   initialize();
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#26490) : this test needs UHV for both client and server
+  return;
+#endif
   MockStreamCallbacks callbacks;
   request_encoder_->getStream().addCallbacks(callbacks);
 
@@ -3920,6 +4017,7 @@ TEST_P(Http2CodecImplTest,
     InSequence seq;
     EXPECT_CALL(request_decoder_, decodeTrailers_(_));
     process_buffered_data_callback->invokeCallback();
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
     EXPECT_FALSE(process_buffered_data_callback->enabled_);
   }
 }
@@ -4066,6 +4164,7 @@ TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
 
     EXPECT_CALL(request_decoder_, decodeData(_, true));
     process_buffered_data_callback->invokeCallback();
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
     EXPECT_FALSE(process_buffered_data_callback->enabled_);
   }
 }
@@ -4203,6 +4302,65 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
   }
 }
 
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway) {
+  initialize();
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(client_callbacks_, onGoAway(_));
+
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  } else {
+    // nghttp2 does not raise the headers to the decoder.
+    EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  }
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointIsOnlyConsultedOncePerDispatch) {
+  initialize();
+
+  int times_shed_load_invoked = 0;
+  EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad())
+      .WillRepeatedly(Invoke([&times_shed_load_invoked]() {
+        ++times_shed_load_invoked;
+        return false;
+      }));
+
+  // Drive new streams to be created within a single server dispatch.
+  const int num_streams_to_create = 20;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+
+  std::vector<RequestEncoder*> request_encoders;
+  std::vector<ResponseEncoder*> response_encoders;
+  request_encoders.reserve(num_streams_to_create);
+  response_encoders.reserve(num_streams_to_create);
+  for (int i = 0; i < num_streams_to_create; ++i) {
+    request_encoders.push_back(&client_->newStream(response_decoder_));
+    EXPECT_CALL(server_callbacks_, newStream(_, _))
+        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoders.push_back(&encoder);
+          encoder.getStream().addCallbacks(server_stream_callbacks_);
+          return request_decoder_;
+        }));
+
+    EXPECT_TRUE(request_encoders[i]->encodeHeaders(request_headers, true).ok());
+  }
+
+  // All the newly created streams are queued in the connection buffer.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).Times(num_streams_to_create);
+  driveToCompletion();
+  EXPECT_EQ(1, times_shed_load_invoked);
+  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
 TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {
   // Per https://datatracker.ietf.org/doc/html/rfc9113#section-8.2.1,
   // leading & trailing whitespace characters in headers are not valid, but this is a new
@@ -4307,6 +4465,7 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
       1 /* 0xfc */, 1 /* 0xfd */, 1 /* 0xfe */, 1 /* 0xff */
   };
 
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.validate_upstream_headers", "false"}});
   stream_error_on_invalid_http_messaging_ = true;
   initialize();
   if (http2_implementation_ == Http2Impl::Oghttp2) {
@@ -4353,10 +4512,8 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
 TEST_P(Http2CodecImplTest, BadResponseHeader) {
   initialize();
 #ifdef ENVOY_ENABLE_UHV
-  // UHV mode makes no effect on nghttp2
-  if (http2_implementation_ != Http2Impl::Oghttp2) {
-    return;
-  }
+  // TODO(#26490): this test needs UHV for both client and server codecs
+  return;
 #endif
 
   InSequence s;
@@ -4377,7 +4534,7 @@ TEST_P(Http2CodecImplTest, BadResponseHeader) {
   // Header validation is done by the CodecClient after header map is fully parsed.
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _))
       .WillOnce(Invoke([this](ResponseHeaderMapPtr& headers, bool) -> void {
-        auto result = header_validator_->validateResponseHeaderMap(*headers);
+        auto result = header_validator_->validateResponseHeaders(*headers);
         ASSERT_FALSE(result.ok());
       }));
 #else
@@ -4542,6 +4699,103 @@ TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
   EXPECT_TRUE(client_->submitMetadata(metadata_vector, 1000));
   driveToCompletion();
 }
+
+TEST(CodecChoiceTest, ProtocolOptionExplicitlySet) {
+  NiceMock<Network::MockConnection> client_connection;
+  MockConnectionCallbacks client_callbacks;
+  TestScopedRuntime scoped_runtime;
+  Stats::TestUtil::TestStore client_stats_store;
+  NiceMock<Random::MockRandomGenerator> random;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.mutable_hpack_table_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
+  http2_options.mutable_max_concurrent_streams()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+  http2_options.mutable_initial_stream_window_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  http2_options.mutable_initial_connection_window_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+
+  http2_options.mutable_use_oghttp2_codec()->set_value(true);
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+
+  auto client = std::make_unique<TestClientConnectionImpl>(
+      client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
+
+  // The protocol option takes precedence over the runtime feature.
+  EXPECT_TRUE(client->useOghttp2Library());
+
+  http2_options.mutable_use_oghttp2_codec()->set_value(false);
+
+  auto client2 = std::make_unique<TestClientConnectionImpl>(
+      client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
+
+  EXPECT_FALSE(client2->useOghttp2Library());
+}
+
+TEST(CodecChoiceTest, ProtocolOptionNotSpecified) {
+  NiceMock<Network::MockConnection> client_connection;
+  MockConnectionCallbacks client_callbacks;
+  Stats::TestUtil::TestStore client_stats_store;
+  NiceMock<Random::MockRandomGenerator> random;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.mutable_hpack_table_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
+  http2_options.mutable_max_concurrent_streams()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+  http2_options.mutable_initial_stream_window_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  http2_options.mutable_initial_connection_window_size()->set_value(
+      CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+
+  ASSERT_FALSE(http2_options.has_use_oghttp2_codec());
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+
+  auto client = std::make_unique<TestClientConnectionImpl>(
+      client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
+
+  // Since no protocol option is specified, the runtime feature is used.
+  EXPECT_TRUE(client->useOghttp2Library());
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+
+  auto client2 = std::make_unique<TestClientConnectionImpl>(
+      client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
+
+  EXPECT_FALSE(client2->useOghttp2Library());
+}
+
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameInvalid) {
+  initialize();
+
+  {
+    const auto status = request_encoder_->encodeHeaders(
+        TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {"x-foo\r\n", "/"}}, true);
+    EXPECT_FALSE(status.ok());
+    EXPECT_THAT(status.message(), testing::HasSubstr("invalid header name: x-foo\\r\\n"));
+  }
+
+  {
+    const auto status = request_encoder_->encodeHeaders(
+        TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {"x-foo", "hello\r\nGET"}},
+        true);
+    EXPECT_FALSE(status.ok());
+    EXPECT_THAT(status.message(), testing::HasSubstr("invalid header value for: x-foo"));
+  }
+}
+#endif
 
 } // namespace Http2
 } // namespace Http

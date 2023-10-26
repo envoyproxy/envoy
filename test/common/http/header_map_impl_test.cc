@@ -46,6 +46,14 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ("goodbye", hello_string.get());
   }
 
+  // assignment operator with const rhs
+  {
+    LowerCaseString present_value("present_value");
+    const LowerCaseString new_value("new_value");
+    present_value = new_value;
+    EXPECT_EQ("new_value", present_value.get());
+  }
+
   // Move constructor for normal UnionString.
   {
     UnionString to_move;
@@ -1079,6 +1087,28 @@ TEST(HeaderMapImplTest, HttpTraceContextTest) {
     // 'host' will be converted to ':authority'.
     EXPECT_EQ(23, size);
     EXPECT_EQ(23, request_headers.byteSize());
+
+    request_headers.removeByKey("non-existent-header");
+    EXPECT_EQ(23, request_headers.byteSize());
+
+    request_headers.removeByKey("ok");
+    EXPECT_EQ(19, request_headers.byteSize());
+    EXPECT_TRUE(request_headers.get(Http::LowerCaseString("ok")).empty());
+
+    // Appending will append to the existing value if it exists using "," as the
+    // delimiter.
+    request_headers.appendCopy(Http::LowerCaseString("bar"), "baz");
+    EXPECT_EQ(23, request_headers.byteSize());
+    EXPECT_EQ(1, request_headers.get(Http::LowerCaseString("bar")).size());
+
+    // Adding will store both key and value.
+    request_headers.addCopy(Http::LowerCaseString("bar"), "qux");
+    EXPECT_EQ(29, request_headers.byteSize());
+    EXPECT_EQ(2, request_headers.get(Http::LowerCaseString("bar")).size());
+
+    request_headers.removeByKey("bar");
+    EXPECT_EQ(13, request_headers.byteSize());
+    EXPECT_TRUE(request_headers.get(Http::LowerCaseString("bar")).empty());
   }
 
   {
@@ -1102,6 +1132,41 @@ TEST(HeaderMapImplTest, HttpTraceContextTest) {
     EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_value.data()),
               reinterpret_cast<intptr_t>(header_entry->value().getStringView().data()));
   }
+}
+
+// Test the header map max limits are setup correctly.
+TEST(HeaderMapImplTest, HeaderMapMaxLimits) {
+  auto request_header_default = RequestHeaderMapImpl::create();
+  EXPECT_EQ(request_header_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(request_header_default->maxHeadersCount(), UINT32_MAX);
+
+  auto request_header = RequestHeaderMapImpl::create(5, 10);
+  EXPECT_EQ(request_header->maxHeadersKb(), 5);
+  EXPECT_EQ(request_header->maxHeadersCount(), 10);
+
+  auto request_trailer_default = RequestTrailerMapImpl::create();
+  EXPECT_EQ(request_trailer_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(request_trailer_default->maxHeadersCount(), UINT32_MAX);
+
+  auto request_trailer = RequestTrailerMapImpl::create(10, 20);
+  EXPECT_EQ(request_trailer->maxHeadersKb(), 10);
+  EXPECT_EQ(request_trailer->maxHeadersCount(), 20);
+
+  auto response_header_default = ResponseHeaderMapImpl::create();
+  EXPECT_EQ(response_header_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(response_header_default->maxHeadersCount(), UINT32_MAX);
+
+  auto response_header = ResponseHeaderMapImpl::create(50, 100);
+  EXPECT_EQ(response_header->maxHeadersKb(), 50);
+  EXPECT_EQ(response_header->maxHeadersCount(), 100);
+
+  auto response_trailer_default = ResponseTrailerMapImpl::create();
+  EXPECT_EQ(response_trailer_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(response_trailer_default->maxHeadersCount(), UINT32_MAX);
+
+  auto response_trailer = ResponseTrailerMapImpl::create(2, 3);
+  EXPECT_EQ(response_trailer->maxHeadersKb(), 2);
+  EXPECT_EQ(response_trailer->maxHeadersCount(), 3);
 }
 
 } // namespace Http

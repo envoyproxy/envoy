@@ -48,10 +48,10 @@ public:
    */
   const std::string toJson() const {
     Util::Replacements replacements;
-    return absl::StrReplaceAll(
-        MessageUtil::getJsonStringFromMessageOrDie(toStruct(replacements), /* pretty_print */ false,
-                                                   /* always_print_primitive_fields */ true),
-        replacements);
+    return absl::StrReplaceAll(MessageUtil::getJsonStringFromMessageOrError(
+                                   toStruct(replacements), /* pretty_print */ false,
+                                   /* always_print_primitive_fields */ true),
+                               replacements);
   };
 };
 

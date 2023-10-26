@@ -199,16 +199,15 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
 void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                                               const quic::QuicSocketAddress& peer_address,
                                               const quic::QuicReceivedPacket& packet) {
-  if (quic_connection_->deferSend()) {
-    // If L4 filters causes the connection to be closed early during initialization, now
-    // is the time to actually close the connection.
-    maybeHandleCloseDuringInitialize();
-  }
+  // If L4 filters causes the connection to be closed early during initialization, now
+  // is the time to actually close the connection.
+  maybeHandleCloseDuringInitialize();
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
   if (connection()->sent_server_preferred_address().IsInitialized() &&
       self_address == connection()->sent_server_preferred_address()) {
     connection_stats_.num_packets_rx_on_preferred_address_.inc();
   }
+  maybeApplyDelayedClose();
 }
 
 } // namespace Quic

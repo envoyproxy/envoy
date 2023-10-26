@@ -8,6 +8,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
@@ -83,23 +84,37 @@ bool useHttp3(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&
 
 absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
 getAlternateProtocolsCacheOptions(
-    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    Server::Configuration::ServerFactoryContext& server_context) {
   if (options.has_auto_config() && options.auto_config().has_http3_protocol_options()) {
     if (!options.auto_config().has_alternate_protocols_cache_options()) {
-      throw EnvoyException(fmt::format("alternate protocols cache must be configured when HTTP/3 "
-                                       "is enabled with auto_config"));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("alternate protocols cache must be configured when HTTP/3 "
+                      "is enabled with auto_config"));
     }
-    return options.auto_config().alternate_protocols_cache_options();
+    auto cache_options = options.auto_config().alternate_protocols_cache_options();
+    if (cache_options.has_key_value_store_config() && server_context.options().concurrency() != 1) {
+      throwEnvoyExceptionOrPanic(
+          fmt::format("options has key value store but Envoy has concurrency = {} : {}",
+                      server_context.options().concurrency(), cache_options.DebugString()));
+    }
+
+    return cache_options;
   }
   return absl::nullopt;
 }
 
 Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
     [[maybe_unused]] const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
-    [[maybe_unused]] ProtobufMessage::ValidationVisitor& validation_visitor) {
+    [[maybe_unused]] Server::Configuration::ServerFactoryContext& server_context) {
 
   Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
+    // This will cause codecs to use legacy header validation and path normalization
+    return nullptr;
+  }
   ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
   if (!options.has_header_validation_config()) {
     // If header validator is not configured ensure that the defaults match Envoy's original
@@ -119,21 +134,27 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   auto* factory = Envoy::Config::Utility::getFactory<Envoy::Http::HeaderValidatorFactoryConfig>(
       header_validator_config);
   if (!factory) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Header validator extension not found: '{}'", header_validator_config.name()));
   }
 
   header_validator_factory =
-      factory->createFromProto(header_validator_config.typed_config(), validation_visitor);
+      factory->createFromProto(header_validator_config.typed_config(), server_context);
   if (!header_validator_factory) {
-    throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
-                                     header_validator_config.name()));
+    throwEnvoyExceptionOrPanic(fmt::format("Header validator extension could not be created: '{}'",
+                                           header_validator_config.name()));
   }
 #else
   if (options.has_header_validation_config()) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("This Envoy binary does not support header validator extensions: '{}'",
                     options.header_validation_config().name()));
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
+    throwEnvoyExceptionOrPanic(
+        "Header validator can not be enabled since this Envoy binary does not support it.");
   }
 #endif
   return header_validator_factory;
@@ -165,9 +186,9 @@ uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
-    ProtobufMessage::ValidationVisitor& validation_visitor)
-    : http1_settings_(
-          Envoy::Http::Http1::parseHttp1Settings(getHttpOptions(options), validation_visitor)),
+    Server::Configuration::ServerFactoryContext& server_context)
+    : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(
+          getHttpOptions(options), server_context.messageValidationVisitor())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(getHttp2Options(options))),
       http3_options_(getHttp3Options(options)),
       common_http_protocol_options_(options.common_http_protocol_options()),
@@ -177,8 +198,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
                     options.upstream_http_protocol_options())
               : absl::nullopt),
       http_filters_(options.http_filters()),
-      alternate_protocol_cache_options_(getAlternateProtocolsCacheOptions(options)),
-      header_validator_factory_(createHeaderValidatorFactory(options, validation_visitor)),
+      alternate_protocol_cache_options_(getAlternateProtocolsCacheOptions(options, server_context)),
+      header_validator_factory_(createHeaderValidatorFactory(options, server_context)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
       use_alpn_(options.has_auto_config()) {}

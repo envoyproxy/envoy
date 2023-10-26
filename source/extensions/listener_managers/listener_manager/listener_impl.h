@@ -28,13 +28,12 @@
 namespace Envoy {
 namespace Server {
 
-constexpr absl::string_view ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG{
-    "envoy.reloadable_features.enable_update_listener_socket_options"};
-
 /**
  * All missing listener config stats. @see stats_macros.h
  */
-#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER)                                                 \
+  COUNTER(extension_config_missing)                                                                \
+  COUNTER(network_extension_config_missing)
 
 /**
  * Struct definition for all missing listener config stats. @see stats_macros.h
@@ -377,6 +376,9 @@ public:
     return access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return max_connections_to_accept_per_socket_event_;
+  }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
@@ -396,10 +398,11 @@ public:
 
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
-                                const std::vector<Network::FilterFactoryCb>& factories) override;
+                                const Filter::NetworkFilterFactoriesList& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager& manager) override;
 
   SystemTime last_updated_;
 
@@ -449,7 +452,7 @@ private:
   void buildAccessLog();
   void buildInternalListener();
   void validateConfig();
-  void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+  bool buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
   void buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
@@ -485,6 +488,7 @@ private:
   const bool workers_started_;
   const uint64_t hash_;
   const uint32_t tcp_backlog_size_;
+  const uint32_t max_connections_to_accept_per_socket_event_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool ignore_global_conn_limit_;
 
@@ -496,6 +500,7 @@ private:
 
   Filter::ListenerFilterFactoriesList listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
+  Filter::QuicListenerFilterFactoriesList quic_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;

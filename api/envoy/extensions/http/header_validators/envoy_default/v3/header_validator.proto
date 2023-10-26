@@ -27,6 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    without `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
 //
 // [#comment:TODO(yanavlasov): Put #extension: envoy.http.header_validators.envoy_default after it is not hidden any more]
+// [#next-free-field: 6]
 message HeaderValidatorConfig {
   // Action to take when Envoy receives client request with header names containing underscore
   // characters.
@@ -144,4 +145,8 @@ message HeaderValidatorConfig {
   // Action to take when a client request with a header name containing underscore characters is received.
   // If this setting is not specified, the value defaults to ALLOW.
   HeadersWithUnderscoresAction headers_with_underscores_action = 4;
+
+  // Allow requests with fragment in URL path and strip the fragment before request processing.
+  // By default Envoy rejects requests with fragment in URL path.
+  bool strip_fragment_from_path = 5;
 }

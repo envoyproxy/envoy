@@ -9,6 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/regex.h"
+#include "source/common/config/datasource.h"
 
 namespace Envoy {
 namespace Router {
@@ -38,16 +39,19 @@ ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
     : name_(config.name()), matcher_(maybeCreateStringMatcher(config)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
-    const Http::Utility::QueryParams& request_query_params) const {
-  auto query_param = request_query_params.find(name_);
-  if (query_param == request_query_params.end()) {
+    const Http::Utility::QueryParamsMulti& request_query_params) const {
+  // This preserves the legacy behavior of ignoring all but the first value for a given key
+  auto data = request_query_params.getFirstValue(name_);
+  if (!data.has_value()) {
     return false;
-  } else if (!matcher_.has_value()) {
-    // Present match.
-    return true;
-  } else {
-    return matcher_.value().match(query_param->second);
   }
+
+  if (!matcher_.has_value()) {
+    // Present check
+    return true;
+  }
+
+  return matcher_.value().match(data.value());
 }
 
 Upstream::ResourcePriority
@@ -63,7 +67,7 @@ ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& pri
 }
 
 bool ConfigUtility::matchQueryParams(
-    const Http::Utility::QueryParams& query_params,
+    const Http::Utility::QueryParamsMulti& query_params,
     const std::vector<QueryParameterMatcherPtr>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
     if (!config_query_param->matches(query_params)) {
@@ -108,28 +112,14 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v
     return EMPTY_STRING;
   }
   const auto& body = route.direct_response().body();
-  const std::string& filename = body.filename();
-  if (!filename.empty()) {
-    if (!api.fileSystem().fileExists(filename)) {
-      throw EnvoyException(fmt::format("response body file {} does not exist", filename));
-    }
-    const ssize_t size = api.fileSystem().fileSize(filename);
-    if (size < 0) {
-      throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
-    }
-    if (static_cast<uint64_t>(size) > max_body_size_bytes) {
-      throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
-                                       filename, size, max_body_size_bytes));
-    }
-    return api.fileSystem().fileReadToEnd(filename);
+
+  const std::string string_body =
+      Envoy::Config::DataSource::read(body, true, api, max_body_size_bytes);
+  if (string_body.length() > max_body_size_bytes) {
+    throwEnvoyExceptionOrPanic(fmt::format("response body size is {} bytes; maximum is {}",
+                                           string_body.length(), max_body_size_bytes));
   }
-  const std::string inline_body(body.inline_bytes().empty() ? body.inline_string()
-                                                            : body.inline_bytes());
-  if (inline_body.length() > max_body_size_bytes) {
-    throw EnvoyException(fmt::format("response body size is {} bytes; maximum is {}",
-                                     inline_body.length(), max_body_size_bytes));
-  }
-  return inline_body;
+  return string_body;
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(

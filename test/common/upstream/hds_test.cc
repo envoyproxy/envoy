@@ -9,6 +9,7 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -50,7 +51,7 @@ public:
   void processPrivateMessage(
       HdsDelegate& hd,
       std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
-    hd.processMessage(std::move(message));
+    ASSERT_TRUE(hd.processMessage(std::move(message)).ok());
   };
   HdsDelegateStats getStats(HdsDelegate& hd) { return hd.stats_; };
 };
@@ -117,7 +118,7 @@ protected:
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
   // healthcheck
-  envoy::service::health::v3::HealthCheckSpecifier* createSimpleMessage() {
+  envoy::service::health::v3::HealthCheckSpecifier* createSimpleMessage(bool http = true) {
     envoy::service::health::v3::HealthCheckSpecifier* msg =
         new envoy::service::health::v3::HealthCheckSpecifier;
     msg->mutable_interval()->set_seconds(1);
@@ -129,10 +130,11 @@ protected:
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
-        envoy::type::v3::HTTP1);
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
-
+    if (http) {
+      health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
+          envoy::type::v3::HTTP1);
+      health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+    }
     auto* locality_endpoints = health_check->add_locality_endpoints();
     // add locality information to this endpoint set of one endpoint.
     auto* locality = locality_endpoints->mutable_locality();
@@ -288,7 +290,9 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
     auto* health_check = message->add_cluster_health_checks();
     health_check->set_cluster_name("anna" + std::to_string(i));
     for (int j = 0; j < 3; j++) {
-      auto* address = health_check->add_locality_endpoints()->add_endpoints()->mutable_address();
+      auto* locality_endpoints = health_check->add_locality_endpoints();
+      locality_endpoints->mutable_locality()->set_zone(std::to_string(j));
+      auto* address = locality_endpoints->add_endpoints()->mutable_address();
       address->mutable_socket_address()->set_address("127.0.0." + std::to_string(i));
       address->mutable_socket_address()->set_port_value(1234 + j);
     }
@@ -464,6 +468,38 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
 }
 
+// Test if processMessage exits gracefully if the update fails
+TEST_F(HdsTest, TestProcessMessageInvalidFieldsWithFallback) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection, setBufferLimits(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Create a invalid message: grpc health checks require an H2 cluster
+  message.reset(createSimpleMessage(false));
+
+  // Pass invalid message through. Should increment stat_ errors upon
+  // getting a bad message.
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check Correctness by verifying one request and one error has been generated in stat_
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
+}
+
 // Test if sendResponse() retains the structure of all endpoints ingested in the specifier
 // from onReceiveMessage(). This verifies that all endpoints are grouped by the correct
 // cluster and the correct locality.
@@ -582,7 +618,7 @@ TEST_F(HdsTest, TestSocketContext) {
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.server_context_, params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.clusterManager(),
             params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
@@ -1071,7 +1107,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.server_context_, params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.clusterManager(),
             params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
@@ -1174,7 +1210,9 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenCreate) {
   auto* health_check = message->add_cluster_health_checks();
   health_check->set_cluster_name("anna");
   for (int i = 0; i < 3; i++) {
-    auto* endpoint = health_check->add_locality_endpoints()->add_endpoints();
+    auto* locality_endpoints = health_check->add_locality_endpoints();
+    locality_endpoints->mutable_locality()->set_zone(std::to_string(i));
+    auto* endpoint = locality_endpoints->add_endpoints();
     endpoint->mutable_health_check_config()->set_port_value(4321 + i);
     auto* address = endpoint->mutable_address();
     address->mutable_socket_address()->set_address("127.0.0.1");

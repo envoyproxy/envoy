@@ -36,21 +36,21 @@ public:
   MOCK_METHOD(Api::IoCallSizeResult, pread_, (void* buf, uint64_t count, uint64_t offset));
   MOCK_METHOD(Api::IoCallSizeResult, pwrite_, (const void* buf, uint64_t count, uint64_t offset));
 
-  size_t num_opens_;
-  size_t num_writes_;
-  size_t num_preads_;
-  size_t num_pwrites_;
-  Thread::MutexBasicLockable open_mutex_;
-  Thread::MutexBasicLockable write_mutex_;
-  Thread::MutexBasicLockable pread_mutex_;
-  Thread::MutexBasicLockable pwrite_mutex_;
-  Thread::CondVar open_event_;
-  Thread::CondVar write_event_;
-  Thread::CondVar pread_event_;
-  Thread::CondVar pwrite_event_;
+  absl::Mutex mutex_;
+  uint64_t num_opens_{0};
+  uint64_t num_writes_{0};
+  uint64_t num_preads_{0};
+  uint64_t num_pwrites_{0};
+
+  bool waitForEventCount(uint64_t& event_counter, uint64_t expected) {
+    auto func = [&]() { return event_counter == expected; };
+    bool result = mutex_.LockWhenWithTimeout(absl::Condition(&func), absl::Seconds(15));
+    mutex_.Unlock();
+    return result;
+  }
 
 private:
-  bool is_open_;
+  bool is_open_{false};
 };
 
 class MockInstance : public Instance {
@@ -63,10 +63,11 @@ public:
   MOCK_METHOD(bool, fileExists, (const std::string&));
   MOCK_METHOD(bool, directoryExists, (const std::string&));
   MOCK_METHOD(ssize_t, fileSize, (const std::string&));
-  MOCK_METHOD(std::string, fileReadToEnd, (const std::string&));
-  MOCK_METHOD(PathSplitResult, splitPathFromFilename, (absl::string_view));
+  MOCK_METHOD(absl::StatusOr<std::string>, fileReadToEnd, (const std::string&));
+  MOCK_METHOD(absl::StatusOr<PathSplitResult>, splitPathFromFilename, (absl::string_view));
   MOCK_METHOD(bool, illegalPath, (const std::string&));
   MOCK_METHOD(Api::IoCallResult<FileInfo>, stat, (absl::string_view));
+  MOCK_METHOD(Api::IoCallBoolResult, createPath, (absl::string_view));
 };
 
 class MockWatcher : public Watcher {

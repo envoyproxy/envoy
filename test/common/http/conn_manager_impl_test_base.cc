@@ -13,10 +13,11 @@ namespace Envoy {
 namespace Http {
 
 HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
-    : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
+    : fake_stats_(*symbol_table_), http_context_(fake_stats_.symbolTable()),
+      access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
-          Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
+          Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
                                       POOL_GAUGE(*fake_stats_.rootScope()),
@@ -77,6 +78,7 @@ void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_n
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
       overload_manager_, test_time_.timeSystem());
+
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
   if (tracing) {
@@ -114,7 +116,7 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
         .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
                           this](FilterChainManager& manager) -> bool {
           bool applied_filters = false;
-          if (log_handler_.get()) {
+          if (log_handler_) {
             auto factory = createLogHandlerFactoryCb(log_handler_);
             manager.applyFilterFactoryCb({}, factory);
             applied_filters = true;
@@ -146,12 +148,12 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
 }
 
 void HttpConnectionManagerImplMixin::setUpBufferLimits() {
-  ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
-  EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
-  EXPECT_CALL(stream_, addCallbacks(_))
+  auto& stream = response_encoder_.stream_;
+  EXPECT_CALL(stream, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
+  EXPECT_CALL(stream, addCallbacks(_))
       .WillOnce(Invoke(
           [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
-  EXPECT_CALL(stream_, setFlushTimeout(_));
+  EXPECT_CALL(stream, setFlushTimeout(_));
 }
 
 void HttpConnectionManagerImplMixin::setUpEncoderAndDecoder(bool request_with_data_and_trailers,
@@ -279,14 +281,13 @@ void HttpConnectionManagerImplMixin::expectOnDestroy(bool deferred) {
 void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
   // We will call removeCallbacks twice.
   // Once in resetAllStreams, and once in doDeferredStreamDestroy.
-  EXPECT_CALL(stream_, removeCallbacks(_)).Times(2);
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_)).Times(2);
   expectOnDestroy(deferred);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 void HttpConnectionManagerImplMixin::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
-  InSequence s;
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -296,6 +297,10 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
     data.drain(4);
     return Http::okStatus();
   }));
+
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -309,21 +314,104 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
   conn_manager_->onData(fake_input, false);
 }
 
-void HttpConnectionManagerImplMixin::expectUhvTrailerCheckFail() {
-  EXPECT_CALL(header_validator_factory_, create(codec_->protocol_, _))
-      .WillOnce(InvokeWithoutArgs([]() {
-        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
-        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
-            .WillOnce(InvokeWithoutArgs(
-                []() { return HeaderValidator::RequestHeaderMapValidationResult::success(); }));
+void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
+  header_validator_config_.mutable_uri_path_normalization_options()->set_skip_path_normalization(
+      !normalize_path_);
+  header_validator_config_.mutable_uri_path_normalization_options()->set_skip_merging_slashes(
+      !merge_slashes_);
+  header_validator_config_.mutable_uri_path_normalization_options()
+      ->set_path_with_escaped_slashes_action(
+          static_cast<
+              ::envoy::extensions::http::header_validators::envoy_default::v3::
+                  HeaderValidatorConfig::UriPathNormalizationOptions::PathWithEscapedSlashesAction>(
+              path_with_escaped_slashes_action_));
+  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
+      .WillOnce(InvokeWithoutArgs([this]() {
+        auto header_validator = std::make_unique<
+            Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
+            header_validator_config_, Protocol::Http11, header_validator_stats_,
+            header_validator_config_overrides_);
 
-        EXPECT_CALL(*header_validator, validateRequestTrailerMap(_))
-            .WillOnce(InvokeWithoutArgs([]() {
-              return HeaderValidator::TrailerValidationResult(
-                  HeaderValidator::TrailerValidationResult::Action::Reject, "bad_trailer_map");
-            }));
         return header_validator;
       }));
+}
+
+void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
+    HeaderValidator::ValidationResult validation_result,
+    ServerHeaderValidator::RequestHeadersTransformationResult transformation_result) {
+  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
+      .WillOnce(InvokeWithoutArgs([validation_result, transformation_result]() {
+        auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
+        EXPECT_CALL(*header_validator, validateRequestHeaders(_))
+            .WillOnce(InvokeWithoutArgs([validation_result]() { return validation_result; }));
+
+        if (validation_result.ok()) {
+          EXPECT_CALL(*header_validator, transformRequestHeaders(_))
+              .WillOnce(Invoke([transformation_result](RequestHeaderMap& headers) {
+                if (transformation_result.action() ==
+                    ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect) {
+                  headers.setPath("/some/new/path");
+                }
+                return transformation_result;
+              }));
+        }
+
+        EXPECT_CALL(*header_validator, transformResponseHeaders(_))
+            .WillOnce(InvokeWithoutArgs([]() {
+              return ServerHeaderValidator::ResponseHeadersTransformationResult::success();
+            }));
+
+        return header_validator;
+      }));
+}
+
+void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
+    HeaderValidator::ValidationResult validation_result,
+    HeaderValidator::TransformationResult transformation_result, bool expect_response) {
+  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
+      .WillOnce(InvokeWithoutArgs([validation_result, transformation_result, expect_response]() {
+        auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
+        EXPECT_CALL(*header_validator, validateRequestHeaders(_)).WillOnce(InvokeWithoutArgs([]() {
+          return HeaderValidator::ValidationResult::success();
+        }));
+
+        EXPECT_CALL(*header_validator, transformRequestHeaders(_)).WillOnce(InvokeWithoutArgs([]() {
+          return ServerHeaderValidator::RequestHeadersTransformationResult::success();
+        }));
+
+        EXPECT_CALL(*header_validator, validateRequestTrailers(_))
+            .WillOnce(InvokeWithoutArgs([validation_result]() { return validation_result; }));
+        if (validation_result.ok()) {
+          EXPECT_CALL(*header_validator, transformRequestTrailers(_))
+              .WillOnce(
+                  InvokeWithoutArgs([transformation_result]() { return transformation_result; }));
+        }
+        if (expect_response) {
+          EXPECT_CALL(*header_validator, transformResponseHeaders(_))
+              .WillOnce(InvokeWithoutArgs([]() {
+                return ServerHeaderValidator::ResponseHeadersTransformationResult::success();
+              }));
+        }
+        return header_validator;
+      }));
+}
+
+Event::MockSchedulableCallback*
+HttpConnectionManagerImplMixin::enableStreamsPerIoLimit(uint32_t limit) {
+  EXPECT_CALL(runtime_.snapshot_, getInteger("http.max_requests_per_io_cycle", _))
+      .WillOnce(Return(limit));
+
+  // Expect HCM to create and set schedulable callback
+  auto* deferred_request_callback =
+      new Event::MockSchedulableCallback(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*deferred_request_callback, enabled())
+      .WillRepeatedly(
+          Invoke([deferred_request_callback]() { return deferred_request_callback->enabled_; }));
+  EXPECT_CALL(*deferred_request_callback, scheduleCallbackNextIteration())
+      .WillRepeatedly(
+          Invoke([deferred_request_callback]() { deferred_request_callback->enabled_ = true; }));
+
+  return deferred_request_callback;
 }
 
 } // namespace Http

@@ -9,8 +9,8 @@ load(
     "envoy_select_admin_functionality",
     "envoy_select_hot_restart",
 )
-load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
 
@@ -56,6 +56,9 @@ envoy_cc_test(
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
@@ -64,7 +67,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -146,10 +148,20 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "hot_restart_udp_forwarding_test_helper",
+    hdrs = ["hot_restart_udp_forwarding_test_helper.h"],
+    deps = [
+        "//source/server:hot_restart_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "hot_restart_impl_test",
     srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
     deps = [
+        ":hot_restart_udp_forwarding_test_helper",
+        ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
@@ -160,9 +172,26 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restarting_child_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_child_test.cc"]),
+    deps = [
+        ":hot_restart_udp_forwarding_test_helper",
+        ":utility_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/stats:stats_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restarting_child",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "hot_restarting_parent_test",
     srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
     deps = [
+        ":utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_child",
@@ -249,6 +278,7 @@ envoy_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
@@ -257,14 +287,15 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "server_fuzz_test",
+    size = "large",
     srcs = ["server_fuzz_test.cc"],
     corpus = "server_corpus",
     deps = [
         "//source/common/thread_local:thread_local_lib",
         "//source/server:server_lib",
         "//test/integration:integration_lib",
-        "//test/mocks/server:options_mocks",
         "//test/mocks/server:hot_restart_mocks",
+        "//test/mocks/server:options_mocks",
         "//test/test_common:environment_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
@@ -306,6 +337,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/tracers/zipkin:config",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
@@ -379,6 +411,7 @@ envoy_cc_benchmark_binary(
         "//envoy/stats:stats_interface",
         "//source/common/stats:thread_local_store_lib",
         "//source/server:server_lib",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
@@ -393,5 +426,6 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["utils_test.cc"]),
     deps = [
         "//source/server:utils_lib",
+        "//test/mocks/server:options_mocks",
     ],
 )

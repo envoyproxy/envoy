@@ -102,22 +102,10 @@ public:
   /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
    * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
-   * default value of 0s will be returned.
+   * default value of 15s will be returned.
    */
   static std::chrono::milliseconds
   configSourceInitialFetchTimeout(const envoy::config::core::v3::ConfigSource& config_source);
-
-  /**
-   * Populate an envoy::config::core::v3::ApiConfigSource.
-   * @param cluster supplies the cluster name for the ApiConfigSource.
-   * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
-   * @param api_type supplies the type of subscription to use for the ApiConfigSource.
-   * @param api_config_source a reference to the envoy::config::core::v3::ApiConfigSource object to
-   * populate.
-   */
-  static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                                       const std::string& api_type,
-                                       envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Check cluster info for API config sanity. Throws on error.
@@ -161,15 +149,6 @@ public:
   static void checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api);
 
   /**
-   * Check the grpc_services and cluster_names for API config sanity. Throws on error.
-   * @param api_config_source the config source to validate.
-   * @throws EnvoyException when an API config has the wrong number of gRPC
-   * services or cluster names, depending on expectations set by its API type.
-   */
-  static void
-  checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source);
-
-  /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param primary_clusters the API config source eligible clusters.
    * @param cluster_name the cluster name to validate.
@@ -202,9 +181,9 @@ public:
   /**
    * Validate transport_api_version field in ApiConfigSource.
    * @param api_config_source the config source to extract transport API version from.
-   * @throws DeprecatedMajorVersionException when the transport version is disabled.
+   * @returns a failure status when the transport version is disabled.
    */
-  template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
+  template <class Proto> static absl::Status checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
@@ -215,8 +194,9 @@ public:
           "see the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      throw DeprecatedMajorVersionException(warning);
+      return absl::InvalidArgumentError(warning);
     }
+    return absl::OkStatus();
   }
 
   /**
@@ -350,9 +330,9 @@ public:
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
     static const std::string& typed_struct_type =
-        xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+        xds::type::v3::TypedStruct::default_instance().GetTypeName();
     static const std::string& legacy_typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+        udpa::type::v1::TypedStruct::default_instance().GetTypeName();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
@@ -401,7 +381,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+    RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
     translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
     return config;
@@ -425,7 +405,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+    RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
     translateOpaqueConfig(typed_config, validation_visitor, *config);
     return config;
@@ -531,7 +511,72 @@ public:
     }
     return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
   }
-};
 
+  /**
+   * Returns Jittered Exponential BackOff Strategy from BackoffStrategy config if present or
+   * provided default timer values
+   * @param api_config_source config
+   * @param random random generator
+   * @param default_base_interval_ms  Default base interval, must be > 0
+   * @param default_max_interval_ms (optional) Default maximum interval
+   * @return JitteredExponentialBackOffStrategyPtr if 1. Backoff Strategy is
+   * found in the config or 2. default base interval and default maximum interval is specified or 3.
+   * max interval is set to 10*default base interval
+   */
+  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
+      const envoy::config::core::v3::ApiConfigSource& api_config_source,
+      Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
+      absl::optional<const uint32_t> default_max_interval_ms) {
+
+    auto& grpc_services = api_config_source.grpc_services();
+    if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
+      return prepareJitteredExponentialBackOffStrategy(
+          grpc_services[0].envoy_grpc(), random, default_base_interval_ms, default_max_interval_ms);
+    }
+    return buildJitteredExponentialBackOffStrategy(absl::nullopt, random, default_base_interval_ms,
+                                                   default_max_interval_ms);
+  }
+
+  /**
+   * Prepares Jittered Exponential BackOff Strategy from config containing the Retry Policy
+   * @param config config containing RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>
+   * @param random random generator
+   * @param default_base_interval_ms  Default base interval, must be > 0
+   * @param default_max_interval_ms (optional) Default maximum interval
+   * @return JitteredExponentialBackOffStrategyPtr if 1. RetryPolicy containing backoff values is
+   * found in config or 2. default base interval and default maximum interval is specified or 3.
+   * default max interval is set to 10*default base interval
+   */
+  template <typename T>
+  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
+      const T& config, Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
+      absl::optional<const uint32_t> default_max_interval_ms) {
+    // If RetryPolicy containing backoff values is found in config
+    if (config.has_retry_policy() && config.retry_policy().has_retry_back_off()) {
+      return buildJitteredExponentialBackOffStrategy(config.retry_policy().retry_back_off(), random,
+                                                     default_base_interval_ms,
+                                                     default_max_interval_ms);
+    }
+    return buildJitteredExponentialBackOffStrategy(absl::nullopt, random, default_base_interval_ms,
+                                                   default_max_interval_ms);
+  }
+
+private:
+  /**
+   * Returns Jittered Exponential BackOff Strategy from BackoffStrategy config or default
+   * values
+   * @param config (optional) BackoffStrategy config
+   * @param random random generator
+   * @param default_base_interval_ms  Default base interval, must be > 0
+   * @param default_max_interval_ms (optional) Default maximum interval
+   * @return JitteredExponentialBackOffStrategyPtr if 1. Backoff Strategy is
+   * specified or 2. default base interval and default maximum interval is specified or 3.
+   * max interval is set to 10*default base interval
+   */
+  static JitteredExponentialBackOffStrategyPtr buildJitteredExponentialBackOffStrategy(
+      absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
+      Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
+      absl::optional<const uint32_t> default_max_interval_ms);
+};
 } // namespace Config
 } // namespace Envoy

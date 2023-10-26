@@ -29,14 +29,18 @@ rebuild_vrp () {
     # Follow instructions from
     # https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/google_vrp#rebuilding-the-docker-image,
     # but here we just use a mock Envoy and mock tools.
-    mkdir -p linux/amd64/build_envoy_release/
-    mkdir -p linux/amd64/build_envoy_release_stripped/
-    touch linux/amd64/build_envoy_release/envoy
-    echo "echo 'VRP PROXY MOCK 2'" > linux/amd64/build_envoy_release_stripped/envoy
-    chmod +x linux/amd64/build_envoy_release_stripped/envoy
-    touch linux/amd64/build_envoy_release_stripped/envoy
-    touch linux/amd64/build_envoy_release/su-exec
-    touch linux/amd64/build_envoy_release/schema_validator_tool
+    mkdir -p linux/arm64 linux/amd64 mockbin/utils
+
+    echo "echo 'VRP PROXY MOCK 2'" > mockbin/envoy
+    chmod +x mockbin/envoy
+    touch mockbin/utils/su-exec
+
+    tar czf release.tar.zst -C mockbin .
+    cp release.tar.zst linux/amd64
+    mv release.tar.zst linux/arm64
+    touch linux/amd64/schema_validator_tool
+    touch linux/arm64/schema_validator_tool
+
     ./ci/docker_rebuild_google-vrp.sh "$@"
     popd > /dev/null
 }

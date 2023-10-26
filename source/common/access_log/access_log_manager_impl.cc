@@ -54,8 +54,8 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
   flush_timer_->enableTimer(flush_interval_msec_);
   auto open_result = open();
   if (!open_result.return_value_) {
-    throw EnvoyException(fmt::format("unable to open file '{}': {}", file_->path(),
-                                     open_result.err_->getErrorDetails()));
+    throwEnvoyExceptionOrPanic(fmt::format("unable to open file '{}': {}", file_->path(),
+                                           open_result.err_->getErrorDetails()));
   }
 }
 
@@ -72,7 +72,11 @@ Api::IoCallBoolResult AccessLogFileImpl::open() {
   return result;
 }
 
-void AccessLogFileImpl::reopen() { reopen_file_ = true; }
+void AccessLogFileImpl::reopen() {
+  Thread::LockGuard lock(write_lock_);
+  reopen_file_ = true;
+  flush_event_.notifyOne();
+}
 
 AccessLogFileImpl::~AccessLogFileImpl() {
   {
@@ -127,6 +131,11 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
 
 void AccessLogFileImpl::flushThreadFunc() {
 
+  // Transfer the action from `reopen_file_` to this variable so that `reopen_file_` is only
+  // accessed while holding the mutex while the actual operation is performed while not holding the
+  // mutex.
+  bool do_reopen = false;
+
   while (true) {
     std::unique_lock<Thread::BasicLockable> flush_lock;
 
@@ -135,6 +144,10 @@ void AccessLogFileImpl::flushThreadFunc() {
 
       // flush_event_ can be woken up either by large enough flush_buffer or by timer.
       // In case it was timer, flush_buffer_ can be empty.
+      //
+      // Note: do not stop waiting when only `do_reopen` is true. In this case, we tried to
+      // reopen and failed. We don't want to retry this in a tight loop, so wait for the next
+      // event (timer or flush).
       while (flush_buffer_.length() == 0 && !flush_thread_exit_ && !reopen_file_) {
         // CondVar::wait() does not throw, so it's safe to pass the mutex rather than the guard.
         flush_event_.wait(write_lock_);
@@ -147,10 +160,14 @@ void AccessLogFileImpl::flushThreadFunc() {
       flush_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
       about_to_write_buffer_.move(flush_buffer_);
       ASSERT(flush_buffer_.length() == 0);
+
+      if (reopen_file_) {
+        do_reopen = true;
+        reopen_file_ = false;
+      }
     }
 
-    // if we failed to reopen before, do it next loop.
-    if (reopen_file_) {
+    if (do_reopen) {
       if (file_->isOpen()) {
         const Api::IoCallBoolResult result = file_->close();
         ASSERT(result.return_value_, fmt::format("unable to close file '{}': {}", file_->path(),
@@ -160,7 +177,7 @@ void AccessLogFileImpl::flushThreadFunc() {
       if (!open_result.return_value_) {
         stats_.reopen_failed_.inc();
       } else {
-        reopen_file_ = false;
+        do_reopen = false;
       }
     }
     // doWrite no matter file isOpen, if not, we can drain buffer

@@ -15,8 +15,11 @@ envoy_cc_extension(
     deps = [
         "//envoy/router:string_accessor_interface",
         "//source/common/network:transport_socket_options_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/extensions/clusters/common:logical_host_lib",
+        "//source/extensions/common/dynamic_forward_proxy:cluster_store",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",

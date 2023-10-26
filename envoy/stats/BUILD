@@ -14,6 +14,11 @@ envoy_cc_library(
     deps = ["//source/common/common:assert_lib"],
 )
 
+envoy_cc_library(
+    name = "tag_interface",
+    hdrs = ["tag.h"],
+)
+
 # TODO(jmarantz): atomize the build rules to match the include files.
 envoy_cc_library(
     name = "stats_interface",
@@ -21,19 +26,28 @@ envoy_cc_library(
         "allocator.h",
         "histogram.h",
         "scope.h",
-        "sink.h",
         "stats.h",
         "stats_matcher.h",
         "store.h",
-        "tag.h",
         "tag_extractor.h",
         "tag_producer.h",
     ],
     external_deps = ["abseil_inlined_vector"],
     deps = [
         ":refcount_ptr_interface",
+        ":tag_interface",
         "//envoy/common:interval_set_interface",
+        "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "sink_interface",
+    hdrs = ["sink.h"],
+    deps = [
+        ":primitive_stats_interface",
+        ":stats_interface",
     ],
 )
 
@@ -43,6 +57,7 @@ envoy_cc_library(
         "primitive_stats.h",
     ],
     deps = [
+        ":tag_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
     ],

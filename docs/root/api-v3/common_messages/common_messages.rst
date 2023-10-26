@@ -23,6 +23,7 @@ Common messages
   ../extensions/filters/common/dependency/v3/dependency.proto
   ../extensions/regex_engines/v3/google_re2.proto
   ../config/core/v3/grpc_method_list.proto
+  ../config/core/v3/http_service.proto
   ../config/core/v3/grpc_service.proto
   ../extensions/key_value/file_based/v3/config.proto
   ../config/common/key_value/v3/config.proto
@@ -30,6 +31,7 @@ Common messages
   ../extensions/early_data/v3/default_early_data_policy.proto
   ../config/core/v3/http_uri.proto
   ../extensions/matching/input_matchers/ip/v3/ip.proto
+  ../extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto
   ../config/core/v3/address.proto
   ../config/core/v3/protocol.proto
   ../config/core/v3/proxy_protocol.proto
@@ -37,3 +39,4 @@ Common messages
   ../config/core/v3/socket_option.proto
   ../config/core/v3/substitution_format_string.proto
   ../config/core/v3/udp_socket_config.proto
+  ../extensions/filters/common/set_filter_state/v3/value.proto

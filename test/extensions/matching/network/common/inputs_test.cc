@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "envoy/http/filter.h"
 
 #include "source/common/http/matching/data_impl.h"
@@ -18,7 +20,8 @@ TEST(MatchingData, DestinationIPInput) {
   DestinationIPInput<MatchingData> input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     socket.connection_info_provider_->setLocalAddress(
@@ -26,7 +29,7 @@ TEST(MatchingData, DestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "127.0.0.1");
   }
 
   {
@@ -35,7 +38,7 @@ TEST(MatchingData, DestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -55,42 +58,42 @@ TEST(MatchingData, HttpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "127.0.0.1");
   }
   {
     DestinationPortInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "8080");
   }
   {
     SourceIPInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "10.0.0.1");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "10.0.0.1");
   }
   {
     SourcePortInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "9090");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "9090");
   }
   {
     DirectSourceIPInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.2");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "127.0.0.2");
   }
   {
     ServerNameInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, host);
+    EXPECT_EQ(absl::get<std::string>(result.data_), host);
   }
 
   connection_info_provider->setRemoteAddress(
@@ -100,7 +103,7 @@ TEST(MatchingData, HttpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "local");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "local");
   }
 }
 
@@ -108,7 +111,8 @@ TEST(MatchingData, DestinationPortInput) {
   DestinationPortInput<MatchingData> input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     socket.connection_info_provider_->setLocalAddress(
@@ -116,7 +120,7 @@ TEST(MatchingData, DestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "8080");
   }
 
   {
@@ -125,7 +129,7 @@ TEST(MatchingData, DestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -133,7 +137,8 @@ TEST(MatchingData, SourceIPInput) {
   SourceIPInput<MatchingData> input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     socket.connection_info_provider_->setRemoteAddress(
@@ -141,7 +146,7 @@ TEST(MatchingData, SourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "127.0.0.1");
   }
 
   {
@@ -150,7 +155,7 @@ TEST(MatchingData, SourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -158,7 +163,8 @@ TEST(MatchingData, SourcePortInput) {
   SourcePortInput<MatchingData> input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     socket.connection_info_provider_->setRemoteAddress(
@@ -166,7 +172,7 @@ TEST(MatchingData, SourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "8080");
   }
 
   {
@@ -175,7 +181,7 @@ TEST(MatchingData, SourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -183,7 +189,8 @@ TEST(MatchingData, DirectSourceIPInput) {
   DirectSourceIPInput<MatchingData> input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     socket.connection_info_provider_->setDirectRemoteAddressForTest(
@@ -191,7 +198,7 @@ TEST(MatchingData, DirectSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "127.0.0.1");
   }
 
   {
@@ -200,7 +207,7 @@ TEST(MatchingData, DirectSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -208,7 +215,8 @@ TEST(MatchingData, SourceTypeInput) {
   SourceTypeInput<MatchingData> input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     socket.connection_info_provider_->setRemoteAddress(
@@ -216,7 +224,7 @@ TEST(MatchingData, SourceTypeInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "local");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "local");
   }
 
   {
@@ -225,7 +233,7 @@ TEST(MatchingData, SourceTypeInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -233,13 +241,14 @@ TEST(MatchingData, ServerNameInput) {
   ServerNameInput<MatchingData> input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -248,7 +257,7 @@ TEST(MatchingData, ServerNameInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, host);
+    EXPECT_EQ(absl::get<std::string>(result.data_), host);
   }
 }
 
@@ -256,14 +265,15 @@ TEST(MatchingData, TransportProtocolInput) {
   TransportProtocolInput input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     EXPECT_CALL(socket, detectedTransportProtocol).WillOnce(testing::Return(""));
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -272,7 +282,7 @@ TEST(MatchingData, TransportProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, protocol);
+    EXPECT_EQ(absl::get<std::string>(result.data_), protocol);
   }
 }
 
@@ -280,7 +290,8 @@ TEST(MatchingData, ApplicationProtocolInput) {
   ApplicationProtocolInput input;
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     std::vector<std::string> protocols = {};
@@ -288,7 +299,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -297,7 +308,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "'h2c'");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "'h2c'");
   }
 
   {
@@ -306,7 +317,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "'h2','http/1.1'");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "'h2','http/1.1'");
   }
 }
 
@@ -320,13 +331,14 @@ TEST(MatchingData, FilterStateInput) {
 
   MockConnectionSocket socket;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
 
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   filter_state.setData("unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
@@ -337,7 +349,7 @@ TEST(MatchingData, FilterStateInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   std::string value = "filter_state_value";
@@ -349,7 +361,7 @@ TEST(MatchingData, FilterStateInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, value);
+    EXPECT_EQ(absl::get<std::string>(result.data_), value);
   }
 }
 
@@ -363,7 +375,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "127.0.0.1");
   }
 
   {
@@ -371,7 +383,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -385,7 +397,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "8080");
   }
 
   {
@@ -393,7 +405,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -407,7 +419,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "127.0.0.1");
   }
 
   {
@@ -415,7 +427,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -429,7 +441,7 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "8080");
   }
 
   {
@@ -437,7 +449,7 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 

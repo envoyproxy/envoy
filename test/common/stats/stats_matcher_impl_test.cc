@@ -330,5 +330,29 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchersWithPrefix) {
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
+TEST_F(StatsMatcherTest, SkipSlowRejectsOnFastReject) {
+  inclusionList()->set_suffix("xyz");
+  initMatcher();
+  StatName stat_name = pool_.add("wxyz");
+  // Verify that we skip the slow check if fast_result is not NoMatch.
+  EXPECT_TRUE(stats_matcher_impl_->slowRejects(StatsMatcher::FastResult::Rejects, stat_name));
+
+  // Verify we don't skip the slow check if fast_result is NoMatch.
+  EXPECT_FALSE(
+      stats_matcher_impl_->slowRejects(stats_matcher_impl_->fastRejects(stat_name), stat_name));
+}
+
+TEST_F(StatsMatcherTest, SkipSlowRejectsOnFastMatches) {
+  exclusionList()->set_suffix("xyz");
+  initMatcher();
+  StatName stat_name = pool_.add("wxyz");
+  // Verify that we skip the slow check if fast_result is not NoMatch.
+  EXPECT_FALSE(stats_matcher_impl_->slowRejects(StatsMatcher::FastResult::Matches, stat_name));
+
+  // Verify we don't skip the slow check if fast_result is NoMatch.
+  EXPECT_TRUE(
+      stats_matcher_impl_->slowRejects(stats_matcher_impl_->fastRejects(stat_name), stat_name));
+}
+
 } // namespace Stats
 } // namespace Envoy

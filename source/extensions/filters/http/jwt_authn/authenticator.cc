@@ -306,21 +306,37 @@ void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
   const auto status = payload_getter.GetValue(claim_name, claim_value);
   std::string str_claim_value;
   if (status == StructUtils::OK) {
-    if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kStringValue) {
+    switch (claim_value->kind_case()) {
+    case Envoy::ProtobufWkt::Value::kStringValue:
       str_claim_value = claim_value->string_value();
-    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kNumberValue) {
+      break;
+    case Envoy::ProtobufWkt::Value::kNumberValue:
       str_claim_value = convertClaimDoubleToString(claim_value->number_value());
-    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kBoolValue) {
+      break;
+    case Envoy::ProtobufWkt::Value::kBoolValue:
       str_claim_value = claim_value->bool_value() ? "true" : "false";
-    } else {
-      ENVOY_LOG(
-          debug,
-          "--------claim : {} is not a primitive type of int, double, string, or bool -----------",
-          claim_name);
+      break;
+    case Envoy::ProtobufWkt::Value::kStructValue:
+      ABSL_FALLTHROUGH_INTENDED;
+    case Envoy::ProtobufWkt::Value::kListValue: {
+      std::string output;
+      auto status = claim_value->has_struct_value()
+                        ? ProtobufUtil::MessageToJsonString(claim_value->struct_value(), &output)
+                        : ProtobufUtil::MessageToJsonString(claim_value->list_value(), &output);
+      if (status.ok()) {
+        str_claim_value = Envoy::Base64::encode(output.data(), output.size());
+      }
+      break;
     }
+    default:
+      ENVOY_LOG(debug, "[jwt_auth] claim : {} is of an unknown type '{}'", claim_name,
+                claim_value->kind_case());
+      break;
+    }
+
     if (!str_claim_value.empty()) {
       headers_->addCopy(Http::LowerCaseString(header_name), str_claim_value);
-      ENVOY_LOG(debug, "--------claim : {} with value : {} is added to the header : {} -----------",
+      ENVOY_LOG(debug, "[jwt_auth] claim : {} with value : {} is added to the header : {}",
                 claim_name, str_claim_value, header_name);
     }
   }

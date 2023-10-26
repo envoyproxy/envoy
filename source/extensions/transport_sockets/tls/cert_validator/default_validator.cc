@@ -77,7 +77,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
     if (list == nullptr) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           absl::StrCat("Failed to load trusted CA certificates from ", config_->caCertPath()));
     }
 
@@ -101,7 +101,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
         }
       }
       if (ca_cert_ == nullptr) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             absl::StrCat("Failed to load trusted CA certificates from ", config_->caCertPath()));
       }
       if (has_crl) {
@@ -128,7 +128,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
     if (list == nullptr) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           absl::StrCat("Failed to load CRL from ", config_->certificateRevocationListPath()));
     }
 
@@ -155,7 +155,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
            cert_validation_config->subjectAltNameMatchers()) {
         auto san_matcher = createStringSanMatcher(matcher);
         if (san_matcher == nullptr) {
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
         }
         subject_alt_name_matchers_.push_back(std::move(san_matcher));
@@ -172,7 +172,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
         }
         const auto& decoded = Hex::decode(hash);
         if (decoded.size() != SHA256_DIGEST_LENGTH) {
-          throw EnvoyException(absl::StrCat("Invalid hex-encoded SHA-256 ", hash));
+          throwEnvoyExceptionOrPanic(absl::StrCat("Invalid hex-encoded SHA-256 ", hash));
         }
         verify_certificate_hash_list_.push_back(decoded);
       }
@@ -183,7 +183,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
       for (const auto& hash : cert_validation_config->verifyCertificateSpkiList()) {
         const auto decoded = Base64::decode(hash);
         if (decoded.size() != SHA256_DIGEST_LENGTH) {
-          throw EnvoyException(absl::StrCat("Invalid base64-encoded SHA-256 ", hash));
+          throwEnvoyExceptionOrPanic(absl::StrCat("Invalid base64-encoded SHA-256 ", hash));
         }
         verify_certificate_spki_list_.emplace_back(decoded.begin(), decoded.end());
       }
@@ -192,37 +192,6 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
   }
 
   return verify_mode;
-}
-
-int DefaultCertValidator::doSynchronousVerifyCertChain(
-    X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
-    const Network::TransportSocketOptions* transport_socket_options) {
-  if (verify_trusted_ca_) {
-    int ret = X509_verify_cert(store_ctx);
-    if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(
-          ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
-                   : Envoy::Ssl::ClientValidationStatus::Failed);
-    }
-
-    if (ret <= 0) {
-      stats_.fail_verify_error_.inc();
-      ENVOY_LOG(debug, "{}", Utility::getX509VerificationErrorInfo(store_ctx));
-      return allow_untrusted_certificate_ ? 1 : ret;
-    }
-  }
-  Envoy::Ssl::ClientValidationStatus detailed_status =
-      Envoy::Ssl::ClientValidationStatus::NotValidated;
-  bool success = verifyCertAndUpdateStatus(&leaf_cert, transport_socket_options, detailed_status,
-                                           nullptr, nullptr);
-  if (ssl_extended_info) {
-    ssl_extended_info->setCertificateValidationStatus(detailed_status);
-  }
-  if (!success) {
-    X509_STORE_CTX_set_error(store_ctx, X509_V_ERR_APPLICATION_VERIFICATION);
-    return 0;
-  }
-  return 1;
 }
 
 bool DefaultCertValidator::verifyCertAndUpdateStatus(
@@ -320,7 +289,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     const char* error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, absl::nullopt, error};
   }
   Envoy::Ssl::ClientValidationStatus detailed_status =
       Envoy::Ssl::ClientValidationStatus::NotValidated;
@@ -532,8 +501,8 @@ void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require
     }
     X509_NAME* name = X509_get_subject_name(cert.get());
     if (name == nullptr) {
-      throw EnvoyException(absl::StrCat("Failed to load trusted client CA certificates from ",
-                                        config_->caCertPath()));
+      throwEnvoyExceptionOrPanic(absl::StrCat("Failed to load trusted client CA certificates from ",
+                                              config_->caCertPath()));
     }
     // Check for duplicates.
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {
@@ -541,8 +510,8 @@ void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require
     }
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
-      throw EnvoyException(absl::StrCat("Failed to load trusted client CA certificates from ",
-                                        config_->caCertPath()));
+      throwEnvoyExceptionOrPanic(absl::StrCat("Failed to load trusted client CA certificates from ",
+                                              config_->caCertPath()));
     }
   }
 
@@ -551,7 +520,7 @@ void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require
   if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
     ERR_clear_error();
   } else {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         absl::StrCat("Failed to load trusted client CA certificates from ", config_->caCertPath()));
   }
   SSL_CTX_set_client_CA_list(ctx, list.release());

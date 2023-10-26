@@ -23,13 +23,6 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
       quic_info->quic_config_.max_idle_time_before_crypto_handshake()) {
     quic_info->quic_config_.set_max_idle_time_before_crypto_handshake(crypto_timeout);
   }
-  // Default enable RVCM connection option so that port migration is enabled.
-  quic::QuicTagVector connection_options;
-  if (quic_info->quic_config_.HasSendConnectionOptions()) {
-    connection_options = quic_info->quic_config_.SendConnectionOptions();
-  }
-  connection_options.push_back(quic::kRVCM);
-  quic_info->quic_config_.SetConnectionOptionsToSend(connection_options);
   return quic_info;
 }
 
@@ -66,10 +59,9 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
 
   // QUICHE client session always use the 1st version to start handshake.
   return std::make_unique<EnvoyQuicClientSession>(
-      config, quic_versions, std::move(connection), server_id, std::move(crypto_config),
-      &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
-      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope,
-      transport_socket_options);
+      config, quic_versions, std::move(connection), server_id, std::move(crypto_config), dispatcher,
+      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache,
+      scope, transport_socket_options);
 }
 
 } // namespace Quic

@@ -1,109 +1,154 @@
 #!/usr/bin/env python3
 
-# Diff or copy pretty-printed artifacts to the source tree.
+# Diff or copy normalized artifacts to the source tree.
 
 import argparse
+import difflib
+import io
 import os
 import pathlib
-import shutil
-import subprocess
 import sys
 import tarfile
-import tempfile
+from hashlib import sha1
+
+# TODO(phlax): Move all of this code to `envoy.code.check`
 
 
-def git_status(path):
-    return subprocess.check_output(
-        ['git', 'status', '--porcelain', str(path)], cwd=str(path)).decode()
+class Git(object):
+
+    # lifted from:
+    #   https://github.com/chris3torek/scripts/blob/2808ac68000c62c3db379d73e3b7df292e333a57/githash.py#L67-L86
+    def blob_hash(self, stream, size):
+        """
+        Return (as hash instance) the hash of a blob,
+        as read from the given stream.
+        """
+        hasher = sha1()
+        hasher.update(('blob %u\0' % size).encode('ascii'))
+        nread = 0
+        while True:
+            # We read just 64K at a time to be kind to
+            # runtime storage requirements.
+            data = stream.read(65536)
+            if data == b'':
+                break
+            nread += len(data)
+            hasher.update(data)
+        if nread != size:
+            # TODO(phlax): move this to pytooling asap.
+            #     This would not pass type checking `BytesIO` has no `stream.name`
+            raise ValueError('%s: expected %u bytes, found %u bytes' % (stream.name, size, nread))
+        return hasher.hexdigest()[:10]
+
+    def string_hash(self, text):
+        chars = text.encode("utf-8")
+        return self.blob_hash(io.BytesIO(chars), len(chars))
+
+    def diff(self, t1, t2, path, mode, remove=False):
+        fhash = self.string_hash(t1)
+        fromfile = f"a/{path}"
+        tofile = f"b/{path}"
+        _diff = [f"diff --git {fromfile} {tofile}"]
+        if remove:
+            _diff += [f"deleted file mode {mode}"]
+            tofile = "/dev/null"
+            desthash = "0000000000"
+        else:
+            desthash = self.string_hash(t2)
+        _diff += [f"index {fhash}..{desthash}"]
+        changes = list(
+            difflib.unified_diff(
+                t1.splitlines(), t2.splitlines(), fromfile=fromfile, tofile=tofile))
+        return (_diff + changes if remove or changes else [])
+
+    def mode(self, path):
+        return oct(os.stat(path).st_mode)[2:]
 
 
-def generate_current_api_dir(api_dir, dst_dir):
-    """Helper function to generate original API repository to be compared with diff.
-    This copies the original API repository and deletes file we don't want to compare.
-    Args:
-        api_dir: the original api directory
-        dst_dir: the api directory to be compared in temporary directory
-    """
-    contrib_dst = dst_dir.joinpath("contrib")
-    shutil.copytree(str(api_dir.joinpath("contrib")), str(contrib_dst))
+def sync(api_root, changed, mode, is_ci):
+    exitcode = 0
+    if os.stat(changed).st_size == 0:
+        sys.exit(exitcode)
 
-    dst = dst_dir.joinpath("envoy")
-    shutil.copytree(str(api_dir.joinpath("envoy")), str(dst))
+    api = pathlib.Path(api_root)
+    envoy_dir = api.parent
+    diff = []
+    fixed = []
+    removed = []
+    git = Git()
 
-    # envoy.service.auth.v2alpha exist for compatibility while we don't run in protoxform
-    # so we ignore it here.
-    shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
-
-    for p in dst.glob('**/*.md'):
-        p.unlink()
-
-
-def sync(api_root, formatted, mode, is_ci):
-    api_root_path = pathlib.Path(api_root)
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = pathlib.Path(tmp)
-
-        # a - the actual api directory found on fs
-        current_api_dir = tmp_path.joinpath("a")
-        current_api_dir.mkdir(0o755, True, True)
-        api_root_path = pathlib.Path(api_root).absolute()
-        generate_current_api_dir(api_root_path, current_api_dir)
-
-        # b - ideally formatted version of api directory according to bazel
-        dst_dir = tmp_path.joinpath("b")
-        with tarfile.open(formatted) as tar:
-            tar.extractall(dst_dir)
-
-        # These support files are handled manually.
-        for f in ['envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
-                  'envoy/annotations/BUILD']:
-            copy_dst_dir = pathlib.Path(dst_dir, os.path.dirname(f))
-            copy_dst_dir.mkdir(exist_ok=True, parents=True)
-            shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
-
-        diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
-
-        if diff.strip():
+    with tarfile.open(changed) as tarball:
+        if not tarball.getmembers():
+            sys.exit(exitcode)
+        for member in tarball.getmembers():
+            _diff = []
+            _remove = []
+            _update = None
+            if member.name == "REMOVE":
+                to_remove = tarball.extractfile(member.name).read().decode("utf-8")
+                for path in to_remove.splitlines():
+                    if mode != "check":
+                        _remove.append(path)
+                    target = pathlib.Path(api_root).parent.joinpath(path)
+                    _diff += git.diff(
+                        target.read_text(),
+                        "",
+                        path.lstrip('.').lstrip('/'),
+                        git.mode(target),
+                        remove=True)
+            else:
+                target = pathlib.Path(api_root).joinpath(member.name)
+                _update = tarball.extractfile(member.name).read().decode("utf-8")
+                # The diff here will be empty if the file has changed but is correct.
+                _diff += git.diff(
+                    target.read_text(), _update, f"api/{member.name.lstrip('.').lstrip('/')}",
+                    git.mode(target))
+            if not _diff:
+                continue
             if mode == "check":
-                print(
-                    "Please apply following patch to directory '{}'".format(api_root),
-                    file=sys.stderr)
-                print(diff.decode(), file=sys.stderr)
-                sys.exit(1)
-            if mode == "fix":
-                _git_status = git_status(api_root_path)
-                if _git_status:
-                    print('git status indicates a dirty API tree:\n%s' % _git_status)
-                    print(
-                        'Proto formatting may overwrite or delete files in the above list with no git backup.'
-                    )
-                    if not is_ci and input('Continue? [yN] ').strip().lower() != 'y':
-                        sys.exit(1)
-                src_files = set(
-                    str(p.relative_to(current_api_dir)) for p in current_api_dir.rglob('*'))
-                dst_files = set(str(p.relative_to(dst_dir)) for p in dst_dir.rglob('*'))
-                deleted_files = src_files.difference(dst_files)
-                if deleted_files:
-                    print('The following files will be deleted: %s' % sorted(deleted_files))
-                    print(
-                        'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
-                    )
-                    if not is_ci and input('Delete files? [yN] ').strip().lower() != 'y':
-                        sys.exit(1)
-                    else:
-                        subprocess.run(['patch', '-p1'],
-                                       input=diff,
-                                       cwd=str(api_root_path.resolve()))
-                else:
-                    subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
+                diff += _diff
+                continue
+            if _update:
+                fixed.append(member.name)
+                api.joinpath(member.name).write_text(_update)
+                continue
+            for path in _remove:
+                removed.append(path)
+                api.parent.joinpath(path).unlink()
+
+    if mode == "check":
+        if not diff:
+            sys.exit(0)
+        sys.stderr.write("Apply the following diff:\n")
+        sys.stderr.write("\n")
+
+        sys.stdout.write("\n".join(d.rstrip() for d in diff))
+        sys.stdout.write("\n")
+        sys.exit(1)
+
+    if fixed:
+        sys.stderr.write("Changes made to following files:\n")
+        sys.stderr.write("\n  ")
+        sys.stderr.write("\n  ".join(f.rstrip() for f in fixed))
+        sys.stderr.write("\n")
+        sys.stderr.write("\n")
+    if removed:
+        sys.stderr.write("Files removed:\n")
+        sys.stderr.write("\n  ")
+        sys.stderr.write("\n  ".join(f.rstrip() for f in removed))
+        sys.stderr.write("\n")
+        sys.stderr.write("\n")
+    sys.exit(1 if fixed or removed else 0)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--formatted')
+    parser.add_argument('--changed')
     parser.add_argument('--mode', choices=['check', 'fix'])
     parser.add_argument('--api_root', default='./api')
     parser.add_argument('--ci', action="store_true", default=False)
     args = parser.parse_args()
 
-    sync(args.api_root, str(pathlib.Path(args.formatted).absolute()), args.mode, args.ci)
+    sync(
+        str(pathlib.Path(args.api_root).absolute()), str(pathlib.Path(args.changed).absolute()),
+        args.mode, args.ci)

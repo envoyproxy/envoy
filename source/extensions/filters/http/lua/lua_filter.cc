@@ -263,16 +263,16 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
         Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
-    coroutine_.resume(1, yield_callback_);
+    resumeCoroutine(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
     ENVOY_LOG(debug, "resuming body due to end stream");
     callbacks_.addData(data);
     state_ = State::Running;
-    coroutine_.resume(luaBody(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   } else if (state_ == State::WaitForTrailers && end_stream_) {
     ENVOY_LOG(debug, "resuming nil trailers due to end stream");
     state_ = State::Running;
-    coroutine_.resume(0, yield_callback_);
+    resumeCoroutine(0, yield_callback_);
   }
 
   if (state_ == State::HttpCall || state_ == State::WaitForBody) {
@@ -294,17 +294,17 @@ Http::FilterTrailersStatus StreamHandleWrapper::onTrailers(Http::HeaderMap& trai
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(debug, "resuming nil body chunk due to trailers");
     state_ = State::Running;
-    coroutine_.resume(0, yield_callback_);
+    resumeCoroutine(0, yield_callback_);
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(debug, "resuming body due to trailers");
     state_ = State::Running;
-    coroutine_.resume(luaBody(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   }
 
   if (state_ == State::WaitForTrailers) {
     // Mimic a call to trailers which will push the trailers onto the stack and then resume.
     state_ = State::Running;
-    coroutine_.resume(luaTrailers(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaTrailers(coroutine_.luaState()), yield_callback_);
   }
 
   Http::FilterTrailersStatus status = (state_ == State::HttpCall || state_ == State::Responded)
@@ -456,12 +456,11 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     state_ = State::Running;
     markLive();
 
-    try {
-      coroutine_.resume(2, yield_callback_);
+    TRY_NEEDS_AUDIT {
+      resumeCoroutine(2, yield_callback_);
       markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      filter_.scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { filter_.scriptError(e); }
 
     if (state_ == State::Running) {
       headers_continued_ = true;
@@ -864,12 +863,11 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
                true);
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
-  try {
+  TRY_NEEDS_AUDIT {
     status = handle.get()->start(function_ref);
     handle.markDead();
-  } catch (const Filters::Common::Lua::LuaException& e) {
-    scriptError(e);
   }
+  END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
 
   return status;
 }
@@ -878,13 +876,12 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
                                       bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
-    try {
+    TRY_NEEDS_AUDIT {
       handle.markLive();
       status = handle.get()->onData(data, end_stream);
       handle.markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
@@ -893,13 +890,12 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
 Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
-    try {
+    TRY_NEEDS_AUDIT {
       handle.markLive();
       status = handle.get()->onTrailers(trailers);
       handle.markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;

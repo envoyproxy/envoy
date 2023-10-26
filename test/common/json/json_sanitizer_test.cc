@@ -26,7 +26,7 @@ protected:
   absl::string_view sanitize(absl::string_view str) { return Envoy::Json::sanitize(buffer_, str); }
 
   absl::string_view protoSanitize(absl::string_view str) {
-    proto_serialization_buffer_ = MessageUtil::getJsonStringFromMessageOrDie(
+    proto_serialization_buffer_ = MessageUtil::getJsonStringFromMessageOrError(
         ValueUtil::stringValue(std::string(str)), false, true);
     return stripDoubleQuotes(proto_serialization_buffer_);
   }
@@ -115,7 +115,7 @@ TEST_F(JsonSanitizerTest, SevenBitAscii) {
 TEST_F(JsonSanitizerTest, Utf8) {
   // reference; https://www.charset.org/utf-8
   auto unicode = [](std::vector<uint8_t> chars) -> std::string {
-    return std::string(reinterpret_cast<const char*>(&chars[0]), chars.size());
+    return {reinterpret_cast<const char*>(&chars[0]), chars.size()};
   };
 
   sanitizeAndCheckAgainstProtobufJson(unicode({0xc2, 0xa2})); // Cent.

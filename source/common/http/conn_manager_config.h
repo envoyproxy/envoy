@@ -8,8 +8,9 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
+#include "envoy/router/scopes.h"
 #include "envoy/stats/scope.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/http/date_provider.h"
@@ -65,6 +66,7 @@ namespace Http {
   COUNTER(downstream_rq_rejected_via_ip_detection)                                                 \
   COUNTER(downstream_rq_response_before_rq_complete)                                               \
   COUNTER(downstream_rq_rx_reset)                                                                  \
+  COUNTER(downstream_rq_too_many_premature_resets)                                                 \
   COUNTER(downstream_rq_timeout)                                                                   \
   COUNTER(downstream_rq_header_timeout)                                                            \
   COUNTER(downstream_rq_too_large)                                                                 \
@@ -216,6 +218,13 @@ public:
    * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
    */
   virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
+
+  // If set to true, access log will be flushed when a new HTTP request is received, after request
+  // headers have been evaluated, and before attempting to establish a connection with the upstream.
+  virtual bool flushAccessLogOnNewRequest() PURE;
+
+  virtual bool flushAccessLogOnTunnelSuccessfullyEstablished() const PURE;
+
   /**
    * Called to create a codec for the connection manager. This function will be called when the
    * first byte of application data is received. This is done to support handling of ALPN, protocol
@@ -223,11 +232,14 @@ public:
    * @param connection supplies the owning connection.
    * @param data supplies the currently available read data.
    * @param callbacks supplies the callbacks to install into the codec.
+   * @param overload_manager supplies overload manager that the codec can
+   * integrate with.
    * @return a codec or nullptr if no codec can be created.
    */
   virtual ServerConnectionPtr createCodec(Network::Connection& connection,
                                           const Buffer::Instance& data,
-                                          ServerConnectionCallbacks& callbacks) PURE;
+                                          ServerConnectionCallbacks& callbacks,
+                                          Server::OverloadManager& overload_manager) PURE;
 
   /**
    * @return DateProvider& the date provider to use for
@@ -332,6 +344,12 @@ public:
   virtual Config::ConfigProvider* scopedRouteConfigProvider() PURE;
 
   /**
+   * @return OptRef<Router::ScopeKeyBuilder> the scope key builder to calculate the scope key.
+   * This will return nullptr when scoped routing is not enabled.
+   */
+  virtual OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() PURE;
+
+  /**
    * @return const std::string& the server name to write into responses.
    */
   virtual const std::string& serverName() const PURE;
@@ -412,9 +430,9 @@ public:
   virtual const absl::optional<std::string>& userAgent() PURE;
 
   /**
-   *  @return HttpTracerSharedPtr HttpTracer to use.
+   *  @return TracerSharedPtr Tracer to use.
    */
-  virtual Tracing::HttpTracerSharedPtr tracer() PURE;
+  virtual Tracing::TracerSharedPtr tracer() PURE;
 
   /**
    * @return tracing config.
@@ -508,7 +526,7 @@ public:
    * @return pointer to the header validator.
    *         If nullptr, header validation will not be done.
    */
-  virtual HeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
+  virtual ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) PURE;
 
   /**
    * @return whether to append the x-forwarded-port header.

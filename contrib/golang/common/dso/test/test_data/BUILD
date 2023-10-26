@@ -13,3 +13,15 @@ go_binary(
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
 )
+
+go_binary(
+    name = "bad.so",
+    srcs = [
+        "bad.go",
+    ],
+    out = "bad.so",
+    cgo = True,
+    importpath = "github.com/envoyproxy/envoy/contrib/golang/common/dso/test/test_data",
+    linkmode = "c-shared",
+    visibility = ["//visibility:public"],
+)

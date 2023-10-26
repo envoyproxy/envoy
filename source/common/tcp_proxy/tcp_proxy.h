@@ -252,7 +252,7 @@ public:
     const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
-    const bool flush_access_log_on_connected_;
+    bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
@@ -374,6 +374,7 @@ class PerConnectionCluster : public StreamInfo::FilterState::Object {
 public:
   PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
+  absl::optional<std::string> serializeAsString() const override { return cluster_; }
   static const std::string& key();
 
 private:
@@ -420,6 +421,10 @@ public:
   }
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
+  }
+
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &read_callbacks_->connection().streamInfo();
   }
 
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
@@ -533,6 +538,10 @@ protected:
   // This will be non-null from when an upstream connection is attempted until
   // it either succeeds or fails.
   std::unique_ptr<GenericConnPool> generic_conn_pool_;
+  // Time the filter first attempted to connect to the upstream after the
+  // cluster is discovered. Capture the first time as the filter may try multiple times to connect
+  // to the upstream.
+  absl::optional<MonotonicTime> initial_upstream_connection_start_time_;
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;

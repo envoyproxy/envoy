@@ -6,252 +6,102 @@
 #include "source/common/common/assert.h"
 #include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/html/utility.h"
-#include "source/server/admin/html/admin_html_gen.h"
+#include "source/server/admin/admin_html_util.h"
 
 #include "absl/strings/str_replace.h"
 
 // Note: if you change this file, it's advisable to manually run
-// test/integration/admin_web_test.sh to semi-automatically validate
+// test/integration/admin_html/web_test.sh to semi-automatically validate
 // the web interface, in addition to updating and running unit tests.
 //
 // The admin web test does not yet run automatically.
-
-namespace {
-
-/**
- * Favicon base64 image was harvested by screen-capturing the favicon from a Chrome tab
- * while visiting https://www.envoyproxy.io/. The resulting PNG was translated to base64
- * by dropping it into https://www.base64-image.de/ and then pasting the resulting string
- * below.
- *
- * The actual favicon source for that, https://www.envoyproxy.io/img/favicon.ico is nicer
- * because it's transparent, but is also 67646 bytes, which is annoying to inline. We could
- * just reference that rather than inlining it, but then the favicon won't work when visiting
- * the admin page from a network that can't see the internet.
- */
-const char EnvoyFavicon[] =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1"
-    "BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAH9SURBVEhL7ZRdTttAFIUrUFaAX5w9gIhgUfzshFRK+gIbaVbA"
-    "zwaqCly1dSpKk5A485/YCdXpHTB4BsdgVe0bD0cZ3Xsm38yZ8byTUuJ/6g3wqqoBrBhPTzmmLfptMbAzttJTpTKAF2MWC"
-    "7ADCdNIwXZpvMMwayiIwwS874CcOc9VuQPR1dBBChPMITpFXXU45hukIIH6kHhzVqkEYB8F5HYGvZ5B7EvwmHt9K/59Cr"
-    "U3QbY2RNYaQPYmJc+jPIBICNCcg20ZsAsCPfbcrFlRF+cJZpvXSJt9yMTxO/IAzJrCOfhJXiOgFEX/SbZmezTWxyNk4Q9"
-    "anHMmjnzAhEyhAW8LCE6wl26J7ZFHH1FMYQxh567weQBOO1AW8D7P/UXAQySq/QvL8Fu9HfCEw4SKALm5BkC3bwjwhSKr"
-    "A5hYAMXTJnPNiMyRBVzVjcgCyHiSm+8P+WGlnmwtP2RzbCMiQJ0d2KtmmmPorRHEhfMROVfTG5/fYrF5iWXzE80tfy9WP"
-    "sCqx5Buj7FYH0LvDyHiqd+3otpsr4/fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5"
-    "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5";
-
-const char AdminHtmlTableBegin[] = R"(
-  <table class='home-table'>
-    <thead>
-      <tr>
-        <th class='home-data'>Command</th>
-        <th class='home-data'>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-)";
-
-const char AdminHtmlTableEnd[] = R"(
-    </tbody>
-  </table>
-)";
-
-} // namespace
 
 namespace Envoy {
 namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml) {
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-  response.add("<!DOCTYPE html>\n");
-  response.add("<html lang='en'>\n");
-  response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
-  if (active_) {
-    response.add("<script>\n");
-    appendResource(response, "active_stats.js", AdminActiveStatsJs);
-    response.add("\n</script>\n");
-  } else {
-    response.add("<body>\n");
+    : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml),
+      json_histograms_(!active_ &&
+                       params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed) {
+  AdminHtmlUtil::renderHead(response_headers, response);
+}
+
+void StatsHtmlRender::finalize(Buffer::Instance& response) {
+  if (first_histogram_) {
+    response.add("</pre>\n");
   }
+
+  AdminHtmlUtil::finalize(response);
 }
 
 void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
                                      const StatsParams& params, Buffer::Instance& response) {
-  setSubmitOnChange(true);
-  tableBegin(response);
-  urlHandler(response, url_handler, params.query_);
+  AdminHtmlUtil::renderTableBegin(response);
+  AdminHtmlUtil::renderEndpointTableRow(response, url_handler, params.query_, 1, !active_, active_);
   if (active_) {
-    appendResource(response, "active_params.html", AdminActiveParamsHtml);
+    std::string buf;
+    response.add(AdminHtmlUtil::getResource("active_params.html", buf));
   }
-  tableEnd(response);
-  startPre(response);
-}
-
-void StatsHtmlRender::finalize(Buffer::Instance& response) {
-  ASSERT(!finalized_);
-  finalized_ = true;
-  if (has_pre_) {
-    response.add("</pre>\n");
-  }
-  response.add("</body>\n");
-  response.add("</html>");
-}
-
-void StatsHtmlRender::appendResource(Buffer::Instance& response, absl::string_view file,
-                                     absl::string_view default_value) {
-#ifdef ENVOY_ADMIN_DEBUG
-  // Build with --cxxopt=-DENVOY_ADMIN_DEBUG to reload css, js, and html files
-  // from the file-system on every admin page load, which enables fast iteration
-  // when debugging the web site.
-  Filesystem::InstanceImpl file_system;
-  std::string path = absl::StrCat("source/server/admin/html/", file);
-  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
-  END_TRY
-  catch (EnvoyException& e) {
-    ENVOY_LOG_MISC(error, "failed to load " + path + ": " + e.what());
-    response.add(default_value);
-  }
-#else
-  UNREFERENCED_PARAMETER(file);
-  response.add(default_value);
-#endif
-}
-
-void StatsHtmlRender::startPre(Buffer::Instance& response) {
-  if (!active_) {
-    has_pre_ = true;
-    response.add("<pre>\n");
+  AdminHtmlUtil::renderTableEnd(response);
+  std::string buf;
+  if (active_) {
+    std::string buf2;
+    response.addFragments({"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf),
+                           AdminHtmlUtil::getResource("active_stats.js", buf2), "</script>\n"});
+  } else {
+    response.addFragments(
+        {"<script>\n", AdminHtmlUtil::getResource("histograms.js", buf), "</script>\n<pre>\n"});
   }
 }
 
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
+  ASSERT(first_histogram_);
   response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
 }
 
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
+  ASSERT(first_histogram_);
   if (!active_) {
     response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
   }
 }
 
-void StatsHtmlRender::tableBegin(Buffer::Instance& response) { response.add(AdminHtmlTableBegin); }
+// When using Detailed mode, we override the generate method for HTML to trigger
+// some JS that will render the histogram graphically. We will render that from
+// JavaScript and convey the histogram data to the JS via JSON, so we can
+// delegate to an instantiated JSON `sub-renderer` that will write into
+// json_data_. that `sub_renderer` will only be populated in Detailed mode.
+//
+// All other modes default to rendering the histogram textually.
+void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
+                               const Stats::ParentHistogram& histogram) {
+  if (json_histograms_) {
+    Json::Streamer streamer(response);
 
-void StatsHtmlRender::tableEnd(Buffer::Instance& response) { response.add(AdminHtmlTableEnd); }
-
-void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
-                                 OptRef<const Http::Utility::QueryParams> query) {
-  absl::string_view path = handler.prefix_;
-
-  if (path == "/") {
-    return; // No need to print self-link to index page.
-  }
-
-  // Remove the leading slash from the link, so that the admin page can be
-  // rendered as part of another console, on a sub-path.
-  //
-  // E.g. consider a downstream dashboard that embeds the Envoy admin console.
-  // In that case, the "/stats" endpoint would be at
-  // https://DASHBOARD/envoy_admin/stats. If the links we present on the home
-  // page are absolute (e.g. "/stats") they won't work in the context of the
-  // dashboard. Removing the leading slash, they will work properly in both
-  // the raw admin console and when embedded in another page and URL
-  // hierarchy.
-  ASSERT(!path.empty());
-  ASSERT(path[0] == '/');
-  std::string sanitized_path = Html::Utility::sanitize(path.substr(1));
-  path = sanitized_path;
-
-  // Alternate gray and white param-blocks. The pure CSS way of coloring based
-  // on row index doesn't work correctly for us as we are using a row for each
-  // parameter, and we want each endpoint/option-block to be colored the same.
-  const char* row_class = (++index_ & 1) ? " class='gray'" : "";
-
-  // For handlers that mutate state, render the link as a button in a POST form,
-  // rather than an anchor tag. This should discourage crawlers that find the /
-  // page from accidentally mutating all the server state by GETting all the hrefs.
-  const char* method = handler.mutates_server_state_ ? "post" : "get";
-  if (submit_on_change_) {
-    response.addFragments({"\n<tr><td><form action='", path, "' method='", method, "' id='", path,
-                           "' class='home-form'></form></td><td></td></tr>\n"});
-  } else {
-    response.addFragments({"\n<tr class='vert-space'><td></td><td></td></tr>\n<tr", row_class,
-                           ">\n  <td class='home-data'>"});
-    if (!handler.mutates_server_state_ && handler.params_.empty()) {
-      // GET requests without parameters can be simple links rather than forms with
-      // buttons that are rendered as links. This simplification improves the
-      // usability of the page with screen-readers.
-      response.addFragments({"<a href='", path, "'>", path, "</a>"});
+    // If this is the first histogram we are rendering, then we need to first
+    // generate the supported-percentiles array sand save it in a constant.
+    //
+    // We use a separate <script> tag for each histogram so that the browser can
+    // begin parsing each potentially large histogram as it is generated,rather
+    // than building up a huge json structure with all the histograms and
+    // blocking rendering until that is parsed.
+    if (first_histogram_) {
+      first_histogram_ = false;
+      response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst supportedPercentiles = ");
+      { StatsJsonRender::populateSupportedPercentiles(*streamer.makeRootArray()); }
+      response.add(";\nconst histogramDiv = document.getElementById('histograms');\n");
+      // The first histogram will share the first script tag with the histogram
+      // div and supportedPercentiles array constants.
     } else {
-      // Render an explicit visible submit as a link (for GET) or button (for POST).
-      const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
-      response.addFragments({"<form action='", path, "' method='", method, "' id='", path,
-                             "' class='home-form'>\n    <button", button_style, ">", path,
-                             "</button>\n  </form>"});
+      response.add("<script>\n");
     }
-    response.addFragments({"</td>\n  <td class='home-data'>",
-                           Html::Utility::sanitize(handler.help_text_), "</td>\n</tr>\n"});
-  }
-
-  for (const Admin::ParamDescriptor& param : handler.params_) {
-    // Give each parameter a unique number. Note that this naming is also referenced in
-    // active_stats.js which looks directly at the parameter widgets to find the
-    // current values during JavaScript-driven active updates.
-    std::string id = absl::StrCat("param-", index_, "-", absl::StrReplaceAll(path, {{"/", "-"}}),
-                                  "-", param.id_);
-    response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
-    input(response, id, param.id_, path, param.type_, query, param.enum_choices_);
-    response.addFragments({"</td>\n  <td class='home-data'>", "<label for='", id, "'>",
-                           Html::Utility::sanitize(param.help_), "</label></td>\n</tr>\n"});
-  }
-}
-
-void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
-                            absl::string_view name, absl::string_view path,
-                            Admin::ParamDescriptor::Type type,
-                            OptRef<const Http::Utility::QueryParams> query,
-                            const std::vector<absl::string_view>& enum_choices) {
-  std::string value;
-  if (query.has_value()) {
-    auto iter = query->find(std::string(name));
-    if (iter != query->end()) {
-      value = iter->second;
-    }
-  }
-
-  std::string on_change;
-  if (submit_on_change_ && (!active_ || name == "format")) {
-    on_change = absl::StrCat(" onchange='", path, ".submit()'");
-  }
-
-  switch (type) {
-  case Admin::ParamDescriptor::Type::Boolean:
-    response.addFragments({"<input type='checkbox' name='", name, "' id='", id, "' form='", path,
-                           "'", on_change, value.empty() ? ">" : " checked/>"});
-    break;
-  case Admin::ParamDescriptor::Type::String: {
-    std::string sanitized;
-    if (!value.empty()) {
-      sanitized = absl::StrCat(" value='", Html::Utility::sanitize(value), "'");
-    }
-    response.addFragments({"<input type='text' name='", name, "' id='", id, "' form='", path, "'",
-                           on_change, sanitized, " />"});
-    break;
-  }
-  case Admin::ParamDescriptor::Type::Enum:
-    response.addFragments(
-        {"\n    <select name='", name, "' id='", id, "' form='", path, "'", on_change, ">\n"});
-    for (absl::string_view choice : enum_choices) {
-      std::string sanitized_choice = Html::Utility::sanitize(choice);
-      std::string sanitized_value = Html::Utility::sanitize(value);
-      absl::string_view selected = (sanitized_value == sanitized_choice) ? " selected" : "";
-      response.addFragments({"      <option value='", sanitized_choice, "'", selected, ">",
-                             sanitized_choice, "</option>\n"});
-    }
-    response.add("    </select>\n  ");
-    break;
+    response.add("renderHistogram(histogramDiv, supportedPercentiles,\n");
+    { StatsJsonRender::generateHistogramDetail(name, histogram, *streamer.makeRootMap()); }
+    response.add(");\n</script>\n");
+  } else {
+    StatsTextRender::generate(response, name, histogram);
   }
 }
 

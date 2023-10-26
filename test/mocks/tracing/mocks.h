@@ -21,10 +21,12 @@ public:
   MOCK_METHOD(const CustomTagMap*, customTags, (), (const));
   MOCK_METHOD(bool, verbose, (), (const));
   MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
+  MOCK_METHOD(bool, spawnUpstreamSpan, (), (const));
 
   OperationName operation_name_{OperationName::Ingress};
   CustomTagMap custom_tags_;
   bool verbose_{false};
+  bool spawn_upstream_span_{false};
 };
 
 class MockSpan : public Span {
@@ -60,14 +62,13 @@ public:
 
   SpanPtr startSpan(const Config& config, TraceContext& trace_context,
                     const StreamInfo::StreamInfo& stream_info,
-                    const Tracing::Decision tracing_decision) override {
+                    Tracing::Decision tracing_decision) override {
     return SpanPtr{startSpan_(config, trace_context, stream_info, tracing_decision)};
   }
 
   MOCK_METHOD(Span*, startSpan_,
               (const Config& config, TraceContext& trace_context,
-               const StreamInfo::StreamInfo& stream_info,
-               const Tracing::Decision tracing_decision));
+               const StreamInfo::StreamInfo& stream_info, Tracing::Decision tracing_decision));
 };
 
 class MockDriver : public Driver {
@@ -76,14 +77,16 @@ public:
   ~MockDriver() override;
 
   SpanPtr startSpan(const Config& config, TraceContext& trace_context,
-                    const std::string& operation_name, SystemTime start_time,
-                    const Tracing::Decision tracing_decision) override {
-    return SpanPtr{startSpan_(config, trace_context, operation_name, start_time, tracing_decision)};
+                    const StreamInfo::StreamInfo& stream_info, const std::string& operation_name,
+                    Tracing::Decision tracing_decision) override {
+    return SpanPtr{
+        startSpan_(config, trace_context, stream_info, operation_name, tracing_decision)};
   }
 
   MOCK_METHOD(Span*, startSpan_,
-              (const Config& config, TraceContext& trace_context, const std::string& operation_name,
-               SystemTime start_time, const Tracing::Decision tracing_decision));
+              (const Config& config, TraceContext& trace_context,
+               const StreamInfo::StreamInfo& stream_info, const std::string& operation_name,
+               Tracing::Decision tracing_decision));
 };
 
 class MockTracerManager : public TracerManager {

@@ -22,6 +22,7 @@
 #include "datadog/sampling_priority.h"
 #include "datadog/span_data.h"
 #include "datadog/tags.h"
+#include "datadog/trace_segment.h"
 #include "datadog/tracer.h"
 #include "gtest/gtest.h"
 
@@ -69,15 +70,25 @@ struct MockCollector : public datadog::tracing::Collector {
   std::vector<std::vector<std::unique_ptr<datadog::tracing::SpanData>>> chunks;
 };
 
+class MockIDGenerator : public datadog::tracing::IDGenerator {
+  std::uint64_t id_;
+
+public:
+  explicit MockIDGenerator(std::uint64_t id) : id_(id) {}
+
+  std::uint64_t span_id() const override { return id_; }
+
+  datadog::tracing::TraceID trace_id() const override { return datadog::tracing::TraceID{id_}; }
+};
+
 class DatadogTracerSpanTest : public testing::Test {
 public:
   DatadogTracerSpanTest()
-      : id_(0xcafebabe), collector_(std::make_shared<MockCollector>()),
-        config_(makeConfig(collector_)),
+      : collector_(std::make_shared<MockCollector>()), config_(makeConfig(collector_)),
         tracer_(
             // Override the tracer's ID generator so that all trace IDs and span
             // IDs are 0xcafebabe.
-            *datadog::tracing::finalize_config(config_), [this]() { return id_; },
+            *datadog::tracing::finalize_config(config_), std::make_shared<MockIDGenerator>(id_),
             datadog::tracing::default_clock),
         span_(tracer_.create_span()) {}
 
@@ -96,7 +107,7 @@ private:
   }
 
 protected:
-  const std::uint64_t id_;
+  const std::uint64_t id_{0xcafebabe};
   const std::shared_ptr<MockCollector> collector_;
   const datadog::tracing::TracerConfig config_;
   datadog::tracing::Tracer tracer_;
@@ -116,7 +127,10 @@ TEST_F(DatadogTracerSpanTest, SetOperation) {
   ASSERT_NE(nullptr, data_ptr);
   const datadog::tracing::SpanData& data = *data_ptr;
 
-  EXPECT_EQ("gastric bypass", data.name);
+  // Setting the operation name actually sets the resource name, because Envoy's
+  // notion of operation name more closely matches Datadog's notion of resource
+  // name.
+  EXPECT_EQ("gastric bypass", data.resource);
 }
 
 TEST_F(DatadogTracerSpanTest, SetTag) {
@@ -124,6 +138,7 @@ TEST_F(DatadogTracerSpanTest, SetTag) {
   span.setTag("foo", "bar");
   span.setTag("boom", "bam");
   span.setTag("foo", "new");
+  span.setTag("resource.name", "vespene gas");
   span.finishSpan();
 
   ASSERT_EQ(1, collector_->chunks.size());
@@ -140,6 +155,12 @@ TEST_F(DatadogTracerSpanTest, SetTag) {
   found = data.tags.find("boom");
   ASSERT_NE(data.tags.end(), found);
   EXPECT_EQ("bam", found->second);
+
+  // The "resource.name" tag is special. It doesn't set a tag, but instead the
+  // span's resource name.
+  found = data.tags.find("resource.name");
+  ASSERT_EQ(data.tags.end(), found);
+  EXPECT_EQ("vespene gas", data.resource);
 }
 
 TEST_F(DatadogTracerSpanTest, InjectContext) {
@@ -198,6 +219,11 @@ TEST_F(DatadogTracerSpanTest, SetSampledTrue) {
   // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
   // (hard drop) or 2 (hard keep).
   {
+    // First ensure that the trace will be dropped (until we override it by
+    // calling `setSampled`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+
     Span local_root{std::move(span_)};
     auto child =
         local_root.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
@@ -224,6 +250,11 @@ TEST_F(DatadogTracerSpanTest, SetSampledFalse) {
   // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
   // (hard drop) or 2 (hard keep).
   {
+    // First ensure that the trace will be kept (until we override it by calling
+    // `setSampled`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_KEEP));
+
     Span local_root{std::move(span_)};
     auto child =
         local_root.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());

@@ -23,6 +23,21 @@ namespace {
 TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
   const std::string yaml_string = R"EOF(
   dynamic_stats: true
+  )EOF";
+
+  envoy::extensions::filters::http::router::v3::Router proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RouterFilterConfig factory;
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats.", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(RouterFilterConfigTest, DEPRECATED_FEATURE_TEST(SimpleRouterFilterConfigWithChildSpan)) {
+  const std::string yaml_string = R"EOF(
+  dynamic_stats: true
   start_child_span: true
   )EOF";
 

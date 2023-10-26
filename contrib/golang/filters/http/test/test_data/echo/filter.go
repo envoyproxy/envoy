@@ -4,27 +4,22 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
-	"google.golang.org/protobuf/types/known/structpb"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 type filter struct {
+	api.PassThroughStreamFilter
+
 	callbacks api.FilterCallbackHandler
 	path      string
-	config    *structpb.Struct
+	config    *config
 }
 
 func (f *filter) sendLocalReply() api.StatusType {
-	headers := make(map[string]string)
-	echoBody := ""
-	v, ok := f.config.AsMap()["echo_body"]
-	if ok {
-		echoBody = v.(string)
-	}
-
+	echoBody := f.config.echoBody
 	{
 		body := fmt.Sprintf("%s, path: %s\r\n", echoBody, f.path)
-		f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
+		f.callbacks.SendLocalReply(403, body, nil, 0, "")
 	}
 	// Force GC to free the body string.
 	// For the case that C++ shouldn't touch the memory of the body string,
@@ -38,33 +33,14 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.path, _ = header.Get(":path")
 	header.Set("rsp-header-from-go", "foo-test")
 	// For the convenience of testing, it's better to in the config parse phase
-	matchPath, ok := f.config.AsMap()["match_path"]
-	if ok && f.path == matchPath.(string) {
+	matchPath := f.config.matchPath
+	if matchPath != "" && f.path == matchPath {
 		return f.sendLocalReply()
 	}
-	return api.Continue
-}
-
-func (f *filter) DecodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	return api.Continue
-}
-
-func (f *filter) DecodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 	return api.Continue
 }
 
 func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api.StatusType {
 	header.Set("Rsp-Header-From-Go", "bar-test")
 	return api.Continue
-}
-
-func (f *filter) EncodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	return api.Continue
-}
-
-func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType {
-	return api.Continue
-}
-
-func (f *filter) OnDestroy(reason api.DestroyReason) {
 }

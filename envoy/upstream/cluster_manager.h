@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -43,6 +44,7 @@ namespace Upstream {
  * ClusterUpdateCallbacks provide a way to expose Cluster lifecycle events in the
  * ClusterManager.
  */
+using ThreadLocalClusterCommand = std::function<ThreadLocalCluster&()>;
 class ClusterUpdateCallbacks {
 public:
   virtual ~ClusterUpdateCallbacks() = default;
@@ -50,11 +52,12 @@ public:
   /**
    * onClusterAddOrUpdate is called when a new cluster is added or an existing cluster
    * is updated in the ClusterManager.
-   * @param cluster is the ThreadLocalCluster that represents the updated
-   * cluster.
+   * @param cluster_name the name of the changed cluster.
+   * @param get_cluster is a callable that will provide the ThreadLocalCluster that represents the
+   * updated cluster. It should be used within the call or discarded.
    */
-  virtual void onClusterAddOrUpdate(ThreadLocalCluster& cluster) PURE;
-
+  virtual void onClusterAddOrUpdate(absl::string_view cluster_name,
+                                    ThreadLocalClusterCommand& get_cluster) PURE;
   /**
    * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
    * @param cluster_name is the name of the removed cluster.
@@ -316,6 +319,11 @@ public:
   virtual void shutdown() PURE;
 
   /**
+   * @return whether the shutdown method has been called.
+   */
+  virtual bool isShutdown() PURE;
+
+  /**
    * @return cluster manager wide bind configuration for new upstream connections.
    */
   virtual const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
@@ -431,6 +439,19 @@ public:
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+
+  /**
+   * @param common_lb_config The config field to be stored
+   * @return shared_ptr to the CommonLbConfig
+   */
+  virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
+  getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) PURE;
+
+  /**
+   * Returns an EdsResourcesCache that is unique for the cluster manager.
+   */
+  virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -503,7 +524,7 @@ public:
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 

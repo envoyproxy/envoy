@@ -12,7 +12,7 @@ namespace Envoy {
 class SslCertsTest : public testing::Test {
 protected:
   SslCertsTest() : api_(Api::createApiForTest(store_, time_system_)) {
-    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   Event::SimulatedTimeSystem time_system_;

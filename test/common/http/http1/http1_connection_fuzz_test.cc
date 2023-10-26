@@ -7,6 +7,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_runtime.h"
 
 #include "absl/strings/substitute.h"
@@ -33,45 +34,52 @@ static Http1Settings fromHttp1Settings() {
 class Http1Harness {
 public:
   Http1Harness(const Http1Settings& server_settings, const Http1Settings& client_settings)
-      : server_settings(server_settings), client_settings(client_settings) {
-    ON_CALL(mock_server_callbacks, newStream(_, _))
+      : server_settings_(server_settings), client_settings_(client_settings) {
+    ON_CALL(mock_server_callbacks_, newStream(_, _))
         .WillByDefault(Invoke(
-            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder; }));
+            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; }));
   }
 
-  void fuzz_response(Buffer::Instance& payload) {
+  void fuzzResponse(Buffer::Instance& payload, bool use_balsa) {
+    client_settings_.use_balsa_parser_ = use_balsa;
     client_ = std::make_unique<Http1::ClientConnectionImpl>(
-        mock_client_connection, Http1::CodecStats::atomicGet(http1_stats, *stats_store.rootScope()),
-        mock_client_callbacks, client_settings, Http::DEFAULT_MAX_HEADERS_COUNT);
+        mock_client_connection_,
+        Http1::CodecStats::atomicGet(http1_stats_, *stats_store_.rootScope()),
+        mock_client_callbacks_, client_settings_, Http::DEFAULT_MAX_HEADERS_COUNT);
     Status status = client_->dispatch(payload);
   }
-  void fuzz_request(Buffer::Instance& payload) {
+
+  void fuzzRequest(Buffer::Instance& payload, bool use_balsa) {
+    server_settings_.use_balsa_parser_ = use_balsa;
     server_ = std::make_unique<Http1::ServerConnectionImpl>(
-        mock_server_connection, Http1::CodecStats::atomicGet(http1_stats, *stats_store.rootScope()),
-        mock_server_callbacks, server_settings, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-        Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        mock_server_connection_,
+        Http1::CodecStats::atomicGet(http1_stats_, *stats_store_.rootScope()),
+        mock_server_callbacks_, server_settings_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+        Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+        overload_manager_);
 
     Status status = server_->dispatch(payload);
   }
 
 private:
-  const Http1Settings server_settings, client_settings;
-  Stats::IsolatedStoreImpl stats_store;
-  Http1::CodecStats::AtomicPtr http1_stats;
+  Http1Settings server_settings_, client_settings_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Http1::CodecStats::AtomicPtr http1_stats_;
 
-  NiceMock<MockConnectionCallbacks> mock_client_callbacks;
-  NiceMock<Network::MockConnection> mock_client_connection;
+  NiceMock<MockConnectionCallbacks> mock_client_callbacks_;
+  NiceMock<Network::MockConnection> mock_client_connection_;
   ClientConnectionPtr client_;
 
-  NiceMock<MockRequestDecoder> orphan_request_decoder;
-  NiceMock<Network::MockConnection> mock_server_connection;
-  NiceMock<MockServerConnectionCallbacks> mock_server_callbacks;
+  NiceMock<MockRequestDecoder> orphan_request_decoder_;
+  NiceMock<Network::MockConnection> mock_server_connection_;
+  NiceMock<MockServerConnectionCallbacks> mock_server_callbacks_;
+  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
 
   ServerConnectionPtr server_;
 };
 
 static std::unique_ptr<Http1Harness> harness;
-static void reset_harness() { harness = nullptr; }
+static void resetHarness() { harness = nullptr; }
 
 // Fuzzing strategy
 // Unconstrained fuzzing, rely on corpus for coverage
@@ -81,15 +89,17 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     Http1Settings server_settings = fromHttp1Settings();
     Http1Settings client_settings = fromHttp1Settings();
     harness = std::make_unique<Http1Harness>(server_settings, client_settings);
-    atexit(reset_harness);
+    atexit(resetHarness);
   }
 
   Buffer::OwnedImpl httpmsg;
   httpmsg.add(buf, len);
   // HTTP requests and responses are handled differently in the codec, hence we
   // setup two instances of the parser, which do not interact.
-  harness->fuzz_request(httpmsg);
-  harness->fuzz_response(httpmsg);
+  harness->fuzzRequest(httpmsg, false);
+  harness->fuzzResponse(httpmsg, false);
+  harness->fuzzRequest(httpmsg, true);
+  harness->fuzzResponse(httpmsg, true);
 }
 
 } // namespace

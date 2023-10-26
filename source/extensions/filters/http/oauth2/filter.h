@@ -20,7 +20,6 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
-#include "source/common/http/rest_api_fetcher.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
@@ -86,7 +85,9 @@ private:
   COUNTER(oauth_unauthorized_rq)                                                                   \
   COUNTER(oauth_failure)                                                                           \
   COUNTER(oauth_passthrough)                                                                       \
-  COUNTER(oauth_success)
+  COUNTER(oauth_success)                                                                           \
+  COUNTER(oauth_refreshtoken_success)                                                              \
+  COUNTER(oauth_refreshtoken_failure)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
@@ -146,7 +147,7 @@ public:
     return oauth_token_endpoint_;
   }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
-  const Http::Utility::QueryParams& authorizationQueryParams() const {
+  const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
   }
   const std::string& redirectUri() const { return redirect_uri_; }
@@ -158,6 +159,7 @@ public:
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const AuthType& authType() const { return auth_type_; }
+  bool useRefreshToken() const { return use_refresh_token_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -166,7 +168,7 @@ private:
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
-  const Http::Utility::QueryParams authorization_query_params_;
+  const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
   const Matchers::PathMatcher redirect_matcher_;
@@ -179,6 +181,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
+  const bool use_refresh_token_{};
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -201,6 +204,7 @@ public:
   virtual const std::string& refreshToken() const PURE;
   virtual void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) PURE;
   virtual bool isValid() const PURE;
+  virtual bool canUpdateTokenByRefreshToken() const PURE;
 };
 
 class OAuth2CookieValidator : public CookieValidator {
@@ -215,6 +219,7 @@ public:
   bool isValid() const override;
   bool hmacIsValid() const;
   bool timestampIsValid() const;
+  bool canUpdateTokenByRefreshToken() const override;
 
 private:
   std::string token_;
@@ -233,23 +238,36 @@ private:
  * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
  * beyond that is broken into component classes.
  */
-class OAuth2Filter : public Http::PassThroughDecoderFilter, public FilterCallbacks {
+class OAuth2Filter : public Http::PassThroughFilter,
+                     FilterCallbacks,
+                     Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
                TimeSource& time_source);
 
-  // Http::PassThroughDecoderFilter
+  // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
   // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
                                const std::string& refresh_token,
                                std::chrono::seconds expires_in) override;
+
+  void onRefreshAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
+                                   const std::string& refresh_token,
+                                   std::chrono::seconds expires_in) override;
+
+  void onRefreshAccessTokenFailure() override;
+
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
   void finishGetAccessTokenFlow();
+  void finishRefreshAccessTokenFlow();
+  void updateTokens(const std::string& access_token, const std::string& id_token,
+                    const std::string& refresh_token, std::chrono::seconds expires_in);
 
 private:
   friend class OAuth2Test;
@@ -261,10 +279,12 @@ private:
   std::string access_token_; // TODO - see if we can avoid this being a member variable
   std::string id_token_;
   std::string refresh_token_;
+  std::string expires_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
   Http::RequestHeaderMap* request_headers_{nullptr};
+  bool was_refresh_token_flow_;
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;
@@ -274,8 +294,6 @@ private:
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
   void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
-  void updateTokens(const std::string& access_token, const std::string& id_token,
-                    const std::string& refresh_token, std::chrono::seconds expires_in);
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 

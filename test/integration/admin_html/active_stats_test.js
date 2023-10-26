@@ -1,6 +1,4 @@
-// This file contains helper functions for writing JavaScript unit tests, in the
-// style of Google's Closure Compiler, but without taking on a large dependency
-// or build infrastructure.
+// This file uses unit-test helper functions defined in web_test.js.
 //
 // See source/server/admin/javascript.md for background info.
 
@@ -117,6 +115,6 @@ async function testActiveFiltered(iframe) {
 }
 
 
-addTest('/stats?format=active', 'testActiveDefaults', testActiveDefaults);
-addTest('/stats?format=active', 'testActiveCustomMaxCount', testActiveCustomMaxCount);
-addTest('/stats?format=active', 'testActiveFiltered', testActiveFiltered);
+addTest('/stats?format=active-html', 'testActiveDefaults', testActiveDefaults);
+addTest('/stats?format=active-html', 'testActiveCustomMaxCount', testActiveCustomMaxCount);
+addTest('/stats?format=active-html', 'testActiveFiltered', testActiveFiltered);

@@ -151,7 +151,8 @@ public:
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override;
+           const StreamInfo::StreamInfo& stream_info,
+           AccessLog::AccessLogType access_log_type) override;
 
   uint32_t getLogLevel() override;
 
@@ -206,6 +207,8 @@ public:
   // State accessors
   WasmResult getProperty(std::string_view path, std::string* result) override;
   WasmResult setProperty(std::string_view path, std::string_view value) override;
+  WasmResult setEnvoyFilterState(std::string_view path, std::string_view value,
+                                 StreamInfo::FilterState::LifeSpan life_span);
   WasmResult declareProperty(std::string_view path,
                              Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype);
 

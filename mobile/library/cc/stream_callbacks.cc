@@ -103,7 +103,6 @@ void* c_on_send_window_available(envoy_stream_intel intel, void* context) {
     auto on_send_window_available = stream_callbacks->on_send_window_available.value();
     on_send_window_available(intel);
   }
-  delete stream_callbacks_ptr;
   return nullptr;
 }
 

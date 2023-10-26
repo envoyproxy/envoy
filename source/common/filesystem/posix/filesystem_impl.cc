@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -136,9 +137,11 @@ static constexpr absl::optional<SystemTime> systemTimeFromTimespec(const struct 
   return timespecToChrono(t);
 }
 
-static FileInfo infoFromStat(absl::string_view path, const struct stat& s, FileType type) {
-  return {
-      std::string{InstanceImplPosix().splitPathFromFilename(path).file_},
+static Api::IoCallResult<FileInfo> infoFromStat(absl::string_view path, const struct stat& s,
+                                                FileType type) {
+  auto result_or_error = InstanceImplPosix().splitPathFromFilename(path);
+  FileInfo ret = {
+      result_or_error.status().ok() ? std::string{result_or_error.value().file_} : "",
       s.st_size,
       type,
 #ifdef _DARWIN_FEATURE_64_BIT_INODE
@@ -151,9 +154,10 @@ static FileInfo infoFromStat(absl::string_view path, const struct stat& s, FileT
       systemTimeFromTimespec(s.st_mtim),
 #endif
   };
+  return result_or_error.status().ok() ? resultSuccess(ret) : resultFailure(ret, EINVAL);
 }
 
-static FileInfo infoFromStat(absl::string_view path, const struct stat& s) {
+static Api::IoCallResult<FileInfo> infoFromStat(absl::string_view path, const struct stat& s) {
   return infoFromStat(path, s, typeFromStat(s));
 }
 
@@ -163,7 +167,7 @@ Api::IoCallResult<FileInfo> FileImplPosix::info() {
   if (::fstat(fd_, &s) != 0) {
     return resultFailure<FileInfo>({}, errno);
   }
-  return resultSuccess(infoFromStat(path(), s));
+  return infoFromStat(path(), s);
 }
 
 Api::IoCallResult<FileInfo> InstanceImplPosix::stat(absl::string_view path) {
@@ -176,12 +180,43 @@ Api::IoCallResult<FileInfo> InstanceImplPosix::stat(absl::string_view path) {
         // but the reference is broken as the target could not be stat()'ed.
         // After confirming this with an lstat, treat this file entity as
         // a regular file, which may be unlink()'ed.
-        return resultSuccess(infoFromStat(path, s, FileType::Regular));
+        return infoFromStat(path, s, FileType::Regular);
       }
     }
     return resultFailure<FileInfo>({}, errno);
   }
-  return resultSuccess(infoFromStat(path, s));
+  return infoFromStat(path, s);
+}
+
+Api::IoCallBoolResult InstanceImplPosix::createPath(absl::string_view path) {
+  // Ideally we could just use std::filesystem::create_directories for this,
+  // identical to ../win32/filesystem_impl.cc, but the OS version used in mobile
+  // CI doesn't support it, so we have to do recursive path creation manually.
+  while (!path.empty() && path.back() == '/') {
+    path.remove_suffix(1);
+  }
+  if (directoryExists(std::string{path})) {
+    return resultSuccess(false);
+  }
+  absl::string_view subpath = path;
+  do {
+    size_t slashpos = subpath.find_last_of('/');
+    if (slashpos == absl::string_view::npos) {
+      return resultFailure(false, ENOENT);
+    }
+    subpath = subpath.substr(0, slashpos);
+  } while (!directoryExists(std::string{subpath}));
+  // We're now at the most-nested directory that already exists.
+  // Time to create paths recursively.
+  while (subpath != path) {
+    size_t slashpos = path.find_first_of('/', subpath.size() + 2);
+    subpath = (slashpos == absl::string_view::npos) ? path : path.substr(0, slashpos);
+    std::string dir_to_create{subpath};
+    if (mkdir(dir_to_create.c_str(), 0777)) {
+      return resultFailure(false, errno);
+    }
+  }
+  return resultSuccess(true);
 }
 
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
@@ -250,14 +285,14 @@ ssize_t InstanceImplPosix::fileSize(const std::string& path) {
   return info.st_size;
 }
 
-std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
+absl::StatusOr<std::string> InstanceImplPosix::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
   }
 
   std::ifstream file(path);
   if (file.fail()) {
-    throw EnvoyException(absl::StrCat("unable to read file: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("unable to read file: ", path));
   }
 
   std::stringstream file_string;
@@ -266,17 +301,17 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
-PathSplitResult InstanceImplPosix::splitPathFromFilename(absl::string_view path) {
+absl::StatusOr<PathSplitResult> InstanceImplPosix::splitPathFromFilename(absl::string_view path) {
   size_t last_slash = path.rfind('/');
   if (last_slash == std::string::npos) {
-    throw EnvoyException(fmt::format("invalid file path {}", path));
+    return absl::InvalidArgumentError(fmt::format("invalid file path {}", path));
   }
   absl::string_view name = path.substr(last_slash + 1);
   // truncate all trailing slashes, except root slash
   if (last_slash == 0) {
     ++last_slash;
   }
-  return {path.substr(0, last_slash), name};
+  return PathSplitResult{path.substr(0, last_slash), name};
 }
 
 bool InstanceImplPosix::illegalPath(const std::string& path) {

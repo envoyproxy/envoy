@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.validate.h"
 
@@ -32,6 +33,7 @@ const std::string& Schema::toString(Type type) {
 }
 
 Options::Options(int argc, const char* const* argv) {
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("schema_validator_tool", ' ', VersionInfo::version());
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", true,
                                            "", "string", cmd);
@@ -124,7 +126,7 @@ void Validator::validate(const Options& options) {
 }
 
 void Validator::run(int argc, const char* const* argv) {
-  Options options(argc, argv);
+  Options options(argc, argv); // NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
   Validator v;
 
   v.validate(options);

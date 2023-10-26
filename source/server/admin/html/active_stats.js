@@ -29,6 +29,11 @@ const nameStatsMap = new Map();
 let activeStatsPreElement = null;
 
 /**
+ * A div into which we render histograms.
+ */
+let activeStatsHistogramsDiv = null;
+
+/**
  * A small div for displaying status and error messages.
  */
 let statusDiv = null;
@@ -65,8 +70,10 @@ function initHook() {
   statusDiv.className = 'error-status-line';
   activeStatsPreElement = document.createElement('pre');
   activeStatsPreElement.id = 'active-content-pre';
+  activeStatsHistogramsDiv = document.createElement('div');
   document.body.appendChild(statusDiv);
   document.body.appendChild(activeStatsPreElement);
+  document.body.appendChild(activeStatsHistogramsDiv);
   loadStats();
 }
 
@@ -76,8 +83,20 @@ function initHook() {
 async function loadStats() {
   const makeQueryParam = (name) => name + '=' + encodeURIComponent(
       document.getElementById(paramIdPrefix + name).value);
-  const params = ['filter', 'type', 'histogram_buckets'];
-  const url = '/stats?format=json&usedonly&' + params.map(makeQueryParam).join('&');
+  const params = ['filter', 'type'];
+  const href = window.location.href;
+
+  // Compute the fetch URL prefix based on the current URL, so that the admin
+  // site can be hosted underneath a site-specific URL structure.
+  const statsPos = href.indexOf('/stats?');
+  if (statsPos == -1) {
+    statusDiv.textContent = 'Cannot find /stats? in ' + href;
+    return;
+  }
+  const prefix = href.substring(0, statsPos);
+  const url = prefix + '/stats?format=json&usedonly&histogram_buckets=detailed&' +
+        params.map(makeQueryParam).join('&');
+
   try {
     const response = await fetch(url);
     const data = await response.json();
@@ -163,6 +182,7 @@ function renderStats(data) {
     }
     sortedStats.push(statRecord);
   }
+  renderHistograms(activeStatsHistogramsDiv, data);
 
   // Sorts all the stats. This is inefficient; we should just pick the top N
   // based on field "active-max-display-count" and sort those. The best

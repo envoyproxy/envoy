@@ -66,6 +66,7 @@ envoy_cc_test(
     deps = [
         "//source/common/stream_info:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
@@ -75,6 +76,14 @@ envoy_cc_test(
     srcs = ["uint32_accessor_impl_test.cc"],
     deps = [
         "//source/common/stream_info:uint32_accessor_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "uint64_accessor_impl_test",
+    srcs = ["uint64_accessor_impl_test.cc"],
+    deps = [
+        "//source/common/stream_info:uint64_accessor_lib",
     ],
 )
 

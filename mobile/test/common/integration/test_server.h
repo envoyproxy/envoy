@@ -8,9 +8,15 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
-#include "test/config/utility.h"
 
 namespace Envoy {
+
+enum class TestServerType {
+  HTTP1_WITHOUT_TLS,
+  HTTP2_WITH_TLS,
+  HTTP3,
+};
+
 class TestServer {
 private:
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
@@ -38,8 +44,9 @@ public:
   /**
    * Starts the server. Can only have one server active per JVM. This is blocking until the port can
    * start accepting requests.
+   * test_server_type: selects between HTTP3, HTTP2, or HTTP1 without TLS
    */
-  void startTestServer(bool use_quic);
+  void startTestServer(TestServerType test_server_type);
 
   /**
    * Shutdowns the server. Can be restarted later. This is blocking until the server has freed all
@@ -51,6 +58,13 @@ public:
    * Returns the port that got attributed. Can only be called once the server has been started.
    */
   int getServerPort();
+
+  /**
+   * Sets headers and data for the test server to return on all future requests.
+   * Can only be called once the server has been started.
+   */
+  void setHeadersAndData(absl::string_view header_key, absl::string_view header_value,
+                         absl::string_view response_body);
 };
 
 } // namespace Envoy

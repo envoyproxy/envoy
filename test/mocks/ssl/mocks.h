@@ -55,6 +55,8 @@ public:
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, dnsSansPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, dnsSansLocalCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, ipSansPeerCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, ipSansLocalCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, validFromPeerCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, expirationPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, sessionId, (), (const));
@@ -84,6 +86,7 @@ public:
   MOCK_METHOD(const std::string&, alpnProtocols, (), (const));
   MOCK_METHOD(const std::string&, cipherSuites, (), (const));
   MOCK_METHOD(const std::string&, ecdhCurves, (), (const));
+  MOCK_METHOD(const std::string&, signatureAlgorithms, (), (const));
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
@@ -98,8 +101,8 @@ public:
 
   MOCK_METHOD(const std::string&, serverNameIndication, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
+  MOCK_METHOD(bool, enforceRsaKeyUsage, (), (const));
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
-  MOCK_METHOD(const std::string&, signingAlgorithmsForTest, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
@@ -108,7 +111,7 @@ public:
   std::string sni_{"default_sni.example.com"};
   std::string ciphers_{"RSA"};
   std::string alpn_{""};
-  std::string test_{};
+  std::string sigalgs_{""};
   Network::Address::IpList iplist_;
   std::string path_{};
 };
@@ -121,6 +124,7 @@ public:
   MOCK_METHOD(const std::string&, alpnProtocols, (), (const));
   MOCK_METHOD(const std::string&, cipherSuites, (), (const));
   MOCK_METHOD(const std::string&, ecdhCurves, (), (const));
+  MOCK_METHOD(const std::string&, signatureAlgorithms, (), (const));
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
@@ -138,6 +142,7 @@ public:
   MOCK_METHOD(OcspStaplePolicy, ocspStaplePolicy, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
   MOCK_METHOD(bool, disableStatelessSessionResumption, (), (const));
+  MOCK_METHOD(bool, disableStatefulSessionResumption, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
@@ -204,6 +209,7 @@ public:
               (SSL * ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
   MOCK_METHOD(void, unregisterPrivateKeyMethod, (SSL * ssl));
   MOCK_METHOD(bool, checkFips, ());
+  MOCK_METHOD(bool, isAvailable, ());
 
 #ifdef OPENSSL_IS_BORINGSSL
   MOCK_METHOD(BoringSslPrivateKeyMethodSharedPtr, getBoringSslPrivateKeyMethod, ());

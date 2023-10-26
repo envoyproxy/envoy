@@ -123,9 +123,10 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
-                             const std::string&, SystemTime start_time,
-                             const Tracing::Decision tracing_decision) override;
+  Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
+                             const StreamInfo::StreamInfo& stream_info,
+                             const std::string& operation_name,
+                             Tracing::Decision tracing_decision) override;
 
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
@@ -224,7 +225,7 @@ public:
    *
    * @return Pointer to the newly-created ZipkinReporter.
    */
-  static ReporterPtr NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+  static ReporterPtr newInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                  const CollectorInfo& collector);
 
 private:

@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.extensions.formatter.cel.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.formatter.cel.v3";
+option java_outer_classname = "CelProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/cel/v3;celv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Formatter extension for printing CEL expressions]
+// [#extension: envoy.formatter.cel]
+
+// CEL formatter extension implements CEL command operator that evaluates configured
+// symbolic Common Expression Language expressions to generate an access log.
+//
+// See :ref:`here <config_access_log>` for more information on access log configuration.
+
+// %CEL(EXPRESSION):Z%
+// Expressions are based on the set of Envoy :ref:`attributes <arch_overview_attributes>`.
+// Expression errors are considered `-`. Z is an optional parameter denoting string
+// truncation up to Z characters long.
+//
+// Examples:
+// - ``%CEL(response.code)%``
+// - ``%CEL(connection.mtls)%``
+// - ``%CEL(request.headers['x-envoy-original-path']):10%``
+// - ``%CEL(request.headers['x-log-mtls'] || request.url_path.contains('v1beta3'))%``
+
+// Configuration for the CEL formatter.
+message Cel {
+}

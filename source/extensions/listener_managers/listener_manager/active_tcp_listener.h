@@ -29,7 +29,8 @@ public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
                     Runtime::Loader& runtime, Network::SocketSharedPtr&& socket,
                     Network::Address::InstanceConstSharedPtr& listen_address,
-                    Network::ConnectionBalancer& connection_balancer);
+                    Network::ConnectionBalancer& connection_balancer,
+                    ThreadLocalOverloadStateOptRef overload_state);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
                     Network::Address::InstanceConstSharedPtr& listen_address,
                     Network::ListenerConfig& config,
@@ -51,6 +52,7 @@ public:
   // Network::TcpListenerCallbacks
   void onAccept(Network::ConnectionSocketPtr&& socket) override;
   void onReject(RejectCause) override;
+  void recordConnectionsAcceptedOnSocketEvent(uint32_t connections_accepted) override;
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }
@@ -59,7 +61,9 @@ public:
 
   void pauseListening() override;
   void resumeListening() override;
-  void shutdownListener() override { listener_.reset(); }
+  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
+    listener_.reset();
+  }
 
   // Network::BalancedConnectionHandler
   uint64_t numConnections() const override { return num_listener_connections_; }

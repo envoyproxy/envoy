@@ -17,21 +17,22 @@ envoy_engine_t EngineHandle::initEngine(envoy_engine_callbacks callbacks, envoy_
 }
 
 envoy_status_t EngineHandle::runEngine(envoy_engine_t handle, const char* config,
-                                       const char* log_level, const char* admin_address_path) {
+                                       const char* log_level) {
   if (auto engine = reinterpret_cast<Envoy::Engine*>(handle)) {
-    engine->run(config, log_level, admin_address_path);
+    engine->run(config, log_level);
     return ENVOY_SUCCESS;
   }
   return ENVOY_FAILURE;
 }
 
-void EngineHandle::terminateEngine(envoy_engine_t handle, bool release) {
+envoy_status_t EngineHandle::terminateEngine(envoy_engine_t handle, bool release) {
   auto engine = reinterpret_cast<Envoy::Engine*>(handle);
-  engine->terminate();
+  envoy_status_t ret = engine->terminate();
   if (release) {
     // TODO(jpsim): Always delete engine to avoid leaking it
     delete engine;
   }
+  return ret;
 }
 
 } // namespace Envoy

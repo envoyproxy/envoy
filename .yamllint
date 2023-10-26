@@ -6,11 +6,20 @@ rules:
     spaces: consistent
     indent-sequences: false
   line-length:
-    max: 200
-    level: warning
+    # This can be adjusted if there is a very good reason.
+    max: 140
+    level: error
+    allow-non-breakable-words: true
   truthy:
     allowed-values:
     - "yes"
     - "no"
     - "true"
     - "false"
+    # https://github.com/adrienverge/yamllint/issues/430
+    - "on"
+
+yaml-files:
+- .clang-format
+- "*.yml"
+- "*.yaml"

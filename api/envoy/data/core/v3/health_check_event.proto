@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.data.core.v3;
 
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/timestamp.proto";
 
@@ -34,7 +35,7 @@ enum HealthCheckerType {
   THRIFT = 4;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message HealthCheckEvent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckEvent";
@@ -66,6 +67,12 @@ message HealthCheckEvent {
 
   // Timestamp for event.
   google.protobuf.Timestamp timestamp = 6;
+
+  // Host metadata
+  config.core.v3.Metadata metadata = 10;
+
+  // Host locality
+  config.core.v3.Locality locality = 11;
 }
 
 message HealthCheckEjectUnhealthy {

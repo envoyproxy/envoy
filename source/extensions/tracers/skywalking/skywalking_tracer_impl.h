@@ -24,9 +24,11 @@ public:
   explicit Driver(const envoy::config::trace::v3::SkyWalkingConfig& config,
                   Server::Configuration::TracerFactoryContext& context);
 
+  // Tracing::Driver
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
-                             const std::string& operation, Envoy::SystemTime start_time,
-                             const Tracing::Decision decision) override;
+                             const StreamInfo::StreamInfo& stream_info,
+                             const std::string& operation_name,
+                             Tracing::Decision tracing_decision) override;
 
 private:
   void loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,

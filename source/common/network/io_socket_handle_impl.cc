@@ -17,20 +17,6 @@ using Envoy::Api::SysCallSizeResult;
 namespace Envoy {
 
 namespace {
-/**
- * On different platforms the sockaddr struct for unix domain
- * sockets is different. We use this function to get the
- * length of the platform specific struct.
- */
-constexpr socklen_t udsAddressLength() {
-#if defined(__APPLE__)
-  return sizeof(sockaddr);
-#elif defined(WIN32)
-  return sizeof(sockaddr_un);
-#else
-  return sizeof(sa_family_t);
-#endif
-}
 
 constexpr int messageTypeContainsIP() {
 #ifdef IP_RECVDSTADDR
@@ -77,10 +63,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
   const int rc = Api::OsSysCallsSingleton::get().close(fd_).return_value_;
   SET_SOCKET_INVALID(fd_);
-  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  return {static_cast<unsigned long>(rc), Api::IoError::none()};
 }
-
-bool IoSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 
 Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                                   uint64_t num_slice) {
@@ -234,6 +218,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    if (result.return_value_ < 0 && result.errno_ == SOCKET_ERROR_INVAL) {
+      ENVOY_LOG(error, fmt::format("EINVAL error. Socket is open: {}, IPv{}.", isOpen(),
+                                   self_ip->version() == Address::IpVersion::v6 ? 6 : 4));
+    }
     return sysCallResultToIoCallResult(result);
   }
 }
@@ -457,14 +445,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, in
   return sysCallResultToIoCallResult(result);
 }
 
-bool IoSocketHandleImpl::supportsMmsg() const {
-  return Api::OsSysCallsSingleton::get().supportsMmsg();
-}
-
-bool IoSocketHandleImpl::supportsUdpGro() const {
-  return Api::OsSysCallsSingleton::get().supportsUdpGro();
-}
-
 Api::SysCallIntResult IoSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
   return Api::OsSysCallsSingleton::get().bind(fd_, address->sockAddr(), address->sockAddrLen());
 }
@@ -512,28 +492,6 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
   return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
 }
 
-Api::SysCallIntResult IoSocketHandleImpl::setOption(int level, int optname, const void* optval,
-                                                    socklen_t optlen) {
-  return Api::OsSysCallsSingleton::get().setsockopt(fd_, level, optname, optval, optlen);
-}
-
-Api::SysCallIntResult IoSocketHandleImpl::getOption(int level, int optname, void* optval,
-                                                    socklen_t* optlen) {
-  return Api::OsSysCallsSingleton::get().getsockopt(fd_, level, optname, optval, optlen);
-}
-
-Api::SysCallIntResult IoSocketHandleImpl::ioctl(unsigned long control_code, void* in_buffer,
-                                                unsigned long in_buffer_len, void* out_buffer,
-                                                unsigned long out_buffer_len,
-                                                unsigned long* bytes_returned) {
-  return Api::OsSysCallsSingleton::get().ioctl(fd_, control_code, in_buffer, in_buffer_len,
-                                               out_buffer, out_buffer_len, bytes_returned);
-}
-
-Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
-  return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
-}
-
 IoHandlePtr IoSocketHandleImpl::duplicate() {
   auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
   RELEASE_ASSERT(result.return_value_ != -1,
@@ -541,48 +499,6 @@ IoHandlePtr IoSocketHandleImpl::duplicate() {
                              errorDetails(result.errno_)));
   return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
                                                          domain_);
-}
-
-absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
-
-Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
-  sockaddr_storage ss;
-  socklen_t ss_len = sizeof(ss);
-  memset(&ss, 0, ss_len);
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult result =
-      os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-  if (result.return_value_ != 0) {
-    throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
-                                     errorDetails(result.errno_)));
-  }
-  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
-}
-
-Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
-  sockaddr_storage ss;
-  socklen_t ss_len = sizeof(ss);
-  memset(&ss, 0, ss_len);
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult result =
-      os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-  if (result.return_value_ != 0) {
-    throw EnvoyException(
-        fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
-  }
-
-  if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
-    // For Unix domain sockets, can't find out the peer name, but it should match our own
-    // name for the socket (i.e. the path should match, barring any namespace or other
-    // mechanisms to hide things, of which there are many).
-    ss_len = sizeof(ss);
-    result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-    if (result.return_value_ != 0) {
-      throw EnvoyException(
-          fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
-    }
-  }
-  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
@@ -610,74 +526,6 @@ void IoSocketHandleImpl::enableFileEvents(uint32_t events) {
 
 Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
-}
-
-absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
-  Api::EnvoyTcpInfo info;
-  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
-  if (!result.return_value_) {
-    return {};
-  }
-  return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
-}
-
-absl::optional<uint64_t> IoSocketHandleImpl::congestionWindowInBytes() const {
-  Api::EnvoyTcpInfo info;
-  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
-  if (!result.return_value_) {
-    return {};
-  }
-  return info.tcpi_snd_cwnd;
-}
-
-absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
-  auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
-  if (!os_syscalls_singleton.supportsGetifaddrs()) {
-    return absl::nullopt;
-  }
-
-  Address::InstanceConstSharedPtr socket_address = localAddress();
-  if (!socket_address || socket_address->type() != Address::Type::Ip) {
-    return absl::nullopt;
-  }
-
-  Api::InterfaceAddressVector interface_addresses{};
-  const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getifaddrs error: {}", rc.errno_));
-
-  absl::optional<std::string> selected_interface_name{};
-  for (const auto& interface_address : interface_addresses) {
-    if (!interface_address.interface_addr_) {
-      continue;
-    }
-
-    if (socket_address->ip()->version() == interface_address.interface_addr_->ip()->version()) {
-      // Compare address _without port_.
-      // TODO: create common addressAsStringWithoutPort method to simplify code here.
-      absl::uint128 socket_address_value;
-      absl::uint128 interface_address_value;
-      switch (socket_address->ip()->version()) {
-      case Address::IpVersion::v4:
-        socket_address_value = socket_address->ip()->ipv4()->address();
-        interface_address_value = interface_address.interface_addr_->ip()->ipv4()->address();
-        break;
-      case Address::IpVersion::v6:
-        socket_address_value = socket_address->ip()->ipv6()->address();
-        interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
-        break;
-      default:
-        ENVOY_BUG(false, fmt::format("unexpected IP family {}",
-                                     static_cast<int>(socket_address->ip()->version())));
-      }
-
-      if (socket_address_value == interface_address_value) {
-        selected_interface_name = interface_address.interface_name_;
-        break;
-      }
-    }
-  }
-
-  return selected_interface_name;
 }
 
 } // namespace Network

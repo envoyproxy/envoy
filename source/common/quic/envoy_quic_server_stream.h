@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_stream.h"
+#include "source/common/quic/http_datagram_handler.h"
 #include "source/common/quic/quic_stats_gatherer.h"
 
 #include "quiche/common/platform/api/quiche_reference_counted.h"
@@ -90,6 +91,7 @@ protected:
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
   void OnHeadersTooLarge() override;
+  void OnInvalidHeaders() override;
 
   // Http::MultiplexedStreamImplBase
   void onPendingFlushTimer() override;
@@ -105,11 +107,24 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
+  // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
+  // starts to receive HTTP/3 Datagrams and decode into Capsules.
+  void useCapsuleProtocol();
+#endif
+
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 
   quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Setting |http_datagram_handler_| enables HTTP Datagram support.
+  std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
+#endif
+  // True if a :path header has been seen before.
+  bool saw_path_{false};
 };
 
 } // namespace Quic

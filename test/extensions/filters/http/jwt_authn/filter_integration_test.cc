@@ -1,11 +1,11 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/string_accessor_impl.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
-#include "test/integration/filters/header_to_filter_state.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 
@@ -33,7 +33,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
   filter.mutable_typed_config()->PackFrom(proto_config);
-  return MessageUtil::getJsonStringFromMessageOrDie(filter);
+  return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
 std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_listener) {
@@ -50,7 +50,7 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
   filter.mutable_typed_config()->PackFrom(proto_config);
-  return MessageUtil::getJsonStringFromMessageOrDie(filter);
+  return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
 std::string getFilterConfig(bool use_local_jwks) {
@@ -59,9 +59,11 @@ std::string getFilterConfig(bool use_local_jwks) {
 
 class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {};
 
-INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, LocalJwksIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // With local Jwks, this test verifies a request is passed with a good Jwt token.
 TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
@@ -206,6 +208,17 @@ TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+class TestObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "jwt_selector"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(TestObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 // This test verifies JwtRequirement specified from filter state rules
 TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   // A config with metadata rules.
@@ -226,10 +239,13 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   config_helper_.prependFilter(R"(
   name: header-to-filter-state
   typed_config:
-    "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
-    header_name: jwt_selector
-    state_name: jwt_selector
-    read_only: true
+    "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+    on_request_headers:
+    - object_key: jwt_selector
+      format_string:
+        text_format_source:
+          inline_string: "%REQ(jwt_selector)%"
+      read_only: true
 )");
   initialize();
 
@@ -385,9 +401,10 @@ public:
   FakeStreamPtr jwks_request_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, RemoteJwksIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, RemoteJwksIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // With remote Jwks, this test verifies a request is passed with a good Jwt token
 // and a good public key fetched from a remote server.
@@ -609,9 +626,10 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, PerRouteIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, PerRouteIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // This test verifies per-route config disabled.
 TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabled) {

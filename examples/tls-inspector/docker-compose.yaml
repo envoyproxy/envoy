@@ -2,6 +2,7 @@ services:
 
   tls-inspector:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service-https-http2:
@@ -16,21 +17,24 @@ services:
 
   service-https-http2:
     build:
-      dockerfile: Dockerfile-echo
+      context: .
+      dockerfile: ../shared/echo2/Dockerfile
     hostname: service-https-http2
     environment:
     - HTTP_PORT=0
 
   service-https-http1.1:
     build:
-      dockerfile: Dockerfile-echo
+      context: .
+      dockerfile: ../shared/echo2/Dockerfile
     hostname: service-https-http1.1
     environment:
     - HTTP_PORT=0
 
   service-http:
     build:
-      dockerfile: Dockerfile-echo
+      context: .
+      dockerfile: ../shared/echo2/Dockerfile
     hostname: service-http
     environment:
     - HTTPS_PORT=0

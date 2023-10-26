@@ -5,8 +5,8 @@
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/extensions/health_checkers/thrift/v3/thrift.pb.h"
 
-#include "source/common/upstream/health_checker_base_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/config.h"
+#include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 #include "source/extensions/health_checkers/thrift/client.h"
 
 namespace Envoy {

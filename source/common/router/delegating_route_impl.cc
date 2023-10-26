@@ -181,12 +181,12 @@ const ConnectConfigOptRef DelegatingRouteEntry::connectConfig() const {
   return base_route_->routeEntry()->connectConfig();
 }
 
-const std::string& DelegatingRouteEntry::routeName() const {
-  return base_route_->routeEntry()->routeName();
-}
-
 const EarlyDataPolicy& DelegatingRouteEntry::earlyDataPolicy() const {
   return base_route_->routeEntry()->earlyDataPolicy();
+}
+
+const RouteStatsContextOptRef DelegatingRouteEntry::routeStatsContext() const {
+  return base_route_->routeEntry()->routeStatsContext();
 }
 
 } // namespace Router

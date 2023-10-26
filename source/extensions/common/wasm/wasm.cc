@@ -68,7 +68,7 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
                                       [this, weak](Event::PostCb post_cb) {
                                         auto lock = weak.lock();
                                         if (lock) { // See if we are still alive.
-                                          server_shutdown_post_cb_ = post_cb;
+                                          server_shutdown_post_cb_ = std::move(post_cb);
                                         }
                                       });
 }
@@ -148,7 +148,7 @@ Wasm::~Wasm() {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
   ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
   if (server_shutdown_post_cb_) {
-    dispatcher_.post(server_shutdown_post_cb_);
+    dispatcher_.post(std::move(server_shutdown_post_cb_));
   }
 }
 
@@ -229,9 +229,10 @@ ContextBase* Wasm::createVmContext() { return new Context(this); }
 void Wasm::log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
                const Http::ResponseHeaderMap* response_headers,
                const Http::ResponseTrailerMap* response_trailers,
-               const StreamInfo::StreamInfo& stream_info) {
+               const StreamInfo::StreamInfo& stream_info,
+               AccessLog::AccessLogType access_log_type) {
   auto context = getRootContext(plugin, true);
-  context->log(request_headers, response_headers, response_trailers, stream_info);
+  context->log(request_headers, response_headers, response_trailers, stream_info, access_log_type);
 }
 
 void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot) {

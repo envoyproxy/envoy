@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -120,7 +121,8 @@ public:
   }
 
   Http2BufferWatermarksTest()
-      : HttpIntegrationTest(
+      : SocketInterfaceSwap(Network::Socket::Type::Stream),
+        HttpIntegrationTest(
             std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
@@ -229,7 +231,9 @@ TEST_P(Http2BufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
 
   // Check the expected number of buffers per account
   if (streamBufferAccounting()) {
-    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
+    // Wait for a short period less than the request timeout time.
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(
+        1, 4, std::chrono::milliseconds(2000)));
   } else {
     EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
   }
@@ -603,6 +607,71 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
   }
 }
 
+class TcpTunnelingWatermarkIntegrationTest : public Http2BufferWatermarksTest {
+public:
+  void SetUp() override {
+    enableHalfClose(true);
+
+    setDownstreamProtocol(std::get<0>(GetParam()).downstream_protocol);
+    setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
+
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+          proxy_config.set_stat_prefix("tcp_stats");
+          proxy_config.set_cluster("cluster_0");
+          proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+
+          auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+          listener->set_name("tcp_proxy");
+          auto* socket_address = listener->mutable_address()->mutable_socket_address();
+          socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+          socket_address->set_port_value(0);
+
+          auto* filter_chain = listener->add_filter_chains();
+          auto* filter = filter_chain->add_filters();
+          filter->mutable_typed_config()->PackFrom(proxy_config);
+          filter->set_name("envoy.filters.network.tcp_proxy");
+
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          auto* options =
+              protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+          options->mutable_initial_stream_window_size()->set_value(65536);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+  }
+
+protected:
+  IntegrationTcpClientPtr tcp_client_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, TcpTunnelingWatermarkIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Bool()),
+    protocolTestParamsAndBoolToString);
+
+TEST_P(TcpTunnelingWatermarkIntegrationTest, MultipleReadDisableCallsIncrementsStatsOnce) {
+  config_helper_.setBufferLimits(16384, 131072);
+  initialize();
+
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  write_matcher_->setWriteReturnsEgain();
+  ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
+  test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
+  tcp_client_->close();
+}
+
 class Http2OverloadManagerIntegrationTest : public Http2BufferWatermarksTest,
                                             public Envoy::BaseOverloadIntegrationTest {
 protected:
@@ -807,98 +876,6 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   ASSERT_TRUE(smallest_response->waitForEndStream());
   ASSERT_TRUE(smallest_response->complete());
   EXPECT_EQ(smallest_response->headers().getStatusValue(), "200");
-}
-
-TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
-  useAccessLog("%RESPONSE_CODE%");
-  initializeOverloadManagerInBootstrap(
-      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
-      name: "envoy.overload_actions.reset_high_memory_stream"
-      triggers:
-        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-          scaled:
-            scaling_threshold: 0.90
-            saturation_threshold: 0.98
-    )EOF"));
-  initialize();
-
-  // Set 10MiB receive window for the client.
-  const int downstream_window_size = 10 * 1024 * 1024;
-  envoy::config::core::v3::Http2ProtocolOptions http2_options =
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions());
-  http2_options.mutable_initial_stream_window_size()->set_value(downstream_window_size);
-  http2_options.mutable_initial_connection_window_size()->set_value(downstream_window_size);
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
-
-  // Makes us have Envoy's writes to downstream return EAGAIN
-  write_matcher_->setSourcePort(lookupPort("http"));
-  write_matcher_->setWriteReturnsEgain();
-
-  // Send a request
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "POST"},
-      {":path", "/"},
-      {":scheme", "http"},
-      {":authority", "host"},
-      {"content-length", "10"},
-  });
-  auto& encoder = encoder_decoder.first;
-  const std::string data(10, 'a');
-  codec_client_->sendData(encoder, data, true);
-  auto response = std::move(encoder_decoder.second);
-
-  waitForNextUpstreamRequest();
-  FakeStreamPtr upstream_request_for_response = std::move(upstream_request_);
-
-  // Send the responses back. It is larger than the downstream's receive window
-  // size. Thus, the codec will not end the stream, but the Envoy level stream
-  // should.
-  upstream_request_for_response->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
-                                               false);
-  const int response_size = downstream_window_size + 1024; // Slightly over the window size.
-  upstream_request_for_response->encodeData(response_size, true);
-
-  if (streamBufferAccounting()) {
-    if (deferProcessingBackedUpStreams()) {
-      // Wait for an accumulation of data, as we cannot rely on the access log
-      // output since we're deferring the processing of the stream data.
-      EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(10 * 10 * 1024));
-
-    } else {
-      // Wait for access log to know the Envoy level stream has been deleted.
-      EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
-    }
-  }
-
-  // Set the pressure so the overload action kills the response if doing stream
-  // accounting
-  updateResource(0.95);
-  test_server_->waitForGaugeEq(
-      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
-
-  if (streamBufferAccounting()) {
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
-  }
-
-  // Reduce resource pressure
-  updateResource(0.80);
-  test_server_->waitForGaugeEq(
-      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
-
-  // Resume writes to downstream.
-  write_matcher_->setResumeWrites();
-
-  if (streamBufferAccounting()) {
-    EXPECT_TRUE(response->waitForReset());
-    EXPECT_TRUE(response->reset());
-  } else {
-    // If we're not doing the accounting, we didn't end up resetting the
-    // streams.
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ(response->headers().getStatusValue(), "200");
-  }
 }
 
 class Http2DeferredProcessingIntegrationTest : public Http2BufferWatermarksTest {

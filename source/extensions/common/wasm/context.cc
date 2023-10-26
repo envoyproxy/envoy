@@ -1125,6 +1125,29 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
   return WasmResult::Ok;
 }
 
+WasmResult Context::setEnvoyFilterState(std::string_view path, std::string_view value,
+                                        StreamInfo::FilterState::LifeSpan life_span) {
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(path);
+  if (!factory) {
+    return WasmResult::NotFound;
+  }
+
+  auto object = factory->createFromBytes(value);
+  if (!object) {
+    return WasmResult::BadArgument;
+  }
+
+  auto* stream_info = getRequestStreamInfo();
+  if (!stream_info) {
+    return WasmResult::NotFound;
+  }
+
+  stream_info->filterState()->setData(path, std::move(object),
+                                      StreamInfo::FilterState::StateType::Mutable, life_span);
+  return WasmResult::Ok;
+}
+
 WasmResult
 Context::declareProperty(std::string_view path,
                          Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype) {
@@ -1456,7 +1479,7 @@ void Context::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& call
 void Context::log(const Http::RequestHeaderMap* request_headers,
                   const Http::ResponseHeaderMap* response_headers,
                   const Http::ResponseTrailerMap* response_trailers,
-                  const StreamInfo::StreamInfo& stream_info) {
+                  const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
   // `log` may be called multiple times due to mid-request logging -- we only want to run on the
   // last call.
   if (!stream_info.requestComplete().has_value()) {
@@ -1556,7 +1579,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       // We are in a reentrant call, so defer.
       wasm()->addAfterVmCallAction([this] {
         network_read_filter_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
+            Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_downstream_close");
       });
     }
     return WasmResult::Ok;
@@ -1565,7 +1588,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       // We are in a reentrant call, so defer.
       wasm()->addAfterVmCallAction([this] {
         network_write_filter_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
+            Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_upstream_close");
       });
     }
     return WasmResult::Ok;

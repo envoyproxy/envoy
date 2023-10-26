@@ -38,19 +38,21 @@ java_library(
         "EnvoyNativeResourceReleaser.java",
         "EnvoyNativeResourceWrapper.java",
         "EnvoyStreamIntelImpl.java",
+        "HeaderMatchConfig.java",
         "JniBridgeUtility.java",
         "JniLibrary.java",
-        "JvmBridgeUtility.java",
         "JvmCallbackContext.java",
         "JvmFilterContext.java",
         "JvmFilterFactoryContext.java",
         "JvmKeyValueStoreContext.java",
         "JvmStringAccessorContext.java",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib_srcs",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_protobuf_protobuf_javalite",
     ],
 )
 

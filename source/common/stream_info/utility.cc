@@ -5,33 +5,43 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/http/default_server_string.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace StreamInfo {
 
+const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info) {
+  return toString(stream_info, true);
+}
+
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
+  return toString(stream_info, false);
+}
+
+const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, bool use_long_name) {
   // We don't expect more than 4 flags are set. Relax to 16 since the vector is allocated on stack
   // anyway.
-  absl::InlinedVector<absl::string_view, 16> flag_strings;
-  for (const auto& [flag_string, flag] : ALL_RESPONSE_STRING_FLAGS) {
+  absl::InlinedVector<absl::string_view, 16> flag_strings_vec;
+  for (const auto& [flag_strings, flag] : ALL_RESPONSE_STRINGS_FLAGS) {
     if (stream_info.hasResponseFlag(flag)) {
-      flag_strings.push_back(flag_string);
+      flag_strings_vec.push_back(use_long_name ? flag_strings.long_string_
+                                               : flag_strings.short_string_);
     }
   }
-  if (flag_strings.empty()) {
+  if (flag_strings_vec.empty()) {
     return std::string(NONE);
   }
-  return absl::StrJoin(flag_strings, ",");
+  return absl::StrJoin(flag_strings_vec, ",");
 }
 
 absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
   static_assert(ResponseFlag::LastFlag == 0x4000000,
-                "A flag has been added. Add the new flag to ALL_RESPONSE_STRING_FLAGS.");
+                "A flag has been added. Add the new flag to ALL_RESPONSE_STRINGS_FLAGS.");
   absl::flat_hash_map<std::string, ResponseFlag> res;
-  for (auto [str, flag] : ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
-    res.emplace(str, flag);
+  for (auto [flag_strings, flag] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+    res.emplace(flag_strings.short_string_, flag);
   }
   return res;
 }
@@ -304,7 +314,7 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
   case ProxyStatusError::TlsProtocolError:
     return TLS_PROTOCOL_ERROR;
   case ProxyStatusError::TlsCertificateError:
-    return TLS_CERTIFICATE_ERORR;
+    return TLS_CERTIFICATE_ERROR;
   case ProxyStatusError::TlsAlertReceived:
     return TLS_ALERT_RECEIVED;
   case ProxyStatusError::HttpRequestError:
@@ -357,7 +367,11 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   } else if (stream_info.hasResponseFlag(ResponseFlag::NoHealthyUpstream)) {
     return ProxyStatusError::DestinationUnavailable;
   } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
-    return ProxyStatusError::ConnectionTimeout;
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.proxy_status_upstream_request_timeout")) {
+      return ProxyStatusError::ConnectionTimeout;
+    }
+    return ProxyStatusError::HttpResponseTimeout;
   } else if (stream_info.hasResponseFlag(ResponseFlag::LocalReset)) {
     return ProxyStatusError::ConnectionTimeout;
   } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRemoteReset)) {

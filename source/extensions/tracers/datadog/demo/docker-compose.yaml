@@ -1,0 +1,35 @@
+version: "3.2"
+
+services:
+
+  # `agent` is the Datadog Agent to which traces are sent.
+  # `agent` needs an API key set in the environment as the
+  # `DD_API_KEY` environment variable.
+  dd-agent:
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - '/run/user:/run/user:ro'
+      - '/proc/:/host/proc/:ro'
+      - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
+    environment:
+      - DOCKER_HOST
+      - DD_API_KEY
+      - DD_APM_ENABLED=true
+      - DD_LOG_LEVEL=ERROR
+    ports:
+      - 8126:8126
+    image: 'datadog/agent'
+
+  # `http` is an HTTP server that is reverse proxied by `nginx`.
+  http:
+    build:
+      context: .
+      dockerfile: ./http.dockerfile
+    environment:
+      - DD_ENV=prod
+      - DD_AGENT_HOST=dd-agent
+      - DD_SERVICE=envoy-demo-http
+    ports:
+      - 8080:8080
+    depends_on:
+      - dd-agent

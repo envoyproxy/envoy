@@ -40,30 +40,41 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
-namespace {
 
 class LogicalDnsClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
-  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {}
+  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {
+    ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
 
   void setupFromV3Yaml(const std::string& yaml) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
     resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
-        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                              : cluster_config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, cm, stats_store_, validation_visitor_);
-    cluster_ = std::make_shared<LogicalDnsCluster>(server_context_, cluster_config, runtime_,
-                                                   dns_resolver_, factory_context, std::move(scope),
-                                                   false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+    cluster_ = std::shared_ptr<LogicalDnsCluster>(
+        new LogicalDnsCluster(cluster_config, factory_context, dns_resolver_));
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
+  }
+
+  absl::Status factorySetupFromV3Yaml(const std::string& yaml) {
+    ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
+    NiceMock<MockClusterManager> cm;
+    envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+    ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver_; };
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, resolver_fn, ssl_context_manager_,
+        nullptr, false);
+
+    LogicalDnsClusterFactory factory;
+    return factory.createClusterImpl(cluster_config, factory_context).status();
   }
 
   void expectResolve(Network::DnsLookupFamily dns_lookup_family,
@@ -201,24 +212,25 @@ protected:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_store_;
+  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  Api::ApiPtr api_;
   Ssl::MockContextManager ssl_context_manager_;
+
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   Network::MockActiveDnsQuery active_dns_query_;
-  NiceMock<Random::MockRandomGenerator> random_;
   Network::DnsResolver::ResolveCb dns_callback_;
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
-  NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<LogicalDnsCluster> cluster_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
   Common::CallbackHandlePtr priority_update_cb_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
+namespace {
 using LogicalDnsConfigTuple =
     std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>;
 std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
@@ -412,8 +424,8 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
                     port_value: 443
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setupFromV3Yaml(multiple_hosts_yaml), EnvoyException,
+  EXPECT_EQ(
+      factorySetupFromV3Yaml(multiple_hosts_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_lb_endpoints_yaml = R"EOF(
@@ -443,8 +455,8 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
               port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setupFromV3Yaml(multiple_lb_endpoints_yaml), EnvoyException,
+  EXPECT_EQ(
+      factorySetupFromV3Yaml(multiple_lb_endpoints_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_endpoints_yaml = R"EOF(
@@ -476,8 +488,8 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
               port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setupFromV3Yaml(multiple_endpoints_yaml), EnvoyException,
+  EXPECT_EQ(
+      factorySetupFromV3Yaml(multiple_endpoints_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string custom_resolver_yaml = R"EOF(
@@ -501,8 +513,8 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
               port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(custom_resolver_yaml), EnvoyException,
-                            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+  EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_yaml).message(),
+            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 
 TEST_F(LogicalDnsClusterTest, Basic) {

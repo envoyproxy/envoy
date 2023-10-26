@@ -9,7 +9,7 @@ routes = web.RouteTableDef()
 async def get(request):
     file_dir = os.path.dirname(os.path.realpath(__file__))
     with open(f"{file_dir}/index.html") as f:
-        return web.Response(text=f.read())
+        return web.Response(text=f.read(), content_type='text/html')
 
 
 if __name__ == "__main__":

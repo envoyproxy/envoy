@@ -33,6 +33,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:basic_resource_limit_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
@@ -55,6 +56,7 @@ envoy_extension_cc_test(
     tags = ["fails_on_clang_cl"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//source/extensions/key_value/file_based:config_lib",
         "//source/extensions/network/dns_resolver/getaddrinfo:config",

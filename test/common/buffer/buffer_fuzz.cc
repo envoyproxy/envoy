@@ -156,7 +156,9 @@ public:
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 
-  void move(Buffer::Instance& rhs, uint64_t length) override {
+  void move(Buffer::Instance& rhs, uint64_t length) override { move(rhs, length, false); }
+
+  void move(Buffer::Instance& rhs, uint64_t length, bool) override {
     StringBuffer& src = dynamic_cast<StringBuffer&>(rhs);
     add(src.start(), length);
     src.start_ += length;
@@ -202,7 +204,7 @@ public:
     return absl::StartsWith(asStringView(), data);
   }
 
-  std::string toString() const override { return std::string(data_.data() + start_, size_); }
+  std::string toString() const override { return {data_.data() + start_, size_}; }
 
   size_t addFragments(absl::Span<const absl::string_view> fragments) override {
     size_t total_size_to_write = 0;

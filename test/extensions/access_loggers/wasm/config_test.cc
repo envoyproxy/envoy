@@ -121,12 +121,14 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
-  instance->log(&request_header, &response_header, &response_trailer, log_stream_info_);
+  instance->log(&request_header, &response_header, &response_trailer, log_stream_info_,
+                AccessLog::AccessLogType::NotSet);
 
   filter = std::make_unique<NiceMock<AccessLog::MockFilter>>();
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(config, std::move(filter), context_);
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_);
+  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_,
+                       AccessLog::AccessLogType::NotSet);
 }
 
 TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
@@ -180,7 +182,8 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(proto_config, nullptr, context_);
   filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_,
+                       AccessLog::AccessLogType::NotSet);
 }
 
 TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
@@ -225,7 +228,8 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
           }));
   AccessLog::InstanceSharedPtr filter_instance =
       factory.createAccessLogInstance(proto_config, nullptr, context_);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_,
+                       AccessLog::AccessLogType::NotSet);
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
   auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
@@ -233,7 +237,8 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   response->body().add(code);
   async_callbacks->onSuccess(request, std::move(response));
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_,
+                       AccessLog::AccessLogType::NotSet);
 }
 
 TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
@@ -274,11 +279,13 @@ TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
 
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_);
+  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_,
+                       AccessLog::AccessLogType::NotSet);
   // Even if the thread local plugin handle returns nullptr, `log` should not raise error or
   // exception.
   threadlocal.data_[0] = std::make_shared<PluginHandleSharedPtrThreadLocal>(nullptr);
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_);
+  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_,
+                       AccessLog::AccessLogType::NotSet);
 }
 
 } // namespace Wasm

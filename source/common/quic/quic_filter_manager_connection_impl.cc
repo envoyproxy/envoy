@@ -123,7 +123,7 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
-  return Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_);
+  return {quic_ssl_info_};
 }
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
@@ -147,12 +147,7 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_
 
 void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_any_data) {
   if (!inDelayedClose()) {
-    if (close_type_during_initialize_.has_value()) {
-      ASSERT(!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"));
-      close(close_type_during_initialize_.value());
-      close_type_during_initialize_ = absl::nullopt;
-    }
+    ASSERT(!close_type_during_initialize_.has_value());
     return;
   }
   if (has_sent_any_data && delayed_close_timer_ != nullptr) {
@@ -161,8 +156,9 @@ void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_a
   }
 }
 
-void QuicFilterManagerConnectionImpl::onWriteEventDone() {
-  // Apply delay close policy if there is any.
+void QuicFilterManagerConnectionImpl::onWriteEventDone() { maybeApplyDelayedClose(); }
+
+void QuicFilterManagerConnectionImpl::maybeApplyDelayedClose() {
   if (!hasDataToWrite() && inDelayedClose() &&
       delayed_close_state_ != DelayedCloseState::CloseAfterFlushAndWait) {
     closeConnectionImmediately();
@@ -205,8 +201,12 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
   if (quicConnection() == nullptr) {
     return;
   }
-  quicConnection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  quicConnection()->CloseConnection(
+      quic::QUIC_NO_ERROR,
+      (localCloseReason().empty()
+           ? "Closed by application"
+           : absl::StrCat("Closed by application with reason: ", localCloseReason())),
+      quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {

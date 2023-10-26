@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_proc.v3;
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -12,7 +10,6 @@ option java_outer_classname = "ProcessingModeProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3;ext_procv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: External Processing Filter]
 // External Processing Filter Processing Mode

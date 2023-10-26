@@ -1,4 +1,11 @@
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//tools/python:namespace.bzl", "envoy_py_namespace")
+
 licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_py_namespace()
 
 exports_files([
     "VERSION.txt",
@@ -6,6 +13,9 @@ exports_files([
     ".clang-format",
     "pytest.ini",
     ".coveragerc",
+    "CODEOWNERS",
+    "OWNERS.md",
+    ".github/workflows/_env.yml",
 ])
 
 alias(
@@ -16,6 +26,12 @@ alias(
 alias(
     name = "envoy.stripped",
     actual = "//source/exe:envoy-static.stripped",
+)
+
+filegroup(
+    name = "clang_tidy_config",
+    srcs = [".clang-tidy"],
+    visibility = ["//visibility:public"],
 )
 
 # These two definitions exist to help reduce Envoy upstream core code depending on extensions.

@@ -699,6 +699,10 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
     createRdsStream(route_table_name_);
   };
   initialize();
+// https://github.com/envoyproxy/envoy/issues/26336
+#if defined(__aarch64__)
+  return;
+#endif
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
@@ -914,16 +918,18 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
-  auto codec1 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  // The socket are closed asynchronously, so waiting the connection closed here.
-  ASSERT_TRUE(codec1->waitForDisconnect());
-
-  // Test the connection again to ensure the socket is closed.
-  auto codec2 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  EXPECT_FALSE(codec2->connected());
-  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+  while (true) {
+    auto codec =
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+    // The socket are closed asynchronously, if the socket is connected directly, it means
+    // the listener socket isn't closed yet, we will try next connection.
+    if (codec->connected()) {
+      ASSERT_TRUE(codec->waitForDisconnect());
+      continue;
+    }
+    EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+    break;
+  }
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
@@ -1006,16 +1012,18 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
-  auto codec1 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  // The socket are closed asynchronously, so waiting the connection closed here.
-  ASSERT_TRUE(codec1->waitForDisconnect());
-
-  // Test the connection again to ensure the socket is closed.
-  auto codec2 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  EXPECT_FALSE(codec2->connected());
-  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+  while (true) {
+    auto codec =
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+    // The socket are closed asynchronously, if the socket is connected directly, it means
+    // the listener socket isn't closed yet, we will try next connection.
+    if (codec->connected()) {
+      ASSERT_TRUE(codec->waitForDisconnect());
+      continue;
+    }
+    EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+    break;
+  }
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
@@ -1551,6 +1559,7 @@ TEST_P(ListenerFilterIntegrationTest,
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
     listener_config_.set_name("listener_foo");
+    listener_config_.set_stat_prefix("listener_stat");
     listener_config_.mutable_enable_reuse_port()->set_value(false);
     ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
     bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
@@ -1583,6 +1592,7 @@ TEST_P(ListenerFilterIntegrationTest,
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  test_server_->waitForGaugeEq("listener.listener_stat.downstream_cx_active", 0);
 
   auto* socket_option = listener_config_.add_socket_options();
   socket_option->set_level(IPPROTO_IP);
@@ -1642,8 +1652,9 @@ public:
           src_listener_config.mutable_use_original_dst()->set_value(true);
           // Note that the below original_dst is replaced by FakeOriginalDstListenerFilter at the
           // link time.
-          src_listener_config.add_listener_filters()->set_name(
-              "envoy.filters.listener.original_dst");
+          auto& filter = *src_listener_config.add_listener_filters();
+          filter.set_name("envoy.filters.listener.original_dst");
+          filter.mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
           auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
           virtual_listener_config = src_listener_config;
           virtual_listener_config.mutable_use_original_dst()->set_value(false);
@@ -1676,8 +1687,11 @@ public:
       connections.emplace_back();
       connections.back().client_conn_ =
           createConnectionAndWrite("dummy", connections.back().response_);
-      connections.back().client_conn_->waitForConnection();
+      ASSERT_TRUE(connections.back().client_conn_->waitForConnection());
       ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
+      std::string data;
+      EXPECT_TRUE(connections.back().upstream_conn_->waitForData(5, &data));
+      EXPECT_EQ("dummy", data);
     }
     for (auto& conn : connections) {
       conn.client_conn_->close();
@@ -1705,8 +1719,7 @@ TEST_P(RebalancerTest, BindToPortUpdate) {
   concurrency_ = 2;
   initialize();
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
 
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {

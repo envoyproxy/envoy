@@ -45,9 +45,6 @@ class CompressorProxyingConnectIntegrationTest : public HttpProtocolIntegrationT
 public:
   void initialize() override;
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
-                                                  {":path", "/"},
-                                                  {":protocol", "bytestream"},
-                                                  {":scheme", "https"},
                                                   {":authority", "host:80"}};
   IntegrationStreamDecoderPtr response_;
 };

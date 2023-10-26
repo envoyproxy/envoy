@@ -57,6 +57,13 @@ TEST_P(AdminInstanceTest, Getters) {
             envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED);
   EXPECT_NE(nullptr, admin_.scopedRouteConfigProvider());
+#ifdef ENVOY_ENABLE_UHV
+  // In UHV mode there is always UHV factory
+  EXPECT_NE(nullptr, admin_.makeHeaderValidator(Http::Protocol::Http11));
+#else
+  // In non UHV mode, header validator can not be created
+  EXPECT_EQ(nullptr, admin_.makeHeaderValidator(Http::Protocol::Http11));
+#endif
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
@@ -72,7 +79,7 @@ TEST_P(AdminInstanceTest, AdminAddress) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS("info", "admin address:",
                       admin_address_out_path.startHttpListener(
@@ -88,7 +95,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "critical", "cannot open admin address output file " + bad_path + " for writing.",
@@ -144,6 +151,7 @@ TEST_P(AdminInstanceTest, Help) {
       enable: enables the CPU profiler; One of (y, n)
   /drain_listeners (POST): drain listeners
       graceful: When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI
+      skip_exit: When draining listeners, do not exit after the drain period. This must be used with graceful
       inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.
   /healthcheck/fail (POST): cause the server to fail health checks
   /healthcheck/ok (POST): cause the server to pass health checks
@@ -172,7 +180,7 @@ TEST_P(AdminInstanceTest, Help) {
       filter: Regular expression (Google re2) for filtering stats
       format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
-      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, none)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, none)
   /stats/prometheus: print server stats in prometheus format
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
@@ -323,7 +331,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.routeConfigProvider().config();
   peer.routeConfigProvider().configInfo();
   peer.routeConfigProvider().lastUpdated();
-  peer.routeConfigProvider().onConfigUpdate();
+  ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
 
   peer.scopedRouteConfigProvider().lastUpdated();
   peer.scopedRouteConfigProvider().getConfigProto();
@@ -336,6 +344,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.overloadState().tryAllocateResource(overload_name, 0);
   peer.overloadState().tryDeallocateResource(overload_name, 0);
   peer.overloadState().isResourceMonitorEnabled(overload_name);
+  peer.overloadState().getProactiveResourceMonitorForTest(overload_name);
 
   peer.overloadManager().scaledTimerFactory();
 

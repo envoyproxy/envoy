@@ -75,12 +75,8 @@ for how to update or override dependencies.
     ```console
     sudo apt-get install \
        autoconf \
-       automake \
-       cmake \
        curl \
        libtool \
-       make \
-       ninja-build \
        patch \
        python3-pip \
        unzip \
@@ -92,13 +88,11 @@ for how to update or override dependencies.
     ```console
     dnf install \
         aspell-en \
-        cmake \
         libatomic \
         libstdc++ \
         libstdc++-static \
         libtool \
         lld \
-        ninja-build \
         patch \
         python3-pip
     ```
@@ -128,7 +122,7 @@ for how to update or override dependencies.
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```console
-    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell python@3.10
+    brew install coreutils wget libtool go bazelisk clang-format autoconf aspell
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
@@ -227,15 +221,6 @@ for how to update or override dependencies.
 
     The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
 
-    Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
-    Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
-    the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
-    projects are used instead.
-    ```cmd
-    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;%PATH%
-    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%
-    ```
-
     [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
 
     Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
@@ -300,7 +285,7 @@ Envoy can also be built with the Docker image used for CI, by installing Docker 
 On Linux, run:
 
 ```
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+./ci/run_envoy_docker.sh './ci/do_ci.sh dev'
 ```
 
 From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
@@ -945,66 +930,14 @@ TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 
 # Running format linting without docker
 
-The easiest way to run the clang-format check/fix commands is to run them via
-docker, which helps ensure the right toolchain is set up. However you may prefer
-to run clang-format scripts on your workstation directly:
- * It's possible there is a speed advantage
- * Docker itself can sometimes go awry and you then have to deal with that
- * Type-ahead doesn't always work when waiting running a command through docker
-
-To run the tools directly, you must install the correct version of clang. This
-may change over time, check the version of clang in the docker image. You must
-also have 'buildifier' installed from the bazel distribution.
-
 Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
 
-Edit the paths shown here to reflect the installation locations on your system:
+You can run clang-format directly, without docker:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
-export BUILDIFIER_BIN="/usr/bin/buildifier"
-```
-
-A relatively easy way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
-
-* Run the ci docker image
-
-```shell
-ci/run_envoy_docker.sh bash
-```
-
-* Get the docker container ID
-
-```shell
-dockerContainerID=$(docker ps | grep envoy-build-ubuntu | awk '{print $1}')
-```
-
-* Copy the `clang-format` to host machine
-
-```shell
-docker cp $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
-```
-
-* Ensure that the copied `clang-format` is the default one, by ensuring it is in `$PATH`:
-
-```shell
-cp clang-format-ci /usr/local/bin/clang-format
-```
-
-Alternatively, if you are a non-root user, you can use a bin dir and add that to `$PATH`
-
-```shell
-mkdir bin
-mv clang-format-ci bin/clang-format
-export PATH=$PATH:$PWD/bin/
-```
-
-Once this is set up, you can run clang-format without docker:
-
-```shell
-./tools/code_format/check_format.py check
+bazel run //tools/code_format:check_format -- check
 ./tools/spelling/check_spelling_pedantic.py check
-./tools/code_format/check_format.py fix
+bazel run //tools/code_format:check_format -- fix
 ./tools/spelling/check_spelling_pedantic.py fix
 ```
 

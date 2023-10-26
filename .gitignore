@@ -37,7 +37,7 @@ cscope.*
 *.pyc
 **/pyformat
 SOURCE_VERSION
-*.s??
+*.swap*
 tags
 TAGS
 /test/coverage/BUILD
@@ -53,3 +53,7 @@ bazel.output.txt
 **/.DS_Store
 **/*.iml
 tools/dev/src
+distribution/custom
+examples/websocket/certs
+/contrib/golang/**/test_data/go.sum
+/contrib/golang/**/test_data/*/go.sum

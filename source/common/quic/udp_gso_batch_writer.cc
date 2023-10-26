@@ -16,25 +16,23 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, si
     }
     // Return payload_len as rc & nullptr as error on success
     return {/*rc=*/payload_len,
-            /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
+            /*err=*/Api::IoError::none()};
   case quic::WRITE_STATUS_BLOCKED_DATA_BUFFERED:
     // Data was buffered, Return payload_len as rc & nullptr as error
     ENVOY_LOG_MISC(trace, "sendmsg blocked, message buffered to send");
     return {/*rc=*/payload_len,
-            /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
+            /*err=*/Api::IoError::none()};
   case quic::WRITE_STATUS_BLOCKED:
     // Writer blocked, return error
     ENVOY_LOG_MISC(trace, "sendmsg blocked, message not buffered");
     return {/*rc=*/0,
-            /*err=*/Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                    Network::IoSocketError::deleteIoError)};
+            /*err=*/Network::IoSocketError::getIoSocketEagainError()};
   default:
     // Write Failed, return {0 and error_code}
     ENVOY_LOG_MISC(trace, "sendmsg failed with error code {}",
                    static_cast<int>(quic_result.error_code));
     return {/*rc=*/0,
-            /*err=*/Api::IoErrorPtr(new Network::IoSocketError(quic_result.error_code),
-                                    Network::IoSocketError::deleteIoError)};
+            /*err=*/Network::IoSocketError::create(quic_result.error_code)};
   }
 }
 
@@ -55,9 +53,10 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
 
   // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
   // specify this parameter here at a later stage.
+  quic::QuicPacketWriterParams params;
   quic::WriteResult quic_result = WritePacket(static_cast<char*>(buffer.frontSlice().mem_),
                                               payload_len, self_addr.host(), peer_addr,
-                                              /*quic::PerPacketOptions=*/nullptr);
+                                              /*quic::PerPacketOptions=*/nullptr, params);
   updateUdpGsoBatchWriterStats(quic_result);
 
   return convertQuicWriteResult(quic_result, payload_len);

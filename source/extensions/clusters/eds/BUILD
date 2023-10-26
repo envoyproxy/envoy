@@ -20,6 +20,7 @@ envoy_cc_extension(
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",
         "//envoy/local_info:local_info_interface",
+        "//envoy/registry",
         "//envoy/secret:secret_manager_interface",
         "//envoy/upstream:cluster_factory_interface",
         "//envoy/upstream:locality_lib",

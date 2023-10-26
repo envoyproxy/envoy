@@ -6,17 +6,12 @@
 #include "source/common/common/assert.h"
 
 #include "library/common/jni/jni_support.h"
-#include "library/common/jni/jni_version.h"
+#include "library/common/jni/types/env.h"
+#include "library/common/jni/types/exception.h"
 
 // NOLINT(namespace-envoy)
 
-static JavaVM* static_jvm = nullptr;
 static jobject static_class_loader = nullptr;
-static thread_local JNIEnv* local_env = nullptr;
-
-void set_vm(JavaVM* vm) { static_jvm = vm; }
-
-JavaVM* get_vm() { return static_jvm; }
 
 void set_class_loader(jobject class_loader) { static_class_loader = class_loader; }
 
@@ -29,32 +24,20 @@ jobject get_class_loader() {
 jclass find_class(const char* class_name) {
   JNIEnv* env = get_env();
   jclass class_loader = env->FindClass("java/lang/ClassLoader");
+  Envoy::JNI::Exception::checkAndClear("find_class:FindClass");
   jmethodID find_class_method =
       env->GetMethodID(class_loader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+  Envoy::JNI::Exception::checkAndClear("find_class:GetMethodID");
   jstring str_class_name = env->NewStringUTF(class_name);
+  Envoy::JNI::Exception::checkAndClear("find_class:NewStringUTF");
   jclass clazz =
       (jclass)(env->CallObjectMethod(get_class_loader(), find_class_method, str_class_name));
+  Envoy::JNI::Exception::checkAndClear("find_class:CallObjectMethod");
   env->DeleteLocalRef(str_class_name);
   return clazz;
 }
 
-JNIEnv* get_env() {
-  if (local_env) {
-    return local_env;
-  }
-
-  jint result = static_jvm->GetEnv(reinterpret_cast<void**>(&local_env), JNI_VERSION);
-  if (result == JNI_EDETACHED) {
-    // Note: the only thread that should need to be attached is Envoy's engine std::thread.
-    static const char* thread_name = "EnvoyMain";
-    JavaVMAttachArgs args = {JNI_VERSION, const_cast<char*>(thread_name), nullptr};
-    result = attach_jvm(static_jvm, &local_env, &args);
-  }
-  RELEASE_ASSERT(result == JNI_OK, "Unable to get a JVM env for the current thread");
-  return local_env;
-}
-
-void jvm_detach_thread() { static_jvm->DetachCurrentThread(); }
+JNIEnv* get_env() { return Envoy::JNI::Env::get(); }
 
 void jni_delete_global_ref(void* context) {
   JNIEnv* env = get_env();
@@ -66,21 +49,11 @@ void jni_delete_const_global_ref(const void* context) {
   jni_delete_global_ref(const_cast<void*>(context));
 }
 
-bool clear_pending_exceptions(JNIEnv* env) {
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    env->ExceptionClear();
-    // TODO(Augustyniak): Log exception details.
-    return true;
-  } else {
-    return false;
-  }
-}
-
 int unbox_integer(JNIEnv* env, jobject boxedInteger) {
   jclass jcls_Integer = env->FindClass("java/lang/Integer");
   jmethodID jmid_intValue = env->GetMethodID(jcls_Integer, "intValue", "()I");
   env->DeleteLocalRef(jcls_Integer);
-  return env->CallIntMethod(boxedInteger, jmid_intValue);
+  return callIntMethod(env, boxedInteger, jmid_intValue);
 }
 
 envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data) {
@@ -167,7 +140,7 @@ jobject native_map_to_map(JNIEnv* env, envoy_map map) {
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     auto key = native_data_to_string(env, map.entries[i].key);
     auto value = native_data_to_string(env, map.entries[i].value);
-    env->CallObjectMethod(j_hashMap, jmid_hashMapPut, key, value);
+    callObjectMethod(env, j_hashMap, jmid_hashMapPut, key, value);
     env->DeleteLocalRef(key);
     env->DeleteLocalRef(value);
   }
@@ -185,7 +158,7 @@ envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
     jmethodID jmid_array = env->GetMethodID(jcls_ByteBuffer, "array", "()[B");
-    jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
+    jbyteArray array = static_cast<jbyteArray>(callObjectMethod(env, j_data, jmid_array));
     env->DeleteLocalRef(jcls_ByteBuffer);
 
     envoy_data native_data = array_to_native_data(env, array);
@@ -206,7 +179,7 @@ envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data, size_t data_length
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
     jmethodID jmid_array = env->GetMethodID(jcls_ByteBuffer, "array", "()[B");
-    jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
+    jbyteArray array = static_cast<jbyteArray>(callObjectMethod(env, j_data, jmid_array));
     env->DeleteLocalRef(jcls_ByteBuffer);
 
     envoy_data native_data = array_to_native_data(env, array, data_length);
@@ -366,3 +339,115 @@ void JavaArrayOfByteToBytesVector(JNIEnv* env, jbyteArray array, std::vector<uin
   // There is nothing to write back, it is always safe to JNI_ABORT.
   env->ReleaseByteArrayElements(array, jbytes, JNI_ABORT);
 }
+
+MatcherData::Type StringToType(std::string type_as_string) {
+  if (type_as_string.length() != 4) {
+    ASSERT("conversion failure failure");
+    return MatcherData::EXACT;
+  }
+  // grab the lowest bit.
+  switch (type_as_string[3]) {
+  case 0:
+    return MatcherData::EXACT;
+  case 1:
+    return MatcherData::SAFE_REGEX;
+  }
+  ASSERT("enum failure");
+  return MatcherData::EXACT;
+}
+
+std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray array,
+                                                      std::string& cluster_name_out) {
+  const size_t len = env->GetArrayLength(array);
+  std::vector<MatcherData> ret;
+  if (len == 0) {
+    return ret;
+  }
+  ASSERT((len - 1) % 3 == 0);
+  if ((len - 1) % 3 != 0) {
+    return ret;
+  }
+
+  JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, 0)),
+                          &cluster_name_out);
+  for (size_t i = 1; i < len; i += 3) {
+    std::string name;
+    std::string type_as_string;
+    std::string value;
+    JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, i)),
+                            &name);
+    JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, i + 1)),
+                            &type_as_string);
+    JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, i + 2)),
+                            &value);
+    ret.emplace_back(MatcherData(name, StringToType(type_as_string), value));
+  }
+  return ret;
+}
+
+void javaByteArrayToProto(JNIEnv* env, jbyteArray source, Envoy::Protobuf::MessageLite* dest) {
+  jbyte* bytes = env->GetByteArrayElements(source, /* isCopy= */ nullptr);
+  jsize size = env->GetArrayLength(source);
+  bool success = dest->ParseFromArray(bytes, size);
+  RELEASE_ASSERT(success, "Failed to parse protobuf message.");
+  env->ReleaseByteArrayElements(source, bytes, 0);
+}
+
+#define DEFINE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                    \
+  JNI_TYPE call##JAVA_TYPE##Method(JNIEnv* env, jobject object, jmethodID method_id, ...) {        \
+    va_list args;                                                                                  \
+    va_start(args, method_id);                                                                     \
+    JNI_TYPE result = env->Call##JAVA_TYPE##MethodV(object, method_id, args);                      \
+    va_end(args);                                                                                  \
+    Envoy::JNI::Exception::checkAndClear();                                                        \
+    return result;                                                                                 \
+  }
+
+void throwException(JNIEnv* env, const char* java_class_name, const char* message) {
+  jclass java_class = env->FindClass(java_class_name);
+  jint error = env->ThrowNew(java_class, message);
+  RELEASE_ASSERT(error == JNI_OK, "Failed to throw an exception.");
+  env->DeleteLocalRef(java_class);
+}
+
+void callVoidMethod(JNIEnv* env, jobject object, jmethodID method_id, ...) {
+  va_list args;
+  va_start(args, method_id);
+  env->CallVoidMethodV(object, method_id, args);
+  va_end(args);
+  Envoy::JNI::Exception::checkAndClear();
+}
+
+DEFINE_CALL_METHOD(Char, jchar)
+DEFINE_CALL_METHOD(Short, jshort)
+DEFINE_CALL_METHOD(Int, jint)
+DEFINE_CALL_METHOD(Long, jlong)
+DEFINE_CALL_METHOD(Double, jdouble)
+DEFINE_CALL_METHOD(Boolean, jboolean)
+DEFINE_CALL_METHOD(Object, jobject)
+
+#define DEFINE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                             \
+  JNI_TYPE callStatic##JAVA_TYPE##Method(JNIEnv* env, jclass clazz, jmethodID method_id, ...) {    \
+    va_list args;                                                                                  \
+    va_start(args, method_id);                                                                     \
+    JNI_TYPE result = env->CallStatic##JAVA_TYPE##MethodV(clazz, method_id, args);                 \
+    va_end(args);                                                                                  \
+    Envoy::JNI::Exception::checkAndClear();                                                        \
+    return result;                                                                                 \
+  }
+
+void callStaticVoidMethod(JNIEnv* env, jclass clazz, jmethodID method_id, ...) {
+  va_list args;
+  va_start(args, method_id);
+  env->CallStaticVoidMethodV(clazz, method_id, args);
+  va_end(args);
+  Envoy::JNI::Exception::checkAndClear();
+}
+
+DEFINE_CALL_STATIC_METHOD(Char, jchar)
+DEFINE_CALL_STATIC_METHOD(Short, jshort)
+DEFINE_CALL_STATIC_METHOD(Int, jint)
+DEFINE_CALL_STATIC_METHOD(Long, jlong)
+DEFINE_CALL_STATIC_METHOD(Double, jdouble)
+DEFINE_CALL_STATIC_METHOD(Boolean, jboolean)
+DEFINE_CALL_STATIC_METHOD(Object, jobject)

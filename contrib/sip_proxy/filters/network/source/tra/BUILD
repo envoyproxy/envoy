@@ -40,7 +40,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/singleton:manager_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//source/common/stats:symbol_table_lib",
     ],
 )

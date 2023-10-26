@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/matcher/matcher.h"
@@ -17,7 +19,8 @@ namespace MatchDelegate {
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
-class DelegatingStreamFilter : public Envoy::Http::StreamFilter {
+class DelegatingStreamFilter : public Logger::Loggable<Logger::Id::http>,
+                               public Envoy::Http::StreamFilter {
 public:
   using MatchDataUpdateFunc = std::function<void(Envoy::Http::Matching::HttpMatchingDataImpl&)>;
 
@@ -29,15 +32,23 @@ public:
     void evaluateMatchTree(MatchDataUpdateFunc data_update_func);
     bool skipFilter() const { return skip_filter_; }
     void onStreamInfo(const StreamInfo::StreamInfo& stream_info) {
-      if (has_match_tree_ && matching_data_ == nullptr) {
+      if (matching_data_ == nullptr) {
         matching_data_ = std::make_shared<Envoy::Http::Matching::HttpMatchingDataImpl>(stream_info);
       }
     }
+
+    // The matcher from the per route config, if available, will override the matcher from the
+    // filter config.
+    void setMatchTree(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) {
+      match_tree_ = std::move(match_tree);
+      has_match_tree_ = match_tree_ != nullptr;
+    }
+
     void setBaseFilter(Envoy::Http::StreamFilterBase* base_filter) { base_filter_ = base_filter; }
 
   private:
     Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
-    const bool has_match_tree_{};
+    bool has_match_tree_{};
     Envoy::Http::StreamFilterBase* base_filter_{};
 
     Envoy::Http::Matching::HttpMatchingDataImplSharedPtr matching_data_;
@@ -87,11 +98,15 @@ private:
 
   Envoy::Http::StreamDecoderFilterSharedPtr decoder_filter_;
   Envoy::Http::StreamEncoderFilterSharedPtr encoder_filter_;
+  Envoy::Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Envoy::Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Envoy::Http::StreamFilterBase* base_filter_{};
 };
 
-class MatchDelegateConfig : public Extensions::HttpFilters::Common::FactoryBase<
-                                envoy::extensions::common::matching::v3::ExtensionWithMatcher> {
+class MatchDelegateConfig
+    : public Extensions::HttpFilters::Common::FactoryBase<
+          envoy::extensions::common::matching::v3::ExtensionWithMatcher,
+          envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute> {
 public:
   // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
   MatchDelegateConfig() : FactoryBase("envoy.filters.http.match_delegate") {}
@@ -100,6 +115,29 @@ private:
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override;
+
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validation) override;
+};
+
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(
+      const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
+      Server::Configuration::ServerFactoryContext& server_context)
+      : match_tree_(createFilterMatchTree(proto_config, server_context)) {}
+
+  const Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>& matchTree() const {
+    return match_tree_;
+  }
+
+private:
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> createFilterMatchTree(
+      const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
+      Server::Configuration::ServerFactoryContext& server_context);
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
 
 DECLARE_FACTORY(MatchDelegateConfig);

@@ -1,7 +1,7 @@
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "envoy/http/header_map.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/random_generator.h"
 #include "source/common/common/utility.h"

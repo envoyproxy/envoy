@@ -5,17 +5,24 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_proto_library(
+    name = "config",
+    srcs = ["config.proto"],
+)
+
 envoy_cc_test_library(
     name = "listener_manager_impl_test_lib",
     hdrs = ["listener_manager_impl_test.h"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
+        ":config_cc_proto",
         "//source/common/init:manager_lib",
         "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
@@ -43,7 +50,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    shard_count = 4,
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -70,7 +76,6 @@ envoy_cc_test(
         "//test/server:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -90,6 +95,7 @@ envoy_cc_test(
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/integration/filters:test_listener_filter_lib",
         "//test/integration/filters:test_network_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",

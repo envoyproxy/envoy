@@ -8,6 +8,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_handle_base_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -16,11 +17,11 @@ namespace Network {
 /**
  * IoHandle derivative for sockets.
  */
-class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
+class IoSocketHandleImpl : public IoSocketHandleBaseImpl {
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                               absl::optional<int> domain = absl::nullopt)
-      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain),
+      : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
         udp_read_normalize_addresses_(
             Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
   }
@@ -28,12 +29,7 @@ public:
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
 
-  // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
-  os_fd_t fdDoNotUse() const override { return fd_; }
-
   Api::IoCallUint64Result close() override;
-
-  bool isOpen() const override;
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
@@ -55,23 +51,10 @@ public:
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
 
-  bool supportsMmsg() const override;
-  bool supportsUdpGro() const override;
-
   Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult listen(int backlog) override;
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
-  Api::SysCallIntResult setOption(int level, int optname, const void* optval,
-                                  socklen_t optlen) override;
-  Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
-  Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
-                              unsigned long in_buffer_len, void* out_buffer,
-                              unsigned long out_buffer_len, unsigned long* bytes_returned) override;
-  Api::SysCallIntResult setBlocking(bool blocking) override;
-  absl::optional<int> domain() override;
-  Address::InstanceConstSharedPtr localAddress() override;
-  Address::InstanceConstSharedPtr peerAddress() override;
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
 
@@ -83,9 +66,6 @@ public:
   void resetFileEvents() override { file_event_.reset(); }
 
   Api::SysCallIntResult shutdown(int how) override;
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
-  absl::optional<uint64_t> congestionWindowInBytes() const override;
-  absl::optional<std::string> interfaceName() override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.
@@ -93,22 +73,18 @@ protected:
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
     if (result.return_value_ >= 0) {
       // Return nullptr as IoError upon success.
-      return Api::IoCallUint64Result(result.return_value_,
-                                     Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+      return Api::IoCallUint64Result(result.return_value_, Api::IoError::none());
     }
-    RELEASE_ASSERT(result.errno_ != SOCKET_ERROR_INVAL, "Invalid argument passed in.");
+    if (result.errno_ == SOCKET_ERROR_INVAL) {
+      ENVOY_LOG(error, "Invalid argument passed in.");
+    }
     return Api::IoCallUint64Result(
-        /*rc=*/0,
-        (result.errno_ == SOCKET_ERROR_AGAIN
-             // EAGAIN is frequent enough that its memory allocation should be avoided.
-             ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)
-             : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
+        /*rc=*/0, (result.errno_ == SOCKET_ERROR_AGAIN
+                       // EAGAIN is frequent enough that its memory allocation should be avoided.
+                       ? IoSocketError::getIoSocketEagainError()
+                       : IoSocketError::create(result.errno_)));
   }
 
-  os_fd_t fd_;
-  int socket_v6only_{false};
-  const absl::optional<int> domain_;
   Event::FileEventPtr file_event_{nullptr};
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso

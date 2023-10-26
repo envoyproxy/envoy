@@ -234,6 +234,10 @@ public:
     return constRootScope()->iterate(fn);
   }
 
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {}
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {}
+  const TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(TagVector); }
+
 protected:
   /**
    * Provides a hook for sub-classes to define how to create new scopes. When

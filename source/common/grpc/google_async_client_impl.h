@@ -9,9 +9,10 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local_object.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/common/thread.h"
@@ -20,6 +21,7 @@
 #include "source/common/grpc/stat_names.h"
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/router/header_parser.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -232,6 +234,7 @@ public:
   bool isAboveWriteBufferHighWatermark() const override {
     return bytes_in_write_pending_queue_ > parent_.perStreamBufferLimitBytes();
   }
+  const StreamInfo::StreamInfo& streamInfo() const override { return unused_stream_info_; }
 
 protected:
   bool callFailed() const { return call_failed_; }
@@ -309,6 +312,10 @@ private:
   // Count of the tags in-flight. This must hit zero before the stream can be
   // freed.
   uint32_t inflight_tags_{};
+
+  // This is unused.
+  StreamInfo::StreamInfoImpl unused_stream_info_;
+
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
   std::deque<std::pair<GoogleAsyncTag::Operation, bool>>

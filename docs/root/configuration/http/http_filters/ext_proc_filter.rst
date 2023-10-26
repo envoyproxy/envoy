@@ -3,7 +3,7 @@
 External Processing
 ===================
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor``.
-* :ref:`Http filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`
 
 The external processing filter connects an external service, called an "external processor,"
 to the filter chain. The processing service itself implements a gRPC interface that allows
@@ -31,7 +31,7 @@ be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.e
 Statistics
 ----------
 This filter outputs statistics in the
-*http.<stat_prefix>.ext_proc.* namespace. The :ref:`stat prefix
+``http.<stat_prefix>.ext_proc.`` namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.
 
@@ -50,3 +50,5 @@ The following statistics are supported:
   failure_mode_allowed, Counter, The number of times an error was ignored due to configuration
   message_timeouts, Counter, The number of times a message failed to receive a response within the configured timeout
   rejected_header_mutations, Counter, The number of rejected header mutations
+  clear_route_cache_ignored, Counter, The number of clear cache request that were ignored
+  clear_route_cache_disabled, Counter, The number of clear cache requests that were rejected from being disabled

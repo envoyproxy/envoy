@@ -23,6 +23,7 @@ envoy_cc_test(
     deps = [
         "//contrib/hyperscan/regex_engines/source:regex_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
     ],
 )

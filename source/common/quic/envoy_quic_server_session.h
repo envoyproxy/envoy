@@ -98,7 +98,6 @@ public:
                                   ConnectionMapIter position);
 
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
-
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:
@@ -114,6 +113,14 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
   quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
+
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+    return quic::HttpDatagramSupport::kRfc;
+#else
+    return quic::HttpDatagramSupport::kNone;
+#endif
+  }
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;

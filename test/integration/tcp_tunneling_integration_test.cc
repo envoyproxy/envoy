@@ -21,7 +21,7 @@ public:
 
   void initialize() override {
     useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-                 "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
+                 "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED% %ACCESS_LOG_TYPE%");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
@@ -68,14 +68,7 @@ public:
   }
 
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
-                                                  {":path", "/"},
-                                                  {":protocol", "bytestream"},
-                                                  {":scheme", "https"},
                                                   {":authority", "foo.lyft.com:80"}};
-  void clearExtendedConnectHeaders() {
-    connect_headers_.removeProtocol();
-    connect_headers_.removePath();
-  }
 
   void sendBidirectionalDataAndCleanShutdown() {
     sendBidirectionalData("hello", "hello", "there!", "there!");
@@ -104,11 +97,12 @@ public:
     const int expected_header_bytes_received = 0;
     checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
                          expected_header_bytes_sent, expected_header_bytes_received);
+    ++access_log_entry_;
   }
 
   void checkAccessLogOutput(int expected_wire_bytes_sent, int expected_wire_bytes_received,
                             int expected_header_bytes_sent, int expected_header_bytes_received) {
-    std::string log = waitForAccessLog(access_log_name_);
+    std::string log = waitForAccessLog(access_log_name_, access_log_entry_);
     std::vector<std::string> log_entries = absl::StrSplit(log, ' ');
     const int wire_bytes_sent = std::stoi(log_entries[0]),
               wire_bytes_received = std::stoi(log_entries[1]),
@@ -126,20 +120,66 @@ public:
   bool enable_timeout_{};
   bool exact_match_{};
   bool allow_post_{};
+  uint32_t access_log_entry_{0};
 };
 
-TEST_P(ConnectTerminationIntegrationTest, OriginalStyle) {
+// Verify that H/2 extended CONNECT with bytestream protocol is treated like
+// standard CONNECT request
+TEST_P(ConnectTerminationIntegrationTest, ExtendedConnectWithBytestreamProtocol) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    // Extended CONNECT is applicable to H/2 and H/3 protocols only
+    return;
+  }
   initialize();
-  clearExtendedConnectHeaders();
+
+  connect_headers_.clear();
+  // The client H/2 codec expects the request header map to be in the form of H/1
+  // upgrade to issue an extended CONNECT request
+  connect_headers_.copyFrom(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/"},
+                                                           {"upgrade", "bytestream"},
+                                                           {"connection", "upgrade"},
+                                                           {":scheme", "https"},
+                                                           {":authority", "foo.lyft.com:80"}});
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
 }
 
 TEST_P(ConnectTerminationIntegrationTest, Basic) {
+  // Regression test upstream connection establishment before connect termination.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
+      cluster->mutable_preconnect_policy()->mutable_per_upstream_preconnect_ratio()->set_value(1.5);
+    }
+  });
+
   initialize();
 
   setUpConnection();
+  sendBidirectionalDataAndCleanShutdown();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
+  cleanupUpstreamAndDownstream();
+
+  setUpConnection();
+  sendBidirectionalDataAndCleanShutdown();
+}
+
+TEST_P(ConnectTerminationIntegrationTest, LogOnSuccessfulTunnel) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_access_log_options()->set_flush_log_on_tunnel_successfully_established(true);
+      });
+
+  initialize();
+
+  setUpConnection();
+  std::string log = waitForAccessLog(access_log_name_, access_log_entry_);
+  EXPECT_THAT(log, testing::HasSubstr("DownstreamTunnelSuccessfullyEstablished"));
+  ++access_log_entry_;
   sendBidirectionalDataAndCleanShutdown();
 }
 
@@ -166,7 +206,8 @@ TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
 
   // Use POST request.
   connect_headers_.setMethod("POST");
-  connect_headers_.removeProtocol();
+  connect_headers_.setPath("/");
+  connect_headers_.setScheme("https");
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
@@ -175,9 +216,6 @@ TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
 TEST_P(ConnectTerminationIntegrationTest, UsingHostMatch) {
   exact_match_ = true;
   initialize();
-
-  connect_headers_.removePath();
-  connect_headers_.removeProtocol();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
@@ -271,12 +309,7 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
   // Sending a header-only request is probably buggy, but rather than having a
   // special corner case it is treated as a regular half close.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  response_ = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
-                                     {":path", "/"},
-                                     {":protocol", "bytestream"},
-                                     {":scheme", "https"},
-                                     {":authority", "foo.lyft.com:80"}});
+  response_ = codec_client_->makeHeaderOnlyRequest(connect_headers_);
   // If the connection is established (created, set to half close, and then the
   // FIN arrives), make sure the FIN arrives, and send a FIN from upstream.
   if (fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_) &&
@@ -407,7 +440,6 @@ protected:
 
 TEST_P(ProxyProtocolConnectTerminationIntegrationTest, SendsProxyProtoHeadersv1) {
   initialize();
-  clearExtendedConnectHeaders();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdownWithProxyProtocol();
@@ -416,7 +448,6 @@ TEST_P(ProxyProtocolConnectTerminationIntegrationTest, SendsProxyProtoHeadersv1)
 TEST_P(ProxyProtocolConnectTerminationIntegrationTest, SendsProxyProtoHeadersv2) {
   proxy_protocol_version_ = envoy::config::core::v3::ProxyProtocolConfig::V2;
   initialize();
-  clearExtendedConnectHeaders();
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdownWithProxyProtocol();
@@ -438,6 +469,15 @@ public:
                 hcm) -> void {
           ConfigHelper::setConnectConfig(hcm, false, false,
                                          downstream_protocol_ == Http::CodecType::HTTP3);
+
+          if (add_upgrade_config_) {
+            auto* route_config = hcm.mutable_route_config();
+            ASSERT_EQ(1, route_config->virtual_hosts_size());
+            auto* route = route_config->mutable_virtual_hosts(0)->add_routes();
+            route->mutable_match()->set_prefix("/");
+            route->mutable_route()->set_cluster("cluster_0");
+            hcm.add_upgrade_configs()->set_upgrade_type("websocket");
+          }
         });
 
     HttpProtocolIntegrationTest::initialize();
@@ -445,7 +485,9 @@ public:
 
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
                                                   {":authority", "foo.lyft.com:80"}};
+
   IntegrationStreamDecoderPtr response_;
+  bool add_upgrade_config_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -486,6 +528,68 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   // Wait for them to arrive downstream.
   response_->waitForHeaders();
   EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Make sure that even once the response has started, that data can continue to go upstream.
+  codec_client_->sendData(*request_encoder_, "hello", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  // Also test upstream to downstream data.
+  upstream_request_->encodeData(12, false);
+  response_->waitForBodyData(12);
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
+  add_upgrade_config_ = true;
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The test client H/2 or H/3 codecs expect the request header map to be in the form of H/1
+  // upgrade to issue an extended CONNECT request.
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {"upgrade", "websocket"},
+                                     {"connection", "upgrade"},
+                                     {":scheme", "https"},
+                                     {":authority", "foo.lyft.com:80"}});
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ("/", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("foo.lyft.com:80", upstream_request_->headers().getHostValue());
+
+  // The fake upstream server codec will transform extended CONNECT to upgrade headers
+  EXPECT_EQ("GET", upstream_request_->headers().getMethodValue());
+  EXPECT_TRUE(upstream_request_->headers().getProtocolValue().empty());
+  EXPECT_EQ("websocket", upstream_request_->headers().getUpgradeValue());
+  EXPECT_EQ("upgrade", upstream_request_->headers().getConnectionValue());
+
+  Http::TestResponseHeaderMapImpl h1_upgrade_response{
+      {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
+
+  // Send response headers
+  // The HTTP/1 upstream will observe the upgrade headers and needs to respond with 101
+  // HTTP/2 and HTTP/3 upstreams need to respond to extended CONNECT with 200
+  upstream_request_->encodeHeaders(upstreamProtocol() == Http::CodecType::HTTP1
+                                       ? h1_upgrade_response
+                                       : default_response_headers_,
+                                   false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  // The test client codec will transform 200 extended CONNECT response to 101
+  EXPECT_EQ("101", response_->headers().getStatusValue());
 
   // Make sure that even once the response has started, that data can continue to go upstream.
   codec_client_->sendData(*request_encoder_, "hello", false);
@@ -574,6 +678,39 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
   // Wait for them to arrive downstream.
   response_->waitForHeaders();
   EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ProxyingConnectIntegrationTest, 2xxStatusCode) {
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  connect_headers_.setHost("1.2.3.4:80");
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+
+  // Send valid response headers, in HTTP1 all status codes in the 2xx range
+  // are considered valid.
+  default_response_headers_.setStatus(enumToInt(Http::Code::Accepted));
+
+  // Send response headers
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  EXPECT_EQ("202", response_->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -851,8 +988,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
   ASSERT_TRUE(tcp_client_->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* header =

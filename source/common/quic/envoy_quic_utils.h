@@ -8,7 +8,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
 #include "openssl/ssl.h"
@@ -65,9 +65,9 @@ public:
 template <class T>
 std::unique_ptr<T>
 quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidator& validator,
-                          uint32_t max_headers_allowed, absl::string_view& details,
-                          quic::QuicRstStreamErrorCode& rst) {
-  auto headers = T::create();
+                          uint32_t max_headers_kb, uint32_t max_headers_allowed,
+                          absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
+  auto headers = T::create(max_headers_kb, max_headers_allowed);
   for (const auto& entry : header_list) {
     if (max_headers_allowed == 0) {
       details = Http3ResponseCodeDetailValues::too_many_headers;
@@ -101,10 +101,10 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 
 template <class T>
 std::unique_ptr<T>
-http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block,
+http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block, uint32_t max_headers_kb,
                                 uint32_t max_headers_allowed, HeaderValidator& validator,
                                 absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
-  auto headers = T::create();
+  auto headers = T::create(max_headers_kb, max_headers_allowed);
   if (header_block.size() > max_headers_allowed) {
     details = Http3ResponseCodeDetailValues::too_many_trailers;
     rst = quic::QUIC_STREAM_EXCESSIVE_LOAD;
@@ -190,7 +190,7 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
 
 // Modify new_connection_id according to given old_connection_id to make sure packets with the new
 // one can be routed to the same listener.
-void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
                                      const quic::QuicConnectionId& old_connection_id);
 
 } // namespace Quic

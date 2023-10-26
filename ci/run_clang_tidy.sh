@@ -16,9 +16,10 @@ CLANG_TIDY_APPLY_FIXES="${CLANG_TIDY_APPLY_FIXES:-}"
 CLANG_TIDY_FIX_DIFF="${CLANG_TIDY_FIX_DIFF:-}"
 
 DIFF_TARGET_REMOTE="${DIFF_TARGET_REMOTE:-origin}"
-DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-${AZP_TARGET_BRANCH:-origin/main}}"
+DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-${CI_TARGET_BRANCH:-origin/main}}"
 # Exclude merges for finding merge base if required
 DIFF_HEAD="$(git rev-list --no-merges HEAD -n1)"
+MERGE_HEAD="$(git rev-list HEAD -n1)"
 
 # Quick syntax check of .clang-tidy.
 ${CLANG_TIDY} -dump-config > /dev/null 2> clang-tidy-config-errors.txt
@@ -102,16 +103,18 @@ function run_clang_tidy() {
 
 function run_clang_tidy_diff() {
   local diff
-  diff="$(git diff "${1}")"
+  diff="$(git diff "${1}" | filter_excludes)"
   if [[ -z "$diff" ]]; then
     echo "No changes detected, skipping clang_tidy_diff"
     return 0
   fi
-  echo "$diff" | filter_excludes | \
+
+  echo "$diff" | \
     python3 "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
       -clang-tidy-binary="${CLANG_TIDY}" \
       -export-fixes="${FIX_YAML}" -j "${NUM_CPUS:-0}" -p 1 -quiet
 }
+
 
 if [[ $# -gt 0 ]]; then
   echo "Running clang-tidy on: $*"
@@ -126,15 +129,9 @@ else
             DIFF_REF="HEAD^"
         # Presubmit/PR
         elif [[ -n "${BUILD_REASON}" ]]; then
-            # Common ancestor commit
-            if "$(git rev-parse --is-shallow-repository)"; then
-                # Ideally we always want to fetch here, but this can
-                # fail depending on how the repository is checked out.
-                # If the repo is shallow (ie CI) then we have to unshallow it.
-                git fetch "${DIFF_TARGET_REMOTE}"
-                git fetch --unshallow
-            fi
-            DIFF_REF="$(git merge-base "${DIFF_HEAD}" "${DIFF_TARGET_BRANCH}")"
+            # Common ancestor commit - we only want the changes between the merged commit
+            #   and the common ancestor - ie the changes in this PR
+            DIFF_REF="$(git merge-base "${MERGE_HEAD}" "${DIFF_TARGET_BRANCH}")"
         else
             # TODO(phlax): this is the path used for local CI. Make this work
             #    similar to above, allow the `remote` to be configurable, and
@@ -142,6 +139,12 @@ else
             DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
         fi
     fi
+    if [[ "${DIFF_REF}" == "${DIFF_HEAD}" ]]; then
+        # TODO(phlax): either skip this altogether in scheduled runs or run full clang tidy
+        echo "Nothing changed"
+        exit 0
+    fi
+
     echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse "${DIFF_HEAD}"))"
     run_clang_tidy_diff "${DIFF_REF}"
 fi

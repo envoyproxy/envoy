@@ -495,10 +495,13 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   // Failed write shouldn't drain the data.
   EXPECT_EQ(payload.length(), buffer->length());
 
-  ON_CALL(os_sys_calls, sendmsg(_, _, _))
-      .WillByDefault(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
-  // EINVAL should cause RELEASE_ASSERT.
-  EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
+  send_result = listener_->send(send_data);
+  EXPECT_FALSE(send_result.ok());
+  EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
+  // Failed write shouldn't drain the data.
+  EXPECT_EQ(payload.length(), buffer->length());
 }
 
 /**
@@ -604,14 +607,9 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
       }))
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, EAGAIN}));
 
-  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce(Invoke([&]() { dispatcher_->exit(); }));
   EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, client_data.size());
-
-        const std::string data_str = data.buffer_->toString();
-        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
-      }))
+      .Times(4u)
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, client_data.size());
 
@@ -621,7 +619,6 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
     EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
-    dispatcher_->exit();
   }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);

@@ -72,7 +72,7 @@ public:
     config.set_shadow_rules_stat_prefix("prefix_");
 
     if (with_matcher) {
-      const std::string matcher_yaml = R"EOF(
+      constexpr absl::string_view matcher_yaml = R"EOF(
 matcher_list:
   matchers:
   - predicate:
@@ -109,7 +109,7 @@ on_no_match:
       name: none
       action: {}
 )EOF";
-      const std::string shadow_matcher_yaml = R"EOF(
+      constexpr absl::string_view shadow_matcher_yaml = R"EOF(
 matcher_list:
   matchers:
   - predicate:
@@ -319,7 +319,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
   setDestinationPort(456);
   setMetadata();
 
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush)).Times(2);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(2);
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
@@ -424,7 +424,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherDenied) {
   setDestinationPort(456);
   setMetadata();
 
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush)).Times(2);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(2);
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));

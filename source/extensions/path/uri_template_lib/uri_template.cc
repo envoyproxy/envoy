@@ -43,7 +43,7 @@ absl::StatusOr<std::vector<ParsedSegment>> parseRewritePattern(absl::string_view
 
   // Don't allow contiguous '/' patterns.
   static const LazyRE2 invalid_regex = {"^.*//.*$"};
-  if (RE2::FullMatch(Internal::toStringPiece(path_pattern), *invalid_regex)) {
+  if (RE2::FullMatch(path_pattern, *invalid_regex)) {
     return absl::InvalidArgumentError("Invalid rewrite literal");
   }
 
@@ -80,7 +80,7 @@ absl::StatusOr<std::vector<ParsedSegment>> parseRewritePattern(absl::string_view
 absl::StatusOr<RewriteSegments> parseRewritePattern(absl::string_view pattern,
                                                     absl::string_view capture_regex) {
   RewriteSegments parsed_pattern;
-  RE2 regex = RE2(Internal::toStringPiece(capture_regex));
+  RE2 regex = RE2(capture_regex);
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
   }

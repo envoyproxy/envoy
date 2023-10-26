@@ -127,10 +127,22 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions
 namespace Http {
 namespace Utility {
 
+enum UrlComponents {
+  UcSchema = 0,
+  UcHost = 1,
+  UcPort = 2,
+  UcPath = 3,
+  UcQuery = 4,
+  UcFragment = 5,
+  UcUserinfo = 6,
+  UcMax = 7
+};
+
 /**
  * Given a fully qualified URL, splits the string_view provided into scheme,
  * host and path with query parameters components.
  */
+
 class Url {
 public:
   bool initialize(absl::string_view absolute_url, bool is_connect_request);
@@ -145,10 +157,14 @@ public:
   /** Returns the fully qualified URL as a string. */
   std::string toString() const;
 
+  bool containsFragment();
+  bool containsUserinfo();
+
 private:
   absl::string_view scheme_;
   absl::string_view host_and_port_;
   absl::string_view path_and_query_params_;
+  uint8_t component_bitmap_;
 };
 
 class PercentEncoding {
@@ -348,7 +364,7 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
  */
 std::string makeSetCookieValue(const std::string& key, const std::string& value,
                                const std::string& path, const std::chrono::seconds max_age,
-                               bool httponly);
+                               bool httponly, const Http::CookieAttributeRefVector attributes);
 
 /**
  * Get the response status from the response headers.
@@ -376,6 +392,11 @@ bool isUpgrade(const RequestOrResponseHeaderMap& headers);
  * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
  */
 bool isH2UpgradeRequest(const RequestHeaderMap& headers);
+
+/**
+ * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
+ */
+bool isH3UpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * Determine whether this is a WebSocket Upgrade request.
@@ -539,11 +560,25 @@ const std::string resetReasonToString(const Http::StreamResetReason reset_reason
 void transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers);
 
 /**
+ * Transforms the supplied headers from an HTTP/1 Upgrade request to an H3 style upgrade,
+ * which is the same as the H2 upgrade.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeRequestFromH1toH3(RequestHeaderMap& headers);
+
+/**
  * Transforms the supplied headers from an HTTP/1 Upgrade response to an H2 style upgrade response.
  * Changes the 101 upgrade response to a 200 for the CONNECT response.
  * @param headers the headers to convert.
  */
 void transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers);
+
+/**
+ * Transforms the supplied headers from an HTTP/1 Upgrade response to an H3 style upgrade response,
+ * which is the same as the H2 style upgrade.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeResponseFromH1toH3(ResponseHeaderMap& headers);
 
 /**
  * Transforms the supplied headers from an H2 "CONNECT"-with-:protocol-header to an HTTP/1 style
@@ -553,11 +588,28 @@ void transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers);
 void transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers);
 
 /**
+ * Transforms the supplied headers from an H3 "CONNECT"-with-:protocol-header to an HTTP/1 style
+ * Upgrade response. Same as H2 upgrade response transform
+ * @param headers the headers to convert.
+ */
+void transformUpgradeRequestFromH3toH1(RequestHeaderMap& headers);
+
+/**
  * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
  * The caller is responsible for ensuring this only happens on upgraded streams.
  * @param headers the headers to convert.
+ * @param upgrade the HTTP Upgrade token.
  */
 void transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
+
+/**
+ * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
+ * The caller is responsible for ensuring this only happens on upgraded streams.
+ * Same as H2 Upgrade response transform
+ * @param headers the headers to convert.
+ * @param upgrade the HTTP Upgrade token.
+ */
+void transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
 
 /**
  * Retrieves the route specific config. Route specific config can be in a few
@@ -607,15 +659,19 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
 
   absl::optional<ConfigType> merged;
 
-  callbacks->traversePerFilterConfig(
-      [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
-        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-        if (!merged) {
-          merged.emplace(*typed_cfg);
-        } else {
-          reduce(merged.value(), *typed_cfg);
-        }
-      });
+  callbacks->traversePerFilterConfig([&reduce,
+                                      &merged](const Router::RouteSpecificFilterConfig& cfg) {
+    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+    if (typed_cfg == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      return;
+    }
+    if (!merged) {
+      merged.emplace(*typed_cfg);
+    } else {
+      reduce(merged.value(), *typed_cfg);
+    }
+  });
 
   return merged;
 }
@@ -665,6 +721,13 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
 bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
 
 /**
+ * @param value: the value of the referer header field
+ * @return true if the given value conforms to RFC specifications
+ * https://www.rfc-editor.org/rfc/rfc7231#section-5.5.2
+ */
+bool isValidRefererValue(absl::string_view value);
+
+/**
  * Return the GatewayTimeout HTTP code to indicate the request is full received.
  */
 Http::Code maybeRequestTimeoutCode(bool remote_decode_complete);
@@ -685,6 +748,25 @@ struct RedirectConfig {
   const bool https_redirect_;
   const bool strip_query_;
 };
+
+/**
+ * Validates the provided scheme is valid (either http or https)
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is valid.
+ */
+bool schemeIsValid(const absl::string_view scheme);
+
+/**
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is http.
+ */
+bool schemeIsHttp(const absl::string_view scheme);
+
+/**
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is https.
+ */
+bool schemeIsHttps(const absl::string_view scheme);
 
 /*
  * Compute new path based on RedirectConfig.

@@ -74,6 +74,7 @@ version_history/v1.21.0.rst  version_history/v1.21/v1.21.0.rst
 version_history/v1.21.1.rst  version_history/v1.21/v1.21.1.rst
 version_history/v1.22.0.rst  version_history/v1.22/v1.22.0.rst
 
+start/sandboxes/golang.rst              start/sandboxes/golang-http.rst
 start/sandboxes/zipkin_tracing.rst      start/sandboxes/zipkin.rst
 start/sandboxes/skywalking_tracing.rst  start/sandboxes/skywalking.rst
 

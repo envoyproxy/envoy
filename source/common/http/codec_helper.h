@@ -85,7 +85,7 @@ private:
 };
 
 // A base class shared between Http2 codec and Http3 codec to set a timeout for locally ended stream
-// with buffered data.
+// with buffered data and register the stream adapter.
 class MultiplexedStreamImplBase : public Stream, public StreamCallbackHelper {
 public:
   MultiplexedStreamImplBase(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
@@ -110,6 +110,11 @@ public:
     }
   }
 
+  CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+    std::swap(codec_callbacks, codec_callbacks_);
+    return codec_callbacks;
+  }
+
 protected:
   void setFlushTimeout(std::chrono::milliseconds timeout) override {
     stream_idle_timeout_ = timeout;
@@ -126,6 +131,8 @@ protected:
   virtual void onPendingFlushTimer() { stream_idle_timer_.reset(); }
 
   virtual bool hasPendingData() PURE;
+
+  CodecEventCallbacks* codec_callbacks_{nullptr};
 
 private:
   Event::Dispatcher& dispatcher_;

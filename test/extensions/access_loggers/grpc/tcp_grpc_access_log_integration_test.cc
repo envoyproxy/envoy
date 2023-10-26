@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/filters/network/echo/v3/echo.pb.h"
+#include "envoy/extensions/filters/network/echo/v3/echo.pb.validate.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
@@ -107,7 +109,9 @@ public:
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
 
-      tcp_proxy_config.mutable_access_log_flush_interval()->set_seconds(1); // 1s
+      tcp_proxy_config.mutable_access_log_options()
+          ->mutable_access_log_flush_interval()
+          ->set_seconds(1); // 1s
 
       tcp_proxy->PackFrom(tcp_proxy_config);
     });
@@ -123,8 +127,9 @@ public:
       auto* alpn = filter_chain->mutable_filter_chain_match()->add_application_protocols();
       *alpn = "envoyalpn";
       auto* filter = filter_chain->mutable_filters(0);
+      envoy::extensions::filters::network::echo::v3::Echo echo;
       filter->set_name("envoy.filters.network.echo");
-      filter->clear_typed_config();
+      filter->mutable_typed_config()->PackFrom(echo);
     });
     if (ssl_terminate) {
       config_helper_.addSslConfig();
@@ -234,9 +239,7 @@ public:
     // Clear connection unique id which is not deterministic.
     log_entry->mutable_common_properties()->clear_stream_id();
 
-    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
-                                        /*ignore_repeated_field_ordering=*/false));
-
+    EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
     return AssertionSuccess();
   }
 
@@ -311,9 +314,14 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      downstream_wire_bytes_received: 3
+      upstream_wire_bytes_sent: 3
+      upstream_wire_bytes_received: 5
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -369,6 +377,11 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      downstream_wire_bytes_received: 3
+      upstream_wire_bytes_sent: 3
+      upstream_wire_bytes_received: 5
+      access_log_type: TcpPeriodic
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -457,10 +470,13 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      upstream_wire_bytes_received: 5
       connection_termination_details: rbac_access_denied_matched_policy[none]
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -527,6 +543,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -590,6 +607,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -636,6 +654,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -689,6 +708,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -742,6 +762,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}

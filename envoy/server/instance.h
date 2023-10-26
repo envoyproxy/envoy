@@ -28,7 +28,7 @@
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
@@ -45,6 +45,11 @@ namespace Server {
 class Instance {
 public:
   virtual ~Instance() = default;
+
+  /**
+   * Runs the server.
+   */
+  virtual void run() PURE;
 
   /**
    * @return OptRef<Admin> the global HTTP admin endpoint for the server.
@@ -84,8 +89,10 @@ public:
 
   /**
    * Close the server's listening sockets and begin draining the listeners.
+   * @param options - if provided, options are passed through to shutdownListener.
    */
-  virtual void drainListeners() PURE;
+  virtual void
+  drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options = absl::nullopt) PURE;
 
   /**
    * @return DrainManager& singleton for use by the entire server.

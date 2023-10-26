@@ -7,15 +7,22 @@
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
+#include "test/extensions/filters/udp/udp_proxy/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/socket.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/mocks/upstream/cluster_update_callbacks_handle.h"
 #include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -30,6 +37,7 @@ using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnNew;
+using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -42,7 +50,7 @@ class TestUdpProxyFilter : public UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
 
-  MOCK_METHOD(Network::SocketPtr, createSocket, (const Upstream::HostConstSharedPtr& host));
+  MOCK_METHOD(Network::SocketPtr, createUdpSocket, (const Upstream::HostConstSharedPtr& host));
 };
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
@@ -52,8 +60,7 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 }
 
 Api::IoCallUint64Result makeError(int sys_errno) {
-  return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
-                                                    Network::IoSocketError::deleteIoError));
+  return {0, Network::IoSocketError::create(sys_errno)};
 }
 
 class UdpProxyFilterBase : public testing::Test {
@@ -172,9 +179,8 @@ public:
         // Return an EAGAIN result.
         EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
         EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
-            .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-                0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                   Network::IoSocketError::deleteIoError)))));
+            .WillOnce(Return(ByMove(
+                Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError()))));
       }
 
       // Kick off the receive.
@@ -200,7 +206,7 @@ public:
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(
             Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
-    ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
+    ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, address())
@@ -213,7 +219,7 @@ public:
 
   void setup(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
              bool has_cluster = true, bool expect_gro = true) {
-    config_ = std::make_shared<UdpProxyFilterConfig>(factory_context_, config);
+    config_ = std::make_shared<UdpProxyFilterConfigImpl>(factory_context_, config);
     EXPECT_CALL(factory_context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -239,7 +245,7 @@ public:
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
-    EXPECT_CALL(*filter_, createSocket(_))
+    EXPECT_CALL(*filter_, createUdpSocket(_))
         .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
     EXPECT_CALL(
         *new_session.socket_->io_handle_,
@@ -419,7 +425,9 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
-      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%";
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
+      "%DOWNSTREAM_REMOTE_ADDRESS% "
+      "%DOWNSTREAM_LOCAL_ADDRESS%";
 
   const std::string proxy_access_log_format =
       "%DYNAMIC_METADATA(udp.proxy.proxy:bytes_received)% "
@@ -469,7 +477,7 @@ upstream_socket_config:
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
   EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
-  EXPECT_EQ(output_.back(), "17 3 17 3");
+  EXPECT_EQ(output_.back(), "17 3 17 3 10.0.0.1:1000 10.0.0.2:80");
 }
 
 // Route with source IP.
@@ -748,15 +756,27 @@ matcher:
   // Add a cluster that we don't care about.
   NiceMock<Upstream::MockThreadLocalCluster> other_thread_local_cluster;
   other_thread_local_cluster.cluster_.info_->name_ = "other_cluster";
-  cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster);
+  {
+    Upstream::ThreadLocalClusterCommand command =
+        [&other_thread_local_cluster]() -> Upstream::ThreadLocalCluster& {
+      return other_thread_local_cluster;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster.info()->name(),
+                                                    command);
+  }
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_no_route_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   // Now add the cluster we care about.
-  cluster_update_callbacks_->onClusterAddOrUpdate(
-      factory_context_.cluster_manager_.thread_local_cluster_);
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return factory_context_.cluster_manager_.thread_local_cluster_;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(
+        factory_context_.cluster_manager_.thread_local_cluster_.info()->name(), command);
+  }
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -917,11 +937,55 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
 
   InSequence s;
 
   ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
+}
+
+TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndSessionFilters) {
+  auto config = R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(readConfig(config)), EnvoyException,
+      "Only one of use_per_packet_load_balancing or session_filters can be used.");
+}
+
+TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndTunneling) {
+  auto config = R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(readConfig(config)), EnvoyException,
+      "Only one of use_per_packet_load_balancing or tunneling_config can be used.");
 }
 
 // Verify that on second data packet sent from the client, another upstream host is selected.
@@ -1142,7 +1206,7 @@ TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
 
   InSequence s;
 
@@ -1199,7 +1263,7 @@ matcher:
 // Make sure exit when use the use_original_src_ip but platform does not support ip
 // transparent option.
 TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent()).WillOnce(Return(false));
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_)).WillOnce(Return(false));
 
   InSequence s;
 
@@ -1412,6 +1476,573 @@ hash_policies:
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
+}
+
+class HttpUpstreamImplTest : public testing::Test {
+public:
+  struct HeaderToAdd {
+    std::string key_;
+    std::string value_;
+  };
+
+  Http::TestRequestHeaderMapImpl
+  expectedHeaders(bool is_ssl = false, bool use_post = false,
+                  absl::optional<std::string> opt_authority = absl::nullopt,
+                  absl::optional<std::string> opt_path = absl::nullopt,
+                  absl::optional<HeaderToAdd> header_to_add = absl::nullopt) {
+    // In case connect-udp is used, Envoy expect the H2 headers to be normalized with H1,
+    // so expect that the request headers here match H1 headers, even though
+    // eventually H2 headers will be sent. When the headers are normalized to H1, the method
+    // is replaced with GET, a header with the 'upgrade' key is added with 'connect-udp'
+    // value and a header with the 'connection' key is added with 'Upgrade' value.
+    std::string scheme = is_ssl ? "https" : "http";
+    std::string authority =
+        opt_authority.has_value() ? opt_authority.value() : "default.host.com:10";
+    std::string method = use_post ? "POST" : "GET";
+    std::string path =
+        opt_path.has_value() ? opt_path.value() : "/.well-known/masque/udp/default.target.host/20/";
+
+    auto headers = Http::TestRequestHeaderMapImpl{
+        {":scheme", scheme}, {":authority", authority}, {":method", method}, {":path", path}};
+
+    if (!use_post) {
+      headers.addCopy("capsule-protocol", "?1");
+      headers.addCopy("upgrade", "connect-udp");
+      headers.addCopy("connection", "Upgrade");
+    }
+
+    if (header_to_add) {
+      headers.addCopy(header_to_add.value().key_, header_to_add.value().value_);
+    }
+
+    return headers;
+  }
+
+  void setAndExpectRequestEncoder(Http::TestRequestHeaderMapImpl expected_headers,
+                                  bool is_ssl = false) {
+    EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
+    EXPECT_CALL(request_encoder_, encodeHeaders(_, _))
+        .WillOnce(Invoke([expected_headers](const Http::RequestHeaderMap& headers,
+                                            bool end_stream) -> Http::Status {
+          EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+          EXPECT_FALSE(end_stream);
+          return absl::OkStatus();
+        }));
+
+    upstream_->setRequestEncoder(request_encoder_, is_ssl);
+
+    // Verify that resetEncoder is called only once.
+    EXPECT_CALL(request_encoder_.stream_, removeCallbacks(_));
+  }
+
+  void filterStateOverride(absl::optional<uint32_t> proxy_port = absl::nullopt,
+                           absl::optional<uint32_t> target_port = absl::nullopt) {
+    if (proxy_port) {
+      stream_info_.filterState()->setData(
+          "udp.connect.proxy_port",
+          std::make_shared<StreamInfo::UInt32AccessorImpl>(proxy_port.value()),
+          Envoy::StreamInfo::FilterState::StateType::Mutable);
+    }
+
+    if (target_port) {
+      stream_info_.filterState()->setData(
+          "udp.connect.target_port",
+          std::make_shared<StreamInfo::UInt32AccessorImpl>(target_port.value()),
+          Envoy::StreamInfo::FilterState::StateType::Mutable);
+    }
+  }
+
+  void setup(absl::optional<HeaderToAdd> header_to_add = absl::nullopt) {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add;
+    if (header_to_add) {
+      envoy::config::core::v3::HeaderValueOption* header = headers_to_add.Add();
+      header->mutable_header()->set_key(header_to_add.value().key_);
+      header->mutable_header()->set_value(header_to_add.value().value_);
+    }
+
+    header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add);
+    config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
+    upstream_ = std::make_unique<HttpUpstreamImpl>(callbacks_, *config_, stream_info_);
+    upstream_->setTunnelCreationCallbacks(creation_callbacks_);
+  }
+
+  NiceMock<MockUpstreamTunnelCallbacks> callbacks_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Http::MockRequestEncoder> request_encoder_;
+  NiceMock<MockTunnelCreationCallbacks> creation_callbacks_;
+  std::unique_ptr<NiceMock<MockUdpTunnelingConfig>> config_;
+  std::unique_ptr<Http::HeaderEvaluator> header_evaluator_;
+  std::unique_ptr<HttpUpstreamImpl> upstream_;
+};
+
+TEST_F(HttpUpstreamImplTest, EncodeData) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  EXPECT_CALL(request_encoder_, encodeData(_, false));
+  Buffer::OwnedImpl data;
+  upstream_->encodeData(data);
+}
+
+TEST_F(HttpUpstreamImplTest, WatermarksCallBack) {
+  setup();
+
+  EXPECT_CALL(callbacks_, onAboveWriteBufferHighWatermark());
+  upstream_->onAboveWriteBufferHighWatermark();
+  EXPECT_CALL(callbacks_, onBelowWriteBufferLowWatermark());
+  upstream_->onBelowWriteBufferLowWatermark();
+}
+
+TEST_F(HttpUpstreamImplTest, OnResetStream) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  // If the creation callbacks are active will resetting the stream, it means that response
+  // headers were not received, so it's expected to be a failure.
+  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  upstream_->onResetStream(Http::StreamResetReason::ConnectionTimeout, "reason");
+}
+
+TEST_F(HttpUpstreamImplTest, LocalCloseByDownstreamResetsStream) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  // If the creation callbacks are active will resetting the stream, it means that response
+  // headers were not received, so it's expected to be a failure.
+  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+}
+
+TEST_F(HttpUpstreamImplTest, RemoteCloseByDownstreamResetsStream) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  // If the creation callbacks are active will resetting the stream, it means that response
+  // headers were not received, so it's expected to be a failure.
+  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  upstream_->onDownstreamEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpUpstreamImplTest, NullOperationFunctions) {
+  setup();
+
+  // Calling functions that implemented by no-op for coverage.
+  upstream_->responseDecoder().decodeMetadata(nullptr);
+  upstream_->responseDecoder().decode1xxHeaders(nullptr);
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  upstream_->responseDecoder().dumpState(ostream, 1);
+}
+
+TEST_F(HttpUpstreamImplTest, FailureResponseHeadersNot200Status) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "500"}, {"Capsule-Protocol", "?1"}});
+  upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/false);
+}
+
+TEST_F(HttpUpstreamImplTest, FailureResponseHeadersEndStream) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "101"}, {"upgrade", "connect-udp"}});
+  upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/true);
+}
+
+TEST_F(HttpUpstreamImplTest, SuccessResponseHeaders) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
+  EXPECT_CALL(creation_callbacks_, onStreamSuccess(_));
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "101"}, {"upgrade", "connect-udp"}});
+  upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/false);
+}
+
+TEST_F(HttpUpstreamImplTest, DecodeData) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  Buffer::OwnedImpl data;
+
+  // Second decodeData call will reset the stream, because it is end of stream.
+  // Since response headers were not received it's considered as a failure.
+  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  EXPECT_CALL(callbacks_, onUpstreamData(_, _))
+      .WillOnce(Invoke([](Buffer::Instance&, bool end_stream) { EXPECT_FALSE(end_stream); }))
+      .WillOnce(Invoke([](Buffer::Instance&, bool end_stream) { EXPECT_TRUE(end_stream); }));
+
+  upstream_->responseDecoder().decodeData(data, /*end_stream=*/false);
+  upstream_->responseDecoder().decodeData(data, /*end_stream=*/true);
+}
+
+TEST_F(HttpUpstreamImplTest, DecodeDataAfterSuccessHeaders) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  Buffer::OwnedImpl data;
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "101"}, {"upgrade", "connect-udp"}});
+
+  EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
+  EXPECT_CALL(creation_callbacks_, onStreamSuccess(_));
+  EXPECT_CALL(callbacks_, onUpstreamData(_, _))
+      .WillOnce(Invoke([](Buffer::Instance&, bool end_stream) { EXPECT_FALSE(end_stream); }))
+      .WillOnce(Invoke([](Buffer::Instance&, bool end_stream) { EXPECT_TRUE(end_stream); }));
+
+  upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/false);
+  upstream_->responseDecoder().decodeData(data, /*end_stream=*/false);
+  upstream_->responseDecoder().decodeData(data, /*end_stream=*/true);
+}
+
+TEST_F(HttpUpstreamImplTest, DecodeTrailers) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  // Decode trailers should reset the stream.
+  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  upstream_->responseDecoder().decodeTrailers(nullptr);
+}
+
+TEST_F(HttpUpstreamImplTest, DecodeTrailersAfterSuccessHeaders) {
+  setup();
+  setAndExpectRequestEncoder(expectedHeaders());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "101"}, {"upgrade", "connect-udp"}});
+
+  EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
+  EXPECT_CALL(creation_callbacks_, onStreamSuccess(_));
+
+  upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/false);
+  upstream_->responseDecoder().decodeTrailers(nullptr);
+}
+
+TEST_F(HttpUpstreamImplTest, EncodeHeaders) {
+  HeaderToAdd header{"test_key", "test_val"};
+  absl::optional<uint32_t> port;
+  bool is_ssl = false;
+
+  setup(header);
+
+  EXPECT_CALL(*config_, proxyHost(_)).WillRepeatedly(Return("proxy.host"));
+  EXPECT_CALL(*config_, proxyPort()).WillRepeatedly(ReturnRef(port));
+  EXPECT_CALL(*config_, targetHost(_)).WillRepeatedly(Return("target.host"));
+  EXPECT_CALL(*config_, defaultTargetPort()).WillRepeatedly(Return(200));
+
+  auto expected_headers = expectedHeaders(
+      is_ssl, /*use_post=*/false, /*opt_authority=*/"proxy.host",
+      /*opt_path=*/"/.well-known/masque/udp/target.host/200/", /*header_to_add=*/header);
+
+  setAndExpectRequestEncoder(expected_headers, is_ssl);
+}
+
+TEST_F(HttpUpstreamImplTest, EncodeHeadersWithPost) {
+  std::string post_path = "/post/path";
+  absl::optional<uint32_t> port = 100;
+  bool is_ssl = true;
+
+  setup();
+
+  EXPECT_CALL(*config_, proxyHost(_)).WillRepeatedly(Return("proxy.host"));
+  EXPECT_CALL(*config_, proxyPort()).WillRepeatedly(ReturnRef(port));
+  EXPECT_CALL(*config_, usePost()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*config_, postPath()).WillRepeatedly(ReturnRef(post_path));
+
+  auto expected_headers =
+      expectedHeaders(is_ssl, /*use_post=*/true, /*opt_authority=*/"proxy.host:100",
+                      /*opt_path=*/post_path, /*header_to_add=*/absl::nullopt);
+
+  setAndExpectRequestEncoder(expected_headers, is_ssl);
+}
+
+TEST_F(HttpUpstreamImplTest, EncodeHeadersWithFilterStateOverrides) {
+  HeaderToAdd header{"test_key", "test_val"};
+  bool is_ssl = false;
+
+  setup(header);
+  filterStateOverride(30, 60);
+
+  EXPECT_CALL(*config_, proxyHost(_)).WillRepeatedly(Return("proxy.host"));
+  EXPECT_CALL(*config_, targetHost(_)).WillRepeatedly(Return("target.host"));
+
+  // Filter state override has precedence, so they are not called.
+  EXPECT_CALL(*config_, proxyPort()).Times(0);
+  EXPECT_CALL(*config_, defaultTargetPort()).Times(0);
+
+  auto expected_headers = expectedHeaders(
+      is_ssl, /*use_post=*/false, /*opt_authority=*/"proxy.host:30",
+      /*opt_path=*/"/.well-known/masque/udp/target.host/60/", /*header_to_add=*/header);
+
+  setAndExpectRequestEncoder(expected_headers, is_ssl);
+}
+
+TEST_F(HttpUpstreamImplTest, TargetHostPercentEncoding) {
+  bool is_ssl = false;
+  setup();
+
+  EXPECT_CALL(*config_, proxyHost(_)).WillRepeatedly(Return("proxy.host"));
+  EXPECT_CALL(*config_, targetHost(_)).WillRepeatedly(Return("2001:db8::42"));
+
+  auto expected_headers =
+      expectedHeaders(is_ssl, /*use_post=*/false, /*opt_authority=*/"proxy.host:10",
+                      /*opt_path=*/"/.well-known/masque/udp/2001%3Adb8%3A%3A42/20/");
+
+  setAndExpectRequestEncoder(expected_headers, is_ssl);
+}
+
+class TunnelingConnectionPoolImplTest : public testing::Test {
+public:
+  void setup() {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add;
+    header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add);
+    config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
+    stream_info_.downstream_connection_info_provider_->setConnectionID(0);
+    pool_ = std::make_unique<TunnelingConnectionPoolImpl>(cluster_, &context_, *config_, callbacks_,
+                                                          stream_info_);
+  }
+
+  void createNewStream() { pool_->newStream(stream_callbacks_); }
+
+  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
+  NiceMock<Upstream::MockLoadBalancerContext> context_;
+  std::unique_ptr<Http::HeaderEvaluator> header_evaluator_;
+  std::unique_ptr<NiceMock<MockUdpTunnelingConfig>> config_;
+  NiceMock<MockUpstreamTunnelCallbacks> callbacks_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<MockHttpStreamCallbacks> stream_callbacks_;
+  NiceMock<Http::MockRequestEncoder> request_encoder_;
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_{
+      new NiceMock<Upstream::MockHostDescription>()};
+  std::unique_ptr<TunnelingConnectionPoolImpl> pool_;
+};
+
+TEST_F(TunnelingConnectionPoolImplTest, ValidPool) {
+  setup();
+  EXPECT_TRUE(pool_->valid());
+}
+
+TEST_F(TunnelingConnectionPoolImplTest, InvalidPool) {
+  EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  setup();
+  EXPECT_FALSE(pool_->valid());
+}
+
+TEST_F(TunnelingConnectionPoolImplTest, OnNewStream) {
+  setup();
+  EXPECT_CALL(cluster_.conn_pool_, newStream(_, _, _));
+  createNewStream();
+}
+
+TEST_F(TunnelingConnectionPoolImplTest, PoolFailure) {
+  setup();
+  createNewStream();
+  EXPECT_CALL(stream_callbacks_, onStreamFailure(_, _, _));
+  pool_->onPoolFailure(Http::ConnectionPool::PoolFailureReason::Timeout, "reason", upstream_host_);
+}
+
+TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
+  setup();
+  createNewStream();
+  EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+}
+
+TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
+  setup();
+  createNewStream();
+  EXPECT_CALL(stream_callbacks_,
+              onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "", _));
+  pool_->onStreamFailure();
+}
+
+TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
+  setup();
+  createNewStream();
+  EXPECT_CALL(stream_callbacks_, onStreamReady(_, _, _, _, _));
+  pool_->onStreamSuccess(request_encoder_);
+}
+
+TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
+  setup();
+
+  TunnelingConnectionPoolFactory factory;
+  auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
+  EXPECT_FALSE(valid_pool == nullptr);
+
+  EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  auto invalid_pool =
+      factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
+  EXPECT_TRUE(invalid_pool == nullptr);
+}
+
+TEST(TunnelingConfigImplTest, DefaultConfigs) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.set_use_post(true);
+  TunnelingConfigImpl config(proto_config, context);
+
+  EXPECT_EQ(1, config.maxConnectAttempts());
+  EXPECT_EQ(1024, config.maxBufferedDatagrams());
+  EXPECT_EQ(16384, config.maxBufferedBytes());
+}
+
+TEST(TunnelingConfigImplTest, DefaultPostPath) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.set_use_post(true);
+  TunnelingConfigImpl config(proto_config, context);
+
+  EXPECT_EQ("/", config.postPath());
+}
+
+TEST(TunnelingConfigImplTest, PostPathWithoutPostMethod) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.set_post_path("/path");
+  EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                            "Can't set a post path when POST method isn't used");
+}
+
+TEST(TunnelingConfigImplTest, PostWithInvalidPath) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.set_use_post(true);
+  proto_config.set_post_path("path");
+  EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                            "Path must start with '/'");
+}
+
+TEST(TunnelingConfigImplTest, ValidProxyPort) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.mutable_proxy_port()->set_value(443);
+  TunnelingConfigImpl config(proto_config, context);
+  EXPECT_EQ(443, config.proxyPort());
+}
+
+TEST(TunnelingConfigImplTest, ProxyPortOutOfRange) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  {
+    TunnelingConfig proto_config;
+    proto_config.mutable_proxy_port()->set_value(0);
+    EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                              "Port value not in range");
+  }
+  {
+    TunnelingConfig proto_config;
+    proto_config.mutable_proxy_port()->set_value(65536);
+    EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                              "Port value not in range");
+  }
+}
+
+TEST(TunnelingConfigImplTest, InvalidHeadersToAdd) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  {
+    TunnelingConfig proto_config;
+    auto* header_to_add = proto_config.add_headers_to_add();
+    auto* header = header_to_add->mutable_header();
+    // Can't add pseudo header.
+    header->set_key(":method");
+    header->set_value("GET");
+    EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                              ":-prefixed or host headers may not be modified");
+  }
+
+  {
+    TunnelingConfig proto_config;
+    auto* header_to_add = proto_config.add_headers_to_add();
+    auto* header = header_to_add->mutable_header();
+    // Can't modify host.
+    header->set_key("host");
+    header->set_value("example.net:80");
+    EXPECT_THROW_WITH_MESSAGE(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                              ":-prefixed or host headers may not be modified");
+  }
+}
+
+TEST(TunnelingConfigImplTest, HeadersToAdd) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  stream_info.filterState()->setData(
+      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"),
+      Envoy::StreamInfo::FilterState::StateType::Mutable);
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%FILTER_STATE(test_key:PLAIN)%");
+  TunnelingConfigImpl config(proto_config, context);
+
+  auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
+  config.headerEvaluator().evaluateHeaders(
+      headers, *Http::StaticEmptyHeaders::get().request_headers,
+      *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  EXPECT_EQ("test_val", headers.getByKey("test_key"));
+}
+
+TEST(TunnelingConfigImplTest, ProxyHostFromFilterState) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  stream_info.filterState()->setData(
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
+      Envoy::StreamInfo::FilterState::StateType::Mutable);
+
+  TunnelingConfig proto_config;
+  proto_config.set_proxy_host("%FILTER_STATE(test-proxy-host:PLAIN)%");
+  TunnelingConfigImpl config(proto_config, context);
+
+  EXPECT_EQ("test.host.com", config.proxyHost(stream_info));
+}
+
+TEST(TunnelingConfigImplTest, TargetHostFromFilterState) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  stream_info.filterState()->setData(
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
+      Envoy::StreamInfo::FilterState::StateType::Mutable);
+
+  TunnelingConfig proto_config;
+  proto_config.set_target_host("%FILTER_STATE(test-proxy-host:PLAIN)%");
+  TunnelingConfigImpl config(proto_config, context);
+
+  EXPECT_EQ("test.host.com", config.targetHost(stream_info));
+}
+
+TEST(TunnelingConfigImplTest, BufferingState) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  {
+    TunnelingConfig proto_config;
+    TunnelingConfigImpl config(proto_config, context);
+    // Buffering should be disabled by default.
+    EXPECT_FALSE(config.bufferEnabled());
+  }
+
+  {
+    TunnelingConfig proto_config;
+    proto_config.mutable_buffer_options(); // Will set buffering.
+    TunnelingConfigImpl config(proto_config, context);
+    EXPECT_TRUE(config.bufferEnabled());
+  }
 }
 
 } // namespace

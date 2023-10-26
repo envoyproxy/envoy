@@ -45,6 +45,11 @@ public final class FakeX509Util {
           + "chain passed as |certChain|. |certChain|=" + Arrays.deepToString(certChain));
     }
 
+    if (ContextUtils.getApplicationContext() == null) {
+      throw new NullPointerException(
+          "ContextUtils is not initialized with a proper context. Call initApplicationContext() during startup.");
+    }
+
     for (byte[] cert : certChain) {
       String fakeCert = new String(cert);
       if (!validFakeCerts.contains(fakeCert)) {

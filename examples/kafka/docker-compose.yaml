@@ -2,6 +2,7 @@ services:
 
   kafka-client:
     build:
+      context: .
       dockerfile: Dockerfile-kafka
     restart: "no"
     deploy:
@@ -9,6 +10,7 @@ services:
 
   proxy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_VARIANT: contrib-dev
@@ -18,6 +20,7 @@ services:
 
   kafka-server:
     build:
+      context: .
       dockerfile: Dockerfile-kafka
     depends_on:
       zookeeper:
@@ -38,6 +41,7 @@ services:
 
   zookeeper:
     build:
+      context: .
       dockerfile: Dockerfile-zookeeper
     healthcheck:
       test: ["CMD", "sh", "-c", "echo ruok | nc 127.0.0.1 2181 || exit -1"]

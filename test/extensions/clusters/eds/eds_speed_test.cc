@@ -10,13 +10,13 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/grpc_subscription_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/eds/eds.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/benchmark/main.h"
@@ -49,23 +49,28 @@ public:
         subscription_stats_(Config::Utility::generateStats(scope_)),
         async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()) {
+    auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+        Config::SubscriptionFactory::RetryInitialDelayMs,
+        Config::SubscriptionFactory::RetryMaxDelayMs, random_);
+    Config::GrpcMuxContext grpc_mux_context{
+        /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*dispatcher_=*/server_context_.dispatcher_,
+        /*service_method_=*/
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
+        /*local_info_=*/local_info_,
+        /*rate_limit_settings_=*/{},
+        /*scope_=*/scope_,
+        /*config_validators_=*/std::move(config_validators_),
+        /*xds_resources_delegate_=*/Config::XdsResourcesDelegateOptRef(),
+        /*xds_config_tracker_=*/Config::XdsConfigTrackerOptRef(),
+        /*backoff_strategy_=*/std::move(backoff_strategy),
+        /*target_xds_authority_=*/"",
+        /*eds_resources_cache_=*/nullptr};
     if (use_unified_mux_) {
-      grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
-          std::unique_ptr<Grpc::MockAsyncClient>(async_client_), server_context_.dispatcher_,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, scope_, {}, local_info_, true, std::move(config_validators_),
-          /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef()));
+      grpc_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
     } else {
-      grpc_mux_.reset(new Config::GrpcMuxImpl(
-          local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
-          server_context_.dispatcher_,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, scope_, {}, true, std::move(config_validators_),
-          /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef(),
-          /*xds_resources_delegate=*/Config::XdsResourcesDelegateOptRef(),
-          /*target_xds_authority=*/""));
+      grpc_mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context, true);
     }
     resetCluster(R"EOF(
       name: name
@@ -90,14 +95,12 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopeSharedPtr scope = stats_.rootScope()->createScope(fmt::format(
-        "cluster.{}.",
-        eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, scope_, server_context_.cluster_manager_, stats_,
-        validation_visitor_);
-    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_,
-                                                factory_context, std::move(scope), false);
+
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+
+    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
@@ -161,12 +164,13 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
+
   State& state_;
   bool use_unified_mux_;
   const std::string type_url_;
   uint64_t version_{};
   bool initialized_{};
-  Stats::TestUtil::TestStore stats_;
   Stats::Scope& scope_{*stats_.rootScope()};
   Config::SubscriptionStats subscription_stats_;
   Ssl::MockContextManager ssl_context_manager_;
@@ -177,7 +181,6 @@ public:
       Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>>(
       validation_visitor_, "cluster_name")};
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   ProtobufMessage::MockValidationVisitor validation_visitor_;
   Grpc::MockAsyncClient* async_client_;

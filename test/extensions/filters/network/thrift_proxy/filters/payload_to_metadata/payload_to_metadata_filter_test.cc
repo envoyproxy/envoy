@@ -92,7 +92,8 @@ public:
   //     f10: set
   //   }
   // }
-  void writeMessage(std::string string_value = "two") {
+  void writeMessage(const std::string& string_value = "two",
+                    const std::string& method_name = "foo") {
     Buffer::OwnedImpl buffer;
     auto metadata_ptr =
         std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -101,7 +102,9 @@ public:
     Buffer::OwnedImpl msg;
     ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
     metadata.setProtocol(protocol_);
-    metadata.setMethodName("foo");
+    if (!method_name.empty()) {
+      metadata.setMethodName(method_name);
+    }
     metadata.setMessageType(MessageType::Call);
     metadata.setSequenceId(0);
 
@@ -185,6 +188,63 @@ public:
     decoder->onData(buffer, underflow);
   }
 
+  void writeMessageMultiStruct() {
+    Buffer::OwnedImpl buffer;
+    auto metadata_ptr =
+        std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+    auto& metadata = *metadata_ptr;
+
+    Buffer::OwnedImpl msg;
+    ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
+    metadata.setProtocol(protocol_);
+    metadata.setMethodName("foo");
+    metadata.setMessageType(MessageType::Call);
+    metadata.setSequenceId(0);
+
+    proto->writeMessageBegin(msg, metadata);
+    proto->writeStructBegin(msg, "wrapper");
+    proto->writeFieldBegin(msg, "context", FieldType::Struct, 1);
+    proto->writeStructBegin(msg, "context");
+
+    proto->writeFieldBegin(msg, "source", FieldType::String, 1);
+    proto->writeString(msg, "bar");
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "requestId", FieldType::String, 2);
+    proto->writeString(msg, "42");
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0); // context stop field
+    proto->writeStructEnd(msg);
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "request", FieldType::Struct, 2);
+    proto->writeStructBegin(msg, "request");
+
+    proto->writeFieldBegin(msg, "baz", FieldType::String, 1);
+    proto->writeString(msg, "qux");
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0); // request stop field
+    proto->writeStructEnd(msg);
+    proto->writeFieldEnd(msg);
+
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0); // wrapper stop field
+    proto->writeStructEnd(msg);
+    proto->writeMessageEnd(msg);
+
+    TransportPtr transport = NamedTransportConfigFactory::getFactory(transport_).createTransport();
+    transport->encodeFrame(buffer, metadata, msg);
+
+    // Simulate the decoder events. Check PassThroughDecoderEventHandler.
+    ProtocolPtr decoder_proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
+    TransportPtr decoder_transport =
+        NamedTransportConfigFactory::getFactory(transport_).createTransport();
+    DecoderPtr decoder = std::make_unique<Decoder>(*decoder_transport, *decoder_proto, *this);
+    bool underflow = false;
+    decoder->onData(buffer, underflow);
+  }
+
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   std::shared_ptr<PayloadToMetadataFilter> filter_;
@@ -208,7 +268,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "two"}};
+  const std::map<std::string, std::string> expected = {{"present", "two"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -237,7 +297,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "seven"}};
+  const std::map<std::string, std::string> expected = {{"present", "seven"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -263,7 +323,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "1"}};
+  const std::map<std::string, std::string> expected = {{"present", "1"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -292,7 +352,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "1"}};
+  const std::map<std::string, std::string> expected = {{"present", "1"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -321,7 +381,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "2"}};
+  const std::map<std::string, std::string> expected = {{"present", "2"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -350,7 +410,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "3.000000"}};
+  const std::map<std::string, std::string> expected = {{"present", "3.000000"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -379,7 +439,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "4"}};
+  const std::map<std::string, std::string> expected = {{"present", "4"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -408,7 +468,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "5"}};
+  const std::map<std::string, std::string> expected = {{"present", "5"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -437,7 +497,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "6"}};
+  const std::map<std::string, std::string> expected = {{"present", "6"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -463,13 +523,63 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "two"}};
+  const std::map<std::string, std::string> expected = {{"present", "two"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
   writeMessage();
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MethodNameWithServicePrefix) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  const std::map<std::string, std::string> expected = {{"present", "two"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  writeMessage("two", "service:foo");
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, WrongMethodNameWithServicePrefix) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  initializeFilter(request_config_yaml, false);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  writeMessage("two", "service:bar");
   filter_->onDestroy();
 }
 
@@ -511,7 +621,7 @@ request_rules:
       value: unknown
 )EOF";
   initializeFilter(request_config_yaml);
-  std::map<std::string, std::string> expected = {{"present", "two"}};
+  const std::map<std::string, std::string> expected = {{"present", "two"}};
   EXPECT_CALL(req_info_,
               setDynamicMetadata("envoy.filters.thrift.payload_to_metadata", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -537,7 +647,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "bar"}};
+  const std::map<std::string, std::string> expected = {{"present", "bar"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -568,7 +678,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "two cents"}};
+  const std::map<std::string, std::string> expected = {{"present", "two cents"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -600,13 +710,13 @@ request_rules:
 )EOF";
 
   const std::string value = "do not match";
-  std::map<std::string, std::string> expected = {{"present", value}};
+  const std::map<std::string, std::string> expected = {{"present", value}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -638,7 +748,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -667,7 +777,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -694,7 +804,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -719,7 +829,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -749,7 +859,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -769,7 +879,7 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
-  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+  const std::map<std::string, std::string> expected = {{"missing", "unknown"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -798,7 +908,7 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
-  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+  const std::map<std::string, std::string> expected = {{"missing", "unknown"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -830,7 +940,7 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
-  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+  const std::map<std::string, std::string> expected = {{"missing", "unknown"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -856,7 +966,7 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
-  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+  const std::map<std::string, std::string> expected = {{"missing", "unknown"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -885,7 +995,7 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
-  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+  const std::map<std::string, std::string> expected = {{"missing", "unknown"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -914,7 +1024,7 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
-  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+  const std::map<std::string, std::string> expected = {{"missing", "unknown"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -989,7 +1099,7 @@ request_rules:
   // empty payload on the field
   const std::string value = "";
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -1017,7 +1127,7 @@ request_rules:
   auto length = MAX_PAYLOAD_VALUE_LEN + 1;
   const std::string value = std::string(length, 'x');
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -1060,7 +1170,7 @@ request_rules:
       key: seven
 )EOF";
 
-  std::map<std::string, std::string> expected = {
+  const std::map<std::string, std::string> expected = {
       {"present", "two"}, {"six", "6"}, {"seven", "seven"}};
 
   initializeFilter(request_config_yaml);
@@ -1117,7 +1227,7 @@ request_rules:
       key: method_not_match_again
 )EOF";
 
-  std::map<std::string, std::string> expected = {
+  const std::map<std::string, std::string> expected = {
       {"present", "two"}, {"present2", "two"}, {"six", "6"}};
 
   initializeFilter(request_config_yaml);
@@ -1125,6 +1235,80 @@ request_rules:
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
   writeMessage();
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MultipleRulesInSamePathFirstRuleUnmatched) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: not_foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+  - method_name: foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present2
+)EOF";
+
+  const std::map<std::string, std::string> expected = {{"present2", "two"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  writeMessage();
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MultipleRulesOnMultiStruct) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: unmatched_foo
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+  - method_name: unmatched_foo2
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+  - method_name: foo
+    field_selector:
+      name: request
+      id: 2
+      child:
+        name: baz
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+)EOF";
+
+  const std::map<std::string, std::string> expected = {{"baz", "qux"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  writeMessageMultiStruct();
   filter_->onDestroy();
 }
 

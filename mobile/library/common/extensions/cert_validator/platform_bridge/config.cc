@@ -10,11 +10,7 @@ namespace Tls {
 CertValidatorPtr PlatformBridgeCertValidatorFactory::createCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
     TimeSource& /*time_source*/) {
-  if (platform_validator_ == nullptr) {
-    platform_validator_ =
-        static_cast<envoy_cert_validator*>(Api::External::retrieveApi("platform_cert_validator"));
-  }
-  return std::make_unique<PlatformBridgeCertValidator>(config, stats, platform_validator_);
+  return std::make_unique<PlatformBridgeCertValidator>(config, stats);
 }
 
 REGISTER_FACTORY(PlatformBridgeCertValidatorFactory, CertValidatorFactory);

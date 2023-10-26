@@ -1,6 +1,5 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -9,10 +8,10 @@ import io.envoyproxy.envoymobile.FilterTrailersStatus
 import io.envoyproxy.envoymobile.FinalStreamIntel
 import io.envoyproxy.envoymobile.GRPCClient
 import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
-import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -22,9 +21,11 @@ import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-private val filterName = "cancel_validation_filter"
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+private const val FILTER_NAME = "cancel_validation_filter"
+private const val PBF_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+private const val LOCAL_ERROR_FILTER_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
 
 class CancelGRPCStreamTest {
 
@@ -35,9 +36,7 @@ class CancelGRPCStreamTest {
   private val filterExpectation = CountDownLatch(1)
   private val onCancelCallbackExpectation = CountDownLatch(1)
 
-  class CancelValidationFilter(
-    private val latch: CountDownLatch
-  ) : ResponseFilter {
+  class CancelValidationFilter(private val latch: CountDownLatch) : ResponseFilter {
     override fun onResponseHeaders(
       headers: ResponseHeaders,
       endStream: Boolean,
@@ -62,6 +61,7 @@ class CancelGRPCStreamTest {
     }
 
     override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {}
+
     override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
     override fun onCancel(finalStreamIntel: FinalStreamIntel) {
@@ -71,29 +71,27 @@ class CancelGRPCStreamTest {
 
   @Test
   fun `cancel grpc stream calls onCancel callback`() {
-    val engine = EngineBuilder(Standard())
-      .addPlatformFilter(
-        name = filterName,
-        factory = { CancelValidationFilter(filterExpectation) }
-      )
-      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $pbfType, platform_filter_name: $filterName}")
-      .addNativeFilter("envoy.filters.http.local_error", "{'@type': $localErrorFilterType}")
-      .setOnEngineRunning {}
-      .build()
+    val engine =
+      EngineBuilder(Standard())
+        .addPlatformFilter(
+          name = FILTER_NAME,
+          factory = { CancelValidationFilter(filterExpectation) }
+        )
+        .addNativeFilter(
+          "envoy.filters.http.platform_bridge",
+          "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}"
+        )
+        .addNativeFilter("envoy.filters.http.local_error", "{'@type': $LOCAL_ERROR_FILTER_TYPE}")
+        .build()
 
     val client = GRPCClient(engine.streamClient())
 
-    val requestHeaders = GRPCRequestHeadersBuilder(
-      scheme = "https",
-      authority = "example.com",
-      path = "/test"
-    )
-      .build()
+    val requestHeaders =
+      GRPCRequestHeadersBuilder(scheme = "https", authority = "example.com", path = "/test").build()
 
-    client.newGRPCStreamPrototype()
-      .setOnCancel { _ ->
-        onCancelCallbackExpectation.countDown()
-      }
+    client
+      .newGRPCStreamPrototype()
+      .setOnCancel { _ -> onCancelCallbackExpectation.countDown() }
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, false)
       .cancel()

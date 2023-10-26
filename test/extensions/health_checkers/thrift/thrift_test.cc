@@ -15,7 +15,6 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
-#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::InSequence;

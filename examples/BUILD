@@ -14,13 +14,15 @@ filegroup(
             "**/*.yaml",
         ],
         exclude = [
+            "cache/ci-responses.yaml",
             "cache/responses.yaml",
             "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",
             "opentelemetry/otel-collector-config.yaml",
             "**/*docker-compose*.yaml",
             # Contrib extensions tested over in contrib.
-            "golang/*.yaml",
+            "golang-http/*.yaml",
+            "golang-network/*.yaml",
             "mysql/*",
             "postgres/*",
             "kafka/*.yaml",
@@ -32,7 +34,8 @@ filegroup(
     name = "contrib_configs",
     srcs = glob(
         [
-            "golang/*.yaml",
+            "golang-http/*.yaml",
+            "golang-network/*.yaml",
             "mysql/*.yaml",
             "postgres/*.yaml",
             "kafka/*.yaml",

@@ -38,6 +38,7 @@ envoy_extension_cc_test(
         "//envoy/network:filter_interface",
         "//source/common/http:context_lib",
         "//source/common/network:address_lib",
+        "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc",
         "//test/common/http:common_lib",
@@ -106,6 +107,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],
@@ -116,12 +118,17 @@ envoy_extension_cc_test(
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    shard_count = 2,
+    shard_count = 4,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
+        ":logging_test_filter_lib",
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
@@ -133,6 +140,9 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["streaming_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":test_processor_lib",
         ":utils_lib",
@@ -140,6 +150,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
@@ -211,25 +222,36 @@ envoy_proto_library(
     srcs = ["ext_proc_grpc_fuzz.proto"],
 )
 
+EXT_PROC_GRPC_FUZZ_TEST_DEPS = [
+    ":ext_proc_grpc_fuzz_lib",
+    ":ext_proc_grpc_fuzz_proto_cc_proto",
+    ":test_processor_lib",
+    "//source/common/network:address_lib",
+    "//source/extensions/filters/http/ext_proc:config",
+    "//test/common/http:common_lib",
+    "//test/fuzz:utility_lib",
+    "//test/integration:http_integration_lib",
+    "//test/test_common:utility_lib",
+    "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+    "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    "@envoy_api//envoy/type/v3:pkg_cc_proto",
+]
+
 envoy_cc_fuzz_test(
     name = "ext_proc_grpc_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz.cc"],
+    hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
-    deps = [
-        ":ext_proc_grpc_fuzz_lib",
-        ":ext_proc_grpc_fuzz_proto_cc_proto",
-        ":test_processor_lib",
-        "//source/common/network:address_lib",
-        "//source/extensions/filters/http/ext_proc:config",
-        "//test/common/http:common_lib",
-        "//test/fuzz:utility_lib",
-        "//test/integration:http_integration_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
+    deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
+)
+
+envoy_cc_fuzz_test(
+    name = "ext_proc_grpc_fuzz_test_persistent",
+    srcs = ["ext_proc_grpc_fuzz_persistent.cc"],
+    hdrs = ["ext_proc_grpc_fuzz.h"],
+    corpus = "ext_proc_grpc_corpus",
+    deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
 
 envoy_extension_cc_test(
@@ -249,5 +271,29 @@ envoy_extension_cc_test(
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "logging_test_filter_proto",
+    srcs = ["logging_test_filter.proto"],
+)
+
+envoy_extension_cc_test_library(
+    name = "logging_test_filter_lib",
+    srcs = [
+        "logging_test_filter.cc",
+    ],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        ":logging_test_filter_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/test_common:utility_lib",
     ],
 )

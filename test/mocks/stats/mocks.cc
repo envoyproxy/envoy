@@ -10,6 +10,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -18,6 +19,7 @@ namespace Stats {
 
 MockCounter::MockCounter() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, hidden()).WillByDefault(ReturnPointee(&hidden_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, latch()).WillByDefault(ReturnPointee(&latch_));
 }
@@ -25,6 +27,7 @@ MockCounter::~MockCounter() = default;
 
 MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accumulate) {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, hidden()).WillByDefault(ReturnPointee(&hidden_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, importMode()).WillByDefault(ReturnPointee(&import_mode_));
 }
@@ -32,6 +35,7 @@ MockGauge::~MockGauge() = default;
 
 MockTextReadout::MockTextReadout() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, hidden()).WillByDefault(ReturnPointee(&hidden_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
 }
 MockTextReadout::~MockTextReadout() = default;
@@ -48,6 +52,7 @@ MockHistogram::~MockHistogram() = default;
 
 MockParentHistogram::MockParentHistogram() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, hidden()).WillByDefault(ReturnPointee(&hidden_));
   ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
     if (store_ != nullptr) {
@@ -63,6 +68,9 @@ MockMetricSnapshot::MockMetricSnapshot() {
   ON_CALL(*this, counters()).WillByDefault(ReturnRef(counters_));
   ON_CALL(*this, gauges()).WillByDefault(ReturnRef(gauges_));
   ON_CALL(*this, histograms()).WillByDefault(ReturnRef(histograms_));
+  ON_CALL(*this, hostCounters()).WillByDefault(ReturnRef(host_counters_));
+  ON_CALL(*this, hostGauges()).WillByDefault(ReturnRef(host_gauges_));
+  ON_CALL(*this, snapshotTime()).WillByDefault(Return(snapshot_time_));
 }
 
 MockMetricSnapshot::~MockMetricSnapshot() = default;

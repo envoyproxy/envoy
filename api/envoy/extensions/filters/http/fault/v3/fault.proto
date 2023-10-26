@@ -6,6 +6,7 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/common/fault/v3/fault.proto";
 import "envoy/type/v3/percent.proto";
 
+import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -55,7 +56,7 @@ message FaultAbort {
   type.v3.FractionalPercent percentage = 3;
 }
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message HTTPFault {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.HTTPFault";
@@ -148,4 +149,11 @@ message HTTPFault {
   // If set to false, dynamic stats storage will be allocated for the downstream cluster name.
   // Default value is false.
   bool disable_downstream_cluster_stats = 15;
+
+  // When an abort or delay fault is executed, the metadata struct provided here will be added to the
+  // request's dynamic metadata under the namespace corresponding to the name of the fault filter.
+  // This data can be logged as part of Access Logs using the :ref:`command operator
+  // <config_access_log_command_operators>` %DYNAMIC_METADATA(NAMESPACE)%, where NAMESPACE is the name of
+  // the fault filter.
+  google.protobuf.Struct filter_metadata = 16;
 }

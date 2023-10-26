@@ -1,11 +1,12 @@
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
     "envoy_cc_library",
+    "envoy_cmake",
     "envoy_contrib_package",
 )
-load("@rules_python//python:defs.bzl", "py_binary")
-load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -17,9 +18,11 @@ cc_library(
     name = "vpp_vcl",
     srcs = [
         "external/libsvm.a",
+        "external/libvlibapi.a",
         "external/libvlibmemoryclient.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
+        "external/vppcom.h",
     ],
     hdrs = ["external/vppcom.h"],
     defines = ["VPP_VCL"],
@@ -28,34 +31,61 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-genrule(
+envoy_cmake(
     name = "build",
-    srcs = [
-        "@com_github_fdio_vpp_vcl//:all",
+    build_data = [requirement("ply")],
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VPP_API_TEST_BUILTIN": "OFF",
+        "BUILD_SHARED_LIBS": "OFF",
+        "CMAKE_ENABLE_EXPORTS": "OFF",
+    },
+    copts = ["-Wno-unused-variable"],
+    default_cache_entries = {},
+    env = {
+        "PLYPATHS": "$(locations %s)" % requirement("ply"),
+    },
+    lib_source = "@com_github_fdio_vpp_vcl//:all",
+    linkopts = ["-Wno-unused-variable"],
+    out_static_libs = [
+        "libvppcom.a",
+        "libvppinfra.a",
+        "libsvm.a",
+        "libvlibapi.a",
+        "libvlibmemoryclient.a",
     ],
+    postfix_script = """
+        mkdir -p $INSTALLDIR/lib/external $INSTALLDIR/include/external \
+        && find . -name "*.a" | xargs -I{} cp -a {} $INSTALLDIR/lib/ \
+        && find . -name "*.h" | xargs -I{} cp -a {} $INSTALLDIR/include
+    """,
+    tags = [
+        "cpu:16",
+        "skip_on_windows",
+    ],
+    targets = [
+        "vppcom",
+    ],
+    working_directory = "src",
+)
+
+genrule(
+    name = "build_files",
     outs = [
+        "external/libsvm.a",
+        "external/libvlibapi.a",
+        "external/libvlibmemoryclient.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
-        "external/libsvm.a",
-        "external/libvlibmemoryclient.a",
         "external/vppcom.h",
     ],
     cmd = """
-        ./$(location :vcl_build_launcher) vpp_vcl_build.sh $(location external/libvppcom.a)
+        EXTERNAL_DIR=$$(dirname $(location external/libsvm.a)) \
+        && mkdir -p $$EXTERNAL_DIR \
+        && find . -name "*.a" | xargs -I{} cp -a {} $$EXTERNAL_DIR \
+        && find . -name "vppcom.h" | xargs -I{} cp -a {} $$EXTERNAL_DIR
     """,
-    tools = [
-        ":vcl_build_launcher",
-    ],
-)
-
-py_binary(
-    name = "vcl_build_launcher",
-    srcs = ["vcl_build_launcher.py"],
-    data = [
-        "vpp_vcl_build.sh",
-    ],
-    main = "vcl_build_launcher.py",
-    deps = [requirement("ply")],
+    tools = [":build"],
 )
 
 envoy_cc_library(

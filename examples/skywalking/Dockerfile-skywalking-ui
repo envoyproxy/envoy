@@ -1,1 +1,1 @@
-FROM apache/skywalking-ui:latest@sha256:295f1dc87d98639fb442980e5baccd3d5e0c9dd2292a88ed328feeaa48c25846
+FROM apache/skywalking-ui:latest@sha256:f99c764048546462195b323a0c6c89bf8208ebbca1a764d7ed0d2b596c303463

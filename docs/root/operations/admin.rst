@@ -307,16 +307,32 @@ modify different aspects of the server:
 
   Enable/disable logging levels for different loggers.
 
-  - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
-  - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
-  - To change multiple logging levels at once, set the query parameter as paths=<logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>.
-  - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
+  If the default component logger is used, the logger name should be exactlly the component name.
 
-  .. note::
+  - To change the logging level across all loggers, set the query parameter as ``level=<desired_level>``.
+  - To change a particular logger's level, set the query parameter like so, ``<logger_name>=<desired_level>``.
+  - To change multiple logging levels at once, set the query parameter as ``paths=<logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>``.
+  - To list the loggers, send a POST request to the ``/logging`` endpoint without a query parameter.
 
-    Generally only used during development. With ``--enable-fine-grain-logging`` being set, the logger is represented
-    by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``), so the logger list
-    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level.
+  If ``--enable-fine-grain-logging`` is set, the logger is represented by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``),
+  so the logger list will show a list of file paths, and the specific path should be used as ``<logger_name>`` to change the log level.
+
+  We also added the file basename, glob ``*`` and ``?`` support for fine-grain loggers. For example, we have the following active loggers with trace level.
+
+  .. code-block:: text
+
+    source/server/admin/admin_filter.cc: 0
+    source/common/event/dispatcher_impl.cc: 0
+    source/common/network/tcp_listener_impl.cc: 0
+    source/common/network/udp_listener_impl.cc: 0
+
+  - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
+  - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
+  - ``/logging?paths=source/common*:warning`` will make the level of ``source/common/event/dispatcher_impl.cc:``, ``source/common/network/tcp_listener_impl.cc`` be warning.
+    Other unmatched loggers will be the default trace, e.g., `admin_filter.cc`, even it was updated to info from the previous post update.
+  - ``/logging?paths=???_listener_impl:info`` will make the level of ``source/common/network/tcp_listener_impl.cc``, ``source/common/network/udp_listener_impl.cc`` be info.
+  - ``/logging?paths=???_listener_impl:info,tcp_listener_impl:warning``, the level of ``source/common/network/tcp_listener_impl.cc`` will be info, since the first match will take effect.
+  - ``/logging?level=info`` will change the default verbosity level to info. All the unmatched loggers in the following update will be this default level.
 
 .. http:get:: /memory
 
@@ -349,6 +365,10 @@ modify different aspects of the server:
    When draining listeners, enter a graceful drain period prior to closing listeners.
    This behaviour and duration is configurable via server options or CLI
    (:option:`--drain-time-s` and :option:`--drain-strategy`).
+
+   .. http:post:: /drain_listeners?graceful&skip_exit
+
+   When draining listeners, do not exit after the drain period. This must be used with `graceful`.
 
 .. attention::
 
@@ -450,6 +470,18 @@ modify different aspects of the server:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
+  .. http::get:: /stats?hidden=showonly
+
+  Only outputs statistics that are internally marked as hidden.
+
+  .. http::get:: /stats?hidden=include
+
+  Hidden stats will be shown along side non-hidden stats.
+
+  .. http::get:: /stats?hidden=exclude
+
+  Hidden stats will be excluded from the output. This is the default behavior.
+
   .. http:get:: /stats?filter=regex
 
   Filters the returned stats to those with names matching the regular
@@ -474,6 +506,24 @@ modify different aspects of the server:
   The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
   Buckets do not include values from other buckets with smaller upper bounds;
   the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
+
+  .. http:get:: /stats?histogram_buckets=detailed
+
+  Shows histograms as both percentile summary data, and raw bucket data.
+
+  Example output
+  .. code-block:: text
+
+    http.admin.downstream_rq_time:
+      totals=1,0.25:25, 2,0.25:9
+      intervals=1,0.25:2, 2,0.25:3
+      summary=P0(1,1) P25(1.0625,1.034) P50(2.0166,1.068) P75(2.058,2.005) P90(2.083,2.06) P95(2.091,2.08) P99(2.09,2.09) P99.5(2.099,2.098) P99.9(2.099,2.099) P100(2.1,2.1)
+
+  Each bucket is shown as `lower_bound,width:count`. In the above example there are two
+  buckets. `totals` contains the accumulated data-points since the binary was started.
+  `intervals` shows the new data points since the previous stats flush.
+
+  Compatible with ``usedonly`` and ``filter``.
 
   .. http:get:: /stats?format=html
 
@@ -647,7 +697,53 @@ modify different aspects of the server:
       ]
     }
 
-.. http:get:: /stats?format=prometheus
+  .. http:get:: /stats?format=json&histogram_buckets=detailed
+
+  Shows histograms as both percentile summary data..
+
+  Example output:
+
+  .. code-block:: json
+
+    {
+      "stats": [
+        {
+          "histograms": {
+            "supported_percentiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
+            "details": [
+              {
+                "name": "http.admin.downstream_rq_time",
+                "percentiles": [
+                  { "interval": null, "cumulative": 1 },
+                  { "interval": null, "cumulative": 1.0351851851851852 },
+                  { "interval": null "cumulative": 1.0703703703703704 },
+                  { "interval": null, "cumulative": 2.0136363636363637 },
+                  { "interval": null "cumulative": 2.0654545454545454 },
+                  { "interval": null "cumulative": 2.0827272727272725 },
+                  { "interval": null "cumulative": 2.0965454545454545 },
+                  { "interval": null, "cumulative": 2.098272727272727 },
+                  { "interval": null, "cumulative": 2.0996545454545457 },
+                  { "interval": null "cumulative": 2.1 }
+                ],
+                "totals": [
+                  { "lower_bound": 1, "width": 0.25, "count": 25 },
+                  { "lower_bound": 2, "width": 0.25, "count": 9 }
+                ],
+                "intervals": [
+                  { "lower_bound": 1, "width": 0.25, "count": 2 },
+                  { "lower_bound": 2, "width": 0.25, "count": 3 }
+                ],
+              },
+            ]
+          }
+        }
+      ]
+    }
+
+  Compatible with ``usedonly`` and ``filter``.
+
+
+  .. http:get:: /stats?format=prometheus
 
   or alternatively,
 

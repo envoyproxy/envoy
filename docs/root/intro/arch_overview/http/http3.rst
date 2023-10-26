@@ -8,8 +8,8 @@ HTTP/3 overview
   While HTTP/3 **downstream support is deemed ready for production use**, improvements are ongoing,
   tracked in the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
 
-  HTTP/3 **upstream support is fine for locally controlled networks**, but is not ready for
-  general internet use, and is missing some key latency features. See details below.
+  HTTP/3 **upstream support is fine for locally controlled networks**, but is alpha for
+  general internet use - key features are implemented but have not been tested at scale.
 
 .. _arch_overview_http3_downstream:
 
@@ -92,7 +92,7 @@ Envoy will attempt to create a QUIC connection, then if the QUIC handshake is no
 will kick off a TCP connection, and will use whichever is established first.
 
 .. tip::
-   See :ref:`here <arch_overview_http3_upstream>` for more information about HTTP/3 connection pooling, including
+   See :ref:`here <arch_overview_http3_pooling_upstream>` for more information about HTTP/3 connection pooling, including
    detailed information of where QUIC will be used, and how it fails over to TCP when QUIC use is configured to be optional.
 
    An example upstream HTTP/3 configuration file can be found :repo:`here </configs/google_com_http3_upstream_proxy.yaml>`.

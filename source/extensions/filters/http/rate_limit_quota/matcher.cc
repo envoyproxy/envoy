@@ -39,16 +39,13 @@ RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataI
           input_factory_ptr->createDataInput(builder_method.custom_value());
       auto result = data_input_cb()->get(data);
       // If result has data.
-      if (result.data_) {
-        if (!result.data_.value().empty()) {
-          // Build the bucket id from the matched result.
-          bucket_id.mutable_bucket()->insert({bucket_id_key, result.data_.value()});
-        } else {
-          // TODO(tyxia) Nothing hits this line at this moment.
-          return absl::InternalError("Empty resulting data from custom value config.");
-        }
-      } else {
+      if (absl::holds_alternative<absl::monostate>(result.data_)) {
         return absl::InternalError("Failed to generate the id from custom value config.");
+      }
+      const std::string& str = absl::get<std::string>(result.data_);
+      if (!str.empty()) {
+        // Build the bucket id from the matched result.
+        bucket_id.mutable_bucket()->insert({bucket_id_key, str});
       }
       break;
     }

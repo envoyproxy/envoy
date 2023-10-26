@@ -67,8 +67,7 @@
 
 @implementation EnvoyConfiguration
 
-- (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
+- (instancetype)initWithGrpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
@@ -78,14 +77,15 @@
                            dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
-                              enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
+                                        quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
+              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -95,11 +95,8 @@
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                                     runtimeGuards:
                                         (NSDictionary<NSString *, NSString *> *)runtimeGuards
-                             typedDirectResponses:
-                                 (NSArray<EMODirectResponse *> *)typedDirectResponses
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:
@@ -111,28 +108,28 @@
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
                                        statsSinks:(NSArray<NSString *> *)statsSinks
-                                    rtdsLayerName:(NSString *)rtdsLayerName
+                                           nodeId:(nullable NSString *)nodeId
+                                       nodeRegion:(nullable NSString *)nodeRegion
+                                         nodeZone:(nullable NSString *)nodeZone
+                                      nodeSubZone:(nullable NSString *)nodeSubZone
+                                 xdsServerAddress:(nullable NSString *)xdsServerAddress
+                                    xdsServerPort:(UInt32)xdsServerPort
+                                    xdsAuthHeader:(nullable NSString *)xdsAuthHeader
+                                     xdsAuthToken:(nullable NSString *)xdsAuthToken
+                                      xdsJwtToken:(nullable NSString *)xdsJwtToken
+                       xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
+                                  xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
+                                           xdsSni:(nullable NSString *)xdsSni
+                                 rtdsResourceName:(nullable NSString *)rtdsResourceName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                       adsAddress:(NSString *)adsAddress
-                                          adsPort:(UInt32)adsPort
-                                      adsJwtToken:(NSString *)adsJwtToken
-                       adsJwtTokenLifetimeSeconds:(UInt32)adsJwtTokenLifetimeSeconds
-                                  adsSslRootCerts:(NSString *)adsSslRootCerts
-                                           nodeId:(NSString *)nodeId
-                                       nodeRegion:(NSString *)nodeRegion
-                                         nodeZone:(NSString *)nodeZone
-                                      nodeSubZone:(NSString *)nodeSubZone
-                              cdsResourcesLocator:(NSString *)cdsResourcesLocator
-                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds
                                         enableCds:(BOOL)enableCds
-
-{
+                              cdsResourcesLocator:(nullable NSString *)cdsResourcesLocator
+                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds {
   self = [super init];
   if (!self) {
     return nil;
   }
 
-  self.adminInterfaceEnabled = adminInterfaceEnabled;
   self.grpcStatsDomain = grpcStatsDomain;
   self.connectTimeoutSeconds = connectTimeoutSeconds;
   self.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -143,14 +140,15 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
-  self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableHttp3 = enableHttp3;
+  self.quicHints = quicHints;
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.forceIPv6 = forceIPv6;
+  self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
@@ -160,25 +158,26 @@
   self.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds;
   self.appVersion = appVersion;
   self.appId = appId;
-  self.virtualClusters = virtualClusters;
   self.runtimeGuards = runtimeGuards;
-  self.typedDirectResponses = typedDirectResponses;
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
-  self.rtdsLayerName = rtdsLayerName;
-  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
-  self.adsAddress = adsAddress;
-  self.adsPort = adsPort;
-  self.adsJwtToken = adsJwtToken;
-  self.adsJwtTokenLifetimeSeconds = adsJwtTokenLifetimeSeconds;
-  self.adsSslRootCerts = adsSslRootCerts;
   self.nodeId = nodeId;
   self.nodeRegion = nodeRegion;
   self.nodeZone = nodeZone;
   self.nodeSubZone = nodeSubZone;
+  self.xdsServerAddress = xdsServerAddress;
+  self.xdsServerPort = xdsServerPort;
+  self.xdsAuthHeader = xdsAuthHeader;
+  self.xdsAuthToken = xdsAuthToken;
+  self.xdsJwtToken = xdsJwtToken;
+  self.xdsJwtTokenLifetimeSeconds = xdsJwtTokenLifetimeSeconds;
+  self.xdsSslRootCerts = xdsSslRootCerts;
+  self.xdsSni = xdsSni;
+  self.rtdsResourceName = rtdsResourceName;
+  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
   self.cdsResourcesLocator = cdsResourcesLocator;
   self.cdsTimeoutSeconds = cdsTimeoutSeconds;
   self.enableCds = enableCds;
@@ -203,6 +202,9 @@
 
 #ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(self.enableHttp3);
+  for (NSString *host in self.quicHints) {
+    builder.addQuicHint([host toCXXString], [[self.quicHints objectForKey:host] intValue]);
+  }
 #endif
 
   builder.enableGzipDecompression(self.enableGzipDecompression);
@@ -211,10 +213,6 @@
   for (NSString *key in self.runtimeGuards) {
     BOOL value = [[self.runtimeGuards objectForKey:key] isEqualToString:@"true"];
     builder.setRuntimeGuard([key toCXXString], value);
-  }
-
-  for (EMODirectResponse *directResponse in self.typedDirectResponses) {
-    builder.addDirectResponse([directResponse toCXX]);
   }
 
   builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);
@@ -232,7 +230,6 @@
     }
     builder.addDnsPreresolveHostnames(hostnames);
   }
-  builder.enableHappyEyeballs(self.enableHappyEyeballs);
   builder.addDnsRefreshSeconds(self.dnsRefreshSeconds);
   builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
   builder.enableInterfaceBinding(self.enableInterfaceBinding);
@@ -247,10 +244,7 @@
   builder.setAppVersion([self.appVersion toCXXString]);
   builder.setAppId([self.appId toCXXString]);
   builder.setDeviceOs("iOS");
-  for (NSString *cluster in self.virtualClusters) {
-    builder.addVirtualCluster([cluster toCXXString]);
-  }
-  builder.enablePlatformCertificatesValidation(true);
+  builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
 
 #ifdef ENVOY_MOBILE_STATS_REPORTING
@@ -266,7 +260,6 @@
   builder.addStatsFlushSeconds(self.statsFlushSeconds);
 #endif
 
-#ifdef ENVOY_GOOGLE_GRPC
   if (self.nodeRegion != nil) {
     builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
                             [self.nodeSubZone toCXXString]);
@@ -274,20 +267,35 @@
   if (self.nodeId != nil) {
     builder.setNodeId([self.nodeId toCXXString]);
   }
-  if (self.rtdsLayerName != nil) {
-    builder.addRtdsLayer([self.rtdsLayerName toCXXString], self.rtdsTimeoutSeconds);
+
+#ifdef ENVOY_GOOGLE_GRPC
+  if (self.xdsServerAddress != nil) {
+    Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
+    if (self.xdsAuthHeader != nil) {
+      xdsBuilder.setAuthenticationToken([self.xdsAuthHeader toCXXString],
+                                        [self.xdsAuthToken toCXXString]);
+    }
+    if (self.xdsJwtToken != nil) {
+      xdsBuilder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
+                                           self.xdsJwtTokenLifetimeSeconds);
+    }
+    if (self.xdsSslRootCerts != nil) {
+      xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
+    }
+    if (self.xdsSni != nil) {
+      xdsBuilder.setSni([self.xdsSni toCXXString]);
+    }
+    if (self.rtdsResourceName != nil) {
+      xdsBuilder.addRuntimeDiscoveryService([self.rtdsResourceName toCXXString],
+                                            self.rtdsTimeoutSeconds);
+    }
+    if (self.enableCds) {
+      xdsBuilder.addClusterDiscoveryService(
+          self.cdsResourcesLocator != nil ? [self.cdsResourcesLocator toCXXString] : "",
+          self.cdsTimeoutSeconds);
+    }
+    builder.setXds(xdsBuilder);
   }
-  if (self.adsAddress != nil) {
-    builder.setAggregatedDiscoveryService(
-        [self.adsAddress toCXXString], self.adsPort, [self.adsJwtToken toCXXString],
-        self.adsJwtTokenLifetimeSeconds, [self.adsSslRootCerts toCXXString]);
-  }
-  if (self.enableCds) {
-    builder.addCdsLayer([self.cdsResourcesLocator toCXXString], self.cdsTimeoutSeconds);
-  }
-#endif
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-  builder.enableAdminInterface(self.adminInterfaceEnabled);
 #endif
 
   return builder;

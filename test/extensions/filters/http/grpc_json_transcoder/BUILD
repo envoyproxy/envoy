@@ -61,6 +61,9 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         "//source/common/grpc:codec_lib",
         "//source/common/http:header_map_lib",

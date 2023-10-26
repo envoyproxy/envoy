@@ -23,8 +23,8 @@ namespace {
 
 class SampleDriver : public Driver {
 public:
-  SpanPtr startSpan(const Config&, Tracing::TraceContext&, const std::string&, SystemTime,
-                    const Tracing::Decision) override {
+  SpanPtr startSpan(const Config&, Tracing::TraceContext&, const StreamInfo::StreamInfo&,
+                    const std::string&, Tracing::Decision) override {
     return nullptr;
   }
 };
@@ -57,22 +57,21 @@ private:
 };
 
 TEST_F(TracerManagerImplTest, ShouldReturnWhenNoTracingProviderHasBeenConfigured) {
-  auto http_tracer = tracer_manager_.getOrCreateTracer(nullptr);
+  auto tracer = tracer_manager_.getOrCreateTracer(nullptr);
 
   // Should return a null object (Tracing::) rather than nullptr.
-  EXPECT_THAT(http_tracer.get(), WhenDynamicCastTo<Tracing::NullTracer*>(NotNull()));
+  EXPECT_THAT(tracer.get(), WhenDynamicCastTo<Tracing::NullTracer*>(NotNull()));
 }
 
 TEST_F(TracerManagerImplTest, ShouldUseProperTracerFactory) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
+  tracing_config.mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
 
-  auto http_tracer = tracer_manager_.getOrCreateTracer(&tracing_config);
+  auto tracer = tracer_manager_.getOrCreateTracer(&tracing_config);
 
-  EXPECT_THAT(http_tracer.get(), WhenDynamicCastTo<TracerImpl*>(NotNull()));
-  auto tracer_impl = dynamic_cast<TracerImpl*>(http_tracer.get());
+  EXPECT_THAT(tracer.get(), WhenDynamicCastTo<TracerImpl*>(NotNull()));
+  auto tracer_impl = dynamic_cast<TracerImpl*>(tracer.get());
 
   // Should use proper TracerFactory.
   EXPECT_THAT(tracer_impl->driverForTest().get(), WhenDynamicCastTo<SampleDriver*>(NotNull()));
@@ -84,14 +83,14 @@ TEST_F(TracerManagerImplTest, ShouldCacheAndReuseTracers) {
   tracing_config.mutable_typed_config()->PackFrom(MessageUtil::keyValueStruct("key1", "value1"));
 
   auto http_tracer_one = tracer_manager_.getOrCreateTracer(&tracing_config);
-  // Expect a new HttpTracer to be added to the cache.
+  // Expect a new Tracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
   auto http_tracer_two = tracer_manager_.getOrCreateTracer(&tracing_config);
   // Expect no changes to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
-  // Should reuse previously created HttpTracer instance.
+  // Should reuse previously created Tracer instance.
   EXPECT_EQ(http_tracer_two, http_tracer_one);
 }
 
@@ -102,7 +101,7 @@ TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
       MessageUtil::keyValueStruct("key1", "value1"));
 
   auto http_tracer_one = tracer_manager_.getOrCreateTracer(&tracing_config_one);
-  // Expect a new HttpTracer to be added to the cache.
+  // Expect a new Tracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
   envoy::config::trace::v3::Tracing_Http tracing_config_two;
@@ -111,27 +110,24 @@ TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
       MessageUtil::keyValueStruct("key2", "value2"));
 
   auto http_tracer_two = tracer_manager_.getOrCreateTracer(&tracing_config_two);
-  // Expect a new HttpTracer to be added to the cache.
+  // Expect a new Tracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(2));
 
-  // Any changes to config must result in a new HttpTracer instance.
+  // Any changes to config must result in a new Tracer instance.
   EXPECT_NE(http_tracer_two, http_tracer_one);
 }
 
 TEST_F(TracerManagerImplTest, ShouldFailIfTracerProviderIsUnknown) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("invalid");
+  tracing_config.mutable_typed_config()->PackFrom(ProtobufWkt::Value());
 
   EXPECT_THROW_WITH_MESSAGE(tracer_manager_.getOrCreateTracer(&tracing_config), EnvoyException,
-                            "Didn't find a registered implementation for name: 'invalid'");
+                            "Didn't find a registered implementation for 'invalid' "
+                            "with type URL: 'google.protobuf.Value'");
 }
 
 TEST_F(TracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
   tracing_config.mutable_typed_config()->PackFrom(ValueUtil::stringValue("value"));
@@ -139,8 +135,8 @@ TEST_F(TracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) {
   ProtobufWkt::Any expected_any_proto;
   expected_any_proto.PackFrom(ValueUtil::stringValue("value"));
   EXPECT_THROW_WITH_MESSAGE(tracer_manager_.getOrCreateTracer(&tracing_config), EnvoyException,
-                            fmt::format("Unable to unpack as google.protobuf.Struct: {}",
-                                        expected_any_proto.DebugString()));
+                            "Didn't find a registered implementation for 'envoy.tracers.sample' "
+                            "with type URL: 'google.protobuf.Value'");
 }
 
 class TracerManagerImplCacheTest : public testing::Test {
@@ -172,7 +168,7 @@ private:
 TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
   Driver* expected_driver = new NiceMock<MockDriver>();
 
-  // Expect HttpTracerManager to create a new HttpTracer.
+  // Expect HttpTracerManager to create a new Tracer.
   EXPECT_CALL(tracer_factory_, createTracerDriver(_, _))
       .WillOnce(InvokeWithoutArgs(
           [expected_driver] { return std::shared_ptr<Driver>(expected_driver); }));
@@ -181,7 +177,7 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
 
   EXPECT_EQ(dynamic_cast<TracerImpl*>(actual_tracer_one.get())->driverForTest().get(),
             expected_driver);
-  // Expect a new HttpTracer to be added to the cache.
+  // Expect a new Tracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
   // Expect HttpTracerManager to re-use cached value.
@@ -192,9 +188,9 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
   // Expect no changes to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
-  // Expect HttpTracerManager to use weak references under the hood and release HttpTracer as soon
+  // Expect HttpTracerManager to use weak references under the hood and release Tracer as soon
   // as it's no longer in use.
-  std::weak_ptr<HttpTracer> weak_pointer{actual_tracer_one};
+  std::weak_ptr<Tracer> weak_pointer{actual_tracer_one};
 
   actual_tracer_one.reset();
   // Expect one strong reference still to be left.
@@ -206,7 +202,7 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
 
   Driver* expected_other_driver = new NiceMock<MockDriver>();
 
-  // Expect HttpTracerManager to create a new HttpTracer once again.
+  // Expect HttpTracerManager to create a new Tracer once again.
   EXPECT_CALL(tracer_factory_, createTracerDriver(_, _))
       .WillOnce(InvokeWithoutArgs(
           [expected_other_driver] { return std::shared_ptr<Driver>(expected_other_driver); }));
@@ -216,7 +212,7 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
 
   EXPECT_EQ(dynamic_cast<TracerImpl*>(actual_tracer_three.get())->driverForTest().get(),
             expected_other_driver);
-  // Expect expired cache entries to be removed and a new HttpTracer to be added to the cache.
+  // Expect expired cache entries to be removed and a new Tracer to be added to the cache.
   EXPECT_THAT(tracer_manager_.peekCachedTracersForTest(), SizeIs(1));
 
   // Expect HttpTracerManager to keep the right value in the cache.

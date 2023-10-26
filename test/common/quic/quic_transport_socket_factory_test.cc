@@ -17,7 +17,7 @@ class QuicServerTransportSocketFactoryConfigTest : public Event::TestUsingSimula
 public:
   QuicServerTransportSocketFactoryConfigTest()
       : server_api_(Api::createApiForTest(server_stats_store_, simTime())) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*server_api_));
+    ON_CALL(context_.server_context_, api()).WillByDefault(ReturnRef(*server_api_));
   }
 
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {

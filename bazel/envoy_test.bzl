@@ -4,7 +4,7 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(":envoy_library.bzl", "tcmalloc_external_deps")
-load(":envoy_pch.bzl", "envoy_pch_copts")
+load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -41,7 +41,7 @@ def _envoy_cc_test_infrastructure_library(
     if disable_pch:
         extra_deps = [envoy_external_dep_path("googletest")]
     else:
-        extra_deps = [repository + "//test:test_pch"]
+        extra_deps = envoy_pch_deps(repository, "//test:test_pch")
         pch_copts = envoy_pch_copts(repository, "//test:test_pch")
 
     native.cc_library(
@@ -176,10 +176,7 @@ def envoy_cc_test(
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
-        ] + select({
-            repository + "//bazel:clang_pch_build": [repository + "//test:test_pch"],
-            "//conditions:default": [],
-        }),
+        ] + envoy_pch_deps(repository, "//test:test_pch"),
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
         args = args + ["--gmock_default_mock_behavior=2"],
@@ -230,6 +227,7 @@ def envoy_cc_test_binary(
         name,
         tags = [],
         deps = [],
+        stamp = 0,
         **kargs):
     envoy_cc_binary(
         name,
@@ -239,6 +237,7 @@ def envoy_cc_test_binary(
         deps = deps + [
             "@envoy//test/test_common:test_version_linkstamp",
         ],
+        stamp = stamp,
         **kargs
     )
 

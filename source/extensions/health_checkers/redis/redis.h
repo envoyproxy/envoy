@@ -9,10 +9,10 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
 
-#include "source/common/upstream/health_checker_base_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -100,6 +100,8 @@ private:
 
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return false; }
+    bool connectionRateLimitEnabled() const override { return false; }
+    uint32_t connectionRateLimitPerSec() const override { return 0; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

@@ -7,7 +7,7 @@ namespace StreamInfo {
 
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
                               FilterState::StateType state_type, FilterState::LifeSpan life_span,
-                              FilterState::StreamSharing stream_sharing) {
+                              StreamSharingMayImpactPooling stream_sharing) {
   if (life_span > life_span_) {
     if (hasDataWithNameInternally(data_name)) {
       IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
@@ -105,11 +105,12 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
                          : std::make_unique<FilterState::Objects>();
   for (const auto& [name, object] : data_storage_) {
     switch (object->stream_sharing_) {
-    case StreamSharing::SharedWithUpstreamConnection:
+    case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
       objects->push_back({object->data_, object->state_type_, object->stream_sharing_, name});
       break;
-    case StreamSharing::SharedWithUpstreamConnectionOnce:
-      objects->push_back({object->data_, object->state_type_, StreamSharing::None, name});
+    case StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce:
+      objects->push_back(
+          {object->data_, object->state_type_, StreamSharingMayImpactPooling::None, name});
       break;
     default:
       break;
@@ -119,7 +120,7 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
 }
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {
-  return data_storage_.count(data_name) > 0;
+  return data_storage_.contains(data_name);
 }
 
 void FilterStateImpl::maybeCreateParent(ParentAccessMode parent_access_mode) {

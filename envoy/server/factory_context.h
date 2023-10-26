@@ -28,7 +28,7 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
@@ -321,11 +321,11 @@ public:
 using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFactoryContext;
 
 /**
- * FactoryContext for upstream HTTP filters.
+ * FactoryContext for upstream filters.
  */
-class UpstreamHttpFactoryContext {
+class UpstreamFactoryContext {
 public:
-  virtual ~UpstreamHttpFactoryContext() = default;
+  virtual ~UpstreamFactoryContext() = default;
 
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.

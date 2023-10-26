@@ -24,8 +24,10 @@ public:
       Network::TransportSocketPtr&&, const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_options) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
-                                      Runtime::Loader& runtime, bool bind_to_port,
-                                      bool ignore_global_conn_limit) override;
+                                      Runtime::Loader&, const Network::ListenerConfig&,
+                                      Server::ThreadLocalOverloadStateOptRef) override {
+    return nullptr;
+  }
 };
 
 } // namespace Event

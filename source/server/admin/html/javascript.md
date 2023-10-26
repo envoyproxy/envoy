@@ -20,12 +20,12 @@ endpoints. This also disables active mode, which is dependent on HTML.
 
 ### Debugging
 
-To facilitate debugging and iterating on the JavaScript, a compile-time ifdef
-can be used at build time: `--cxxopt=-DENVOY_ADMIN_DEBUG`. When compiled this
-way, binaries (e.g. tests and envoy-static) will read the source files from
-their source tree locations every time they are served. So you can debug
-JavaScript by editing the file and refreshing the admin site in your browser,
-without rebuilding or restarting the binary.
+To facilitate debugging and iterating on the JavaScript, a simplified variant of
+envoy-static is provided in `test/integration/admin_html:test_server`, which
+accepts `debug` as its first argument. In that case, `test_server` will read web
+resources from their source tree locations every time they are served. So you
+can debug JavaScript and tweak CSS by editing the file and refreshing the admin
+site in your browser, without rebuilding or restarting the binary.
 
 ### Testing
 

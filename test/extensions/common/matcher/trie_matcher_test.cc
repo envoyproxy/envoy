@@ -135,6 +135,45 @@ matcher_tree:
   }
 }
 
+TEST_F(TrieMatcherTest, TestInvalidMatcher) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.FloatValue
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+      - ranges:
+        - address_prefix: 192.101.0.0
+          prefix_len: 10
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: bar
+  )EOF";
+  loadConfig(yaml);
+  auto input_factory = ::Envoy::Matcher::TestDataInputFloatFactory(3.14);
+  auto match_tree = factory_.create(matcher_);
+  std::string error_message = absl::StrCat("Unsupported data input type: float, currently only "
+                                           "string type is supported in trie matcher");
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
+}
+
 TEST_F(TrieMatcherTest, TestMatcherOnNoMatch) {
   const std::string yaml = R"EOF(
 matcher_tree:
@@ -182,7 +221,7 @@ on_no_match:
   {
     // Input is nullopt.
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     validateMatch("bar");
   }
 }
@@ -473,26 +512,26 @@ matcher_tree:
 
   {
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
     auto nested = TestDataInputBoolFactory("");
     validateUnableToMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
     validateUnableToMatch();
   }
 }
@@ -536,7 +575,8 @@ matcher_tree:
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080));
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  Network::Matching::MatchingDataImpl data(socket, filter_state);
+  envoy::config::core::v3::Metadata metadata;
+  Network::Matching::MatchingDataImpl data(socket, filter_state, metadata);
 
   const auto result = match_tree()->match(data);
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);

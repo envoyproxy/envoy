@@ -354,22 +354,22 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
   auto shared = std::make_shared<SimpleType>(1);
   filterState().setData("shared_1", shared, FilterState::StateType::ReadOnly,
                         FilterState::LifeSpan::FilterChain,
-                        FilterState::StreamSharing::SharedWithUpstreamConnection);
+                        StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   filterState().setData("test_2", std::make_shared<SimpleType>(2), FilterState::StateType::Mutable,
                         FilterState::LifeSpan::FilterChain);
   filterState().setData("test_3", std::make_shared<SimpleType>(3), FilterState::StateType::ReadOnly,
                         FilterState::LifeSpan::Request);
   filterState().setData("shared_4", std::make_shared<SimpleType>(4),
                         FilterState::StateType::Mutable, FilterState::LifeSpan::Request,
-                        FilterState::StreamSharing::SharedWithUpstreamConnection);
+                        StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   filterState().setData("shared_5", std::make_shared<SimpleType>(5),
                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
-                        FilterState::StreamSharing::SharedWithUpstreamConnection);
+                        StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   filterState().setData("test_6", std::make_shared<SimpleType>(6), FilterState::StateType::Mutable,
                         FilterState::LifeSpan::Connection);
   filterState().setData("shared_7", std::make_shared<SimpleType>(7),
                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
-                        FilterState::StreamSharing::SharedWithUpstreamConnectionOnce);
+                        StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce);
   auto objects = filterState().objectsSharedWithUpstreamConnection();
   EXPECT_EQ(objects->size(), 4);
   std::sort(objects->begin(), objects->end(),
@@ -377,19 +377,19 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
   EXPECT_EQ(objects->at(0).name_, "shared_1");
   EXPECT_EQ(objects->at(0).state_type_, FilterState::StateType::ReadOnly);
   EXPECT_EQ(objects->at(0).stream_sharing_,
-            FilterState::StreamSharing::SharedWithUpstreamConnection);
+            StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(0).data_.get(), shared.get());
   EXPECT_EQ(objects->at(1).name_, "shared_4");
   EXPECT_EQ(objects->at(1).state_type_, FilterState::StateType::Mutable);
   EXPECT_EQ(objects->at(1).stream_sharing_,
-            FilterState::StreamSharing::SharedWithUpstreamConnection);
+            StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(2).name_, "shared_5");
   EXPECT_EQ(objects->at(2).state_type_, FilterState::StateType::ReadOnly);
   EXPECT_EQ(objects->at(2).stream_sharing_,
-            FilterState::StreamSharing::SharedWithUpstreamConnection);
+            StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(3).name_, "shared_7");
   EXPECT_EQ(objects->at(3).state_type_, FilterState::StateType::ReadOnly);
-  EXPECT_EQ(objects->at(3).stream_sharing_, FilterState::StreamSharing::None);
+  EXPECT_EQ(objects->at(3).stream_sharing_, StreamSharingMayImpactPooling::None);
 }
 
 TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {

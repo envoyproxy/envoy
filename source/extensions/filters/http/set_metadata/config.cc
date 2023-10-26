@@ -25,6 +25,17 @@ Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
+Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext&) {
+  ConfigSharedPtr filter_config(std::make_shared<Config>(proto_config));
+
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(
+        Http::StreamDecoderFilterSharedPtr{new SetMetadataFilter(filter_config)});
+  };
+}
+
 REGISTER_FACTORY(SetMetadataConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace SetMetadataFilter

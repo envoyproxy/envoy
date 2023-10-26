@@ -29,11 +29,8 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
-#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -85,10 +82,10 @@ InstanceImpl::InstanceImpl(
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
     Buffer::WatermarkFactorySharedPtr watermark_factory)
-    : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
-      options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             options.ignoreUnknownDynamicFields()),
+    : init_manager_(init_manager), live_(false), options_(options),
+      validation_context_(options_.allowUnknownStaticFields(),
+                          !options.rejectUnknownDynamicFields(),
+                          options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
@@ -101,47 +98,47 @@ InstanceImpl::InstanceImpl(
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
-      terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
       enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+  std::function set_up_logger = [&] {
+    TRY_ASSERT_MAIN_THREAD {
+      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
+          options.logPath(), access_log_manager_, Logger::Registry::getSink());
+    }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      throw EnvoyException(
+          fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
+    });
+  };
+
   TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
-      TRY_ASSERT_MAIN_THREAD {
-        file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-            options.logPath(), access_log_manager_, Logger::Registry::getSink());
-      }
-      END_TRY
-      catch (const EnvoyException& e) {
-        throw EnvoyException(
-            fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
-      }
+      set_up_logger();
     }
-
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
     initialize(std::move(local_address), component_factory);
   }
   END_TRY
-  catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
-              e.what());
-    terminate();
-    throw;
-  }
-  catch (const std::exception& e) {
-    ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
-    terminate();
-    throw;
-  }
-  catch (...) {
-    ENVOY_LOG(critical, "error initializing due to unknown exception");
-    terminate();
-    throw;
-  }
+  MULTI_CATCH(
+      const EnvoyException& e,
+      {
+        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+                  options.configProto().DebugString(), options.configYaml(), options.configPath(),
+                  e.what());
+        terminate();
+        throw;
+      },
+      {
+        ENVOY_LOG(critical, "error initializing due to unknown exception");
+        terminate();
+        throw;
+      });
 }
 
 InstanceImpl::~InstanceImpl() {
@@ -186,9 +183,11 @@ const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
   return *config_.clusterManager();
 }
 
-void InstanceImpl::drainListeners() {
+void InstanceImpl::drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) {
   ENVOY_LOG(info, "closing and draining listeners");
-  listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
+  listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
+                                   options.has_value() ? *options
+                                                       : Network::ExtraShutdownListenerOptions{});
   drain_manager_->startDrainSequence([] {});
 }
 
@@ -197,7 +196,9 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
+                                       Upstream::ClusterManager& cluster_manager,
+                                       TimeSource& time_source) {
   store.forEachSinkedCounter(
       [this](std::size_t size) {
         snapped_counters_.reserve(size);
@@ -214,7 +215,6 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         gauges_.reserve(size);
       },
       [this](Stats::Gauge& gauge) {
-        ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
         snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
         gauges_.push_back(gauge);
       });
@@ -239,16 +239,25 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         text_readouts_.push_back(text_readout);
       });
 
+  Upstream::HostUtility::forEachHostMetric(
+      cluster_manager,
+      [this](Stats::PrimitiveCounterSnapshot&& metric) {
+        host_counters_.emplace_back(std::move(metric));
+      },
+      [this](Stats::PrimitiveGaugeSnapshot&& metric) {
+        host_gauges_.emplace_back(std::move(metric));
+      });
+
   snapshot_time_ = time_source.systemTime();
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                       TimeSource& time_source) {
+                                       Upstream::ClusterManager& cm, TimeSource& time_source) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store, time_source);
+  MetricSnapshotImpl snapshot(store, cm, time_source);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -307,7 +316,8 @@ void InstanceImpl::updateServerStats() {
 void InstanceImpl::flushStatsInternal() {
   updateServerStats();
   auto& stats_config = config_.statsConfig();
-  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, timeSource());
+  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
+                                    timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
@@ -341,8 +351,8 @@ void registerCustomInlineHeadersFromBootstrap(
   for (const auto& inline_header : bootstrap.inline_headers()) {
     const Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
     if (!canBeRegisteredAsInlineHeader(lower_case_name)) {
-      throw EnvoyException(fmt::format("Header {} cannot be registered as an inline header.",
-                                       inline_header.inline_header_name()));
+      throwEnvoyExceptionOrPanic(fmt::format("Header {} cannot be registered as an inline header.",
+                                             inline_header.inline_header_name()));
     }
     switch (inline_header.inline_header_type()) {
     case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_HEADER:
@@ -379,18 +389,30 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
   // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
-    throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
-                         "should be non-empty");
+    throwEnvoyExceptionOrPanic(
+        "At least one of --config-path or --config-yaml or Options::configProto() "
+        "should be non-empty");
   }
 
   if (!config_path.empty()) {
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+#else
+    if (!config_path.empty()) {
+      throwEnvoyExceptionOrPanic("Cannot load from file with YAML disabled\n");
+    }
+    UNREFERENCED_PARAMETER(api);
+#endif
   }
   if (!config_yaml.empty()) {
+#ifdef ENVOY_ENABLE_YAML
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
+#else
+    throwEnvoyExceptionOrPanic("Cannot load from YAML with YAML disabled\n");
+#endif
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
@@ -413,6 +435,12 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
+  if (bootstrap_.has_application_log_config()) {
+    THROW_IF_NOT_OK(
+        Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
+    THROW_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
+  }
+
 #ifdef ENVOY_PERFETTO
   perfetto::TracingInitArgs args;
   // Include in-process events only.
@@ -434,7 +462,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   tracing_session_ = perfetto::Tracing::NewTrace();
   tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
   if (tracing_fd_ == -1) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
   }
   // Configure the tracing session.
@@ -501,7 +529,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     version_int = bootstrap_.stats_server_version_override().value();
   } else {
     if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+      throwEnvoyExceptionOrPanic("compiled GIT SHA is invalid. Invalid build.");
     }
   }
   server_stats_->version_.set(version_int);
@@ -620,17 +648,17 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     }
   }
 
-  ListenerManagerFactory* listener_manager_factory_ = nullptr;
+  ListenerManagerFactory* listener_manager_factory = nullptr;
   if (bootstrap_.has_listener_manager()) {
-    listener_manager_factory_ = Config::Utility::getAndCheckFactory<ListenerManagerFactory>(
+    listener_manager_factory = Config::Utility::getAndCheckFactory<ListenerManagerFactory>(
         bootstrap_.listener_manager(), false);
   } else {
-    listener_manager_factory_ = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-        options_.listenerManager());
+    listener_manager_factory = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+        Config::ServerExtensionValues::get().DEFAULT_LISTENER);
   }
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ = listener_manager_factory_->createListenerManager(
+  listener_manager_ = listener_manager_factory->createListenerManager(
       *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
@@ -662,12 +690,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
-  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.remove_runtime_singleton", true)) {
-    runtime_ = std::move(runtime_ptr);
-  } else {
-    runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
-  }
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+
   initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
 
@@ -680,7 +704,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   if (initial_config.admin().address()) {
     if (!admin_) {
-      throw EnvoyException("Admin address configured but admin support compiled out");
+      throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
     }
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
                               initial_config.admin().address(),
@@ -701,11 +725,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), admin(), runtime(), stats_store_, thread_local_,
+      serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_, options_, quic_stat_names_, *this);
+      *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -768,17 +790,17 @@ void InstanceImpl::onRuntimeReady() {
   // Initializing can throw exceptions, so catch these.
   TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
     shutdown();
-  }
+  });
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
     TRY_ASSERT_MAIN_THREAD {
-      Config::Utility::checkTransportVersion(hds_config);
+      THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
@@ -787,18 +809,18 @@ void InstanceImpl::onRuntimeReady() {
           stats_store_, *ssl_context_manager_, info_factory_);
     }
     END_TRY
-    catch (const EnvoyException& e) {
+    CATCH(const EnvoyException& e, {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
       shutdown();
-    }
+    });
   }
 
-  // If there is no global limit to the number of active connections, warn on startup.
-  // TODO (tonya11en): Move this functionality into the overload manager.
-  if (!runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
+  // TODO (nezdolik): Fully deprecate this runtime key in the next release.
+  if (runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
-              "there is no configured limit to the number of allowed active connections. Set a "
-              "limit via the runtime key {}",
+              "Usage of the deprecated runtime key {}, consider switching to "
+              "`envoy.resource_monitors.downstream_connections` instead."
+              "This runtime key will be removed in future.",
               Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
@@ -824,7 +846,9 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
+#ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
+#endif
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
@@ -881,6 +905,14 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+
+  // If there is no global limit to the number of active connections, warn on startup.
+  if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
+    ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
+                    "connections. Configure a "
+                    "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
+  }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -945,10 +977,15 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
-  Config::GrpcMuxImpl::shutdownAll();
-  Config::NewGrpcMuxImpl::shutdownAll();
-  Config::XdsMux::GrpcMuxSotw::shutdownAll();
-  Config::XdsMux::GrpcMuxDelta::shutdownAll();
+  std::vector<std::string> muxes = {
+      "envoy.config_mux.new_grpc_mux_factory", "envoy.config_mux.grpc_mux_factory",
+      "envoy.config_mux.delta_grpc_mux_factory", "envoy.config_mux.sotw_grpc_mux_factory"};
+  for (const auto& name : muxes) {
+    auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
+    if (factory) {
+      factory->shutdownAll();
+    }
+  }
 
   if (overload_manager_) {
     overload_manager_->stop();
@@ -956,13 +993,6 @@ void InstanceImpl::terminate() {
 
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_ != nullptr) {
-    // Also shutdown the listener manager's ApiListener, if there is one, which runs on the main
-    // thread. This needs to happen ahead of calling thread_local_.shutdown() below to prevent any
-    // objects in the ApiListener destructor to reference any objects in thread local storage.
-    if (listener_manager_->apiListener().has_value()) {
-      listener_manager_->apiListener()->get().shutdown();
-    }
-
     listener_manager_->stopWorkers();
   }
 
@@ -982,12 +1012,7 @@ void InstanceImpl::terminate() {
   FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
-Runtime::Loader& InstanceImpl::runtime() {
-  if (runtime_singleton_) {
-    return runtime_singleton_->instance();
-  }
-  return *runtime_;
-}
+Runtime::Loader& InstanceImpl::runtime() { return *runtime_; }
 
 void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
@@ -1023,7 +1048,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
                                                                                 callback);
 }
 
-void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
+void InstanceImpl::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {

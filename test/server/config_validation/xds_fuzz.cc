@@ -12,7 +12,7 @@ namespace Envoy {
 
 // Helper functions to build API responses.
 envoy::config::cluster::v3::Cluster XdsFuzzTest::buildCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "ROUND_ROBIN");
+  return ConfigHelper::buildCluster(name);
 };
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
@@ -62,7 +62,7 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
                                              test::server::config_validation::Config::SOTW
                                          ? "GRPC"
                                          : "DELTA_GRPC")),
-      verifier_(input.config().sotw_or_delta()), actions_(input.actions()), version_(1),
+      verifier_(input.config().sotw_or_delta()), actions_(input.actions()),
       ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
                                     use_unified_mux ? "true" : "false");

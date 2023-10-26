@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.pick_first.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.pick_first.v3";
+option java_outer_classname = "PickFirstProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/pick_first/v3;pick_firstv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Pick First Load Balancing Policy]
+// [#not-implemented-hide:]
+
+// This configuration allows the built-in PICK_FIRST LB policy to be configured
+// via the LB policy extension point.
+message PickFirst {
+  // If set to true, instructs the LB policy to shuffle the list of addresses
+  // received from the name resolver before attempting to connect to them.
+  bool shuffle_address_list = 1;
+}

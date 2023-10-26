@@ -56,7 +56,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -85,7 +85,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
   // The number of timeouts that can occur before port migration is triggered for QUIC clients.
-  // This defaults to 1. If set to 0, port migration will not occur on path degrading.
+  // This defaults to 4. If set to 0, port migration will not occur on path degrading.
   // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
   // This has no effect on server sessions.
   google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
@@ -94,6 +94,14 @@ message QuicProtocolOptions {
   // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
   QuicKeepAliveSettings connection_keepalive = 5;
+
+  // A comma-separated list of strings representing QUIC connection options defined in
+  // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>`_ and to be sent by upstream connections.
+  string connection_options = 6;
+
+  // A comma-separated list of strings representing QUIC client connection options defined in
+  // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>`_ and to be sent by upstream connections.
+  string client_connection_options = 7;
 }
 
 message UpstreamHttpProtocolOptions {
@@ -104,12 +112,14 @@ message UpstreamHttpProtocolOptions {
   // upstream connections based on the downstream HTTP host/authority header or any other arbitrary
   // header when :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>`
   // is set, as seen by the :ref:`router filter <config_http_filters_router>`.
+  // Does nothing if a filter before the http router filter sets the corresponding metadata.
   bool auto_sni = 1;
 
   // Automatic validate upstream presented certificate for new upstream connections based on the
   // downstream HTTP host/authority header or any other arbitrary header when :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>`
   // is set, as seen by the :ref:`router filter <config_http_filters_router>`.
   // This field is intended to be set with ``auto_sni`` field.
+  // Does nothing if a filter before the http router filter sets the corresponding metadata.
   bool auto_san_validation = 2;
 
   // An optional alternative to the host/authority header to be used for setting the SNI value.
@@ -119,6 +129,7 @@ message UpstreamHttpProtocolOptions {
   // is not found or the value is empty, host/authority header will be used instead.
   // This field is intended to be set with ``auto_sni`` and/or ``auto_san_validation`` fields.
   // If none of these fields are set then setting this would be a no-op.
+  // Does nothing if a filter before the http router filter sets the corresponding metadata.
   string override_auto_sni_header = 3
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 }
@@ -259,7 +270,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -358,6 +369,19 @@ message Http1ProtocolOptions {
   // See issue #21245.
   google.protobuf.BoolValue use_balsa_parser = 9
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // [#not-implemented-hide:] Hiding so that field can be removed.
+  // If true, and BalsaParser is used (either `use_balsa_parser` above is true,
+  // or `envoy.reloadable_features.http1_use_balsa_parser` is true and
+  // `use_balsa_parser` is unset), then every non-empty method with only valid
+  // characters is accepted. Otherwise, methods not on the hard-coded list are
+  // rejected.
+  // Once UHV is enabled, this field should be removed, and BalsaParser should
+  // allow any method. UHV validates the method, rejecting empty string or
+  // invalid characters, and provides :ref:`restrict_http_methods
+  // <envoy_v3_api_field_extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.restrict_http_methods>`
+  // to reject custom methods.
+  bool allow_custom_methods = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 message KeepaliveSettings {
@@ -390,7 +414,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -568,6 +592,12 @@ message Http2ProtocolOptions {
   // Send HTTP/2 PING frames to verify that the connection is still healthy. If the remote peer
   // does not respond within the configured timeout, the connection will be aborted.
   KeepaliveSettings connection_keepalive = 15;
+
+  // [#not-implemented-hide:] Hiding so that the field can be removed after oghttp2 is rolled out.
+  // If set, force use of a particular HTTP/2 codec: oghttp2 if true, nghttp2 if false.
+  // If unset, HTTP/2 codec is selected based on envoy.reloadable_features.http2_use_oghttp2.
+  google.protobuf.BoolValue use_oghttp2_codec = 16
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // [#not-implemented-hide:]

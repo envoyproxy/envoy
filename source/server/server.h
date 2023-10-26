@@ -21,7 +21,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
@@ -133,7 +133,7 @@ public:
    * @param store provides the store being flushed.
    */
   static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                  TimeSource& time_source);
+                                  Upstream::ClusterManager& cm, TimeSource& time_source);
 
   /**
    * Load a bootstrap config and perform validation.
@@ -191,6 +191,7 @@ public:
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
   OptRef<Admin> admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
+  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
@@ -200,11 +201,11 @@ public:
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
 
   // Configuration::TransportSocketFactoryContext
+  ServerFactoryContext& serverFactoryContext() override { return *this; }
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
-  Stats::Store& stats() override { return server_.stats(); }
+  Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
-  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation
@@ -242,7 +243,7 @@ public:
 
   ~InstanceImpl() override;
 
-  void run();
+  void run() override;
 
   // Server::Instance
   OptRef<Admin> admin() override { return makeOptRefFromPtr(admin_.get()); }
@@ -252,7 +253,7 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
-  void drainListeners() override;
+  void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) override;
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool fail) override;
@@ -318,7 +319,7 @@ private:
   void startWorkers();
   void terminate();
   void notifyCallbacksForStage(
-      Stage stage, Event::PostCb completion_cb = [] {});
+      Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
 
@@ -335,9 +336,9 @@ private:
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
-  bool workers_started_;
+  bool workers_started_{false};
   std::atomic<bool> live_;
-  bool shutdown_;
+  bool shutdown_{false};
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
@@ -365,7 +366,6 @@ private:
   std::unique_ptr<Admin> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Runtime::Loader> runtime_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
@@ -378,7 +378,7 @@ private:
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<Server::GuardDog> main_thread_guard_dog_;
   std::unique_ptr<Server::GuardDog> worker_guard_dog_;
-  bool terminated_;
+  bool terminated_{false};
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
@@ -399,7 +399,7 @@ private:
   ListenerHooks& hooks_;
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
-  bool enable_reuse_port_default_;
+  bool enable_reuse_port_default_{false};
   Regex::EnginePtr regex_engine_;
 
   bool stats_flush_in_progress_ : 1;
@@ -426,7 +426,8 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
-  explicit MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source);
+  explicit MetricSnapshotImpl(Stats::Store& store, Upstream::ClusterManager& cluster_manager,
+                              TimeSource& time_source);
 
   // Stats::MetricSnapshot
   const std::vector<CounterSnapshot>& counters() override { return counters_; }
@@ -439,6 +440,10 @@ public:
   const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
     return text_readouts_;
   }
+  const std::vector<Stats::PrimitiveCounterSnapshot>& hostCounters() override {
+    return host_counters_;
+  }
+  const std::vector<Stats::PrimitiveGaugeSnapshot>& hostGauges() override { return host_gauges_; }
   SystemTime snapshotTime() const override { return snapshot_time_; }
 
 private:
@@ -450,6 +455,8 @@ private:
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
   std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
   std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
+  std::vector<Stats::PrimitiveCounterSnapshot> host_counters_;
+  std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges_;
   SystemTime snapshot_time_;
 };
 

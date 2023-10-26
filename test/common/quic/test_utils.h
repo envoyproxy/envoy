@@ -49,7 +49,7 @@ public:
             &writer, /*owns_writer=*/false, supported_versions,
             createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
                                          "example.com", "h3-29"),
-            generator) {}
+            generator, nullptr) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();
@@ -58,7 +58,27 @@ public:
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+  MOCK_METHOD(quic::MessageStatus, SendMessage,
+              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+};
+
+class MockEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
+public:
+  MockEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
+                                quic::QuicConnectionHelperInterface& helper,
+                                quic::QuicAlarmFactory& alarm_factory,
+                                quic::QuicPacketWriter* writer, bool owns_writer,
+                                const quic::ParsedQuicVersionVector& supported_versions,
+                                Event::Dispatcher& dispatcher,
+                                Network::ConnectionSocketPtr&& connection_socket,
+                                quic::ConnectionIdGeneratorInterface& generator)
+      : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
+                                  supported_versions, dispatcher, std::move(connection_socket),
+                                  generator) {}
+
+  MOCK_METHOD(quic::MessageStatus, SendMessage,
+              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
 };
 
 class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {
@@ -119,6 +139,9 @@ public:
   using quic::QuicSpdySession::ActivateStream;
 
 protected:
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    return quic::HttpDatagramSupport::kRfc;
+  }
   bool hasDataToWrite() override { return HasDataToWrite(); }
   const quic::QuicConnection* quicConnection() const override {
     return initialized_ ? connection() : nullptr;
@@ -177,7 +200,7 @@ public:
                                quic::QuicServerId("example.com", 443, false),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
-                               nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
+                               dispatcher, send_buffer_limit, crypto_stream_factory,
                                quic_stat_names_, {}, *stats_store_.rootScope(), nullptr) {}
 
   void Initialize() override {
@@ -208,6 +231,9 @@ public:
   using quic::QuicSpdySession::ActivateStream;
 
 protected:
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    return quic::HttpDatagramSupport::kRfc;
+  }
   bool hasDataToWrite() override { return HasDataToWrite(); }
   const quic::QuicConnection* quicConnection() const override {
     return initialized_ ? connection() : nullptr;

@@ -21,38 +21,45 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
-var httpFilterConfigFactory = sync.Map{}
+var httpFilterConfigFactoryAndParser = sync.Map{}
 
-func RegisterHttpFilterConfigFactory(name string, f api.StreamFilterConfigFactory) {
-	httpFilterConfigFactory.Store(name, f)
+type filterConfigFactoryAndParser struct {
+	configFactory api.StreamFilterConfigFactory
+	configParser  api.StreamFilterConfigParser
 }
 
-// no parser by default
-var httpFilterConfigParser api.StreamFilterConfigParser = nil
-
-// TODO merge it to api.HttpFilterConfigFactory
-func RegisterHttpFilterConfigParser(parser api.StreamFilterConfigParser) {
-	httpFilterConfigParser = parser
+// Register config factory and config parser for the specified plugin.
+// The "factory" parameter is required, should not be nil,
+// and the "parser" parameter is optional, could be nil.
+func RegisterHttpFilterConfigFactoryAndParser(name string, factory api.StreamFilterConfigFactory, parser api.StreamFilterConfigParser) {
+	if factory == nil {
+		panic("config factory should not be nil")
+	}
+	httpFilterConfigFactoryAndParser.Store(name, &filterConfigFactoryAndParser{factory, parser})
 }
 
 func getOrCreateHttpFilterFactory(name string, configId uint64) api.StreamFilterFactory {
 	config, ok := configCache.Load(configId)
 	if !ok {
-		panic(fmt.Sprintf("get config failed, plugin: %s, configId: %d", name, configId))
+		panic(fmt.Sprintf("config not found, plugin: %s, configId: %d", name, configId))
 	}
 
-	if v, ok := httpFilterConfigFactory.Load(name); ok {
-		return (v.(api.StreamFilterConfigFactory))(config)
+	if v, ok := httpFilterConfigFactoryAndParser.Load(name); ok {
+		return (v.(*filterConfigFactoryAndParser)).configFactory(config)
 	}
+
+	api.LogErrorf("plugin %s not found, pass through by default", name)
 
 	// pass through by default
 	return PassThroughFactory(config)
 }
 
-// streaming and async supported by default
-func RegisterStreamingHttpFilterConfigFactory(name string, f api.StreamFilterConfigFactory) {
-	httpFilterConfigFactory.Store(name, f)
+func getHttpFilterConfigParser(name string) api.StreamFilterConfigParser {
+	if v, ok := httpFilterConfigFactoryAndParser.Load(name); ok {
+		return (v.(*filterConfigFactoryAndParser)).configParser
+	}
+	return nil
 }

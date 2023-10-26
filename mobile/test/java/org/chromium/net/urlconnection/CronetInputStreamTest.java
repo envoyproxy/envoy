@@ -26,13 +26,13 @@ import org.mockito.stubbing.Answer;
 public class CronetInputStreamTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
-  private CronetHttpURLConnection mMockConnection;
+  private CronvoyHttpURLConnection mMockConnection;
 
   @Before
   public void setUp() throws Exception {
     // Disable StrictMode constraints for mock initialization.
     try (StrictModeContext ignored = StrictModeContext.allowAllVmPolicies()) {
-      mMockConnection = Mockito.mock(CronetHttpURLConnection.class);
+      mMockConnection = Mockito.mock(CronvoyHttpURLConnection.class);
     }
   }
 
@@ -133,7 +133,7 @@ public class CronetInputStreamTest {
   }
 
   private void runTestCase(CronetInputStreamTestCase testCase) throws Exception {
-    try (CronetInputStream underTest = new CronetInputStream(mMockConnection)) {
+    try (CronvoyInputStream underTest = new CronvoyInputStream(mMockConnection)) {
       testCase.runTestCase(underTest);
     }
   }
@@ -163,6 +163,6 @@ public class CronetInputStreamTest {
   }
 
   private static interface CronetInputStreamTestCase {
-    void runTestCase(CronetInputStream underTest) throws Exception;
+    void runTestCase(CronvoyInputStream underTest) throws Exception;
   }
 }

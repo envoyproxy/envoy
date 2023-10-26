@@ -24,14 +24,11 @@ namespace Envoy {
 
 class CustomStaticCluster : public Upstream::ClusterImplBase {
 public:
-  CustomStaticCluster(Server::Configuration::ServerFactoryContext& server_context,
-                      const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                      Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                      Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, uint32_t priority,
+  CustomStaticCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                      Upstream::ClusterFactoryContext& context, uint32_t priority,
                       std::string address, uint32_t port)
-      : ClusterImplBase(server_context, cluster, runtime, factory_context, std::move(stats_scope),
-                        added_via_api, factory_context.mainThreadDispatcher().timeSource()),
-        priority_(priority), address_(std::move(address)), port_(port), host_(makeHost()) {}
+      : ClusterImplBase(cluster, context), priority_(priority), address_(std::move(address)),
+        port_(port), host_(makeHost()) {}
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
@@ -58,18 +55,14 @@ protected:
       : ConfigurableClusterFactoryBase(name), create_lb_(create_lb) {}
 
 private:
-  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
-  createClusterWithConfig(
-      Server::Configuration::ServerFactoryContext& server_context,
-      const envoy::config::cluster::v3::Cluster& cluster,
-      const test::integration::clusters::CustomStaticConfig& proto_config,
-      Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override {
-    auto new_cluster = std::make_shared<CustomStaticCluster>(
-        server_context, cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
-        context.addedViaApi(), proto_config.priority(), proto_config.address(),
-        proto_config.port_value());
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
+  createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
+                          const test::integration::clusters::CustomStaticConfig& proto_config,
+                          Upstream::ClusterFactoryContext& context) override {
+    auto new_cluster =
+        std::make_shared<CustomStaticCluster>(cluster, context, proto_config.priority(),
+                                              proto_config.address(), proto_config.port_value());
     return std::make_pair(new_cluster, create_lb_ ? new_cluster->threadAwareLb() : nullptr);
   }
 

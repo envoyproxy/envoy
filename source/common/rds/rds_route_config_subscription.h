@@ -62,17 +62,15 @@ public:
 
 private:
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
+                              const std::string& version_info) override;
 
-  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string&) override;
+  absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
-
-  bool validateUpdateSize(int num_resources);
 
   virtual void beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
                                     std::unique_ptr<Cleanup>&) {}
@@ -98,7 +96,7 @@ protected:
   RdsStats stats_;
   RouteConfigProviderManager& route_config_provider_manager_;
   const uint64_t manager_identifier_;
-  RouteConfigProvider* route_config_provider_;
+  RouteConfigProvider* route_config_provider_{nullptr};
   RouteConfigUpdatePtr config_update_info_;
   Envoy::Config::OpaqueResourceDecoderSharedPtr resource_decoder_;
 };

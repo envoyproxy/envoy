@@ -6,7 +6,6 @@
 #include "library/common/api/c_types.h"
 
 #import "library/common/main_interface.h"
-#import "library/common/network/apple_platform_cert_verifier.h"
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
 #import "library/cc/engine_builder.h"
@@ -518,8 +517,6 @@ static void ios_track_event(envoy_map map, const void *context) {
   for (NSString *name in config.keyValueStores) {
     [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
   }
-
-  register_apple_platform_cert_verifier();
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
@@ -557,7 +554,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   [self startObservingLifecycleNotifications];
 
   @try {
-    return (int)run_engine(_engineHandle, yaml.UTF8String, logLevel.UTF8String, "");
+    return (int)run_engine(_engineHandle, yaml.UTF8String, logLevel.UTF8String);
   } @catch (NSException *exception) {
     [self logException:exception];
     return kEnvoyFailure;

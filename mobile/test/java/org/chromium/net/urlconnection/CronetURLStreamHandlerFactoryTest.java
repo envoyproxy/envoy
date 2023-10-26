@@ -25,7 +25,7 @@ public class CronetURLStreamHandlerFactoryTest {
   public void testRequireConfig() throws Exception {
     mTestRule.startCronetTestFramework();
     try {
-      new CronetURLStreamHandlerFactory(null);
+      new CronvoyURLStreamHandlerFactory(null);
       fail();
     } catch (NullPointerException e) {
       assertEquals("CronetEngine is null.", e.getMessage());

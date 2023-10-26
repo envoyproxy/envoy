@@ -21,6 +21,7 @@ public:
 
 private:
   static constexpr uint64_t DefaultMessageTimeoutMs = 200;
+  static constexpr uint64_t DefaultMaxMessageTimeoutMs = 0;
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
@@ -30,6 +31,11 @@ private:
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& server_context) override;
 };
 
 } // namespace ExternalProcessing

@@ -35,6 +35,24 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 }
 
 static uint16_t default_port = 6379;
+
+bool isClusterProvidedLb(const Upstream::ClusterInfo& info) {
+  const auto lb_type = info.lbType();
+  bool cluster_provided_lb = lb_type == Upstream::LoadBalancerType::ClusterProvided;
+  if (lb_type == Upstream::LoadBalancerType::LoadBalancingPolicyConfig) {
+    auto* typed_lb_factory = info.loadBalancerFactory();
+    if (typed_lb_factory == nullptr) {
+      // This should never happen because if there is no valid factory, the cluster should
+      // have been rejected during config load and this code should never be reached.
+      IS_ENVOY_BUG("ClusterInfo should contain a valid factory");
+      return false;
+    }
+    cluster_provided_lb =
+        typed_lb_factory->name() == "envoy.load_balancing_policies.cluster_provided";
+  }
+  return cluster_provided_lb;
+}
+
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -92,14 +110,17 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
-      is_redis_cluster_(false), client_factory_(parent->client_factory_), config_(parent->config_),
+      client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
       refresh_manager_(parent->refresh_manager_) {
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
-    onClusterAddOrUpdateNonVirtual(*cluster);
+    Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+      return *cluster;
+    };
+    onClusterAddOrUpdateNonVirtual(cluster->info()->name(), command);
   }
 }
 
@@ -116,8 +137,8 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
-    Upstream::ThreadLocalCluster& cluster) {
-  if (cluster.info()->name() != cluster_name_) {
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+  if (cluster_name != cluster_name_) {
     return;
   }
   // Ensure the filter is not deleted in the main thread during this method.
@@ -132,6 +153,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   }
 
   ASSERT(cluster_ == nullptr);
+  auto& cluster = get_cluster();
   cluster_ = &cluster;
   // Update username and password when cluster updates.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
@@ -158,8 +180,8 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type =
       info->clusterType();
-  is_redis_cluster_ = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
-                      cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
+  is_redis_cluster_ = isClusterProvidedLb(*info) && cluster_type.has_value() &&
+                      cluster_type->name() == "envoy.clusters.redis";
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
@@ -179,6 +201,7 @@ void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_
 
   cluster_ = nullptr;
   host_address_map_.clear();
+  cx_rate_limiter_map_.clear();
 }
 
 void InstanceImpl::ThreadLocalPool::onHostsAdded(
@@ -201,6 +224,10 @@ void InstanceImpl::ThreadLocalPool::onHostsAdded(
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
     const std::vector<Upstream::HostSharedPtr>& hosts_removed) {
   for (const auto& host : hosts_removed) {
+    auto token_bucket = cx_rate_limiter_map_.find(host);
+    if (token_bucket != cx_rate_limiter_map_.end()) {
+      cx_rate_limiter_map_.erase(token_bucket);
+    }
     auto it = client_map_.find(host);
     if (it != client_map_.end()) {
       if (it->second->redis_client_->active()) {
@@ -236,14 +263,24 @@ void InstanceImpl::ThreadLocalPool::drainClients() {
 
 InstanceImpl::ThreadLocalActiveClientPtr&
 InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstSharedPtr host) {
+  TokenBucketPtr& rate_limiter = cx_rate_limiter_map_[host];
+  if (config_->connectionRateLimitEnabled() && !rate_limiter) {
+    rate_limiter = std::make_unique<TokenBucketImpl>(config_->connectionRateLimitPerSec(),
+                                                     dispatcher_.timeSource(),
+                                                     config_->connectionRateLimitPerSec());
+  }
   ThreadLocalActiveClientPtr& client = client_map_[host];
   if (!client) {
-    client = std::make_unique<ThreadLocalActiveClient>(*this);
-    client->host_ = host;
-    client->redis_client_ =
-        client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_, false);
-    client->redis_client_->addConnectionCallbacks(*client);
+    if (config_->connectionRateLimitEnabled() && rate_limiter->consume(1, false) == 0) {
+      redis_cluster_stats_.connection_rate_limited_.inc();
+    } else {
+      client = std::make_unique<ThreadLocalActiveClient>(*this);
+      client->host_ = host;
+      client->redis_client_ =
+          client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+                                 auth_username_, auth_password_, false);
+      client->redis_client_->addConnectionCallbacks(*client);
+    }
   }
   return client;
 }
@@ -268,26 +305,33 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
+  uint32_t client_idx = transaction.current_client_idx_;
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
-    transaction.client_ =
+    transaction.clients_[client_idx] =
         client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
                                auth_username_, auth_password_, true);
     if (transaction.connection_cb_) {
-      transaction.client_->addConnectionCallbacks(*transaction.connection_cb_);
+      transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }
-    transaction.connection_established_ = true;
   }
 
   pending_requests_.emplace_back(*this, std::move(request), callbacks, host);
   PendingRequest& pending_request = pending_requests_.back();
 
   if (!transaction.active_) {
-    pending_request.request_handler_ =
-        this->threadLocalActiveClient(host)->redis_client_->makeRequest(
-            getRequest(pending_request.incoming_request_), pending_request);
+    ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
+    if (!client) {
+      ENVOY_LOG(debug, "redis connection is rate limited, erasing empty client");
+      pending_request.request_handler_ = nullptr;
+      onRequestCompleted();
+      client_map_.erase(host);
+      return nullptr;
+    }
+    pending_request.request_handler_ = client->redis_client_->makeRequest(
+        getRequest(pending_request.incoming_request_), pending_request);
   } else {
-    pending_request.request_handler_ = transaction.client_->makeRequest(
+    pending_request.request_handler_ = transaction.clients_[client_idx]->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
   }
 
@@ -326,11 +370,10 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
       return nullptr;
     }
-    try {
+    TRY_NEEDS_AUDIT {
       address_ptr = std::make_shared<Network::Address::Ipv6Instance>(ip_address, ip_port_number);
-    } catch (const EnvoyException&) {
-      return nullptr;
     }
+    END_TRY catch (const EnvoyException&) { return nullptr; }
     host_address_map_key = address_ptr->asString();
   }
 
@@ -349,11 +392,10 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
       if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
         return nullptr;
       }
-      try {
+      TRY_NEEDS_AUDIT {
         address_ptr = std::make_shared<Network::Address::Ipv4Instance>(ip_address, ip_port_number);
-      } catch (const EnvoyException&) {
-        return nullptr;
       }
+      END_TRY catch (const EnvoyException&) { return nullptr; }
     }
     Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
         cluster_->info(), "", address_ptr, nullptr, 1, envoy::config::core::v3::Locality(),
@@ -365,6 +407,11 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
   }
 
   ThreadLocalActiveClientPtr& client = threadLocalActiveClient(it->second);
+  if (!client) {
+    ENVOY_LOG(debug, "redis connection is rate limited, erasing empty client");
+    client_map_.erase(it->second);
+    return nullptr;
+  }
 
   return client->redis_client_->makeRequest(request, callbacks);
 }

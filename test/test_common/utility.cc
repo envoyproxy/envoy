@@ -19,6 +19,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "source/common/api/api_impl.h"
@@ -228,10 +229,57 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
   return AssertionSuccess();
 }
 
+AssertionResult TestUtility::waitForProactiveOverloadResourceUsageEq(
+    Server::ThreadLocalOverloadState& overload_state,
+    const Server::OverloadProactiveResourceName resource_name, int64_t expected_value,
+    Event::TestTimeSystem& time_system, Event::Dispatcher& dispatcher,
+    std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  const auto& monitor = overload_state.getProactiveResourceMonitorForTest(resource_name);
+  while (monitor->currentResourceUsage() != expected_value) {
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      uint64_t current_value;
+      current_value = monitor->currentResourceUsage();
+      return AssertionFailure() << fmt::format(
+                 "timed out waiting for proactive resource to be {}, current value {}",
+                 expected_value, current_value);
+    }
+    dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  return AssertionSuccess();
+}
+
 AssertionResult TestUtility::waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
                                                    Event::TestTimeSystem& time_system) {
   while (findGauge(store, name) != nullptr) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult TestUtility::waitForNumHistogramSamplesGe(Stats::Store& store,
+                                                          const std::string& name,
+                                                          uint64_t min_sample_count_required,
+                                                          Event::TestTimeSystem& time_system,
+                                                          Event::Dispatcher& main_dispatcher,
+                                                          std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (true) {
+    auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
+    if (histo) {
+      uint64_t sample_count = readSampleCount(main_dispatcher, *histo);
+      if (sample_count >= min_sample_count_required) {
+        break;
+      }
+    }
+
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to have {} samples", name,
+                                               min_sample_count_required);
+    }
   }
   return AssertionSuccess();
 }
@@ -241,23 +289,7 @@ AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
                                                           Event::TestTimeSystem& time_system,
                                                           Event::Dispatcher& main_dispatcher,
                                                           std::chrono::milliseconds timeout) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (true) {
-    auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
-    if (histo) {
-      uint64_t sample_count = readSampleCount(main_dispatcher, *histo);
-      if (sample_count) {
-        break;
-      }
-    }
-
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to have samples", name);
-    }
-  }
-  return AssertionSuccess();
+  return waitForNumHistogramSamplesGe(store, name, 1, time_system, main_dispatcher, timeout);
 }
 
 uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,
@@ -273,6 +305,21 @@ uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,
   notification.WaitForNotification();
 
   return sample_count;
+}
+
+double TestUtility::readSampleSum(Event::Dispatcher& main_dispatcher,
+                                  const Stats::ParentHistogram& histogram) {
+  // Note: we need to read the sample count from the main thread, to avoid data races.
+  double sample_sum = 0;
+  absl::Notification notification;
+
+  main_dispatcher.post([&] {
+    sample_sum = histogram.cumulativeStatistics().sampleSum();
+    notification.Notify();
+  });
+  notification.WaitForNotification();
+
+  return sample_sum;
 }
 
 std::list<Network::DnsResponse>
