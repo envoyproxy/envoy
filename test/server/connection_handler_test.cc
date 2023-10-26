@@ -50,12 +50,22 @@ namespace Envoy {
 namespace Server {
 namespace {
 
+class MockConnectionHandlerImpl : public ConnectionHandlerImpl {
+public:
+  using ConnectionHandlerImpl::ConnectionHandlerImpl;
+  MOCK_METHOD(Network::ListenerPtr, createListener,
+              (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
+               Runtime::Loader& runtime, Random::RandomGenerator& random,
+               const Network::ListenerConfig& listener_config,
+               Server::ThreadLocalOverloadStateOptRef overload_state));
+};
+
 class ConnectionHandlerTest : public testing::Test,
                               protected Logger::Loggable<Logger::Id::main>,
                               public Event::TestUsingSimulatedTime {
 public:
   ConnectionHandlerTest()
-      : handler_(new ConnectionHandlerImpl(dispatcher_, 0)),
+      : handler_(new MockConnectionHandlerImpl(dispatcher_, 0)),
         filter_chain_(std::make_shared<NiceMock<Network::MockFilterChain>>()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()),
         access_log_(std::make_shared<AccessLog::MockInstance>()) {
@@ -321,16 +331,17 @@ public:
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
         .WillOnce(Return(listeners_.back()->sockets_[0]));
     if (socket_type == Network::Socket::Type::Stream) {
-      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-          .WillOnce(Invoke([listener, listener_callbacks](
-                               Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
-                               Runtime::Loader&, const Network::ListenerConfig&,
-                               Server::ThreadLocalOverloadStateOptRef) -> Network::Listener* {
-            if (listener_callbacks != nullptr) {
-              *listener_callbacks = &cb;
-            }
-            return listener;
-          }));
+      EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
+          .WillOnce(
+              Invoke([listener, listener_callbacks](
+                         Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
+                         Runtime::Loader&, Random::RandomGenerator&, const Network::ListenerConfig&,
+                         Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+                if (listener_callbacks != nullptr) {
+                  *listener_callbacks = &cb;
+                }
+                return std::unique_ptr<Network::Listener>(listener);
+              }));
     } else {
       delete listener;
       if (address == nullptr) {
@@ -382,18 +393,18 @@ public:
       test_listener_raw_ptr->sockets_[i]->connection_info_provider_->setLocalAddress(addresses[i]);
 
       if (socket_type == Network::Socket::Type::Stream) {
-        EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-            .WillOnce(
-                Invoke([i, &mock_listeners, &listener_callbacks_map](
-                           Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                           Runtime::Loader&, const Network::ListenerConfig&,
-                           Server::ThreadLocalOverloadStateOptRef) -> Network::Listener* {
-                  auto listener_callbacks_iter = listener_callbacks_map.find(
-                      socket->connectionInfoProvider().localAddress()->asString());
-                  EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
-                  *listener_callbacks_iter->second = &cb;
-                  return mock_listeners[i];
-                }))
+        EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
+            .WillOnce(Invoke([i, &mock_listeners, &listener_callbacks_map](
+                                 Network::SocketSharedPtr&& socket,
+                                 Network::TcpListenerCallbacks& cb, Runtime::Loader&,
+                                 Random::RandomGenerator&, const Network::ListenerConfig&,
+                                 Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+              auto listener_callbacks_iter = listener_callbacks_map.find(
+                  socket->connectionInfoProvider().localAddress()->asString());
+              EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
+              *listener_callbacks_iter->second = &cb;
+              return std::unique_ptr<Network::Listener>(mock_listeners[i]);
+            }))
             .RetiresOnSaturation();
       } else {
         listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
@@ -453,7 +464,7 @@ public:
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
   std::list<TestListenerPtr> listeners_;
-  std::unique_ptr<ConnectionHandlerImpl> handler_;
+  std::unique_ptr<MockConnectionHandlerImpl> handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
   NiceMock<Network::MockFilterChainFactory> factory_;
   const std::shared_ptr<Network::MockFilterChain> filter_chain_;

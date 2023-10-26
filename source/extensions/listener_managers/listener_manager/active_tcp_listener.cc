@@ -7,7 +7,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/network/connection_impl.h"
-#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 
 namespace Envoy {
@@ -22,10 +21,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      ThreadLocalOverloadStateOptRef overload_state)
     : OwnedActiveStreamListenerBase(
           parent, parent.dispatcher(),
-          std::make_unique<Network::TcpListenerImpl>(
-              parent.dispatcher(), random, runtime, std::move(socket), *this, config.bindToPort(),
-                config.ignoreGlobalConnLimit(), config.maxConnectionsToAcceptPerSocketEvent(),
-                overload_state),
+          parent.createListener(std::move(socket), *this, runtime, random, config, overload_state),
           config),
       tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
       listen_address_(listen_address) {

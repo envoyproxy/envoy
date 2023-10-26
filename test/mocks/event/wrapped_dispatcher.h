@@ -60,13 +60,6 @@ public:
     return impl_.createFilesystemWatcher();
   }
 
-  Network::ListenerPtr
-  createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                 Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
-                 Server::ThreadLocalOverloadStateOptRef overload_state) override {
-    return impl_.createListener(std::move(socket), cb, runtime, listener_config, overload_state);
-  }
-
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }
   TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override {
     return impl_.createScaledTimer(minimum, std::move(cb));

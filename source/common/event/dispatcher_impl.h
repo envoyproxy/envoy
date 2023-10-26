@@ -43,6 +43,7 @@ public:
   DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
                  const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                  const Buffer::WatermarkFactorySharedPtr& watermark_factory);
+  // TODO(alyssawilk) remove random_generator.
   DispatcherImpl(const std::string& name, Thread::ThreadFactory& thread_factory,
                  TimeSource& time_source, Random::RandomGenerator& random_generator,
                  Filesystem::Instance& file_system, Event::TimeSystem& time_system,
@@ -143,7 +144,6 @@ private:
   const std::string name_;
   Thread::ThreadFactory& thread_factory_;
   TimeSource& time_source_;
-  Random::RandomGenerator& random_generator_;
   Filesystem::Instance& file_system_;
   std::string stats_prefix_;
   DispatcherStatsPtr stats_;

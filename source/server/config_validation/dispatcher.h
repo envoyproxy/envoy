@@ -23,11 +23,6 @@ public:
       Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
       Network::TransportSocketPtr&&, const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_options) override;
-  Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
-                                      Runtime::Loader&, const Network::ListenerConfig&,
-                                      Server::ThreadLocalOverloadStateOptRef) override {
-    return nullptr;
-  }
 };
 
 } // namespace Event
