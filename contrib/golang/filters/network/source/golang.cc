@@ -107,9 +107,6 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& data, bool end_stream) {
   auto ret = dynamic_lib_->envoyGoFilterOnDownstreamWrite(
       wrapper_, data.length(), reinterpret_cast<GoUint64>(slices), slice_num, end_stream);
 
-  // TODO: do not drain buffer by default
-  data.drain(data.length());
-
   delete[] slices;
 
   return Network::FilterStatus(ret);
