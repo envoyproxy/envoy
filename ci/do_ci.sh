@@ -163,7 +163,7 @@ function bazel_binary_build() {
     # The COMPILE_TYPE variable is redundant in this case and is only here for
     # readability. It is already set in the .bazelrc config for sizeopt.
     COMPILE_TYPE="opt"
-    CONFIG_ARGS="--config=sizeopt"
+    CONFIG_ARGS=("--config=sizeopt")
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
     COMPILE_TYPE="fastbuild"
   fi
@@ -181,7 +181,7 @@ function bazel_binary_build() {
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" "${CONFIG_ARGS[@]}"
   collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the built envoy binary somewhere that we can access outside of the
@@ -191,14 +191,14 @@ function bazel_binary_build() {
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     # Generate dwp file for debugging since we used split DWARF to reduce binary
     # size
-    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" "${CONFIG_ARGS[@]}"
     # Copy the debug information
     cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
   # Validation tools for the tools image.
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
+    //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" external:su-exec
