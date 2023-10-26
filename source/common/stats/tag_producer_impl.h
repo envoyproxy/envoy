@@ -43,6 +43,8 @@ public:
    */
   std::string produceTags(absl::string_view metric_name, TagVector& tags) const override;
 
+  const TagVector& fixedTags() const override { return fixed_tags_; }
+
 private:
   friend class DefaultTagRegexTester;
 
@@ -104,6 +106,8 @@ private:
   // we need do elide duplicate extractors during extraction. It is not valid to
   // send duplicate tag names to Prometheus so this needs to be filtered out.
   absl::flat_hash_map<absl::string_view, std::reference_wrapper<TagExtractor>> extractor_map_;
+
+  TagVector fixed_tags_;
 };
 
 } // namespace Stats

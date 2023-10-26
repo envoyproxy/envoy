@@ -1082,7 +1082,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                   common_lb_config_->ignore_new_hosts_until_first_hc()),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
-      added_via_api_(added_via_api), has_configured_http_filters_(false) {
+      added_via_api_(added_via_api), has_configured_http_filters_(false),
+      per_endpoint_stats_(config.has_track_cluster_stats() &&
+                          config.track_cluster_stats().per_endpoint_stats()) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(
@@ -1090,6 +1092,14 @@ ClusterInfoImpl::ClusterInfoImpl(
         "on Windows platforms");
   }
 #endif
+
+  // Both LoadStatsReporter and per_endpoint_stats need to `latch()` the counters, so if both are
+  // configured they will interfere with each other and both get incorrect values.
+  if (perEndpointStatsEnabled() &&
+      server_context.bootstrap().cluster_manager().has_load_stats_config()) {
+    throwEnvoyExceptionOrPanic("Only one of cluster per_endpoint_stats and cluster manager "
+                               "load_stats_config can be specified");
+  }
 
   if (config.has_max_requests_per_connection() &&
       http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {

@@ -274,10 +274,13 @@ The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt
         claim_name: sub
       - header_name: x-jwt-claim-nested-key
         claim_name: nested.claim.key
+      - header_name: x-jwt-tenants
+        claim_name: tenants
 
-JWT claim ("sub" and "nested.claim.key") will be added to HTTP headers as following format:
+In this example the `tenants` claim is an object, therefore the JWT claim ("sub", "nested.claim.key" and "tenants") will be added to HTTP headers as following format:
 
 .. code-block::
 
     x-jwt-claim-sub: <JWT Claim>
     x-jwt-claim-nested-key: <JWT Claim>
+    x-jwt-tenants: <Base64 encoded JSON JWT Claim>

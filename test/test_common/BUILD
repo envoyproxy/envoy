@@ -293,6 +293,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "stats_utility_lib",
+    hdrs = ["stats_utility.h"],
+    deps = [
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+    ],
+)
+
+envoy_cc_test_library(
     name = "status_utility_lib",
     hdrs = ["status_utility.h"],
 )

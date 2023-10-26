@@ -30,6 +30,27 @@ envoy_extension_cc_test(
     ],
 )
 
+# Runs the same test suite as :maglev_lb_test with the forced original implementation
+# to ensure coverage on x86.
+envoy_extension_cc_test(
+    name = "maglev_lb_force_original_impl_test",
+    srcs = ["maglev_lb_test.cc"],
+    extension_names = ["envoy.load_balancing_policies.maglev"],
+    deps = [
+        "//source/extensions/load_balancing_policies/maglev:maglev_lb_force_original_impl_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
