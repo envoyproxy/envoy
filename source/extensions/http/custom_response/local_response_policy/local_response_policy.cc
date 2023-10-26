@@ -31,7 +31,8 @@ LocalResponsePolicy::LocalResponsePolicy(
                        ? absl::optional<Envoy::Http::Code>(
                              static_cast<Envoy::Http::Code>(config.status_code().value()))
                        : absl::optional<Envoy::Http::Code>{}},
-      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {}
+      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
+      preserve_response_headers_{config.preserve_response_headers()} {}
 
 // TODO(pradeepcrao): investigate if this code can be made common with
 // Envoy::LocalReply::BodyFormatter for consistent behavior.
@@ -64,6 +65,9 @@ Envoy::Http::FilterHeadersStatus LocalResponsePolicy::encodeHeaders(
                  : *encoder_callbacks->streamInfo().getRequestHeaders(),
              headers, encoder_callbacks->streamInfo(), body);
 
+  if (preserve_response_headers_) {
+    header_parser_->save_headers(headers);
+  }
   const auto mutate_headers = [this, encoder_callbacks](Envoy::Http::ResponseHeaderMap& headers) {
     header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
   };

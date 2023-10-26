@@ -99,6 +99,7 @@ public:
                                : *Http::StaticEmptyHeaders::get().request_headers),
                     *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
   }
+  void save_headers(Http::ResponseHeaderMap& headers);
 
   /*
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
@@ -119,6 +120,7 @@ protected:
 private:
   std::vector<std::pair<Http::LowerCaseString, HeadersToAddEntry>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
+  std::vector<std::pair<Http::LowerCaseString, std::string>> saved_headers_;
 };
 
 } // namespace Router
