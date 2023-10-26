@@ -93,7 +93,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci \
+            --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
             --linkopt=-fuse-ld=lld \
             //examples/java/hello_world:hello_envoy
@@ -153,7 +153,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci \
+            --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
             --linkopt=-fuse-ld=lld \
             //examples/kotlin/hello_world:hello_envoy_kt
@@ -217,7 +217,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci \
+            --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
             --linkopt=-fuse-ld=lld \
             //test/kotlin/apps/baseline:hello_envoy_kt
@@ -277,7 +277,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci \
+            --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
             --define envoy_mobile_listener=enabled \
             --linkopt=-fuse-ld=lld \
