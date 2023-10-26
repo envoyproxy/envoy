@@ -1526,7 +1526,7 @@ envoy.matching.custom_matchers.trie_matcher:
 envoy.load_balancing_policies.least_request:
   categories:
   - envoy.load_balancing_policies
-  security_posture: unknown
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest

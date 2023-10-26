@@ -36,6 +36,10 @@ bug_fixes:
 - area: grpc
   change: |
     Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+- area: upstream_lb
+  change: |
+    Updated the security posture of the :ref:`least request lb <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>` to
+    robust against untrusted downstreams and upstreams.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
