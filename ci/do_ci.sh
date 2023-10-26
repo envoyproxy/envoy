@@ -278,9 +278,7 @@ case $CI_TARGET in
         ;&
 
     api.go)
-        if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
-            setup_clang_toolchain
-        fi
+        setup_clang_toolchain
         GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
         GO_TARGETS=(@envoy_api//...)
         read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
