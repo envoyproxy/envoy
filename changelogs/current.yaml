@@ -13,5 +13,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: upstream
+  change: |
+    Added :ref:`selection_method <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    option to the least request load balancer. If set to ``FULL_SCAN``,
+    Envoy will select the host with the fewest active requests from the entire host set rather than
+    :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    random choices.
 
 deprecated:
