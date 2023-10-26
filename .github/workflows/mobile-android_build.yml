@@ -58,7 +58,7 @@ jobs:
       contents: read
       packages: read
     name: java_helloworld
-    runs-on: macos-12
+    runs-on: macos-12-large
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_helloworld
-    runs-on: macos-12
+    runs-on: macos-12-large
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -164,7 +164,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_baseline_app
-    runs-on: macos-12
+    runs-on: macos-12-large
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -217,7 +217,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_experimental_app
-    runs-on: macos-12
+    runs-on: macos-12-large
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
