@@ -58,7 +58,7 @@ jobs:
       contents: read
       packages: read
     name: java_helloworld
-    runs-on: mobile
+    runs-on: custom
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
