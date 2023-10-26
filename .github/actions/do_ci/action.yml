@@ -29,6 +29,18 @@ inputs:
   catch-errors:
     type: boolean
     default: false
+  error-match:
+    type: string
+    default: |
+      ERROR
+  warning-match:
+    type: string
+    default: |
+      WARNING
+  notice-match:
+    type: string
+    default: |
+      NOTICE
 
   env:
     type: string
@@ -39,7 +51,7 @@ inputs:
 runs:
   using: composite
   steps:
-  - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.0.33
+  - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.0.34
     name: 'Run CI target ${{ inputs.target }}'
     with:
       catch-errors: ${{ inputs.catch-errors }}
@@ -47,6 +59,9 @@ runs:
       command-prefix: ${{ inputs.command_ci }}
       command: ${{ inputs.target }}
       env: ${{ inputs.env }}
+      error-match: ${{ inputs.error-match }}
+      notice-match: ${{ inputs.notice-match }}
+      warning-match: ${{ inputs.warning-match }}
     env:
       GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
       ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
