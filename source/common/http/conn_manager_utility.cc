@@ -91,15 +91,17 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (!Utility::isUpgrade(request_headers)) {
+    // since java/tomcat relies on Connection: keep-alive request header for http1.1,
+    // retain the same only if connection has keep-alive. Since its optional per
+    // RFC https://datatracker.ietf.org/doc/html/rfc2616#section-19.6.2, we are doing
+    // it for ebay use case when protocol is http 1.1
     if (protocol == Protocol::Http11 && request_headers.Connection() &&
       Envoy::StringUtil::caseFindToken(request_headers.Connection()->value().getStringView(), ",",
                                        Http::Headers::get().ConnectionValues.KeepAlive)) {
         if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.retain_keepalive_header_http11")) {
-        request_headers.removeConnection();
+          request_headers.removeConnection();
         }
-      }
-        request_headers.removeConnection();
-    } else {
+      } else {
         request_headers.removeConnection();
     }
     request_headers.removeUpgrade();

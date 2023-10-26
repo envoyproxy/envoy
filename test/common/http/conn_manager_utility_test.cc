@@ -2251,7 +2251,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHo
   EXPECT_EQ("80", headers.getForwardedPortValue());
 }
 
-TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersHttp11) {
+TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersForHttp11) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60, max=1000"},
                                                    {"proxy-connection", "proxy-header"}};
@@ -2284,24 +2284,24 @@ TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyResponseHeadersHttp11) 
   EXPECT_FALSE(response_headers.has("proxy-connection"));
 }
 
-// Don't remove connection keep- aliveheaders for http11 as tomcat/java relies on this.
+// Don't remove connection keep-alive headers for h11 as tomcat/java relies on this.
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeaderHttp11) {
-  TestRequestHeaderMapImpl headers{{"connection", "keep-alive"}};
+  TestRequestHeaderMapImpl request_headers{{"connection", "keep-alive"}};
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
-            callMutateRequestHeaders(headers, Protocol::Http11));
-  EXPECT_EQ("keep-alive", headers.get_("connection"));
+            callMutateRequestHeaders(request_headers, Protocol::Http11));
+  EXPECT_EQ("keep-alive", request_headers.get_("connection"));
 }
 
-// Remove connection keep- aliveheaders for http11 if retain_keepalive_header_http11 is false
-TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeaderHttp11) {
-  TestRequestHeaderMapImpl headers{{"connection", "keep-alive"}};
+// Remove connection keep-alive headers for h11 if retain_keepalive_header_http11 is false
+TEST_F(ConnectionManagerUtilityTest, RemoveConnectionKeepAliveRequestHeaderHttp11) {
+  TestRequestHeaderMapImpl request_headers{{"connection", "keep-alive"}};
   TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
-            callMutateRequestHeaders(headers, Protocol::Http11));
-  EXPECT_FALSE(headers.has("keep-alive"));
+            callMutateRequestHeaders(request_headers, Protocol::Http11));
+  EXPECT_FALSE(request_headers.has("connection"));
 }
 
 } // namespace Http
