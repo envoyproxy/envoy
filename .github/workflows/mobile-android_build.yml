@@ -157,10 +157,6 @@ jobs:
             --fat_apk_cpu=x86_64 \
             --linkopt=-fuse-ld=lld \
             //examples/kotlin/hello_world:hello_envoy_kt
-        ls bazel-bin || true
-        ls bazel-bin/examples || true
-        ls bazel-bin/examples/kotlin || true
-        ls bazel-bin/examples/kotlin/hello_world || true
         "${ANDROID_HOME}/platform-tools/adb" install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
         "${ANDROID_HOME}/platform-tools/adb" shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
     - name: 'Check connectivity'
