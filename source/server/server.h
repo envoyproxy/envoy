@@ -233,14 +233,16 @@ public:
    * @throw EnvoyException if initialization fails.
    */
   InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
-               Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-               HotRestart& restarter, Stats::StoreRoot& store,
-               Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
+               ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+               Thread::BasicLockable& access_log_lock,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                std::unique_ptr<ProcessContext> process_context,
                Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
+  // initialize the server. This must be called before run().
+  void initialize(Network::Address::InstanceConstSharedPtr local_address,
+                  ComponentFactory& component_factory);
   ~InstanceImpl() override;
 
   void run() override;
@@ -313,8 +315,10 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  void initialize(Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory);
+  // This does most of the work of initialization, but can throw errors caught
+  // by initialize().
+  void initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                         ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
