@@ -1,7 +1,7 @@
-diff --git a/src/include/openssl/base.h b/src/include/openssl/base.h
+diff --git a/src/include/openssl/target.h b/src/include/openssl/target.h
 index 190e250ff..8538316ef 100644
---- a/src/include/openssl/base.h
-+++ b/src/include/openssl/base.h
+--- a/src/include/openssl/target.h
++++ b/src/include/openssl/target.h
 @@ -116,6 +116,9 @@ extern "C" {
  #define OPENSSL_32_BIT
  #elif defined(__myriad2__)
