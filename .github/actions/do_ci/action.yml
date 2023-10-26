@@ -51,7 +51,7 @@ inputs:
 runs:
   using: composite
   steps:
-  - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.0.34
+  - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.0.35
     name: 'Run CI target ${{ inputs.target }}'
     with:
       catch-errors: ${{ inputs.catch-errors }}
