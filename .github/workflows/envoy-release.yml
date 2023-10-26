@@ -59,6 +59,8 @@ jobs:
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
     - run: |
         if [[ ! -s "changelogs/summary.md" ]]; then
             if [[ "${{ inputs.summary }}" == "false" ]]; then
@@ -68,6 +70,9 @@ jobs:
             echo "::error::Changelog summary (changelogs/summary.md) is empty!"
             exit 1
         fi
+        COMMITTER=$(git log -n 1 --format='%an <%ae>' -- changelogs/summary.md)
+        echo "committer=${COMMITTER}" >> $GITHUB_OUTPUT
+      id: changelog
       name: Check changelog summary
     - run: |
         BRANCHNAME="${GITHUB_REF_NAME#release/}"
@@ -82,28 +87,30 @@ jobs:
       uses: envoyproxy/toolshed/gh-actions/email/validate@actions-v0.1.1
       with:
         email: ${{ inputs.author }}
+    - uses: envoyproxy/toolshed/gh-actions/github/run@ffa33da04ea0b9528f666a49ff2f336fedf9fca4
+      name: Create release
+      with:
+        source: |
+          BAZEL_ARGS=(--)
+          BAZEL_RUN_ARGS=(--config=ci)
+          if [[ -n "${{ inputs.author }}" ]]; then
+              BAZEL_ARGS+=(
+                  "--release-author=${{ inputs.author }}"
+                  "--signoff=${{ steps.changelog.outputs.committer }}")
+          else
+              BAZEL_ARGS+=("--release-author=${{ steps.changelog.outputs.committer }}")
+          fi
+        command: >-
+          bazel
+          run
+          "${BAZEL_RUN_ARGS[@]}"
+          @envoy_repo//:release
+          "${BAZEL_ARGS[@]}"
     - run: |
-        git config --global user.name ${{ env.COMMITTER_NAME }}
-        git config --global user.email ${{ env.COMMITTER_EMAIL }}
-      name: Configure committer
-    - run: |
-        BAZEL_ARGS=(-- -l debug -v debug)
-        BAZEL_RUN_ARGS=(--config=ci)
-        CHANGELOG_COMMITTER="$(git log -n 1 --format="%an <%ae>" -- changelogs/summary.md)"
-        if [[ -n "$AUTHOR" ]]; then
-            BAZEL_ARGS+=(
-                --release-author="${AUTHOR}"
-                --release-signoff="${CHANGELOG_COMMITTER}")
-        else
-            BAZEL_ARGS+=(--release-author="${CHANGELOG_COMMITTER}")
-        fi
-        bazel run "${BAZEL_RUN_ARGS[@]}" @envoy_repo//:release "${BAZEL_ARGS[@]}"
         VERSION=$(cat VERSION.txt)
         echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-      name: Create release
+      name: Release version
       id: release
-      env:
-        AUTHOR: ${{ inputs.author }}
     - name: Create a PR
       uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.1
       with:
@@ -134,6 +141,8 @@ jobs:
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
     - run: |
         BRANCHNAME="${GITHUB_REF_NAME#release/}"
         echo "name=${BRANCHNAME}" >> $GITHUB_OUTPUT
@@ -142,16 +151,19 @@ jobs:
       id: branch
       env:
         GITHUB_REF_NAME: ${{ github.ref_name }}
-    - run: |
-        git config --global user.name ${{ env.COMMITTER_NAME }}
-        git config --global user.email ${{ env.COMMITTER_NAME }}
-      name: Configure committer
-    - run: |
-        bazel run --config=ci @envoy_repo//:sync
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.1
       name: Sync version histories
+      with:
+        command: >-
+          bazel
+          run
+          --config=ci @envoy_repo//:sync
+          --
+          --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
     - name: Create a PR
       uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.1
       with:
+        append-commit-message: true
         base: ${{ github.ref_name }}
         commit: false
         body: |
@@ -178,23 +190,18 @@ jobs:
     if: github.event_name == 'release' && endsWith(github.ref, '.0')
     name: Create release branch
     steps:
-    - name: Fetch token for app auth
-      id: appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.1.1
+    - name: Checkout repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.1
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ steps.appauth.outputs.token }}
+        app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
     - name: Create release branch
       run: |
         version="$(cut -d- -f1 < VERSION.txt | cut -d. -f-2)"
         release_branch="release/v${version}"
         commit_sha="$(git rev-parse HEAD)"
-        git config --global user.name "${{ env.COMMITTER_NAME }}"
-        git config --global user.email "${{ env.COMMITTER_EMAIL }}"
         echo "Creating ${release_branch} from ${commit_sha}"
         git checkout -b "$release_branch"
         bazel run @envoy_repo//:dev -- --patch

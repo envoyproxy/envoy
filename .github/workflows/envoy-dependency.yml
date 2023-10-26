@@ -95,18 +95,15 @@ jobs:
     name: Update build image (PR)
     runs-on: ubuntu-22.04
     steps:
-    - name: Fetch token for app auth
-      id: appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.1.1
-      with:
-        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
-        key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - uses: actions/checkout@v4
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.1
+      id: checkout
       name: Checkout Envoy repository
       with:
-        path: envoy
-        fetch-depth: 0
-        token: ${{ steps.appauth.outputs.token }}
+        config: |
+          path: envoy
+          fetch-depth: 0
+        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
+        app_key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - uses: actions/checkout@v4
       name: Checkout Envoy build tools repository
       with:
@@ -178,5 +175,5 @@ jobs:
 
           Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
         title: 'deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`'
-        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
         working-directory: envoy
