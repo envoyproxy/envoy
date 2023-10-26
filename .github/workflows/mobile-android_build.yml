@@ -97,13 +97,13 @@ jobs:
             --fat_apk_cpu=x86_64 \
             --linkopt=-fuse-ld=lld \
             //examples/java/hello_world:hello_envoy
-        "${ANDROID_HOME}/platform-tools/adb" install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
-        "${ANDROID_HOME}/platform-tools/adb" shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
+        "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
+        "${ANDROID_HOME}"/platform-tools/adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
     - name: 'Check connectivity'
       run: |
-        timeout 30 "${ANDROID_HOME}/platform-tools/adb" logcat -e "received headers with status 301" -m 1 || {
+        timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat -e "received headers with status 301" -m 1 || {
             echo "Failed checking for headers in adb logcat" >&2
-            timeout 30 "${ANDROID_HOME}/platform-tools/adb" logcat || {
+            timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat || {
                 echo "Failed dumping adb logcat" >&2
             }
             exit 1
@@ -157,13 +157,13 @@ jobs:
             --fat_apk_cpu=x86_64 \
             --linkopt=-fuse-ld=lld \
             //examples/kotlin/hello_world:hello_envoy_kt
-        "${ANDROID_HOME}/platform-tools/adb" install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
-        "${ANDROID_HOME}/platform-tools/adb" shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
+        "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
+        "${ANDROID_HOME}"/platform-tools/adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
     - name: 'Check connectivity'
       run: |
-        timeout 30 "${ANDROID_HOME}/platform-tools/adb" logcat -e "received headers with status 200" -m 1 || {
+        timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat -e "received headers with status 200" -m 1 || {
             echo "Failed checking for headers in adb logcat" >&2
-            timeout 30 "${ANDROID_HOME}/platform-tools/adb" logcat || {
+            timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat || {
                 echo "Failed dumping adb logcat" >&2
             }
             exit 1
@@ -217,13 +217,13 @@ jobs:
             --fat_apk_cpu=x86_64 \
             --linkopt=-fuse-ld=lld \
             //test/kotlin/apps/baseline:hello_envoy_kt
-        "${ANDROID_HOME}/platform-tools/adb" install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
-        "${ANDROID_HOME}/platform-tools/adb" shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
+        "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
+        "${ANDROID_HOME}"/platform-tools/adb shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
     - name: 'Check connectivity'
       run: |
-        timeout 30 "${ANDROID_HOME}/platform-tools/adb" logcat -e "received headers with status 301" -m 1 || {
+        timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat -e "received headers with status 301" -m 1 || {
             echo "Failed checking for headers in adb logcat" >&2
-            timeout 30 "${ANDROID_HOME}/platform-tools/adb" logcat || {
+            timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat || {
                 echo "Failed dumping adb logcat" >&2
             }
             exit 1
@@ -278,13 +278,13 @@ jobs:
             --define envoy_mobile_listener=enabled \
             --linkopt=-fuse-ld=lld \
             //test/kotlin/apps/experimental:hello_envoy_kt
-        "${ANDROID_HOME}/platform-tools/adb" install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
-        "${ANDROID_HOME}/platform-tools/adb" shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
+        "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
+        "${ANDROID_HOME}"/platform-tools/adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
     - name: 'Check connectivity'
       run: |
-        timeout 30 "${ANDROID_HOME}/platform-tools/adb" logcat -e "received headers with status 200" -m 1 || {
+        timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat -e "received headers with status 200" -m 1 || {
             echo "Failed checking for headers in adb logcat" >&2
-            timeout 30 "${ANDROID_HOME}/platform-tools/adb" logcat || {
+            timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat || {
                 echo "Failed dumping adb logcat" >&2
             }
             exit 1
