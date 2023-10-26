@@ -48,6 +48,18 @@ on:
       catch-errors:
         type: boolean
         default: false
+      error-match:
+        type: string
+        default: |
+          ERROR
+      warning-match:
+        type: string
+        default: |
+          WARNING
+      notice-match:
+        type: string
+        default: |
+          NOTICE
 
       diskspace_hack:
         type: boolean
@@ -162,13 +174,13 @@ jobs:
         managed: ${{ inputs.managed }}
         auth_bazel_rbe: ${{ inputs.auth_bazel_rbe }}
         bazel_extra: ${{ inputs.bazel_extra }}
-        bazel_local_cache: ${{ inputs.bazel_local_cache }}
-        bazel_rbe_cache: ${{ inputs.bazel_rbe_cache }}
-        bazel_rbe_instance: ${{ inputs.bazel_rbe_instance }}
         bazel_rbe_jobs: ${{ inputs.bazel_rbe_jobs }}
         command_prefix: ${{ inputs.command_prefix }}
         command_ci: ${{ inputs.command_ci }}
         catch-errors: ${{ inputs.catch-errors }}
+        error-match: ${{ inputs.error-match }}
+        notice-match: ${{ inputs.notice-match }}
+        warning-match: ${{ inputs.warning-match }}
         env: ${{ inputs.env }}
         GITHUB_TOKEN: ${{ steps.context.outputs.use_appauth == 'true' && steps.appauth.outputs.token || secrets.GITHUB_TOKEN }}
 
