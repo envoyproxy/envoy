@@ -5,12 +5,6 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: ratelimit
-  change: |
-    Ratelimit supports setting the HTTP status that is returned to the client when the ratelimit server
-    returns an error or cannot be reached with :ref:`status_on_error
-    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.status_on_error>`
-    configuration flag.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -29,5 +23,11 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: ratelimit
+  change: |
+    Ratelimit supports setting the HTTP status that is returned to the client when the ratelimit server
+    returns an error or cannot be reached with :ref:`status_on_error
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.status_on_error>`
+    configuration flag.
 
 deprecated:
