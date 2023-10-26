@@ -142,15 +142,15 @@ For example, to disable response compression for a particular virtual host, but 
       typed_per_filter_config:
         envoy.filters.http.compression:
           "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
-            disabled: true
+          disabled: true
       routes:
       - match: { prefix: "/static" }
         route: { cluster: some_service }
         typed_per_filter_config:
           envoy.filters.http.compression:
             "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
-          overrides:
-            response_direction_config:
+            overrides:
+              response_direction_config:
       - match: { prefix: "/" }
         route: { cluster: some_service }
 
