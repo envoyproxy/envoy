@@ -2293,5 +2293,16 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeader
   EXPECT_EQ("keep-alive", headers.get_("connection"));
 }
 
+// Remove connection keep- aliveheaders for http11 if retain_keepalive_header_http11 is false
+TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeaderHttp11) {
+  TestRequestHeaderMapImpl headers{{"connection", "keep-alive"}};
+  TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http11));
+  EXPECT_FALSE(headers.has("keep-alive"));
+}
+
 } // namespace Http
 } // namespace Envoy
