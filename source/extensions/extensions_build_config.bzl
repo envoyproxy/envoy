@@ -44,14 +44,6 @@ EXTENSIONS = {
     "envoy.config.validators.minimum_clusters_validator":     "//source/extensions/config/validators/minimum_clusters:config",
 
     #
-    # Credentials
-    #
-
-    "envoy.credentials.basic_auth":                     "//source/extensions/credentials/basic_auth:config",
-    "envoy.credentials.bearer_token":                   "//source/extensions/credentials/bearer_token:config",
-    "envoy.credentials.generic":                        "//source/extensions/credentials/generic:config",
-
-    #
     #
     # gRPC Credentials Plugins
     #
@@ -140,7 +132,6 @@ EXTENSIONS = {
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.composite":                     "//source/extensions/filters/http/composite:config",
     "envoy.filters.http.connect_grpc_bridge":           "//source/extensions/filters/http/connect_grpc_bridge:config",
-    "envoy.filters.http.credential_injector":           "//source/extensions/filters/http/credential_injector:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.custom_response":               "//source/extensions/filters/http/custom_response:factory",
     "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",

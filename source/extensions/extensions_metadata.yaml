@@ -171,27 +171,6 @@ envoy.config.validators.minimum_clusters_validator:
   status: stable
   type_urls:
   - envoy.extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator
-envoy.credentials.basic_auth:
-  categories:
-  - envoy.credentials
-  security_posture: unknown
-  status: alpha
-  type_urls:
-  - envoy.extensions.credentials.basic_auth.v3.BasicAuth
-envoy.credentials.bearer_token:
-  categories:
-  - envoy.credentials
-  security_posture: unknown
-  status: alpha
-  type_urls:
-  - envoy.extensions.credentials.bearer_token.v3.BearerToken
-envoy.credentials.generic:
-  categories:
-  - envoy.credentials
-  security_posture: unknown
-  status: alpha
-  type_urls:
-  - envoy.extensions.credentials.generic.v3.Generic
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
@@ -262,13 +241,6 @@ envoy.filters.http.cdn_loop:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
-envoy.filters.http.credential_injector:
-  categories:
-  - envoy.filters.http
-  security_posture: unknown
-  status: alpha
-  type_urls:
-  - envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
 envoy.filters.http.geoip:
   categories:
   - envoy.filters.http
