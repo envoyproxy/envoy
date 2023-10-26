@@ -58,7 +58,7 @@ jobs:
       contents: read
       packages: read
     name: java_helloworld
-    runs-on: custom
+    runs-on: mobile
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -117,7 +117,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_helloworld
-    runs-on: macos-12
+    runs-on: mobile
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -130,7 +130,7 @@ jobs:
     - name: 'Install dependencies'
       run: |
         cd mobile
-        ./ci/mac_ci_setup.sh --android
+        ./ci/linux_ci_setup.sh
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -146,7 +146,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci-macos \
+            --config=mobile-remote-ci \
             --fat_apk_cpu=x86_64 \
             //examples/kotlin/hello_world:hello_envoy_kt
         adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
@@ -170,7 +170,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_baseline_app
-    runs-on: macos-12
+    runs-on: mobile
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -183,7 +183,7 @@ jobs:
     - name: 'Install dependencies'
       run: |
         cd mobile
-        ./ci/mac_ci_setup.sh --android
+        ./ci/linux_ci_setup.sh
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -199,7 +199,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci-macos \
+            --config=mobile-remote-ci \
             --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/baseline:hello_envoy_kt
         adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
@@ -223,7 +223,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_experimental_app
-    runs-on: macos-12
+    runs-on: mobile
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -236,7 +236,7 @@ jobs:
     - name: 'Install dependencies'
       run: |
         cd mobile
-        ./ci/mac_ci_setup.sh --android
+        ./ci/linux_ci_setup.sh
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -252,7 +252,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci-macos \
+            --config=mobile-remote-ci \
             --fat_apk_cpu=x86_64 \
             --define envoy_mobile_listener=enabled \
             //test/kotlin/apps/experimental:hello_envoy_kt
