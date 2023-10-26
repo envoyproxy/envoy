@@ -1650,7 +1650,7 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
   EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 }
 
-TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeadersForH2) {
+TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
                                                    {"proxy-connection", "proxy-header"}};
@@ -2251,7 +2251,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHo
   EXPECT_EQ("80", headers.getForwardedPortValue());
 }
 
-TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersForHttp11) {
+TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersHttp11) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60, max=1000"},
                                                    {"proxy-connection", "proxy-header"}};
@@ -2266,7 +2266,7 @@ TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersForHttp1
   EXPECT_FALSE(response_headers.has("proxy-connection"));
 }
 
-TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyResponseHeadersForHttp11) {
+TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyResponseHeadersHttp11) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
