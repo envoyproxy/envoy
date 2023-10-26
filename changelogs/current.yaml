@@ -70,5 +70,11 @@ new_features:
     initial connection to the upstream cluster was attempted to when either the
     connection was successfully established or the filiter failed to initialize
     any connection to the upstream.
+- area: ratelimit
+  change: |
+    Ratelimit supports setting the HTTP status that is returned to the client when the ratelimit server
+    returns an error or cannot be reached with :ref:`status_on_error
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.status_on_error>`
+    configuration flag.
 
 deprecated:

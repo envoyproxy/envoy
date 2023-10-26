@@ -73,6 +73,13 @@ public:
   failure_mode_deny: true
   )EOF";
 
+  const std::string fail_close_with_custom_status_code_config_ = R"EOF(
+  domain: foo
+  failure_mode_deny: true
+  status_on_error:
+    code: 503
+  )EOF";
+
   const std::string enable_x_ratelimit_headers_config_ = R"EOF(
   domain: foo
   enable_x_ratelimit_headers: DRAFT_VERSION_03
@@ -473,12 +480,54 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError));
+
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
+      }));
+
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
                                nullptr, "", nullptr);
 
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_error_).value());
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_failure_mode_allowed_)
+                    .value());
+  EXPECT_EQ("rate_limiter_error", filter_callbacks_.details());
+}
+
+TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOffAndCustomStatusOn) {
+  setUpTest(fail_close_with_custom_status_code_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
   EXPECT_CALL(filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError))
-      .Times(0);
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError));
+
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
+      }));
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
+                               nullptr, "", nullptr);
 
   EXPECT_EQ(
       1U,
