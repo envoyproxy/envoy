@@ -44,7 +44,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-          --config=mobile-remote-ci \
+          --config=mobile-remote-release-clang \
           --fat_apk_cpu=x86_64 \
           --linkopt=-fuse-ld=lld \
           //:android_dist
