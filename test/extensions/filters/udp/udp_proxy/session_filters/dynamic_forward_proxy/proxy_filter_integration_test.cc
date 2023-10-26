@@ -35,22 +35,25 @@ public:
     uint32_t max_buffered_bytes_;
   };
 
-  void setup(std::string upsteam_host = "localhost", absl::optional<BufferConfig> buffer_config = absl::nullopt, uint32_t max_hosts = 1024,
+  void setup(std::string upsteam_host = "localhost",
+             absl::optional<BufferConfig> buffer_config = absl::nullopt, uint32_t max_hosts = 1024,
              uint32_t max_pending_requests = 1024) {
     setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
 
-    config_helper_.addConfigModifier([this, upsteam_host, buffer_config, max_hosts, max_pending_requests](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Switch predefined cluster_0 to CDS filesystem sourcing.
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()
-          ->mutable_cds_config()
-          ->mutable_path_config_source()
-          ->set_path(cds_helper_.cdsPath());
-      bootstrap.mutable_static_resources()->clear_clusters();
+    config_helper_.addConfigModifier(
+        [this, upsteam_host, buffer_config, max_hosts,
+         max_pending_requests](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          // Switch predefined cluster_0 to CDS filesystem sourcing.
+          bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
+          bootstrap.mutable_dynamic_resources()
+              ->mutable_cds_config()
+              ->mutable_path_config_source()
+              ->set_path(cds_helper_.cdsPath());
+          bootstrap.mutable_static_resources()->clear_clusters();
 
-      std::string filter_config = fmt::format(R"EOF(
+          std::string filter_config = fmt::format(
+              R"EOF(
 name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
@@ -79,25 +82,23 @@ typed_config:
         dns_cache_circuit_breaker:
           max_pending_requests: {}
 )EOF",
-                                              upsteam_host,
-                                              fake_upstreams_[0]->localAddress()->ip()->port(),
-                                              Network::Test::ipVersionToDnsFamily(GetParam()),
-                                              max_hosts, max_pending_requests);
+              upsteam_host, fake_upstreams_[0]->localAddress()->ip()->port(),
+              Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests);
 
-      if (buffer_config.has_value()) {
-        filter_config += fmt::format(R"EOF(
+          if (buffer_config.has_value()) {
+            filter_config += fmt::format(R"EOF(
       buffer_options:
         max_buffered_datagrams: {}
         max_buffered_bytes: {}
 )EOF",
-                                     buffer_config.value().max_buffered_datagrams_,
-                                     buffer_config.value().max_buffered_bytes_);
-      }
+                                         buffer_config.value().max_buffered_datagrams_,
+                                         buffer_config.value().max_buffered_bytes_);
+          }
 
-      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter = listener->add_listener_filters();
-      TestUtility::loadFromYaml(filter_config, *filter);
-    });
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* filter = listener->add_listener_filters();
+          TestUtility::loadFromYaml(filter_config, *filter);
+        });
 
     // Setup the initial CDS cluster.
     cluster_.mutable_connect_timeout()->CopyFrom(
