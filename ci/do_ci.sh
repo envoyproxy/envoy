@@ -278,7 +278,7 @@ case $CI_TARGET in
         ;&
 
     api.go)
-        if [[ -z "$NO_BUILD_SETUP" ]]; then
+        if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
             setup_clang_toolchain
         fi
         GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"

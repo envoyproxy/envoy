@@ -56,6 +56,7 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
+  export CLANG_TOOLCHAIN_SETUP=1
   ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
