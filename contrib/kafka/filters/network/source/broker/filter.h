@@ -109,6 +109,22 @@ private:
   RichResponseMetricsSharedPtr response_metrics_;
 };
 
+class ResponseRewriter : public ResponseCallback, private Logger::Loggable<Logger::Id::kafka> {
+public:
+  ResponseRewriter() = default;
+
+  // ResponseCallback
+  void onMessage(AbstractResponseSharedPtr response) override;
+  void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
+
+  void emit(Buffer::Instance& buffer);
+
+private:
+  std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
+};
+
+using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
+
 /**
  * Implementation of Kafka broker-level filter.
  * Uses two decoders - request and response ones, that are connected using Forwarder instance.
@@ -130,7 +146,12 @@ private:
  *            |                   v                       |
  *            |           +-------+-------+               |
  *            +---------->+ResponseDecoder+---------------+
- *                        +---------------+
+ *                        +-------+-------+
+ *                                |
+ *                                v
+ *                        +-------+--------+
+ *                        +ResponseRewriter+
+ *                        +----------------+
  */
 class KafkaBrokerFilter : public Network::Filter, private Logger::Loggable<Logger::Id::kafka> {
 public:
@@ -145,7 +166,9 @@ public:
   /**
    * Visible for testing.
    */
-  KafkaBrokerFilter(KafkaMetricsFacadeSharedPtr metrics, ResponseDecoderSharedPtr response_decoder,
+  KafkaBrokerFilter(KafkaMetricsFacadeSharedPtr metrics,
+                    ResponseRewriterSharedPtr response_rewriter,
+                    ResponseDecoderSharedPtr response_decoder,
                     RequestDecoderSharedPtr request_decoder);
 
   // Network::ReadFilter
@@ -167,6 +190,7 @@ private:
   KafkaBrokerFilter(const KafkaMetricsFacadeSharedPtr& metrics);
 
   const KafkaMetricsFacadeSharedPtr metrics_;
+  const ResponseRewriterSharedPtr response_rewriter_;
   const ResponseDecoderSharedPtr response_decoder_;
   const RequestDecoderSharedPtr request_decoder_;
 };

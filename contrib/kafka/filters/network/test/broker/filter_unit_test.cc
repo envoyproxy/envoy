@@ -32,6 +32,15 @@ public:
 
 using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
 
+class MockResponseRewriter : public ResponseRewriter {
+public:
+  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
+  MOCK_METHOD(void, emit, (Buffer::Instance&));
+};
+
+using MockResponseRewriterSharedPtr = std::shared_ptr<MockResponseRewriter>;
+
 class MockResponseDecoder : public ResponseDecoder {
 public:
   MockResponseDecoder() : ResponseDecoder{{}} {};
@@ -92,12 +101,13 @@ public:
 class KafkaBrokerFilterUnitTest : public testing::Test {
 protected:
   MockKafkaMetricsFacadeSharedPtr metrics_{std::make_shared<MockKafkaMetricsFacade>()};
+  MockResponseRewriterSharedPtr response_rewriter_{std::make_shared<MockResponseRewriter>()};
   MockResponseDecoderSharedPtr response_decoder_{std::make_shared<MockResponseDecoder>()};
   MockRequestDecoderSharedPtr request_decoder_{std::make_shared<MockRequestDecoder>()};
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 
-  KafkaBrokerFilter testee_{metrics_, response_decoder_, request_decoder_};
+  KafkaBrokerFilter testee_{metrics_, response_rewriter_, response_decoder_, request_decoder_};
 
   void initialize() {
     testee_.initializeReadFilterCallbacks(filter_callbacks_);
