@@ -84,7 +84,7 @@ public:
   void resetStream();
   void setupPerTryTimeout();
   void maybeEndDecode(bool end_stream);
-  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host, bool pool_success);
 
   // Http::StreamDecoder
   void decodeData(Buffer::Instance& data, bool end_stream) override;

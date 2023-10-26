@@ -43,13 +43,13 @@ jobs:
     steps:
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.0.32
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.0.35
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         app_key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: version
       name: Shorten (possible) SHA
-      uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.0.32
+      uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.0.35
       with:
         string: ${{ inputs.version }}
         length: 7
@@ -64,13 +64,13 @@ jobs:
         TARGET: ${{ inputs.task == 'bazel' && 'update' || 'api-update' }}
         TASK: ${{ inputs.task == 'bazel' && 'bazel' || 'api/bazel' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.0.32
+    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.0.35
       name: Upload diff
       with:
         name: ${{ inputs.dependency }}-${{ steps.version.outputs.string }}
     - name: Create a PR
       if: ${{ inputs.pr }}
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.32
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.35
       with:
         base: main
         body: |
@@ -97,7 +97,7 @@ jobs:
     steps:
     - name: Fetch token for app auth
       id: appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.32
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.0.35
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
@@ -137,7 +137,7 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.0.32
+      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.0.35
       with:
         images: |
            sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
@@ -166,7 +166,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.32
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.0.35
       with:
         base: main
         body: Created by Envoy dependency bot

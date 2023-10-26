@@ -1331,9 +1331,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                    enable_platform_certificates_validation, runtime_guards, node_id, node_region,
                    node_zone, node_sub_zone, serialized_node_metadata, builder);
 
-#ifdef ENVOY_GOOGLE_GRPC
   std::string native_xds_address = getCppString(env, xds_address);
   if (!native_xds_address.empty()) {
+#ifdef ENVOY_GOOGLE_GRPC
     Envoy::Platform::XdsBuilder xds_builder(std::move(native_xds_address), xds_port);
     std::string native_xds_auth_header = getCppString(env, xds_auth_header);
     if (!native_xds_auth_header.empty()) {
@@ -1362,8 +1362,12 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                                              cds_timeout_seconds);
     }
     builder.setXds(std::move(xds_builder));
-  }
+#else
+    throwException(env, "java/lang/UnsupportedOperationException",
+                   "This library does not support xDS. Please use "
+                   "io.envoyproxy.envoymobile:envoy-xds instead.");
 #endif
+  }
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

@@ -116,7 +116,7 @@ jobs:
     needs:
     - publish
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.32
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.35
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
