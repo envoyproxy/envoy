@@ -5,6 +5,7 @@ on:
     secrets:
       app_id:
       app_key:
+      rbe-key:
     inputs:
       target:
         required: true
@@ -17,6 +18,18 @@ on:
         default: true
       runs-on:
         default: ubuntu-22.04
+        type: string
+      run-du:
+        default: true
+        type: boolean
+      temp-dir:
+        default:
+        type: string
+      upload-name:
+        default:
+        type: string
+      upload-path:
+        default:
         type: string
       auth_bazel_rbe:
         type: string
@@ -159,7 +172,7 @@ jobs:
         uses: ${{ inputs.run_pre }}
         with: ${{ inputs.run_pre_with }}
 
-    - uses: envoyproxy/toolshed/gh-actions/github/run@5a3993152f00cc3f7c364d97b2a339fff606b0fc
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.1
       name: 'Run CI target ${{ inputs.target }}'
       with:
         catch-errors: ${{ inputs.catch-errors }}
@@ -174,7 +187,7 @@ jobs:
         GITHUB_TOKEN: ${{ steps.checkout.outputs.token != '' && steps.checkout.outputs.token || secrets.GITHUB_TOKEN }}
         ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
         ENVOY_RBE: ${{ inputs.rbe != 'false' && 1 || '' }}
-        GCP_SERVICE_ACCOUNT_KEY: ${{ inputs.rbe && inputs.auth_bazel_rbe || '' }}
+        RBE_KEY: ${{ secrets.rbe-key }}
         BAZEL_BUILD_EXTRA_OPTIONS: >-
           --config=remote-ci
           ${{ inputs.bazel_extra }}
@@ -193,6 +206,14 @@ jobs:
         echo "disk space at end of build:"
         df -h
         echo
-        du -ch "${{ runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G"
+        if [[ "${{ inputs.run-du }}" != "false" ]]; then
+            du -ch "${{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G"
+        fi
       name: "Check disk space at end"
       shell: bash
+
+    - uses: actions/upload-artifact@v3
+      if: ${{ inputs.upload-name && inputs.upload-path }}
+      with:
+        name: ${{ inputs.upload-name }}
+        path: ${{ inputs.upload-path }}
