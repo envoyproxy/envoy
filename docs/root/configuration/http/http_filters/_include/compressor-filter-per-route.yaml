@@ -1,0 +1,19 @@
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      typed_per_filter_config:
+        envoy.filters.http.compression:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+          disabled: true
+      routes:
+      - match: { prefix: "/static" }
+        route: { cluster: some_service }
+        typed_per_filter_config:
+          envoy.filters.http.compression:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+            overrides:
+              response_direction_config:
+      - match: { prefix: "/" }
+        route: { cluster: some_service }
