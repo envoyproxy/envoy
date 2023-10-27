@@ -44,7 +44,7 @@ jobs:
       run: |
         cd mobile
         ./bazelw build \
-          --config=mobile-remote-ci \
+          --config=mobile-remote-release-clang \
           --fat_apk_cpu=x86_64 \
           --linkopt=-fuse-ld=lld \
           //:android_dist
@@ -58,7 +58,7 @@ jobs:
       contents: read
       packages: read
     name: java_helloworld
-    runs-on: macos-12
+    runs-on: envoy-x64-small
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -68,10 +68,16 @@ jobs:
         java-package: jdk
         architecture: x64
         distribution: zulu
-    - run: |
+    - name: 'Install dependencies'
+      run: |
         cd mobile
-        ./ci/mac_ci_setup.sh --android
-      name: 'Install dependencies'
+        ./ci/linux_ci_setup.sh
+    # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
+    - name: Enable KVM group permissions
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -81,22 +87,23 @@ jobs:
     # Return to using:
     #   cd mobile && ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
     # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
-    - name: 'Start java app'
+    - name: 'Start Java app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci-macos \
+            --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
+            --linkopt=-fuse-ld=lld \
             //examples/java/hello_world:hello_envoy
-        adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
-        adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
+        "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
+        "${ANDROID_HOME}"/platform-tools/adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
     - name: 'Check connectivity'
       run: |
-        timeout 30 adb logcat -e "received headers with status 301" -m 1 || {
+        timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat -e "received headers with status 301" -m 1 || {
             echo "Failed checking for headers in adb logcat" >&2
-            timeout 30 adb logcat || {
+            timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat || {
                 echo "Failed dumping adb logcat" >&2
             }
             exit 1
@@ -111,7 +118,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_helloworld
-    runs-on: macos-12
+    runs-on: envoy-x64-small
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -124,7 +131,13 @@ jobs:
     - name: 'Install dependencies'
       run: |
         cd mobile
-        ./ci/mac_ci_setup.sh --android
+        ./ci/linux_ci_setup.sh
+    # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
+    - name: Enable KVM group permissions
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -134,22 +147,23 @@ jobs:
     # Return to using:
     #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
     # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
-    - name: 'Start kotlin app'
+    - name: 'Start Kotlin app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci-macos \
+            --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
+            --linkopt=-fuse-ld=lld \
             //examples/kotlin/hello_world:hello_envoy_kt
-        adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
-        adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
+        "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
+        "${ANDROID_HOME}"/platform-tools/adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
     - name: 'Check connectivity'
       run: |
-        timeout 30 adb logcat -e "received headers with status 200" -m 1 || {
+        timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat -e "received headers with status 200" -m 1 || {
             echo "Failed checking for headers in adb logcat" >&2
-            timeout 30 adb logcat || {
+            timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat || {
                 echo "Failed dumping adb logcat" >&2
             }
             exit 1
@@ -164,7 +178,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_baseline_app
-    runs-on: macos-12
+    runs-on: envoy-x64-small
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -177,7 +191,13 @@ jobs:
     - name: 'Install dependencies'
       run: |
         cd mobile
-        ./ci/mac_ci_setup.sh --android
+        ./ci/linux_ci_setup.sh
+    # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
+    - name: Enable KVM group permissions
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -187,22 +207,23 @@ jobs:
     # Return to using:
     #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
     # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
-    - name: 'Start kotlin app'
+    - name: 'Start Kotlin app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci-macos \
+            --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
+            --linkopt=-fuse-ld=lld \
             //test/kotlin/apps/baseline:hello_envoy_kt
-        adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
-        adb shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
+        "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
+        "${ANDROID_HOME}"/platform-tools/adb shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
     - name: 'Check connectivity'
       run: |
-        timeout 30 adb logcat -e "received headers with status 301" -m 1 || {
+        timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat -e "received headers with status 301" -m 1 || {
             echo "Failed checking for headers in adb logcat" >&2
-            timeout 30 adb logcat || {
+            timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat || {
                 echo "Failed dumping adb logcat" >&2
             }
             exit 1
@@ -217,7 +238,7 @@ jobs:
       contents: read
       packages: read
     name: kotlin_experimental_app
-    runs-on: macos-12
+    runs-on: envoy-x64-small
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
@@ -230,7 +251,13 @@ jobs:
     - name: 'Install dependencies'
       run: |
         cd mobile
-        ./ci/mac_ci_setup.sh --android
+        ./ci/linux_ci_setup.sh
+    # https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/
+    - name: Enable KVM group permissions
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -240,23 +267,24 @@ jobs:
     # Return to using:
     #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
     # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
-    - name: 'Start kotlin app'
+    - name: 'Start Kotlin app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile
         ./bazelw build \
-            --config=mobile-remote-ci-macos \
+            --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
             --define envoy_mobile_listener=enabled \
+            --linkopt=-fuse-ld=lld \
             //test/kotlin/apps/experimental:hello_envoy_kt
-        adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
-        adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
+        "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
+        "${ANDROID_HOME}"/platform-tools/adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
     - name: 'Check connectivity'
       run: |
-        timeout 30 adb logcat -e "received headers with status 200" -m 1 || {
+        timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat -e "received headers with status 200" -m 1 || {
             echo "Failed checking for headers in adb logcat" >&2
-            timeout 30 adb logcat || {
+            timeout 30 "${ANDROID_HOME}"/platform-tools/adb logcat || {
                 echo "Failed dumping adb logcat" >&2
             }
             exit 1
