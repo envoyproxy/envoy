@@ -111,7 +111,7 @@ message ExtAuthz {
   // ext_authz service. :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
   // is passed as an ``protobuf::Any``.
   //
-  // Please note that this field exclusively applies to the gRPC ExtAuthZ service and has no effect on the HTTP service.
+  // Please note that this field exclusively applies to the gRPC ext_authz service and has no effect on the HTTP service.
   //
   // It works in a way similar to ``metadata_context_namespaces`` but allows Envoy and ext_authz server to share
   // the protobuf message definition in order to do a safe parsing.
