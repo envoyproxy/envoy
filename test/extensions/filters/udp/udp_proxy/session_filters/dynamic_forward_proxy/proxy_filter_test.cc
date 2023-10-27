@@ -344,7 +344,6 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithContinueFilterChainFailure) 
   filter_->onLoadDnsCacheComplete(nullptr);
 
   EXPECT_CALL(*handle, onDestroy());
-  EXPECT_FALSE(filter_config_->bufferEnabled());
 }
 
 } // namespace

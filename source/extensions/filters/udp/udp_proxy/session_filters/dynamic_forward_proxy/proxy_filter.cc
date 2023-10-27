@@ -118,12 +118,14 @@ void ProxyFilter::onLoadDnsCacheComplete(
 
   load_dns_cache_completed_ = true;
 
-  if (read_callbacks_->continueFilterChain()) {
-    while (!datagrams_buffer_.empty()) {
-      BufferedDatagramPtr buffered_datagram = std::move(datagrams_buffer_.front());
-      datagrams_buffer_.pop();
-      read_callbacks_->injectDatagramToFilterChain(*buffered_datagram);
-    }
+  if (!read_callbacks_->continueFilterChain()) {
+    return;
+  }
+
+  while (!datagrams_buffer_.empty()) {
+    BufferedDatagramPtr buffered_datagram = std::move(datagrams_buffer_.front());
+    datagrams_buffer_.pop();
+    read_callbacks_->injectDatagramToFilterChain(*buffered_datagram);
   }
 
   config_->disableBuffer();
