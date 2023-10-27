@@ -8,7 +8,7 @@ command -v bazelisk &> /dev/null || bazel_or_isk=bazel
 [[ -z "${EXCLUDE_CONTRIB}" ]] || opts="--exclude_contrib"
 
 # Setting TEST_TMPDIR here so the compdb headers won't be overwritten by another bazel run
-TEST_TMPDIR=${BUILD_DIR:-/tmp}/envoy-compdb tools/gen_compilation_database.py --vscode --bazel=$bazel_or_isk ${opts}
+TEST_TMPDIR=${BUILD_DIR:-/tmp}/envoy-compdb tools/gen_compilation_database.py --vscode --bazel=$bazel_or_isk "${opts}"
 
 # Kill clangd to reload the compilation database
 pkill clangd || :
