@@ -229,12 +229,11 @@ public:
     return session;
   }
 
-  IntegrationCodecClientPtr makeRawHttpConnection(
-      Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
-    ENVOY_LOG(debug, "Creating a new client {}",
-              conn->connectionInfoProvider().localAddress()->asStringView());
-    return makeRawHttp3Connection(std::move(conn), http2_options, true);
+  IntegrationCodecClientPtr
+  makeRawHttpConnection(Network::ClientConnectionPtr&& conn,
+                        absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+                        bool wait_till_connected = true) override {
+    return makeRawHttp3Connection(std::move(conn), http2_options, wait_till_connected);
   }
 
   // Create Http3 codec client with the option not to wait for 1-RTT key establishment.
@@ -242,6 +241,8 @@ public:
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
       bool wait_for_1rtt_key) {
+    ENVOY_LOG(debug, "Creating a new client {}",
+              conn->connectionInfoProvider().localAddress()->asStringView());
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     cluster->max_response_headers_count_ = 200;
     if (http2_options.has_value()) {

@@ -171,6 +171,8 @@ public:
     max_headers_count_ = max_headers_count;
   }
 
+  bool extend_filter_manager_lifetime() const { return extend_filter_manager_lifetime_; }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
@@ -209,6 +211,8 @@ private:
 
   // ConnectionManagerImpl should always be the last filter. Its onRead() is only called once to
   // trigger ReadFilter::onNewConnection() and the rest incoming data bypasses these filters.
+  // Its filter have the same life time as this connection. If the connection gets defer-deleted,
+  // they will be defer-deleted together.
   std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
@@ -222,6 +226,7 @@ private:
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
   absl::optional<Network::ConnectionCloseType> close_type_during_initialize_;
+  bool extend_filter_manager_lifetime_{false};
 };
 
 } // namespace Quic
