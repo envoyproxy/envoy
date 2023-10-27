@@ -57,7 +57,7 @@ TEST(HostUtilityTest, All) {
 #undef SET_HEALTH_FLAG
   EXPECT_EQ("/failed_active_hc/failed_outlier_check/failed_eds_health/degraded_active_hc/"
             "degraded_eds_health/pending_dynamic_removal/pending_active_hc/"
-            "excluded_via_immediate_hc_fail/active_hc_timeout",
+            "excluded_via_immediate_hc_fail/active_hc_timeout/draining_eds_health",
             HostUtility::healthFlagsToString(*host));
 }
 

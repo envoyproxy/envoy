@@ -150,7 +150,7 @@ public:
   m(EXCLUDED_VIA_IMMEDIATE_HC_FAIL, 0x80)                                        \
   /* The host failed active HC due to timeout. */                                \
   m(ACTIVE_HC_TIMEOUT, 0x100)                                                    \
-  /* The host if currently marked as draining by EDS */                          \
+  /* The host is currently marked as draining by EDS */                          \
   m(DRAINING_EDS_HEALTH, 0x200)
   // clang-format on
 
