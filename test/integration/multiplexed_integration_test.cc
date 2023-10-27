@@ -2159,11 +2159,6 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   // Check access log if the agnostic stream lifetime is not extended.
   // It should have access logged since it has received the entire response.
   int hcm_logged_wire_bytes_sent, hcm_logged_wire_header_bytes_sent;
-  if (!Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
-    hcm_logged_wire_bytes_sent = access_log_values[0];
-    hcm_logged_wire_header_bytes_sent = access_log_values[1];
-  }
 
   // Grant the sender (Envoy) additional window so it can finish sending the
   // stream.
@@ -2181,13 +2176,11 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   EXPECT_EQ(accumulator.bodyWireBytesReceivedDiscountingHeaders(),
             accumulator.bodyWireBytesReceivedGivenPayloadAndFrames());
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    // Access logs are only available now due to the expanded agnostic stream
-    // lifetime.
-    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
-    hcm_logged_wire_bytes_sent = access_log_values[0];
-    hcm_logged_wire_header_bytes_sent = access_log_values[1];
-  }
+  // Access logs are only available now due to the expanded agnostic stream
+  // lifetime.
+  auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
+  hcm_logged_wire_bytes_sent = access_log_values[0];
+  hcm_logged_wire_header_bytes_sent = access_log_values[1];
   EXPECT_EQ(accumulator.stream_wire_header_bytes_recieved_, hcm_logged_wire_header_bytes_sent);
   EXPECT_EQ(accumulator.stream_wire_bytes_recieved_, hcm_logged_wire_bytes_sent)
       << "Received " << accumulator.stream_wire_bytes_recieved_
@@ -2471,7 +2464,7 @@ TEST_P(Http2FrameIntegrationTest, ResettingDeferredRequestsTriggersPrematureRese
 TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   // Use large number of requests to ensure close is detected while there are
   // still some deferred streams.
-  const int kRequestsSentPerIOCycle = 1000;
+  const int kRequestsSentPerIOCycle = 20000;
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   // Ensure premature reset detection does not get in the way
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count", "1001");
@@ -2479,8 +2472,7 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
 
   std::string buffer;
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
-    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "a", "/",
-                                           {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "a", "/");
     absl::StrAppend(&buffer, std::string(request));
   }
 
@@ -2489,8 +2481,9 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   // Drop the downstream connection
   tcp_client_->close();
   // Test that Envoy can clean-up deferred streams
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset",
-                                 kRequestsSentPerIOCycle);
+  // Make the timeout longer to accommodate non optimized builds
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", kRequestsSentPerIOCycle,
+                                 TestUtility::DefaultTimeout * 3);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,

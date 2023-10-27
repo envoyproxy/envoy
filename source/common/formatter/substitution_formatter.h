@@ -106,7 +106,7 @@ public:
       std::smatch m;
       const std::string search_space = std::string(format.substr(pos));
       if (!std::regex_search(search_space, m, command_w_args_regex)) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
                         format, pos));
       }
@@ -121,7 +121,7 @@ public:
       if (m.str(3).length() != 0) {
         size_t length_value;
         if (!absl::SimpleAtoi(m.str(3), &length_value)) {
-          throw EnvoyException(absl::StrCat("Length must be an integer, given: ", m.str(3)));
+          throwEnvoyExceptionOrPanic(absl::StrCat("Length must be an integer, given: ", m.str(3)));
         }
         max_length = length_value;
       }
@@ -317,7 +317,7 @@ private:
           output->emplace(pair.first, toFormatNumberValue(pair.second.number_value()));
           break;
         default:
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -346,7 +346,7 @@ private:
           break;
 
         default:
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }

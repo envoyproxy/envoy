@@ -222,6 +222,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.udp.session.http_capsule":           "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
+    "envoy.filters.udp.session.dynamic_forward_proxy":  "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:config",
 
     #
     # Resource monitors
@@ -263,6 +264,12 @@ EXTENSIONS = {
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
     "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
+
+    #
+    # OpenTelemetry Resource Detectors
+    #
+
+    "envoy.tracers.opentelemetry.resource_detectors.environment":         "//source/extensions/tracers/opentelemetry/resource_detectors/environment:config",
 
     #
     # Transport sockets

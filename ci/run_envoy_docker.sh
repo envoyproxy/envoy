@@ -91,7 +91,7 @@ VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
     -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
 
-if ! is_windows && [[ -n "$ENVOY_DOCKER_IN_DOCKER" || -n "$ENVOY_SHARED_TMP_DIR" ]]; then
+if [[ -n "$ENVOY_DOCKER_IN_DOCKER" || -n "$ENVOY_SHARED_TMP_DIR" ]]; then
     # Create a "shared" directory that has the same path in/outside the container
     # This allows the host docker engine to see artefacts using a temporary path created inside the container,
     # at the same path.
@@ -126,6 +126,7 @@ docker run --rm \
        -e CI_TARGET_BRANCH \
        -e DOCKERHUB_USERNAME \
        -e DOCKERHUB_PASSWORD \
+       -e ENVOY_DOCKER_SAVE_IMAGE \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
        -e BAZEL_REMOTE_INSTANCE \

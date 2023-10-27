@@ -54,8 +54,8 @@ public:
     TestReadFilter(IntegrationTest& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      parent_.response_decoder_->decode(data);
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+      parent_.client_codec_->decode(data, end_stream);
       return Network::FilterStatus::Continue;
     }
     Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
@@ -65,19 +65,19 @@ public:
   };
   using TestReadFilterSharedPtr = std::shared_ptr<TestReadFilter>;
 
-  struct TestRequestEncoderCallback : public RequestEncoderCallback {
+  struct TestRequestEncoderCallback : public EncodingCallbacks {
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
     Buffer::OwnedImpl buffer_;
   };
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
 
-  struct TestResponseEncoderCallback : public ResponseEncoderCallback {
+  struct TestResponseEncoderCallback : public EncodingCallbacks {
     void onEncodingSuccess(Buffer::Instance& buffer, bool) override { buffer_.move(buffer); }
     Buffer::OwnedImpl buffer_;
   };
   using TestResponseEncoderCallbackSharedPtr = std::shared_ptr<TestResponseEncoderCallback>;
 
-  struct TestResponseDecoderCallback : public ResponseDecoderCallback {
+  struct TestResponseDecoderCallback : public ClientCodecCallbacks {
     TestResponseDecoderCallback(IntegrationTest& parent) : parent_(parent) {}
 
     struct SingleResponse {
@@ -125,19 +125,21 @@ public:
     integration_ = std::make_unique<GenericProxyIntegrationTest>(config_yaml);
     integration_->initialize();
 
-    // Create codec for downstream client.
+    // Create codec for downstream client to encode request and decode response.
     codec_factory_ = std::move(codec_factory);
-    request_encoder_ = codec_factory_->requestEncoder();
-    response_decoder_ = codec_factory_->responseDecoder();
-    response_encoder_ = codec_factory_->responseEncoder();
+    client_codec_ = codec_factory_->createClientCodec();
+
     request_encoder_callback_ = std::make_shared<TestRequestEncoderCallback>();
     response_decoder_callback_ = std::make_shared<TestResponseDecoderCallback>(*this);
+    client_codec_->setCodecCallbacks(*response_decoder_callback_);
+
+    // Helper codec for upstream server to encode response.
+    server_codec_ = codec_factory_->createServerCodec();
     response_encoder_callback_ = std::make_shared<TestResponseEncoderCallback>();
-    response_decoder_->setDecoderCallback(*response_decoder_callback_);
   }
 
-  std::string defaultConfig() {
-    return absl::StrCat(ConfigHelper::baseConfig(false), R"EOF(
+  std::string defaultConfig(bool bind_upstream_connection = false) {
+    return absl::StrCat(ConfigHelper::baseConfig(false), fmt::format(R"EOF(
     filter_chains:
       filters:
         name: meta
@@ -148,12 +150,13 @@ public:
           - name: envoy.filters.generic.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.router.v3.Router
+              bind_upstream_connection: {}
           codec_config:
             name: fake
             typed_config:
               "@type": type.googleapis.com/xds.type.v3.TypedStruct
               type_url: envoy.generic_proxy.codecs.fake.type
-              value: {}
+              value: {{}}
           route_config:
             name: test-routes
             virtual_hosts:
@@ -187,7 +190,8 @@ public:
                                   typed_config:
                                     "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
                                     cluster: cluster_0
-)EOF");
+)EOF",
+                                                                     bind_upstream_connection));
   }
 
   // Create client connection.
@@ -205,7 +209,7 @@ public:
 
   // Send downstream request.
   void sendRequestForTest(StreamFrame& request) {
-    request_encoder_->encode(request, *request_encoder_callback_);
+    client_codec_->encode(request, *request_encoder_callback_);
     client_connection_->write(request_encoder_callback_->buffer_, false);
     client_connection_->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
     // Clear buffer for next encoding.
@@ -228,7 +232,7 @@ public:
 
   // Send upstream response.
   void sendResponseForTest(const StreamFrame& response) {
-    response_encoder_->encode(response, *response_encoder_callback_);
+    server_codec_->encode(response, *response_encoder_callback_);
 
     auto result =
         upstream_connection_->write(response_encoder_callback_->buffer_.toString(), false);
@@ -278,9 +282,9 @@ public:
 
   // Codec.
   CodecFactoryPtr codec_factory_;
-  RequestEncoderPtr request_encoder_;
-  ResponseDecoderPtr response_decoder_;
-  ResponseEncoderPtr response_encoder_;
+  ServerCodecPtr server_codec_;
+  ClientCodecPtr client_codec_;
+
   TestRequestEncoderCallbackSharedPtr request_encoder_callback_;
   TestResponseDecoderCallbackSharedPtr response_decoder_callback_;
   TestResponseEncoderCallbackSharedPtr response_encoder_callback_;
@@ -375,13 +379,11 @@ TEST_P(IntegrationTest, RequestAndResponse) {
 
 TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
   FakeStreamCodecFactoryConfig codec_factory_config;
-  codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
   auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
-  codec_factory->protocol_options_ = ProtocolOptions{true};
 
-  initialize(defaultConfig(), std::move(codec_factory));
+  initialize(defaultConfig(true), std::move(codec_factory));
 
   EXPECT_TRUE(makeClientConnectionForTest());
 
@@ -418,13 +420,11 @@ TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
 
 TEST_P(IntegrationTest, MultipleRequests) {
   FakeStreamCodecFactoryConfig codec_factory_config;
-  codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
   auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
-  codec_factory->protocol_options_ = ProtocolOptions{true};
 
-  initialize(defaultConfig(), std::move(codec_factory));
+  initialize(defaultConfig(true), std::move(codec_factory));
 
   EXPECT_TRUE(makeClientConnectionForTest());
 
@@ -499,13 +499,11 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
 TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   FakeStreamCodecFactoryConfig codec_factory_config;
-  codec_factory_config.protocol_options_ = ProtocolOptions{true};
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
   auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
-  codec_factory->protocol_options_ = ProtocolOptions{true};
 
-  initialize(defaultConfig(), std::move(codec_factory));
+  initialize(defaultConfig(true), std::move(codec_factory));
 
   EXPECT_TRUE(makeClientConnectionForTest());
 

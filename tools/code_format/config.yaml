@@ -104,7 +104,7 @@ paths:
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
-    - source/common/network/io_socket_handle_impl.cc
+    - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
     - source/common/network/cidr_range.cc
     - source/common/network/utility.cc

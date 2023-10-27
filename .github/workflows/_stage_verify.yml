@@ -51,3 +51,4 @@ jobs:
       env: ${{ matrix.env }}
       trusted: ${{ inputs.trusted }}
       repo_ref: ${{ inputs.repo_ref }}
+      runs-on: envoy-x64-small

@@ -136,6 +136,7 @@ categories:
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
 - envoy.router.cluster_specifier_plugin
+- envoy.tracers.opentelemetry.resource_detectors
 
 status_values:
 - name: stable
