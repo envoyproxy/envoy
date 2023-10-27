@@ -62,6 +62,9 @@ static_resources:
                   window_bits: 15
                   compression_level: BEST_SPEED
                   compression_strategy: DEFAULT_STRATEGY
+          - name: envoy.filters.http.router
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: service
     type: STRICT_DNS
