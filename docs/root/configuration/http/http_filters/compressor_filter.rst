@@ -26,10 +26,11 @@ compression only. Other compression libraries can be supported as extensions.
 
 An example configuration of the filter may look like the following:
 
-.. literalinclude:: _include/compressor-filter-request-response.yaml
+.. literalinclude:: _include/compressor-filter.yaml
     :language: yaml
     :linenos:
-    :caption: :download:`compressor-filter-request-response.yaml <_include/compressor-filter-request-response.yaml>`
+    :lines: 33-56
+    :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
 
 By *default* request compression is disabled, but when enabled it will be *skipped* if:
 
@@ -113,6 +114,7 @@ For example, to disable response compression for a particular virtual host, but 
 .. literalinclude:: _include/compressor-filter-per-route.yaml
     :language: yaml
     :linenos:
+    :lines: 14-32
     :caption: :download:`compressor-filter-per-route.yaml <_include/compressor-filter-per-route.yaml>`
 
 Using different compressors for requests and responses
@@ -124,6 +126,7 @@ multiple compressor filters enabled only for requests or responses. For instance
 .. literalinclude:: _include/compressor-filter-request-response.yaml
     :language: yaml
     :linenos:
+    :lines: 25-64
     :caption: :download:`compressor-filter-request-response.yaml <_include/compressor-filter-request-response.yaml>`
 
 .. _compressor-statistics:
