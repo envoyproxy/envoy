@@ -57,11 +57,10 @@ The following list of filter state objects are consumed by Envoy extensions:
   per-connection bases. Accepts values "true" and "false".
 
 ``envoy.filters.network.http_connection_manager.local_reply_owner``
-  Shared filter status for logging which filter in the HTTP filter chain sent the local reply.
-  Fields:
+  Shared filter status for logging which filter in the HTTP filter chain sent the local reply. Fields:
 
   * ``filter_config_name``: filter configuration name in the HTTP filter chain;
-  * ``details``: local replay details.
+
 
 Filter state object fields
 --------------------------
