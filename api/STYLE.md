@@ -162,7 +162,7 @@ To add an extension config to the API, the steps below should be followed:
    [source/extensions/extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl) or [contrib/contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
    to include the new extension.
 1. If the extension is not hidden, find or create a docs file with a toctree
-   and to reference your proto to make sure users can navigate to it from the API docs
+   and reference your proto to make sure users can navigate to it from the API docs
    (and to not break the docs build), like [docs/root/api-v3/admin/admin.rst](../docs/root/api-v3/admin/admin.rst).
 1. Run `./tools/proto_format/proto_format.sh fix`. **Before running the script**, you will need to **commit your local changes**. By adding the commit, the tool will recognize the change, and will regenerate the `BUILD` file and reformat `foobar.proto` as needed. If you have not followed any of the above steps correctly `proto_format.sh` may remove some of the files that you added. If that is the case you can revert to the committed state, and try again once any issues are resolved.
 1. See the [key-value-store PR](https://github.com/envoyproxy/envoy/pull/17745/files) for an example of adding a new extension point to common.

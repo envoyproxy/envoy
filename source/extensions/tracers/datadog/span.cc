@@ -41,7 +41,9 @@ void Span::setOperation(absl::string_view operation) {
     return;
   }
 
-  span_->set_name(operation);
+  // What Envoy calls the operation name more closely corresponds to what
+  // Datadog calls the resource name.
+  span_->set_resource_name(operation);
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
@@ -49,7 +51,17 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
     return;
   }
 
-  span_->set_tag(name, value);
+  // The special "resource.name" tag is a holdover from when the Datadog tracer
+  // was OpenTracing-based, and so there was no way to set the Datadog resource
+  // name directly.
+  // In Envoy, it's still the case that there's no way to set the Datadog
+  // resource name directly; so, here if the tag name is "resource.name", we
+  // actually set the resource name instead of setting a tag.
+  if (name == "resource.name") {
+    span_->set_resource_name(value);
+  } else {
+    span_->set_tag(name, value);
+  }
 }
 
 void Span::log(SystemTime, const std::string&) {

@@ -137,7 +137,9 @@ envoy_entry_point(
     args = [
         "release",
         PATH,
+        "--release-message-path=$(location @envoy//changelogs:summary)",
     ],
+    data = ["@envoy//changelogs:summary"],
     pkg = "envoy.base.utils",
     script = "envoy.project",
     init_data = [":__init__.py"],
@@ -339,7 +341,12 @@ def envoy_dependencies(skip_targets = []):
         patches = ["@envoy//bazel:rules_pkg.patch"],
     )
     external_http_archive("com_github_aignas_rules_shellcheck")
-    external_http_archive("aspect_bazel_lib")
+    external_http_archive(
+        "aspect_bazel_lib",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:aspect.patch"],
+    )
+
     _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
@@ -476,6 +483,10 @@ def _com_github_gabime_spdlog():
 def _com_github_google_benchmark():
     external_http_archive(
         name = "com_github_google_benchmark",
+    )
+    external_http_archive(
+        name = "libpfm",
+        build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
     )
     native.bind(
         name = "benchmark",
@@ -1386,22 +1397,6 @@ def _rules_ruby():
 
 def _foreign_cc_dependencies():
     external_http_archive("rules_foreign_cc")
-
-def _is_linux(ctxt):
-    return ctxt.os.name == "linux"
-
-def _is_arch(ctxt, arch):
-    res = ctxt.execute(["uname", "-m"])
-    return arch in res.stdout
-
-def _is_linux_ppc(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "ppc")
-
-def _is_linux_s390x(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "s390x")
-
-def _is_linux_x86_64(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(
