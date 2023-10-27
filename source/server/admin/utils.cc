@@ -45,26 +45,6 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
   }
   return absl::OkStatus();
 }
-// Helper method to get the histogram_mode parameter. Returns an error if histogram_mode query
-// param is found and the value is not "histogram", "summary", or "none".
-absl::Status histogramModeParam(const Http::Utility::QueryParams& params,
-                                HistogramMode& histogram_mode) {
-  absl::optional<std::string> histogram_emit_mode_query_param =
-      queryParam(params, "histogram_emit_mode");
-  histogram_mode = Utility::HistogramMode::Histogram;
-  if (histogram_emit_mode_query_param.has_value()) {
-    if (histogram_emit_mode_query_param.value() == "histogram") {
-      histogram_mode = HistogramMode::Histogram;
-    } else if (histogram_emit_mode_query_param.value() == "summary") {
-      histogram_mode = HistogramMode::Summary;
-    } else if (histogram_emit_mode_query_param.value() == "none") {
-      histogram_mode = HistogramMode::None;
-    } else {
-      return absl::InvalidArgumentError("usage: /stats?histogram_mode=(histogram|summary|none)\n");
-    }
-  }
-  return absl::OkStatus();
-}
 
 // Helper method to get the format parameter.
 absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {

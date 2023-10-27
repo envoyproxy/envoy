@@ -770,11 +770,11 @@ modify different aspects of the server:
     Text readout stats create a new label value every time the value
     of the text readout stat changes, which could create an unbounded number of time series.
 
-  .. http:get:: /stats?format=prometheus&histogram_emit_mode=histogram,summary
+  .. http:get:: /stats?format=prometheus&histogram_buckets=none
 
-  Optional ``histogram_emit_mode`` query parameter is used to control how histogram metrics get reported.
-  By default, histograms get reported as the "histogram" prometheus metric type, but can also be used to
-  emit prometheus "summary" metrics with the histogram quantile values.
+  Optional ``histogram_buckets`` query parameter is used to control how histogram metrics get reported.
+  If unset, histograms get reported as the "histogram" prometheus metric type, but can also be used to
+  emit prometheus "summary" metrics if set to ``none``.
 
 .. http:get:: /stats/recentlookups
 

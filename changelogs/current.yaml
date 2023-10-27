@@ -51,9 +51,8 @@ removed_config_or_runtime:
 new_features:
 - area: admin
   change: |
-    Added a new ``histogram_emit_mode`` query parameter to the ``/stats/prometheus`` endpoint to control how histograms
-    are reported. Supported modes are ``histogram`` and ``summary``, referring to the corresponding prometheus metric
-    types.
+    The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
+    ``histogram_buckets`` query parameter to ``none``.
 - area: jwt
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.

@@ -316,17 +316,15 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count += outputStatType<Stats::TextReadout>(
       response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
-  switch (params.histogram_mode_) {
-  case Utility::HistogramMode::Histogram:
-    metric_name_count += outputStatType<Stats::ParentHistogram>(
-        response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
-    break;
-  case Utility::HistogramMode::Summary:
+  // Due to current behavior around the default value of histogram_buckets, we must interpret the default "NoBuckets"
+  // differently from an explicit query parameter setting "NoBuckets".
+  if (Utility::queryParam(params.query_, "histogram_buckets").has_value() &&
+      params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::NoBuckets) {
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
-    break;
-  case Utility::HistogramMode::None:
-    break;
+  } else {
+    metric_name_count += outputStatType<Stats::ParentHistogram>(
+        response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
   }
 
   return metric_name_count;

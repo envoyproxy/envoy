@@ -1380,8 +1380,48 @@ TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
   EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
 }
 
+TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusDefaultHistogramEmission) {
+  const std::string url = "/stats?format=prometheus";
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  const std::string expected_response = R"EOF(# TYPE envoy_h1 histogram
+envoy_h1_bucket{le="0.5"} 0
+envoy_h1_bucket{le="1"} 0
+envoy_h1_bucket{le="5"} 0
+envoy_h1_bucket{le="10"} 0
+envoy_h1_bucket{le="25"} 0
+envoy_h1_bucket{le="50"} 0
+envoy_h1_bucket{le="100"} 0
+envoy_h1_bucket{le="250"} 0
+envoy_h1_bucket{le="500"} 1
+envoy_h1_bucket{le="1000"} 1
+envoy_h1_bucket{le="2500"} 1
+envoy_h1_bucket{le="5000"} 1
+envoy_h1_bucket{le="10000"} 1
+envoy_h1_bucket{le="30000"} 1
+envoy_h1_bucket{le="60000"} 1
+envoy_h1_bucket{le="300000"} 1
+envoy_h1_bucket{le="600000"} 1
+envoy_h1_bucket{le="1800000"} 1
+envoy_h1_bucket{le="3600000"} 1
+envoy_h1_bucket{le="+Inf"} 1
+envoy_h1_sum{} 305
+envoy_h1_count{} 1
+)EOF";
+
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ(expected_response, code_response.second);
+}
+
 TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusExplicitHistogramEmission) {
-  const std::string url = "/stats?format=prometheus&histogram_emit_mode=histogram";
+  const std::string url = "/stats?format=prometheus&histogram_buckets=cumulative";
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
 
@@ -1421,7 +1461,7 @@ envoy_h1_count{} 1
 }
 
 TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusSummaryEmission) {
-  const std::string url = "/stats?format=prometheus&histogram_emit_mode=summary";
+  const std::string url = "/stats?format=prometheus&histogram_buckets=none";
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
 
