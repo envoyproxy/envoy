@@ -4560,7 +4560,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
 }
 
 TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHost) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
@@ -4584,7 +4584,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHost) {
 }
 
 TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) {
-  createWithLocalClusterUpdate();
+  createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
   EXPECT_CALL(context, overrideHostToSelect())
