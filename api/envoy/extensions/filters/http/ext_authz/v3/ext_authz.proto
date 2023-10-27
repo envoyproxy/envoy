@@ -382,7 +382,16 @@ message CheckSettings {
   //   :ref:`grpc_service<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1 [(udpa.annotations.sensitive) = true];
 
-  // When set to true, disable the configured :ref:`with_request_body
-  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a route.
-  bool disable_request_body_buffering = 2;
+  oneof override {
+    option (validate.required) = true;
+
+    // When set to true, disable the configured :ref:`with_request_body
+    // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a specific route.
+    bool disable_request_body_buffering = 2;
+
+    // Enable or override request body buffering, which is configured with
+    // :ref:`with_request_body <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
+    // for a specific route.
+    BufferSettings with_request_body = 3;
+  }
 }

@@ -92,5 +92,10 @@ new_features:
 - area: tracing
   change: |
     Added support for configuring resource detectors on the OpenTelemetry tracer.
+- area: ext_authz_filter
+  change: |
+    added :ref:`with_request_body
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>` to optionally override
+    the default behavior of sending the request body to the authorization server from the per-route filter.
 
 deprecated:
