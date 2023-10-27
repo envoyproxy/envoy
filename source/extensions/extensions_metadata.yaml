@@ -1676,3 +1676,10 @@ envoy.filters.network.set_filter_state:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.set_filter_state.v3.Config
+envoy.tracers.opentelemetry.resource_detectors.environment:
+  categories:
+  - envoy.tracers.opentelemetry.resource_detectors
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig

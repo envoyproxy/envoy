@@ -73,7 +73,6 @@ new_features:
   change: |
     added :ref:`per_endpoint_stats <envoy_v3_api_field_config.cluster.v3.TrackClusterStats.per_endpoint_stats>` to get some metrics
     for each endpoint in a cluster.
-
 - area: jwt
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
@@ -90,5 +89,8 @@ new_features:
     returns an error or cannot be reached with :ref:`status_on_error
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.status_on_error>`
     configuration flag.
+- area: tracing
+  change: |
+    Added support for configuring resource detectors on the OpenTelemetry tracer.
 
 deprecated:
