@@ -96,7 +96,8 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   span_config.start = estimateTime(stream_info.startTime());
 
   TraceContextReader reader{trace_context};
-  datadog::tracing::Span span = extract_or_create_span(*thread_local_tracer.tracer, span_config, reader);
+  datadog::tracing::Span span =
+      extract_or_create_span(*thread_local_tracer.tracer, span_config, reader);
 
   // If we did not extract a sampling decision, and if Envoy is telling us to
   // drop the trace, then we treat that as a "user drop" (manual override).
@@ -111,7 +112,10 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   return std::make_unique<Span>(std::move(span));
 }
 
-datadog::tracing::Span Tracer::extract_or_create_span(datadog::tracing::Tracer& tracer, const datadog::tracing::SpanConfig& span_config, const datadog::tracing::DictReader& reader) {
+datadog::tracing::Span
+Tracer::extract_or_create_span(datadog::tracing::Tracer& tracer,
+                               const datadog::tracing::SpanConfig& span_config,
+                               const datadog::tracing::DictReader& reader) {
   datadog::tracing::Expected<datadog::tracing::Span> maybe_span =
       tracer.extract_span(reader, span_config);
   if (datadog::tracing::Error* error = maybe_span.if_error()) {

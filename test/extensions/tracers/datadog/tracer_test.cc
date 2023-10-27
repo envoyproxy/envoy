@@ -1,3 +1,5 @@
+#include <cstdlib>
+
 #include "envoy/tracing/trace_reason.h"
 
 #include "source/common/tracing/null_span_impl.h"
@@ -20,8 +22,6 @@
 #include "datadog/tracer_config.h"
 #include "gtest/gtest.h"
 
-#include <cstdlib>
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -30,9 +30,8 @@ namespace {
 
 class EnvVarGuard {
 public:
-  EnvVarGuard(const std::string& name, const std::string& value)
-  : name_(name) {
-    if (const char *const previous = std::getenv(name.c_str())) {
+  EnvVarGuard(const std::string& name, const std::string& value) : name_(name) {
+    if (const char* const previous = std::getenv(name.c_str())) {
       previous_value_ = previous;
     }
     const int overwrite = 1; // Yes, overwrite it.
@@ -264,36 +263,37 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
     // into an outgoing request.
     datadog::tracing::Optional<int> resulting_sampling_priority;
   } cases[] = {
-    {__LINE__, datadog::tracing::nullopt, true, datadog::tracing::PropagationStyle::DATADOG, datadog::tracing::nullopt},
-    // Note that the `resulting_sampling_priority` in this case is an artifact
-    // of "traceparent" always containing a sampling decision in its flags. See
-    // the main body of the test, below, for more information.
-    {__LINE__, datadog::tracing::nullopt, true, datadog::tracing::PropagationStyle::W3C, 0},
-    // This is the only case, at least in this test, where Envoy's decision
-    // affects the resulting sampling priority.
-    {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::DATADOG, -1},
-    // Same here.
-    {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::W3C, 0},
+      {__LINE__, datadog::tracing::nullopt, true, datadog::tracing::PropagationStyle::DATADOG,
+       datadog::tracing::nullopt},
+      // Note that the `resulting_sampling_priority` in this case is an artifact
+      // of "traceparent" always containing a sampling decision in its flags. See
+      // the main body of the test, below, for more information.
+      {__LINE__, datadog::tracing::nullopt, true, datadog::tracing::PropagationStyle::W3C, 0},
+      // This is the only case, at least in this test, where Envoy's decision
+      // affects the resulting sampling priority.
+      {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::DATADOG, -1},
+      // Same here.
+      {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::W3C, 0},
 
-    {__LINE__, -1, true, datadog::tracing::PropagationStyle::DATADOG, -1},
-    {__LINE__, -1, true, datadog::tracing::PropagationStyle::W3C, -1},
-    {__LINE__, -1, false, datadog::tracing::PropagationStyle::DATADOG, -1},
-    {__LINE__, -1, false, datadog::tracing::PropagationStyle::W3C, -1},
+      {__LINE__, -1, true, datadog::tracing::PropagationStyle::DATADOG, -1},
+      {__LINE__, -1, true, datadog::tracing::PropagationStyle::W3C, -1},
+      {__LINE__, -1, false, datadog::tracing::PropagationStyle::DATADOG, -1},
+      {__LINE__, -1, false, datadog::tracing::PropagationStyle::W3C, -1},
 
-    {__LINE__, 0, true, datadog::tracing::PropagationStyle::DATADOG, 0},
-    {__LINE__, 0, true, datadog::tracing::PropagationStyle::W3C, 0},
-    {__LINE__, 0, false, datadog::tracing::PropagationStyle::DATADOG, 0},
-    {__LINE__, 0, false, datadog::tracing::PropagationStyle::W3C, 0},
+      {__LINE__, 0, true, datadog::tracing::PropagationStyle::DATADOG, 0},
+      {__LINE__, 0, true, datadog::tracing::PropagationStyle::W3C, 0},
+      {__LINE__, 0, false, datadog::tracing::PropagationStyle::DATADOG, 0},
+      {__LINE__, 0, false, datadog::tracing::PropagationStyle::W3C, 0},
 
-    {__LINE__, 1, true, datadog::tracing::PropagationStyle::DATADOG, 1},
-    {__LINE__, 1, true, datadog::tracing::PropagationStyle::W3C, 1},
-    {__LINE__, 1, false, datadog::tracing::PropagationStyle::DATADOG, 1},
-    {__LINE__, 1, false, datadog::tracing::PropagationStyle::W3C, 1},
+      {__LINE__, 1, true, datadog::tracing::PropagationStyle::DATADOG, 1},
+      {__LINE__, 1, true, datadog::tracing::PropagationStyle::W3C, 1},
+      {__LINE__, 1, false, datadog::tracing::PropagationStyle::DATADOG, 1},
+      {__LINE__, 1, false, datadog::tracing::PropagationStyle::W3C, 1},
 
-    {__LINE__, 2, true, datadog::tracing::PropagationStyle::DATADOG, 2},
-    {__LINE__, 2, true, datadog::tracing::PropagationStyle::W3C, 2},
-    {__LINE__, 2, false, datadog::tracing::PropagationStyle::DATADOG, 2},
-    {__LINE__, 2, false, datadog::tracing::PropagationStyle::W3C, 2},
+      {__LINE__, 2, true, datadog::tracing::PropagationStyle::DATADOG, 2},
+      {__LINE__, 2, true, datadog::tracing::PropagationStyle::W3C, 2},
+      {__LINE__, 2, false, datadog::tracing::PropagationStyle::DATADOG, 2},
+      {__LINE__, 2, false, datadog::tracing::PropagationStyle::W3C, 2},
   };
 
   for (const Case& test_case : cases) {
@@ -304,7 +304,8 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
     if (test_case.extraction_style == datadog::tracing::PropagationStyle::DATADOG) {
       style_name = "datadog";
     } else {
-      ASSERT_EQ(test_case.extraction_style, datadog::tracing::PropagationStyle::W3C) << failure_context.str();
+      ASSERT_EQ(test_case.extraction_style, datadog::tracing::PropagationStyle::W3C)
+          << failure_context.str();
       style_name = "tracecontext";
     }
 
@@ -325,10 +326,12 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
       context.context_map_["x-datadog-trace-id"] = "123";
       context.context_map_["x-datadog-parent-id"] = "456";
       if (test_case.extracted_sampling_priority) {
-        context.context_map_["x-datadog-sampling-priority"] = std::to_string(*test_case.extracted_sampling_priority);
+        context.context_map_["x-datadog-sampling-priority"] =
+            std::to_string(*test_case.extracted_sampling_priority);
       }
     } else {
-      ASSERT_EQ(test_case.extraction_style, datadog::tracing::PropagationStyle::W3C) << failure_context.str();
+      ASSERT_EQ(test_case.extraction_style, datadog::tracing::PropagationStyle::W3C)
+          << failure_context.str();
       std::string flags;
       if (test_case.extracted_sampling_priority) {
         const int priority = *test_case.extracted_sampling_priority;
@@ -339,11 +342,12 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
         // "traceparent," so default to "drop."
         flags = "00";
       }
-      context.context_map_["traceparent"] = "00-0000000000000000000000000000007b-00000000000001c8-" + flags;
+      context.context_map_["traceparent"] =
+          "00-0000000000000000000000000000007b-00000000000001c8-" + flags;
     }
 
-    const Tracing::SpanPtr span =
-        tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, envoy_decision);
+    const Tracing::SpanPtr span = tracer.startSpan(Tracing::MockConfig{}, context, stream_info_,
+                                                   operation_name, envoy_decision);
     ASSERT_TRUE(span) << failure_context.str();
     const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
     EXPECT_NE(nullptr, as_dd_span_wrapper) << failure_context.str();
@@ -353,12 +357,14 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
     ASSERT_TRUE(maybe_dd_span) << failure_context.str();
     const datadog::tracing::Span& dd_span = *maybe_dd_span;
 
-    const datadog::tracing::Optional<datadog::tracing::SamplingDecision> decision = dd_span.trace_segment().sampling_decision();
+    const datadog::tracing::Optional<datadog::tracing::SamplingDecision> decision =
+        dd_span.trace_segment().sampling_decision();
     if (test_case.resulting_sampling_priority) {
       // We expect that the tracer made a sampling decision immediately, and
       // that it has the expected sampling priority.
       ASSERT_NE(datadog::tracing::nullopt, decision) << failure_context.str();
-      EXPECT_EQ(*test_case.resulting_sampling_priority, decision->priority) << failure_context.str();
+      EXPECT_EQ(*test_case.resulting_sampling_priority, decision->priority)
+          << failure_context.str();
     } else {
       // We expect that the tracer did not immediately make a sampling decision.
       EXPECT_EQ(datadog::tracing::nullopt, decision) << failure_context.str();
