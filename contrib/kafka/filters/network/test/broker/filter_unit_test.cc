@@ -4,6 +4,7 @@
 #include "test/mocks/stats/mocks.h"
 
 #include "contrib/kafka/filters/network/source/broker/filter.h"
+#include "contrib/kafka/filters/network/source/broker/filter_config.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -34,9 +35,11 @@ using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
 
 class MockResponseRewriter : public ResponseRewriter {
 public:
+  MockResponseRewriter() : ResponseRewriter{{"aaa", false}} {};
   MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
   MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
-  MOCK_METHOD(void, emit, (Buffer::Instance&));
+  MOCK_METHOD(void, rewrite, (Buffer::Instance&));
+  MOCK_METHOD(size_t, getStoredResponseCountForTest, (), (const));
 };
 
 using MockResponseRewriterSharedPtr = std::shared_ptr<MockResponseRewriter>;
@@ -84,17 +87,19 @@ class MockRequest : public AbstractRequest {
 public:
   MockRequest(const int16_t api_key, const int16_t api_version, const int32_t correlation_id)
       : AbstractRequest{{api_key, api_version, correlation_id, ""}} {};
-  uint32_t computeSize() const override { return 0; };
-  uint32_t encode(Buffer::Instance&) const override { return 0; };
+  MOCK_METHOD(uint32_t, computeSize, (), (const));
+  MOCK_METHOD(uint32_t, encode, (Buffer::Instance&), (const));
 };
 
 class MockResponse : public AbstractResponse {
 public:
   MockResponse(const int16_t api_key, const int32_t correlation_id)
       : AbstractResponse{{api_key, 0, correlation_id}} {};
-  uint32_t computeSize() const override { return 0; };
-  uint32_t encode(Buffer::Instance&) const override { return 0; };
+  MOCK_METHOD(uint32_t, computeSize, (), (const));
+  MOCK_METHOD(uint32_t, encode, (Buffer::Instance&), (const));
 };
+
+using MockResponseSharedPtr = std::shared_ptr<MockResponse>;
 
 // Tests.
 
@@ -285,6 +290,71 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, ShouldRegisterUnknownResponse) {
   testee_.onFailedParse(unknown_response);
 
   // then - response_metrics_ is updated.
+}
+
+TEST(ResponseRewriterUnitTest, ShouldDoNothingIfDisabled) {
+  // given
+  BrokerFilterConfig config = {"aaa", false};
+  ResponseRewriter testee = ResponseRewriter{config};
+
+  AbstractResponseSharedPtr response1 = std::make_shared<MockResponse>(0, 0);
+  AbstractResponseSharedPtr response2 = std::make_shared<MockResponse>(0, 1);
+
+  // when
+  testee.onMessage(response1);
+  testee.onMessage(response2);
+
+  // then
+  ASSERT_EQ(testee.getStoredResponseCountForTest(), 0);
+}
+
+static void putBytesIntoBuffer(Buffer::Instance& buffer, const uint32_t size) {
+  std::vector<char> data(size, 1);
+  absl::string_view sv = {data.data(), data.size()};
+  buffer.add(sv);
+}
+
+static Buffer::InstancePtr makeRandomBuffer(const uint32_t size) {
+  Buffer::InstancePtr result = std::make_unique<Buffer::OwnedImpl>();
+  putBytesIntoBuffer(*result, size);
+  return result;
+}
+
+TEST(ResponseRewriterUnitTest, ShouldRewriteBuffer) {
+  // given
+  BrokerFilterConfig config = {"aaa", true};
+  ResponseRewriter testee = ResponseRewriter{config};
+
+  MockResponseSharedPtr response1 = std::make_shared<MockResponse>(0, 0);
+  MockResponseSharedPtr response2 = std::make_shared<MockResponse>(0, 1);
+  MockResponseSharedPtr response3 = std::make_shared<MockResponse>(0, 2);
+  EXPECT_CALL(*response1, computeSize()).WillOnce([]() -> uint32_t { return 7; });
+  EXPECT_CALL(*response1, encode(_)).WillOnce([](Buffer::Instance& buffer) -> uint32_t {
+    putBytesIntoBuffer(buffer, 7);
+    return 7;
+  });
+  EXPECT_CALL(*response2, computeSize()).WillOnce([]() -> uint32_t { return 13; });
+  EXPECT_CALL(*response2, encode(_)).WillOnce([](Buffer::Instance& buffer) -> uint32_t {
+    putBytesIntoBuffer(buffer, 13);
+    return 13;
+  });
+  EXPECT_CALL(*response3, computeSize()).WillOnce([]() -> uint32_t { return 42; });
+  EXPECT_CALL(*response3, encode(_)).WillOnce([](Buffer::Instance& buffer) -> uint32_t {
+    putBytesIntoBuffer(buffer, 42);
+    return 42;
+  });
+  testee.onMessage(response1);
+  testee.onMessage(response2);
+  testee.onMessage(response3);
+
+  auto buffer = makeRandomBuffer(1024);
+
+  // when
+  testee.rewrite(*buffer);
+
+  // then
+  ASSERT_EQ(testee.getStoredResponseCountForTest(), 0);
+  ASSERT_EQ(buffer->length(), (3 * 4) + 7 + 13 + 42); // 4 bytes for message length
 }
 
 } // namespace Broker

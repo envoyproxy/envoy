@@ -35,7 +35,7 @@ protected:
   Stats::TestUtil::TestStore store_;
   Stats::Scope& scope_{*store_.rootScope()};
   Event::TestRealTimeSystem time_source_;
-  KafkaBrokerFilter testee_{scope_, time_source_, {"prefix"}};
+  KafkaBrokerFilter testee_{scope_, time_source_, {"prefix", false}};
 
   Network::FilterStatus consumeRequestFromBuffer() {
     return testee_.onData(RequestB::buffer_, false);

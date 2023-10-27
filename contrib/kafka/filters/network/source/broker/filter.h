@@ -119,6 +119,8 @@ public:
 
   void rewrite(Buffer::Instance& buffer);
 
+  size_t getStoredResponseCountForTest() const;
+
 private:
   const BrokerFilterConfig config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;

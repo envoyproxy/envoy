@@ -72,7 +72,9 @@ absl::flat_hash_map<int32_t, MonotonicTime>& KafkaMetricsFacadeImpl::getRequestA
 ResponseRewriter::ResponseRewriter(const BrokerFilterConfig& config) : config_{config} {};
 
 void ResponseRewriter::onMessage(AbstractResponseSharedPtr response) {
-  responses_to_rewrite_.push_back(response);
+  if (config_.force_response_rewrite_) {
+    responses_to_rewrite_.push_back(response);
+  }
 }
 
 void ResponseRewriter::onFailedParse(ResponseMetadataSharedPtr) { /* Nothing to do. */
@@ -92,6 +94,10 @@ void ResponseRewriter::rewrite(Buffer::Instance& buffer) {
     encoder.encode(*response);
   }
   responses_to_rewrite_.erase(responses_to_rewrite_.begin(), responses_to_rewrite_.end());
+}
+
+size_t ResponseRewriter::getStoredResponseCountForTest() const {
+  return responses_to_rewrite_.size();
 }
 
 KafkaBrokerFilter::KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_source,
