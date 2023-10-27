@@ -79,7 +79,7 @@ make_healthy backend-local-1-1
 make_healthy backend-local-2-1
 
 run_log "Scale backend-local-1 to 5 replicas."
-"${DOCKER_COMPOSE[@]}" -p ${NAME} up --scale backend-local-1=5 -d --build
+"${DOCKER_COMPOSE[@]}" -p "${NAME}" up --scale backend-local-1=5 -d --build
 wait_for 5 check_health backend-local-1-2 healthy
 wait_for 5 check_health backend-local-1-3 healthy
 wait_for 5 check_health backend-local-1-4 healthy

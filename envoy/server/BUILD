@@ -43,6 +43,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:context_interface",
+        "//envoy/stats:sink_interface",
         "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],

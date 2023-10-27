@@ -111,6 +111,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/upstreams/http/generic:config",
         "//test/config:v2_link_hacks",
         "//test/integration/load_balancers:custom_lb_policy",
         "//test/mocks/matcher:matcher_mocks",
@@ -252,9 +253,9 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:stats_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )
@@ -480,7 +481,6 @@ envoy_cc_benchmark_binary(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
-        "//source/extensions/load_balancing_policies/subset:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:printers_lib",
@@ -493,33 +493,6 @@ envoy_benchmark_test(
     name = "load_balancer_benchmark_test",
     timeout = "long",
     benchmark_binary = "load_balancer_benchmark",
-)
-
-envoy_cc_test(
-    name = "subset_lb_test",
-    srcs = ["subset_lb_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
-        "//source/extensions/load_balancing_policies/subset:config",
-        "//test/mocks:common_lib",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/mocks/upstream:host_mocks",
-        "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
-        "//test/mocks/upstream:load_balancer_mocks",
-        "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
 )
 
 envoy_cc_test(
@@ -631,7 +604,6 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
-        "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/stats:stat_test_utility_lib",

@@ -116,7 +116,7 @@ CAPIStatus envoyGoFilterDownstreamInfo(void* f, int info_type, void* ret) {
 // Upstream
 //
 
-void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, unsigned long long int conn_id) {
+void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, uint64_t conn_id) {
   std::string id = copyGoString(library_id);
   auto dynamic_lib = Dso::DsoManager<Dso::NetworkFilterDsoImpl>::getDsoByID(id);
   UpstreamConnPtr conn_ptr =

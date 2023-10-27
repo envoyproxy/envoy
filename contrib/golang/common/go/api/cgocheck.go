@@ -24,7 +24,6 @@ import (
 
 func CgoCheckDisabled() bool {
 	env := os.Getenv("GODEBUG")
-	// TODO: handle compile-time GODEBUG var after Go 1.21 is released
 	if strings.Index(env, "cgocheck=0") != -1 {
 		return true
 	}

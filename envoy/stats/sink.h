@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/primitive_stats.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -41,6 +42,16 @@ public:
    * @return a snapshot of all text readouts.
    */
   virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
+
+  /**
+   * @return a snapshot of all host/endpoint-specific primitive counters.
+   */
+  virtual const std::vector<Stats::PrimitiveCounterSnapshot>& hostCounters() PURE;
+
+  /**
+   * @return a snapshot of all host/endpoint-specific primitive gauges.
+   */
+  virtual const std::vector<Stats::PrimitiveGaugeSnapshot>& hostGauges() PURE;
 
   /**
    * @return the time in UTC since epoch when the snapshot was created.

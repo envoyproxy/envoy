@@ -22,6 +22,12 @@ envoy_cc_test(
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
+        "@envoy//source/common/quic:active_quic_listener_lib",
+        "@envoy//source/common/quic:client_connection_factory_lib",
+        "@envoy//source/common/quic:quic_server_factory_lib",
+        "@envoy//source/common/quic:quic_transport_socket_factory_lib",
+        "@envoy//source/common/quic:udp_gso_batch_writer_lib",
+        "@envoy//source/extensions/udp_packet_writer/gso:config",
     ],
 )
 
@@ -182,6 +188,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         ":base_client_integration_test_lib",
+        "@envoy//source/common/event:libevent_lib",
         "@envoy//source/common/grpc:google_grpc_creds_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
