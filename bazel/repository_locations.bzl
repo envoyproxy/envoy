@@ -679,7 +679,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2023-08-31",
         cpe = "cpe:2.3:a:google:brotli:*",
         license = "MIT",
-        license_url = "https://github.com/google/brotli/blob/{version}/LICENSE",
+        license_url = "https://github.com/google/brotli/blob/v{version}/LICENSE",
     ),
     com_github_facebook_zstd = dict(
         project_name = "zstd",
