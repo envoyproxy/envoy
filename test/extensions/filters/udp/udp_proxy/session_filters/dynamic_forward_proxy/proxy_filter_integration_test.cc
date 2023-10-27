@@ -205,11 +205,17 @@ TEST_P(DynamicForwardProxyIntegrationTest, EmptyDnsResponseDueToDummyHost) {
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
 
-  client.write("hello", *listener_address);
+  client.write("hello1", *listener_address);
   test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
 
-  // The DNS response is empty, so will not be found any valid host.
+  // The DNS response is empty, so will not be found any valid host and session will be removed.
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_none_healthy", 1);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  // DNS cache hit but still no host found.
+  client.write("hello2", *listener_address);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_none_healthy", 2);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 
 } // namespace
