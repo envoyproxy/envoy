@@ -150,7 +150,7 @@ typed_config:
 )EOF";
 static const std::string HEADER_STRICT_MODE =
     R"EOF(
-      strict: true 
+      strict: true
 )EOF";
 
 static const std::string DISABLE_STATEFUL_SESSION =
