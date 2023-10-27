@@ -344,7 +344,11 @@ TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
   filter_manager_->destroyFilters();
 };
 
-TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
+TEST_F(FilterManagerTest, GetRouteLevelFilterConfigAndEnableDowngrade) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.no_downgrade_to_canonical_name", "false"}});
+
   initialize();
 
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
@@ -405,11 +409,7 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   filter_manager_->destroyFilters();
 };
 
-TEST_F(FilterManagerTest, GetRouteLevelFilterConfigButDisabledDowngrade) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.no_downgrade_to_canonical_name", "true"}});
-
+TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   initialize();
 
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
