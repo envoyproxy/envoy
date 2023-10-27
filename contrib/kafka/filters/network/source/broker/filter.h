@@ -111,15 +111,16 @@ private:
 
 class ResponseRewriter : public ResponseCallback, private Logger::Loggable<Logger::Id::kafka> {
 public:
-  ResponseRewriter() = default;
+  ResponseRewriter(const BrokerFilterConfig& config);
 
   // ResponseCallback
   void onMessage(AbstractResponseSharedPtr response) override;
   void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
 
-  void emit(Buffer::Instance& buffer);
+  void rewrite(Buffer::Instance& buffer);
 
 private:
+  const BrokerFilterConfig config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
 };
 
@@ -187,7 +188,8 @@ private:
    * Helper delegate constructor.
    * Passes metrics facade as argument to decoders.
    */
-  KafkaBrokerFilter(const KafkaMetricsFacadeSharedPtr& metrics);
+  KafkaBrokerFilter(const BrokerFilterConfig& filter_config,
+                    const KafkaMetricsFacadeSharedPtr& metrics);
 
   const KafkaMetricsFacadeSharedPtr metrics_;
   const ResponseRewriterSharedPtr response_rewriter_;

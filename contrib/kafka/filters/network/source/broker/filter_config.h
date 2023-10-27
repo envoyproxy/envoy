@@ -19,14 +19,16 @@ using KafkaBrokerProtoConfig = envoy::extensions::filters::network::kafka_broker
 struct BrokerFilterConfig {
 
   BrokerFilterConfig(const KafkaBrokerProtoConfig& proto_config)
-      : BrokerFilterConfig{proto_config.stat_prefix()} {}
+      : BrokerFilterConfig{proto_config.stat_prefix(), proto_config.force_response_rewrite()} {}
 
   // Visible for testing.
-  BrokerFilterConfig(const std::string& stat_prefix) : stat_prefix_{stat_prefix} {
+  BrokerFilterConfig(const std::string& stat_prefix, bool force_response_rewrite)
+      : stat_prefix_{stat_prefix}, force_response_rewrite_{force_response_rewrite} {
     ASSERT(!stat_prefix_.empty());
   };
 
   std::string stat_prefix_;
+  bool force_response_rewrite_;
 };
 
 } // namespace Broker
