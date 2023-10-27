@@ -113,7 +113,7 @@ message ExtAuthz {
   //
   // Please note that this field exclusively applies to the gRPC ExtAuthZ service and has no effect on the HTTP service.
   //
-  // It works in a way similar to ``metadata_context_namespaces`` but allows envoy and external authz server to share
+  // It works in a way similar to ``metadata_context_namespaces`` but allows Envoy and ext_authz server to share
   // the protobuf message definition in order to do a safe parsing.
   //
   repeated string typed_metadata_context_namespaces = 16;
