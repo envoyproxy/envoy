@@ -179,7 +179,7 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     network_connection_ = nullptr;
   }
 
-  filter_manager_ = nullptr;
+  // filter_manager_ = nullptr;
   if (!codec_stats_.has_value()) {
     // The connection was closed before it could be used. Stats are not recorded.
     return;

@@ -266,7 +266,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 
 IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     Network::ClientConnectionPtr&& conn,
-    absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) {
+    absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+    bool wait_till_connected) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
   if (!http2_options.has_value()) {
@@ -295,8 +296,10 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
   // in-connection version negotiation.
   auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
-                                                        host_description, downstream_protocol_);
-  if (downstream_protocol_ == Http::CodecType::HTTP3 && codec->disconnected()) {
+                                                        host_description, downstream_protocol_,
+                                                        wait_till_connected);
+  if (downstream_protocol_ == Http::CodecType::HTTP3 && wait_till_connected &&
+      codec->disconnected()) {
     // Connection may get closed during version negotiation or handshake.
     // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
     // INVALID_VERSION error to caller and let caller to use server advertised version list to

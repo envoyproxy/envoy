@@ -207,10 +207,8 @@ private:
   // Called when aggregated buffered bytes across all the streams declines to low watermark.
   void onSendBufferLowWatermark();
 
-  // Currently ConnectionManagerImpl is the one and only filter. If more network
-  // filters are added, ConnectionManagerImpl should always be the last one.
-  // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
-  // and the rest incoming data bypasses these filters.
+  // ConnectionManagerImpl should always be the last filter. Its onRead() is only called once to
+  // trigger ReadFilter::onNewConnection() and the rest incoming data bypasses these filters.
   std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;

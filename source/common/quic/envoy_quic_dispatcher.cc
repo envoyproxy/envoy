@@ -184,6 +184,10 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
       connection.close(Network::ConnectionCloseType::NoFlush);
     }
     ASSERT(connections_by_filter_chain_.find(filter_chain) == connections_by_filter_chain_.end());
+    // Explicitly destroy closed sessions in the current call stack, because upon returning the
+    // filter chain configs will be destroyed, and no longer safe to be accessed. If any filters
+    // access those configs during destruction, it'll be use-after-free.
+    DeleteSessions();
   }
 }
 
