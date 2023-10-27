@@ -302,6 +302,7 @@ build:remote-windows --spawn_strategy=remote,local
 build:remote-windows --strategy=Javac=remote,local
 build:remote-windows --strategy=Closure=remote,local
 build:remote-windows --strategy=Genrule=remote,local
+build:remote-windows --strategy=CppLink=local
 build:remote-windows --remote_timeout=7200
 build:remote-windows --google_default_credentials=true
 build:remote-windows --remote_download_toplevel
