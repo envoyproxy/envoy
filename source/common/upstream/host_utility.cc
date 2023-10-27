@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -151,6 +152,72 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
     return host;
   }
   return nullptr;
+}
+
+void HostUtility::forEachHostMetric(
+    const ClusterManager& cluster_manager,
+    const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
+    const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb) {
+  for (const auto& [unused_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster_ref.get().info();
+    if (cluster_info->perEndpointStatsEnabled()) {
+      const std::string cluster_name =
+          Stats::Utility::sanitizeStatsName(cluster_info->observabilityName());
+
+      const Stats::TagVector& fixed_tags = cluster_info->statsScope().store().fixedTags();
+
+      for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
+        for (auto& host : host_set->hosts()) {
+
+          Stats::TagVector tags;
+          tags.reserve(fixed_tags.size() + 3);
+          tags.insert(tags.end(), fixed_tags.begin(), fixed_tags.end());
+          tags.emplace_back(Stats::Tag{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name});
+          tags.emplace_back(Stats::Tag{"envoy.endpoint_address", host->address()->asString()});
+
+          const auto& hostname = host->hostname();
+          if (!hostname.empty()) {
+            tags.push_back({"envoy.endpoint_hostname", hostname});
+          }
+
+          auto set_metric_metadata = [&](absl::string_view metric_name,
+                                         Stats::PrimitiveMetricMetadata& metric) {
+            metric.setName(
+                absl::StrCat("cluster.", cluster_name, ".endpoint.",
+                             Stats::Utility::sanitizeStatsName(host->address()->asStringView()),
+                             ".", metric_name));
+            metric.setTagExtractedName(absl::StrCat("cluster.endpoint.", metric_name));
+            metric.setTags(tags);
+
+            // Validate that all components were sanitized.
+            ASSERT(metric.name() == Stats::Utility::sanitizeStatsName(metric.name()));
+            ASSERT(metric.tagExtractedName() ==
+                   Stats::Utility::sanitizeStatsName(metric.tagExtractedName()));
+          };
+
+          for (auto& [metric_name, primitive] : host->counters()) {
+            Stats::PrimitiveCounterSnapshot metric(primitive.get());
+            set_metric_metadata(metric_name, metric);
+
+            counter_cb(std::move(metric));
+          }
+
+          auto gauges = host->gauges();
+
+          // Add synthetic "healthy" gauge.
+          Stats::PrimitiveGauge healthy_gauge;
+          healthy_gauge.set((host->coarseHealth() == Host::Health::Healthy) ? 1 : 0);
+          gauges.emplace_back(absl::string_view("healthy"), healthy_gauge);
+
+          for (auto& [metric_name, primitive] : gauges) {
+            Stats::PrimitiveGaugeSnapshot metric(primitive.get());
+            set_metric_metadata(metric_name, metric);
+            gauge_cb(std::move(metric));
+          }
+        }
+      }
+    }
+  }
 }
 
 } // namespace Upstream

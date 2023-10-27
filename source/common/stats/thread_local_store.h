@@ -224,6 +224,7 @@ public:
   void extractAndAppendTags(StatName name, StatNamePool& pool, StatNameTagVector& tags) override;
   void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                             StatNameTagVector& tags) override;
+  const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
 
 private:
   friend class ThreadLocalStoreTestingPeer;
