@@ -111,11 +111,11 @@ Per-Route Configuration
 Response compression can be enabled and disabled on individual virtual hosts and routes.
 For example, to disable response compression for a particular virtual host, but enable response compression for its ``/static`` route:
 
-.. literalinclude:: _include/compressor-filter-per-route.yaml
+.. literalinclude:: _include/compressor-filter.yaml
     :language: yaml
     :linenos:
     :lines: 14-32
-    :caption: :download:`compressor-filter-per-route.yaml <_include/compressor-filter-per-route.yaml>`
+    :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
 
 Using different compressors for requests and responses
 --------------------------------------------------------
