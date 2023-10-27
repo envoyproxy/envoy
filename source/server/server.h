@@ -133,7 +133,7 @@ public:
    * @param store provides the store being flushed.
    */
   static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                  TimeSource& time_source);
+                                  Upstream::ClusterManager& cm, TimeSource& time_source);
 
   /**
    * Load a bootstrap config and perform validation.
@@ -426,7 +426,8 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
-  explicit MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source);
+  explicit MetricSnapshotImpl(Stats::Store& store, Upstream::ClusterManager& cluster_manager,
+                              TimeSource& time_source);
 
   // Stats::MetricSnapshot
   const std::vector<CounterSnapshot>& counters() override { return counters_; }
@@ -439,6 +440,10 @@ public:
   const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
     return text_readouts_;
   }
+  const std::vector<Stats::PrimitiveCounterSnapshot>& hostCounters() override {
+    return host_counters_;
+  }
+  const std::vector<Stats::PrimitiveGaugeSnapshot>& hostGauges() override { return host_gauges_; }
   SystemTime snapshotTime() const override { return snapshot_time_; }
 
 private:
@@ -450,6 +455,8 @@ private:
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
   std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
   std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
+  std::vector<Stats::PrimitiveCounterSnapshot> host_counters_;
+  std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges_;
   SystemTime snapshot_time_;
 };
 

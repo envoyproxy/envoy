@@ -17,7 +17,8 @@ android_artifacts(
     }),
     proguard_rules = "//library:proguard_rules",
     substitutions = {
-        "pom_artifact_id": "envoy",
+        "{pom_artifact_id}": "envoy",
+        "{pom_extra_dependencies}": "",
     },
     visibility = ["//visibility:public"],
 )
@@ -33,7 +34,13 @@ android_artifacts(
     }),
     proguard_rules = "//library:proguard_rules",
     substitutions = {
-        "pom_artifact_id": "envoy-xds",
+        "{pom_artifact_id}": "envoy-xds",
+        "{pom_extra_dependencies}": """
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-javalite</artifactId>
+            <version>3.24.4</version>
+        </dependency>""",
     },
     visibility = ["//visibility:public"],
 )

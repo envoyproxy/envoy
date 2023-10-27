@@ -12,3 +12,4 @@ HTTP tracers
   :maxdepth: 2
 
   v3/*
+  opentelemetry/resource_detectors

@@ -388,7 +388,8 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
 void javaByteArrayToProto(JNIEnv* env, jbyteArray source, Envoy::Protobuf::MessageLite* dest) {
   jbyte* bytes = env->GetByteArrayElements(source, /* isCopy= */ nullptr);
   jsize size = env->GetArrayLength(source);
-  ASSERT(dest->ParseFromArray(bytes, size));
+  bool success = dest->ParseFromArray(bytes, size);
+  RELEASE_ASSERT(success, "Failed to parse protobuf message.");
   env->ReleaseByteArrayElements(source, bytes, 0);
 }
 
@@ -401,6 +402,13 @@ void javaByteArrayToProto(JNIEnv* env, jbyteArray source, Envoy::Protobuf::Messa
     Envoy::JNI::Exception::checkAndClear();                                                        \
     return result;                                                                                 \
   }
+
+void throwException(JNIEnv* env, const char* java_class_name, const char* message) {
+  jclass java_class = env->FindClass(java_class_name);
+  jint error = env->ThrowNew(java_class, message);
+  RELEASE_ASSERT(error == JNI_OK, "Failed to throw an exception.");
+  env->DeleteLocalRef(java_class);
+}
 
 void callVoidMethod(JNIEnv* env, jobject object, jmethodID method_id, ...) {
   va_list args;
