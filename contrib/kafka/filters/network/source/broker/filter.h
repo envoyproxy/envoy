@@ -7,6 +7,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
+#include "contrib/kafka/filters/network/source/broker/rewriter.h"
 #include "contrib/kafka/filters/network/source/external/request_metrics.h"
 #include "contrib/kafka/filters/network/source/external/response_metrics.h"
 #include "contrib/kafka/filters/network/source/parser.h"
@@ -108,25 +109,6 @@ private:
   RichRequestMetricsSharedPtr request_metrics_;
   RichResponseMetricsSharedPtr response_metrics_;
 };
-
-class ResponseRewriter : public ResponseCallback, private Logger::Loggable<Logger::Id::kafka> {
-public:
-  ResponseRewriter(const BrokerFilterConfig& config);
-
-  // ResponseCallback
-  void onMessage(AbstractResponseSharedPtr response) override;
-  void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
-
-  void rewrite(Buffer::Instance& buffer);
-
-  size_t getStoredResponseCountForTest() const;
-
-private:
-  const BrokerFilterConfig config_;
-  std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
-};
-
-using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
 
 /**
  * Implementation of Kafka broker-level filter.
