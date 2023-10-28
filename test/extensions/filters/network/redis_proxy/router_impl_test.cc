@@ -69,6 +69,20 @@ TEST(PrefixRoutesTest, RoutedToCatchAll) {
   EXPECT_EQ(upstream_c, router.upstreamPool(key, stream_info)->upstream(""));
 }
 
+TEST(PrefixRoutesTest, MissingCatchAll) {
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+
+  Runtime::MockLoader runtime_;
+
+  PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
+
+  std::string key("c:bar");
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(nullptr, router.upstreamPool(key, stream_info));
+}
+
 TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
   auto upstream_a = std::make_shared<ConnPool::MockInstance>();
 
