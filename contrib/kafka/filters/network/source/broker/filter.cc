@@ -89,7 +89,7 @@ void ResponseRewriter::rewrite(Buffer::Instance& buffer) {
   // At this stage we have access to responses, and can do something to them.
   buffer.drain(buffer.length());
   ResponseEncoder encoder{buffer};
-  ENVOY_LOG(info, "Emitting {} responses", responses_to_rewrite_.size());
+  ENVOY_LOG(trace, "emitting {} stored responses", responses_to_rewrite_.size());
   for (auto response : responses_to_rewrite_) {
     encoder.encode(*response);
   }

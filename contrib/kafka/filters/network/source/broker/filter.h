@@ -131,7 +131,8 @@ using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
 /**
  * Implementation of Kafka broker-level filter.
  * Uses two decoders - request and response ones, that are connected using Forwarder instance.
- * There's also a KafkaMetricsFacade, that is listening on codec events.
+ * KafkaMetricsFacade is listening for both request/response events to keep metrics.
+ * ResponseRewriter is listening for response events to capture and rewrite them if needed.
  *
  *        +---------------------------------------------------+
  *        |                                                   |
@@ -143,17 +144,17 @@ using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
  *        |   |                   v                       v   v
  * +------+---+------+       +----+----+        +---------+---+----+
  * |KafkaBrokerFilter|       |Forwarder|        |KafkaMetricsFacade|
- * +----------+------+       +----+----+        +---------+--------+
- *            |                   |                       ^
- *            |                   |                       |
- *            |                   v                       |
- *            |           +-------+-------+               |
- *            +---------->+ResponseDecoder+---------------+
- *                        +-------+-------+
- *                                |
- *                                v
- *                        +-------+--------+
- *                        +ResponseRewriter+
+ * +------+---+------+       +----+----+        +---------+--------+
+ *        |   |                   |                       ^
+ *        |   |                   |                       |
+ *        |   |                   v                       |
+ *        |   |           +-------+-------+               |
+ *        |   +---------->+ResponseDecoder+---------------+
+ *        |               +-------+-------+
+ *        |                       |
+ *        |                       v
+ *        |               +-------+--------+
+ *        +-------------->+ResponseRewriter+
  *                        +----------------+
  */
 class KafkaBrokerFilter : public Network::Filter, private Logger::Loggable<Logger::Id::kafka> {
