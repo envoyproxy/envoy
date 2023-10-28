@@ -19,8 +19,6 @@ namespace OpenTelemetry {
 constexpr absl::string_view kTraceParent = "traceparent";
 constexpr absl::string_view kTraceState = "tracestate";
 constexpr absl::string_view kDefaultVersion = "00";
-constexpr absl::string_view kServiceNameKey = "service.name";
-constexpr absl::string_view kDefaultServiceName = "unknown_service:envoy";
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
@@ -110,12 +108,9 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
 Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
-               const std::string& service_name)
+               const ResourceConstSharedPtr resource)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
-      tracing_stats_(tracing_stats), service_name_(service_name) {
-  if (service_name.empty()) {
-    service_name_ = std::string{kDefaultServiceName};
-  }
+      tracing_stats_(tracing_stats), resource_(resource) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -134,14 +129,20 @@ void Tracer::flushSpans() {
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
-  opentelemetry::proto::common::v1::KeyValue key_value =
-      opentelemetry::proto::common::v1::KeyValue();
-  opentelemetry::proto::common::v1::AnyValue value_proto =
-      opentelemetry::proto::common::v1::AnyValue();
-  value_proto.set_string_value(std::string{service_name_});
-  key_value.set_key(std::string{kServiceNameKey});
-  *key_value.mutable_value() = value_proto;
-  (*resource_span->mutable_resource()->add_attributes()) = key_value;
+  resource_span->set_schema_url(resource_->schemaUrl_);
+
+  // add resource attributes
+  for (auto const& att : resource_->attributes_) {
+    opentelemetry::proto::common::v1::KeyValue key_value =
+        opentelemetry::proto::common::v1::KeyValue();
+    opentelemetry::proto::common::v1::AnyValue value_proto =
+        opentelemetry::proto::common::v1::AnyValue();
+    value_proto.set_string_value(std::string{att.second});
+    key_value.set_key(std::string{att.first});
+    *key_value.mutable_value() = value_proto;
+    (*resource_span->mutable_resource()->add_attributes()) = key_value;
+  }
+
   ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;

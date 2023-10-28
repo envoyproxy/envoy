@@ -137,7 +137,9 @@ envoy_entry_point(
     args = [
         "release",
         PATH,
+        "--release-message-path=$(location @envoy//changelogs:summary)",
     ],
+    data = ["@envoy//changelogs:summary"],
     pkg = "envoy.base.utils",
     script = "envoy.project",
     init_data = [":__init__.py"],
@@ -1402,22 +1404,6 @@ def _rules_ruby():
 
 def _foreign_cc_dependencies():
     external_http_archive("rules_foreign_cc")
-
-def _is_linux(ctxt):
-    return ctxt.os.name == "linux"
-
-def _is_arch(ctxt, arch):
-    res = ctxt.execute(["uname", "-m"])
-    return arch in res.stdout
-
-def _is_linux_ppc(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "ppc")
-
-def _is_linux_s390x(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "s390x")
-
-def _is_linux_x86_64(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(

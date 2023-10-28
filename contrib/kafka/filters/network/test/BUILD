@@ -247,7 +247,7 @@ envoy_cc_test(
     srcs = ["metrics_integration_test.cc"],
     deps = [
         ":message_utilities",
-        "//contrib/kafka/filters/network/source:kafka_broker_filter_lib",
+        "//contrib/kafka/filters/network/source:kafka_metrics_lib",
         "//test/common/stats:stat_test_utility_lib",
     ],
 )

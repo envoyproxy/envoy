@@ -403,6 +403,13 @@ void javaByteArrayToProto(JNIEnv* env, jbyteArray source, Envoy::Protobuf::Messa
     return result;                                                                                 \
   }
 
+void throwException(JNIEnv* env, const char* java_class_name, const char* message) {
+  jclass java_class = env->FindClass(java_class_name);
+  jint error = env->ThrowNew(java_class, message);
+  RELEASE_ASSERT(error == JNI_OK, "Failed to throw an exception.");
+  env->DeleteLocalRef(java_class);
+}
+
 void callVoidMethod(JNIEnv* env, jobject object, jmethodID method_id, ...) {
   va_list args;
   va_start(args, method_id);

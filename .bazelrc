@@ -61,6 +61,7 @@ common --experimental_allow_tags_propagation
 
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
+build:linux --copt=-fdebug-types-section
 build:linux --copt=-fPIC
 build:linux --copt=-Wno-deprecated-declarations
 build:linux --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
@@ -301,6 +302,7 @@ build:remote-windows --spawn_strategy=remote,local
 build:remote-windows --strategy=Javac=remote,local
 build:remote-windows --strategy=Closure=remote,local
 build:remote-windows --strategy=Genrule=remote,local
+build:remote-windows --strategy=CppLink=local
 build:remote-windows --remote_timeout=7200
 build:remote-windows --google_default_credentials=true
 build:remote-windows --remote_download_toplevel
