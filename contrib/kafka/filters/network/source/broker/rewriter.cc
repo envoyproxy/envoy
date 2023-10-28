@@ -6,22 +6,15 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Broker {
 
-ResponseRewriter::ResponseRewriter(const BrokerFilterConfig& config) : config_{config} {};
+// ResponseRewriterImpl.
 
-void ResponseRewriter::onMessage(AbstractResponseSharedPtr response) {
-  if (config_.force_response_rewrite_) {
-    responses_to_rewrite_.push_back(response);
-  }
+void ResponseRewriterImpl::onMessage(AbstractResponseSharedPtr response) {
+  responses_to_rewrite_.push_back(response);
 }
 
-void ResponseRewriter::onFailedParse(ResponseMetadataSharedPtr) {}
+void ResponseRewriterImpl::onFailedParse(ResponseMetadataSharedPtr) {}
 
-void ResponseRewriter::rewrite(Buffer::Instance& buffer) {
-  if (!config_.force_response_rewrite_) {
-    // Data received from upstream is going to be sent downstream without any changes.
-    return;
-  }
-
+void ResponseRewriterImpl::rewrite(Buffer::Instance& buffer) {
   // At this stage we have access to responses, and can do something to them.
   buffer.drain(buffer.length());
   ResponseEncoder encoder{buffer};
@@ -32,8 +25,26 @@ void ResponseRewriter::rewrite(Buffer::Instance& buffer) {
   responses_to_rewrite_.erase(responses_to_rewrite_.begin(), responses_to_rewrite_.end());
 }
 
-size_t ResponseRewriter::getStoredResponseCountForTest() const {
+size_t ResponseRewriterImpl::getStoredResponseCountForTest() const {
   return responses_to_rewrite_.size();
+}
+
+// DoNothingRewriter.
+
+void DoNothingRewriter::onMessage(AbstractResponseSharedPtr) {}
+
+void DoNothingRewriter::onFailedParse(ResponseMetadataSharedPtr) {}
+
+void DoNothingRewriter::rewrite(Buffer::Instance&) {}
+
+// Factory method.
+
+ResponseRewriterSharedPtr createRewriter(const BrokerFilterConfig& config) {
+  if (config.force_response_rewrite_) {
+    return std::make_shared<ResponseRewriterImpl>();
+  } else {
+    return std::make_shared<DoNothingRewriter>();
+  }
 }
 
 } // namespace Broker

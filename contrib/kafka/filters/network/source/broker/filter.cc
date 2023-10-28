@@ -76,7 +76,7 @@ KafkaBrokerFilter::KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_sourc
 
 KafkaBrokerFilter::KafkaBrokerFilter(const BrokerFilterConfig& filter_config,
                                      const KafkaMetricsFacadeSharedPtr& metrics)
-    : metrics_{metrics}, response_rewriter_{std::make_shared<ResponseRewriter>(filter_config)},
+    : metrics_{metrics}, response_rewriter_{createRewriter(filter_config)},
       response_decoder_{new ResponseDecoder({metrics, response_rewriter_})},
       request_decoder_{
           new RequestDecoder({std::make_shared<Forwarder>(*response_decoder_), metrics})} {};

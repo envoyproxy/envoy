@@ -35,7 +35,6 @@ using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
 
 class MockResponseRewriter : public ResponseRewriter {
 public:
-  MockResponseRewriter() : ResponseRewriter{{"aaa", false}} {};
   MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
   MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
   MOCK_METHOD(void, rewrite, (Buffer::Instance&));
@@ -150,6 +149,7 @@ TEST_F(KafkaBrokerFilterUnitTest, ShouldAcceptDataSentByKafkaBroker) {
   // given
   Buffer::OwnedImpl data;
   EXPECT_CALL(*response_decoder_, onData(_));
+  EXPECT_CALL(*response_rewriter_, rewrite(_));
 
   // when
   initialize();

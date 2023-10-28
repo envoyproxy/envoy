@@ -15,24 +15,60 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Broker {
 
-class ResponseRewriter : public ResponseCallback, private Logger::Loggable<Logger::Id::kafka> {
+/**
+ * Responsible for modifying any outbound requests.
+ */
+class ResponseRewriter : public ResponseCallback {
 public:
-  ResponseRewriter(const BrokerFilterConfig& config);
+  virtual ~ResponseRewriter() = default;
 
+  /**
+   * Performs any desired payload changes.
+   * @param buffer buffer with the original data from upstream
+   */
+  virtual void rewrite(Buffer::Instance& buffer) PURE;
+};
+
+using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
+
+/**
+ * Uses captured response objects instead of original data.
+ * Entry point for any response payload changes.
+ */
+class ResponseRewriterImpl : public ResponseRewriter, private Logger::Loggable<Logger::Id::kafka> {
+public:
   // ResponseCallback
   void onMessage(AbstractResponseSharedPtr response) override;
   void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
 
-  void rewrite(Buffer::Instance& buffer);
+  // ResponseRewriter
+  void rewrite(Buffer::Instance& buffer) override;
 
   size_t getStoredResponseCountForTest() const;
 
 private:
-  const BrokerFilterConfig config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
 };
 
-using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
+/**
+ * Does nothing, letting the data from upstream pass without any changes.
+ */
+class DoNothingRewriter : public ResponseRewriter {
+public:
+  // ResponseCallback
+  void onMessage(AbstractResponseSharedPtr response) override;
+  void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
+
+  // ResponseRewriter
+  void rewrite(Buffer::Instance& buffer) override;
+};
+
+/**
+ * Factory method that creates a rewriter depending on configuration.
+ * @param config
+ * @return rewriter
+ */
+ResponseRewriterSharedPtr createRewriter(const BrokerFilterConfig& config);
 
 } // namespace Broker
 } // namespace Kafka

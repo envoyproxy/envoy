@@ -37,42 +37,36 @@ private:
   size_t size_;
 };
 
-TEST(ResponseRewriterUnitTest, ShouldDoNothingIfDisabled) {
+TEST(ResponseRewriterImplUnitTest, ShouldRewriteBuffer) {
   // given
-  BrokerFilterConfig config = {"aaa", false};
-  ResponseRewriter testee = ResponseRewriter{config};
-
-  auto response1 = std::make_shared<FakeResponse>(7);
-  auto response2 = std::make_shared<FakeResponse>(13);
-
-  // when
-  testee.onMessage(response1);
-  testee.onMessage(response2);
-
-  // then
-  ASSERT_EQ(testee.getStoredResponseCountForTest(), 0);
-}
-
-TEST(ResponseRewriterUnitTest, ShouldRewriteBuffer) {
-  // given
-  BrokerFilterConfig config = {"aaa", true};
-  ResponseRewriter testee = ResponseRewriter{config};
+  ResponseRewriterImpl testee;
 
   auto response1 = std::make_shared<FakeResponse>(7);
   auto response2 = std::make_shared<FakeResponse>(13);
   auto response3 = std::make_shared<FakeResponse>(42);
+
+  // when - 1
   testee.onMessage(response1);
   testee.onMessage(response2);
   testee.onMessage(response3);
 
-  auto buffer = makeRandomBuffer(1024);
+  // then - 1
+  ASSERT_EQ(testee.getStoredResponseCountForTest(), 3);
 
-  // when
+  // when - 2
+  auto buffer = makeRandomBuffer(4242);
   testee.rewrite(*buffer);
 
-  // then
+  // then - 2
   ASSERT_EQ(testee.getStoredResponseCountForTest(), 0);
   ASSERT_EQ(buffer->length(), (3 * 4) + 7 + 13 + 42); // 4 bytes for message length
+}
+
+TEST(ResponseRewriterUnitTest, ShouldCreateProperRewriter) {
+  ResponseRewriterSharedPtr r1 = createRewriter({"aaa", true});
+  ASSERT_NE(std::dynamic_pointer_cast<ResponseRewriterImpl>(r1), nullptr);
+  ResponseRewriterSharedPtr r2 = createRewriter({"aaa", false});
+  ASSERT_NE(std::dynamic_pointer_cast<DoNothingRewriter>(r2), nullptr);
 }
 
 } // namespace Broker
