@@ -10,7 +10,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/router/header_formatter.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"

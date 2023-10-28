@@ -453,7 +453,6 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
-        "//source/common/router:header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",

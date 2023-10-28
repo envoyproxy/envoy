@@ -10,7 +10,6 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/router/header_formatter.h"
 
 namespace Envoy {
 namespace Router {
@@ -29,7 +28,7 @@ struct HeadersToAddEntry {
   std::string original_value_;
   bool add_if_empty_ = false;
 
-  HttpHeaderFormatterPtr formatter_;
+  Formatter::FormatterPtr formatter_;
   HeaderAppendAction append_action_;
 };
 
@@ -38,7 +37,7 @@ struct HeadersToAddEntry {
  * between a constant value implementation and a dynamic value implementation based on
  * StreamInfo::StreamInfo fields.
  */
-class HeaderParser : public Http::HeaderEvaluator {
+class HeaderParser {
 public:
   /*
    * @param headers_to_add defines the headers to add during calls to evaluateHeaders
@@ -73,7 +72,8 @@ public:
 
   void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
                        const Http::ResponseHeaderMap& response_headers,
-                       const StreamInfo::StreamInfo& stream_info) const override;
+                       const StreamInfo::StreamInfo& stream_info) const;
+
   void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
                        const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo* stream_info) const;
