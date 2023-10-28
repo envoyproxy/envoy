@@ -19,6 +19,7 @@ jobs:
   start:
     runs-on: ubuntu-22.04
     permissions:
+      contents: read
       statuses: write
     steps:
     - uses: actions/checkout@v4

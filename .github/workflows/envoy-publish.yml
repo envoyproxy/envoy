@@ -26,7 +26,8 @@ jobs:
   env:
     if: >-
       ${{
-          github.repository == 'envoyproxy/envoy'
+          (github.repository == 'envoyproxy/envoy'
+           || vars.ENVOY_CI)
           && (!contains(github.actor, '[bot]')
               || github.actor == 'trigger-workflow-envoy[bot]'
               || github.actor == 'trigger-release-envoy[bot]')
@@ -78,6 +79,8 @@ jobs:
     name: Verify ${{ needs.env.outputs.repo_ref_title }}
     needs:
     - env
+    permissions:
+      contents: read
     with:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       given_ref: ${{ inputs.ref }}
