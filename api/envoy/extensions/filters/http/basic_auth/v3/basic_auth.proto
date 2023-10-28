@@ -32,5 +32,5 @@ message BasicAuth {
   // Username-password pairs used to verify user credentials in the "Authorization" header.
   // The value needs to be the htpasswd format.
   // Reference to https://httpd.apache.org/docs/2.4/programs/htpasswd.html
-  config.core.v3.DataSource users = 1 [(udpa.annotations.sensitive) = true];
+   config.core.v3.DataSource users = 1 [(udpa.annotations.sensitive) = true];
 }

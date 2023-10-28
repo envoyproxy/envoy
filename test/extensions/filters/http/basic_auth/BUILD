@@ -31,3 +31,15 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "basic_auth_integration_test",
+    size = "large",
+    srcs = ["basic_auth_integration_test.cc"],
+    extension_names = ["envoy.filters.http.basic_auth"],
+    deps = [
+        "//source/extensions/filters/http/basic_auth:config",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
