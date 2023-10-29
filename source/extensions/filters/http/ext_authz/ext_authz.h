@@ -263,7 +263,14 @@ public:
         check_settings_(config.has_check_settings()
                             ? config.check_settings()
                             : envoy::extensions::filters::http::ext_authz::v3::CheckSettings()),
-        disabled_(config.disabled()) {}
+        disabled_(config.disabled()) {
+    if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
+        config.check_settings().has_with_request_body()) {
+      ExceptionUtil::throwEnvoyException(
+          "Invalid configuration for check_settings. Only one of disable_request_body_buffering or "
+          "with_request_body can be set.");
+    }
+  }
 
   void merge(const FilterConfigPerRoute& other);
 
