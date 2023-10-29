@@ -74,26 +74,30 @@ public:
   uint32_t maxBufferedDatagrams() const override { return max_buffered_datagrams_; };
   uint64_t maxBufferedBytes() const override { return max_buffered_bytes_; };
 
-  void propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                const StreamInfo::FilterStateSharedPtr& filter_state) const override {
+  void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const override {
     if (!propagate_response_headers_) {
       return;
     }
 
-    filter_state->setData(
-      TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+    filter_state->setData(TunnelResponseHeaders::key(),
+                          std::make_shared<TunnelResponseHeaders>(std::move(headers)),
+                          StreamInfo::FilterState::StateType::ReadOnly,
+                          StreamInfo::FilterState::LifeSpan::Connection);
   }
 
-  void propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
-                                 const StreamInfo::FilterStateSharedPtr& filter_state) const override {
+  void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const override {
     if (!propagate_response_trailers_) {
       return;
     }
 
-    filter_state->setData(
-        TunnelResponseTrailers::key(), std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+    filter_state->setData(TunnelResponseTrailers::key(),
+                          std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
+                          StreamInfo::FilterState::StateType::ReadOnly,
+                          StreamInfo::FilterState::LifeSpan::Connection);
   }
 
 private:

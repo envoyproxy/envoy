@@ -733,11 +733,11 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseHeaders) {
       log_format:
         text_format_source:
           inline_string: "%FILTER_STATE(envoy.udp_proxy.propagate_response_headers:TYPED)%\n"
-)EOF", 
+)EOF",
                                                             access_log_filename);
 
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, absl::nullopt,
-                    session_access_log_config, true, false};
+  TestConfig config{"host.com",      "target.com", 1, 30, false, "", BufferOptions{1, 30},
+                    absl::nullopt, session_access_log_config, true, false};
   setup(config);
 
   const std::string datagram = "hello";
@@ -769,8 +769,8 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailerrs) {
 )EOF", 
                                                             access_log_filename);
 
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, absl::nullopt,
-                    session_access_log_config, false, true};
+  TestConfig config{"host.com",      "target.com", 1, 30, false, "", BufferOptions{1, 30},
+                    absl::nullopt, session_access_log_config, false, true};
   setup(config);
 
   const std::string datagram = "hello";
