@@ -59,11 +59,11 @@ public:
   MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const));
   MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const));
   MOCK_METHOD(void, propagateResponseHeaders,
-              (Http::ResponseHeaderMapPtr&& headers,
+              (Http::ResponseHeaderMapPtr && headers,
                const StreamInfo::FilterStateSharedPtr& filter_state),
               (const));
   MOCK_METHOD(void, propagateResponseTrailers,
-              (Http::ResponseTrailerMapPtr&& trailers,
+              (Http::ResponseTrailerMapPtr && trailers,
                const StreamInfo::FilterStateSharedPtr& filter_state),
               (const));
 
