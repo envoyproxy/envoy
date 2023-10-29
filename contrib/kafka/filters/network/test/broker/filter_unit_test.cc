@@ -37,7 +37,7 @@ class MockResponseRewriter : public ResponseRewriter {
 public:
   MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
   MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
-  MOCK_METHOD(void, rewrite, (Buffer::Instance&));
+  MOCK_METHOD(void, process, (Buffer::Instance&));
 };
 
 using MockResponseRewriterSharedPtr = std::shared_ptr<MockResponseRewriter>;
@@ -149,7 +149,7 @@ TEST_F(KafkaBrokerFilterUnitTest, ShouldAcceptDataSentByKafkaBroker) {
   // given
   Buffer::OwnedImpl data;
   EXPECT_CALL(*response_decoder_, onData(_));
-  EXPECT_CALL(*response_rewriter_, rewrite(_));
+  EXPECT_CALL(*response_rewriter_, process(_));
 
   // when
   initialize();

@@ -111,7 +111,7 @@ Network::FilterStatus KafkaBrokerFilter::onWrite(Buffer::Instance& data, bool) {
   ENVOY_LOG(trace, "data from Kafka broker [{} response bytes]", data.length());
   try {
     response_decoder_->onData(data);
-    response_rewriter_->rewrite(data);
+    response_rewriter_->process(data);
     return Network::FilterStatus::Continue;
   } catch (const EnvoyException& e) {
     ENVOY_LOG(debug, "could not process data from Kafka broker: {}", e.what());

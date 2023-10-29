@@ -26,7 +26,7 @@ public:
    * Performs any desired payload changes.
    * @param buffer buffer with the original data from upstream
    */
-  virtual void rewrite(Buffer::Instance& buffer) PURE;
+  virtual void process(Buffer::Instance& buffer) PURE;
 };
 
 using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
@@ -42,7 +42,7 @@ public:
   void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
 
   // ResponseRewriter
-  void rewrite(Buffer::Instance& buffer) override;
+  void process(Buffer::Instance& buffer) override;
 
   size_t getStoredResponseCountForTest() const;
 
@@ -52,6 +52,7 @@ private:
 
 /**
  * Does nothing, letting the data from upstream pass without any changes.
+ * It allows us to avoid the unnecessary deserialization-then-serialization steps.
  */
 class DoNothingRewriter : public ResponseRewriter {
 public:
@@ -60,13 +61,11 @@ public:
   void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
 
   // ResponseRewriter
-  void rewrite(Buffer::Instance& buffer) override;
+  void process(Buffer::Instance& buffer) override;
 };
 
 /**
  * Factory method that creates a rewriter depending on configuration.
- * @param config
- * @return rewriter
  */
 ResponseRewriterSharedPtr createRewriter(const BrokerFilterConfig& config);
 

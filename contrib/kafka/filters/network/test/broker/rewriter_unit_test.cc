@@ -55,7 +55,7 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteBuffer) {
 
   // when - 2
   auto buffer = makeRandomBuffer(4242);
-  testee.rewrite(*buffer);
+  testee.process(*buffer);
 
   // then - 2
   ASSERT_EQ(testee.getStoredResponseCountForTest(), 0);
