@@ -762,7 +762,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseHeaders) {
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("capsule-protocol"));
 }
 
-TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailerrs) {
+TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailers) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
@@ -794,14 +794,14 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailerrs) {
   const std::string datagram = "hello";
   establishConnection(datagram);
 
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+  sendCapsuleDownstream("response", false);
+
   const std::string trailer_value = "test-trailer-value";
   Http::TestResponseTrailerMapImpl response_trailers{{"test-trailer-name", trailer_value}};
   upstream_request_->encodeTrailers(response_trailers);
 
-  // Wait for buffered datagram.
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
-
-  sendCapsuleDownstream("response", true);
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 
   // Verify response trailer value is in the access log.
