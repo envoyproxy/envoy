@@ -43,8 +43,9 @@ public:
   /**
    * If a read filter stopped filter iteration, continueFilterChain() can be called to continue the
    * filter chain. It will have onNewSession() called if it was not previously called.
+   * @return false if the session is removed and no longer valid, otherwise returns true.
    */
-  virtual void continueFilterChain() PURE;
+  virtual bool continueFilterChain() PURE;
 };
 
 class WriteFilterCallbacks : public FilterCallbacks {};
