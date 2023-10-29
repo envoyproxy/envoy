@@ -87,7 +87,7 @@ jobs:
       uses: envoyproxy/toolshed/gh-actions/email/validate@actions-v0.1.1
       with:
         email: ${{ inputs.author }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@ffa33da04ea0b9528f666a49ff2f336fedf9fca4
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.1
       name: Create release
       with:
         source: |
