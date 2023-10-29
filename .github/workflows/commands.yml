@@ -24,7 +24,7 @@ jobs:
       actions: write
       checks: read
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.1.1
+    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.1.2
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         azp_org: cncf
