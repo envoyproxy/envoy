@@ -66,7 +66,7 @@ message UdpProxyConfig {
 
   // Configuration for tunneling UDP over other transports or application layers.
   // Tunneling is currently supported over HTTP/2.
-  // [#next-free-field: 10]
+  // [#next-free-field: 12]
   message UdpTunnelingConfig {
     // Configuration for UDP datagrams buffering.
     message BufferOptions {
@@ -160,6 +160,14 @@ message UdpProxyConfig {
     // while the upstream is not ready will be dropped. In case this field is set but the options
     // are not configured, the default values will be applied as described in the ``BufferOptions``.
     BufferOptions buffer_options = 9;
+
+    // Save the response headers to the downstream info filter state for consumption
+    // by the session filters. The filter state key is ``envoy.udp_proxy.propagate_response_headers``.
+    bool propagate_response_headers = 10;
+
+    // Save the response trailers to the downstream info filter state for consumption
+    // by the session filters. The filter state key is ``envoy.udp_proxy.propagate_response_trailers``.
+    bool propagate_response_trailers = 11;
   }
 
   // The stat prefix used when emitting UDP proxy filter stats.
