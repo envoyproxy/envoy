@@ -770,11 +770,11 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailerrs) {
   access_log:
   - name: envoy.access_loggers.file
     typed_config:
-      '@type': type.googleapis.com/envoy.extensions.access_ oggers.file.v3.FileAccessLog
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
       path: {}
       log_format:
         text_format_source:
-          inline_string: "%FILTER_STATE(envoy.udp_proxy.pro agate_response_trailers:TYPED)%\n"
+          inline_string: "%FILTER_STATE(envoy.udp_proxy.propagate_response_trailers:TYPED)%\n"
 )EOF",
                                                             access_log_filename);
 
