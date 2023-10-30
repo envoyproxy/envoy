@@ -92,5 +92,9 @@ new_features:
 - area: tracing
   change: |
     Added support for configuring resource detectors on the OpenTelemetry tracer.
+- area: tracing
+  change: |
+   Upstream dd-trace-cpp update. Datadog propagation styles now includes ``B3Multi``, which replaces ``B3``.
+   ``B3`` is marked as deprecated and should no longer be used.
 
 deprecated:
