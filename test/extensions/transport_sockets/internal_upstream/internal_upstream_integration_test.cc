@@ -4,6 +4,7 @@
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/transport_sockets/internal_upstream/config.h"
 
 #include "test/integration/http_integration.h"
@@ -16,6 +17,27 @@
 
 namespace Envoy {
 namespace {
+
+class TestObject1Factory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "internal_state"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+class TestObject2Factory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "internal_state_once"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(TestObject1Factory, StreamInfo::FilterState::ObjectFactory);
+REGISTER_FACTORY(TestObject2Factory, StreamInfo::FilterState::ObjectFactory);
 
 class InternalUpstreamIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
@@ -38,18 +60,24 @@ public:
     config_helper_.prependFilter(R"EOF(
     name: header-to-filter-state
     typed_config:
-      "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
-      header_name: internal-header
-      state_name: internal_state
-      shared: TRANSITIVE
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: internal_state
+        format_string:
+          text_format_source:
+            inline_string: "%REQ(internal-header)%"
+        shared_with_upstream: TRANSITIVE
     )EOF");
     config_helper_.prependFilter(R"EOF(
     name: header-to-filter-state
     typed_config:
-      "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
-      header_name: internal-header-once
-      state_name: internal_state_once
-      shared: ONCE
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: internal_state_once
+        format_string:
+          text_format_source:
+            inline_string: "%REQ(internal-header-once)%"
+        shared_with_upstream: ONCE
     )EOF");
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       setupBootstrapExtension(bootstrap);

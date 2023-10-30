@@ -201,15 +201,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirectHttpRequest) {
     EXPECT_EQ("301", response->headers().getStatusValue());
     EXPECT_EQ("https://www.redirect.com/foo",
               response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                           BytesCountExpectation(69, 30, 69, 30),
-                                           BytesCountExpectation(0, 30, 0, 30));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                           BytesCountExpectation(0, 30, 0, 30),
-                                           BytesCountExpectation(0, 30, 0, 30));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
+                                         BytesCountExpectation(69, 30, 69, 30),
+                                         BytesCountExpectation(0, 30, 0, 30));
   } else {
     // All QUIC requests use https, and should not be redirected. (Even those sent with http scheme
     // will be overridden to https by HCM.)
@@ -717,15 +711,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(40, 58, 40, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
-  } else {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(0, 58, 0, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
-  }
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                       BytesCountExpectation(40, 58, 40, 58),
+                                       BytesCountExpectation(7, 10, 7, 8));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
@@ -3096,6 +3084,50 @@ TEST_P(ProtocolIntegrationTest, ContinueAllFromDecodeMetadata) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, ContinueAllFromDecodeMetadataFollowedByLocalReply) {
+  if (downstream_protocol_ != Http::CodecType::HTTP2 ||
+      upstreamProtocol() != Http::CodecType::HTTP2) {
+    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
+  }
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.prependFilter(R"EOF(
+  name: local-reply-during-decode
+  )EOF");
+  config_helper_.prependFilter(R"EOF(
+  name: metadata-control-filter
+  )EOF");
+  autonomous_upstream_ = false;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+  IntegrationStreamDecoderPtr& decoder = encoder_decoder.second;
+  // Send some data; this should be buffered.
+  codec_client_->sendData(encoder, "abc", false);
+  // Allow the headers through.
+  Http::MetadataMap metadata;
+  metadata["should_continue"] = "true";
+  codec_client_->sendMetadata(encoder, metadata);
+
+  ASSERT_TRUE(decoder->waitForEndStream(std::chrono::milliseconds(500)));
+  EXPECT_EQ("500", decoder->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(ProtocolIntegrationTest, ContinueAllFromEncodeMetadata) {
   if (upstreamProtocol() != Http::CodecType::HTTP2 ||
       downstream_protocol_ != Http::CodecType::HTTP2) {
@@ -4276,9 +4308,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   waitForNextUpstreamRequest();
 
   // Makes us have Envoy's writes to downstream return EBADF
-  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  Api::IoErrorPtr ebadf = Network::IoSocketError::getIoSocketEbadfError();
   socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
-  socket_swap.write_matcher_->setWriteOverride(ebadf);
+  socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
@@ -4293,7 +4325,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
-  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  socket_swap.write_matcher_->setWriteOverride(Api::IoError::none());
   // Shut down the server and upstreams before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();
@@ -4321,9 +4353,9 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   RELEASE_ASSERT(result, result.message());
 
   // Makes us have Envoy's writes to upstream return EBADF
-  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  Api::IoErrorPtr ebadf = Network::IoSocketError::getIoSocketEbadfError();
   socket_swap.write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-  socket_swap.write_matcher_->setWriteOverride(ebadf);
+  socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
 
   Buffer::OwnedImpl data("HTTP body content goes here");
   codec_client_->sendData(*downstream_request, data, true);
@@ -4333,7 +4365,7 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
               HasSubstr("upstream_reset_before_response_started{connection_termination}"));
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  socket_swap.write_matcher_->setWriteOverride(Api::IoError::none());
   // Shut down the server before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();

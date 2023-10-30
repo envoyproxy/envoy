@@ -15,33 +15,10 @@ GeoipFilterConfig::GeoipFilterConfig(
     const envoy::extensions::filters::http::geoip::v3::Geoip& config,
     const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
-      total_(stat_name_set_->add("total")), use_xff_(config.has_xff_config()),
+      stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")), use_xff_(config.has_xff_config()),
       xff_num_trusted_hops_(config.has_xff_config() ? config.xff_config().xff_num_trusted_hops()
                                                     : 0) {
-  const auto& geo_headers_to_add = config.geo_headers_to_add();
-  geo_headers_ = processGeoHeaders({geo_headers_to_add.country(), geo_headers_to_add.city(),
-                                    geo_headers_to_add.region(), geo_headers_to_add.asn()});
-  geo_anon_headers_ =
-      processGeoHeaders({geo_headers_to_add.is_anon(), geo_headers_to_add.anon_vpn(),
-                         geo_headers_to_add.anon_hosting(), geo_headers_to_add.anon_tor(),
-                         geo_headers_to_add.anon_proxy()});
-  if (geo_headers_.empty() && geo_anon_headers_.empty()) {
-    throw EnvoyException("No geolocation headers configured");
-  }
-}
-
-absl::flat_hash_set<std::string>
-GeoipFilterConfig::processGeoHeaders(const absl::flat_hash_set<absl::string_view>& headers) const {
-  absl::flat_hash_set<std::string> geo_headers;
-  for (auto header : headers) {
-    if (!header.empty()) {
-      stat_name_set_->rememberBuiltin(absl::StrCat(header, ".hit"));
-      stat_name_set_->rememberBuiltin(absl::StrCat(header, ".total"));
-      geo_headers.insert(std::string(header));
-    }
-  }
-  return geo_headers;
+  stat_name_set_->rememberBuiltin("total");
 }
 
 void GeoipFilterConfig::incCounter(Stats::StatName name) {
@@ -49,7 +26,7 @@ void GeoipFilterConfig::incCounter(Stats::StatName name) {
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
-GeoipFilter::GeoipFilter(GeoipFilterConfigSharedPtr config, DriverSharedPtr driver)
+GeoipFilter::GeoipFilter(GeoipFilterConfigSharedPtr config, Geolocation::DriverSharedPtr driver)
     : config_(config), driver_(std::move(driver)) {}
 
 GeoipFilter::~GeoipFilter() = default;
@@ -76,13 +53,9 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // This is a safe measure to protect against the case when filter gets deleted before the callback
   // is run.
   GeoipFilterWeakPtr self = weak_from_this();
-  // Copy header values to pass to the driver lookup function (in case filter gets destroyed before
-  // lookup completes).
-  absl::flat_hash_set<std::string> geo_headers = config_->geoHeaders();
-  absl::flat_hash_set<std::string> geo_anon_headers = config_->geoAnonHeaders();
   driver_->lookup(
-      LookupRequest{std::move(remote_address), std::move(geo_headers), std::move(geo_anon_headers)},
-      [self, &dispatcher = decoder_callbacks_->dispatcher()](LookupResult&& result) {
+      Geolocation::LookupRequest{std::move(remote_address)},
+      [self, &dispatcher = decoder_callbacks_->dispatcher()](Geolocation::LookupResult&& result) {
         dispatcher.post([self, result]() {
           if (GeoipFilterSharedPtr filter = self.lock()) {
             filter->onLookupComplete(std::move(result));
@@ -106,18 +79,16 @@ void GeoipFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& 
   decoder_callbacks_ = &callbacks;
 }
 
-void GeoipFilter::onLookupComplete(LookupResult&& result) {
+void GeoipFilter::onLookupComplete(Geolocation::LookupResult&& result) {
   ASSERT(request_headers_);
   for (auto it = result.cbegin(); it != result.cend();) {
     const auto& geo_header = it->first;
     const auto& lookup_result = it++->second;
-    if (lookup_result) {
-      request_headers_->setCopy(Http::LowerCaseString(geo_header), lookup_result.value());
-      config_->incHit(geo_header);
+    if (!lookup_result.empty()) {
+      request_headers_->setCopy(Http::LowerCaseString(geo_header), lookup_result);
     }
-    config_->incTotal(geo_header);
   }
-
+  config_->incTotal();
   ENVOY_LOG(debug, "Geoip filter: finished decoding geolocation headers");
   decoder_callbacks_->continueDecoding();
 }

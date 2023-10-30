@@ -127,5 +127,24 @@ TEST_F(TagProducerTest, Fixed) {
   checkTags(tag_config, tags);
 }
 
+// Test that fixed tags both from cli and from stats_config are returned from `fixedTags()`.
+TEST_F(TagProducerTest, FixedTags) {
+  const TagVector tag_config{{"my-tag", "fixed"}};
+
+  auto& specifier = *stats_config_.mutable_stats_tags()->Add();
+  specifier.set_tag_name("tag2");
+  specifier.set_fixed_value("value2");
+
+  // This one isn't a fixed value so it won't be included.
+  addSpecifier("regex", "value");
+
+  TagProducerImpl producer{stats_config_, tag_config};
+  const auto& tags = producer.fixedTags();
+  EXPECT_THAT(tags, testing::UnorderedElementsAreArray(TagVector{
+                        {"my-tag", "fixed"},
+                        {"tag2", "value2"},
+                    }));
+}
+
 } // namespace Stats
 } // namespace Envoy

@@ -193,6 +193,11 @@ public:
    */
   virtual void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                                     StatNameTagVector& stat_tags) PURE;
+
+  /**
+   * Returns the configured fixed tags (which don't depend on the name of the stat).
+   */
+  virtual const TagVector& fixedTags() PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

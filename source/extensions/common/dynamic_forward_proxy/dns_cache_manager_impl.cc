@@ -19,7 +19,7 @@ DnsCacheSharedPtr DnsCacheManagerImpl::getCache(
   const auto& existing_cache = caches_.find(config.name());
   if (existing_cache != caches_.end()) {
     if (!Protobuf::util::MessageDifferencer::Equivalent(config, existing_cache->second.config_)) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("config specified DNS cache '{}' with different settings", config.name()));
     }
 

@@ -56,6 +56,10 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
+  if [[ -n "$CLANG_TOOLCHAIN_SETUP" ]]; then
+    return
+  fi
+  export CLANG_TOOLCHAIN_SETUP=1
   ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
@@ -118,14 +122,6 @@ bazel () {
 
 export _bazel
 export -f bazel
-
-if [[ -n "$BAZEL_NO_CACHE_TEST_RESULTS" ]]; then
-    VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
-    # Use uncached test results for non-release commits to a branch.
-    if [[ $VERSION_DEV == "dev" ]]; then
-        BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
-    fi
-fi
 
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.

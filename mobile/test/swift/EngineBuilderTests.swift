@@ -407,21 +407,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains("fake_ssl_root_certs"))
     XCTAssertTrue(bootstrapDebugDescription.contains("fake_sni_address"))
   }
-
-  func testAddingXdsJwtSecurityConfigurationWhenRunningEnvoy() {
-    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
-      .setJwtAuthenticationToken(token: "fake_jwt_token", tokenLifetimeInSeconds: 12345)
-      .setSslRootCerts(rootCerts: "fake_ssl_root_certs")
-      .setSni(sni: "fake_sni_address")
-      .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
-    let bootstrapDebugDescription = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .setXds(xdsBuilder)
-      .bootstrapDebugDescription()
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_jwt_token"))
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_ssl_root_certs"))
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_sni_address"))
-  }
 #endif
 
   func testXDSDefaultValues() {

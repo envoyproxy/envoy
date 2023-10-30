@@ -184,15 +184,9 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(40, 58, 40, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(0, 58, 0, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                         BytesCountExpectation(40, 58, 40, 58),
+                                         BytesCountExpectation(7, 10, 7, 8));
   }
 }
 

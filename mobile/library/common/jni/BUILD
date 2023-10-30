@@ -43,6 +43,7 @@ cc_library(
         "//library/common/types:managed_types_lib",
         "//library/common/types:matcher_data_lib",
         "@envoy//source/common/common:assert_lib",
+        "@envoy//source/common/protobuf",
     ],
 )
 
@@ -68,6 +69,7 @@ cc_library(
         "//library/common/jni/types:jni_exception_lib",
         "//library/common/jni/types:jni_javavm_lib",
         "//library/common/types:managed_types_lib",
+        "@envoy//source/common/protobuf",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,

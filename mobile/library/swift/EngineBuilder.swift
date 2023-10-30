@@ -14,15 +14,12 @@ import Foundation
 /// This class is typically used as input to the EngineBuilder's setXds() method.
 @objcMembers
 open class XdsBuilder: NSObject {
-  public static let defaultJwtTokenLifetimeInSeconds: UInt32 = 60 * 60 * 24 * 90 // 90 days
   public static let defaultXdsTimeoutInSeconds: UInt32 = 5
 
   let xdsServerAddress: String
   let xdsServerPort: UInt32
   var authHeader: String?
   var authToken: String?
-  var jwtToken: String?
-  var jwtTokenLifetimeInSeconds: UInt32 = XdsBuilder.defaultJwtTokenLifetimeInSeconds
   var sslRootCerts: String?
   var sni: String?
   var rtdsResourceName: String?
@@ -53,25 +50,6 @@ open class XdsBuilder: NSObject {
     token: String) -> Self {
     self.authHeader = header
     self.authToken = token
-    return self
-  }
-
-  /// Sets JWT as the authentication method to the xDS management server, using the given token.
-  ///
-  /// - parameter token:                  The JWT token used to authenticate the client to the xDS
-  ///                                     management server.
-  /// - parameter tokenLifetimeInSeconds: <optional> the lifetime of the JWT token, in seconds. If
-  ///                                     none (or 0) is specified, then
-  ///                                     defaultJwtTokenLifetimeSeconds is used.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func setJwtAuthenticationToken(
-    token: String,
-    tokenLifetimeInSeconds: UInt32 = XdsBuilder.defaultJwtTokenLifetimeInSeconds) -> Self {
-    self.jwtToken = token
-    self.jwtTokenLifetimeInSeconds = (tokenLifetimeInSeconds > 0) ?
-        tokenLifetimeInSeconds : XdsBuilder.defaultJwtTokenLifetimeInSeconds
     return self
   }
 
@@ -787,8 +765,6 @@ open class EngineBuilder: NSObject {
     var xdsServerPort: UInt32 = 0
     var xdsAuthHeader: String?
     var xdsAuthToken: String?
-    var xdsJwtToken: String?
-    var xdsJwtTokenLifetimeSeconds: UInt32 = 0
     var xdsSslRootCerts: String?
     var xdsSni: String?
     var rtdsResourceName: String?
@@ -802,8 +778,6 @@ open class EngineBuilder: NSObject {
     xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
     xdsAuthHeader = self.xdsBuilder?.authHeader
     xdsAuthToken = self.xdsBuilder?.authToken
-    xdsJwtToken = self.xdsBuilder?.jwtToken
-    xdsJwtTokenLifetimeSeconds = self.xdsBuilder?.jwtTokenLifetimeInSeconds ?? 0
     xdsSslRootCerts = self.xdsBuilder?.sslRootCerts
     xdsSni = self.xdsBuilder?.sni
     rtdsResourceName = self.xdsBuilder?.rtdsResourceName
@@ -856,8 +830,6 @@ open class EngineBuilder: NSObject {
       xdsServerPort: xdsServerPort,
       xdsAuthHeader: xdsAuthHeader,
       xdsAuthToken: xdsAuthToken,
-      xdsJwtToken: xdsJwtToken,
-      xdsJwtTokenLifetimeSeconds: xdsJwtTokenLifetimeSeconds,
       xdsSslRootCerts: xdsSslRootCerts,
       xdsSni: xdsSni,
       rtdsResourceName: rtdsResourceName,
@@ -963,10 +935,6 @@ private extension EngineBuilder {
       if let xdsAuthHeader = xdsBuilder.authHeader {
         cxxXdsBuilder.setAuthenticationToken(xdsAuthHeader.toCXX(),
                                              xdsBuilder.authToken?.toCXX() ?? "".toCXX())
-      }
-      if let xdsJwtToken = xdsBuilder.jwtToken {
-        cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(),
-                                                Int32(xdsBuilder.jwtTokenLifetimeInSeconds))
       }
       if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
         cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())

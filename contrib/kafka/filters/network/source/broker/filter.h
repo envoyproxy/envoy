@@ -6,6 +6,7 @@
 #include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "contrib/kafka/filters/network/source/broker/filter_config.h"
 #include "contrib/kafka/filters/network/source/external/request_metrics.h"
 #include "contrib/kafka/filters/network/source/external/response_metrics.h"
 #include "contrib/kafka/filters/network/source/parser.h"
@@ -138,7 +139,8 @@ public:
    * Creates decoders that eventually update prefixed metrics stored in scope, using time source for
    * duration calculation.
    */
-  KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_source, const std::string& stat_prefix);
+  KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_source,
+                    const BrokerFilterConfig& filter_config);
 
   /**
    * Visible for testing.

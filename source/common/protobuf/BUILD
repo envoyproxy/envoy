@@ -105,8 +105,8 @@ envoy_cc_library(
     deps = [
         "utility_lib_header",
     ] + envoy_select_enable_lite_protos([
-        "//bazel/cc_proto_descriptor_library:create_dynamic_message",
-        "//bazel/cc_proto_descriptor_library:text_format_transcoder",
+        "@envoy_api//bazel/cc_proto_descriptor_library:create_dynamic_message",
+        "@envoy_api//bazel/cc_proto_descriptor_library:text_format_transcoder",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/annotations:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto_descriptor",
@@ -154,6 +154,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/http/original_ip_detection/xff/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/extensions/load_balancing_policies/cluster_provided/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto_descriptor",

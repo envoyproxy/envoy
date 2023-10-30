@@ -618,6 +618,7 @@ bool RouterCheckTool::runtimeMock(absl::string_view key,
 }
 
 Options::Options(int argc, char** argv) {
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,
