@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -200,7 +200,7 @@ message ExtAuthz {
 
   // Whether to increment cluster statistics (e.g. cluster.<cluster_name>.upstream_rq_*) on authorization failure.
   // Prefixed with `no_` because proto bool defaults are `false`.
-  bool no_charge_cluster_response_stats = 19;
+  bool no_charge_cluster_response_stats = 20;
 }
 
 // Configuration for buffering the request data.
