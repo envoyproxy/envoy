@@ -44,7 +44,6 @@ EXTENSIONS = {
     "envoy.config.validators.minimum_clusters_validator":     "//source/extensions/config/validators/minimum_clusters:config",
 
     #
-    #
     # gRPC Credentials Plugins
     #
 
