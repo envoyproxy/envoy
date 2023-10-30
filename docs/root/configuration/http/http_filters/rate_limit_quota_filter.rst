@@ -30,7 +30,7 @@ Bucket definitions can be overridden by the virtual host or route configurations
 
 Initially all Envoy's quota assignments are empty. The rate limit quota filter requests quota assignment from RLQS when the request matches to a bucket for the first time.
 The behavior of the filter while it waits for the initial assignment is determined by the ``no_assignment_behavior`` value. In this state, requests can either all be
-immediately allowed, denied or enqueued [1]_ until quota assignment is received.
+immediately allowed, denied until quota assignment is received.
 
 A quota assignment may have an associated :ref:`time to live <envoy_v3_api_field_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction.assignment_time_to_live>`.
 The RLQS is expected to update the assignment before the TTL runs out. If RLQS failed to update the assignment and its TTL
@@ -50,14 +50,12 @@ if it has not yet received a rate limit quota or to the
 connection could not be re-established by the time the existing quota expired.
 
 In case the RLQS client doesn't receive the initial bucket assignment (for any reason, including
-RLQS server connection failures) within predetermined [2]_ time, such buckets will eventually be
-purged from memory. Any enqueued [1]_ requests will be rejected (only applies when "no assignment behavior"
-is to enqueue). Subsequent requests matched into the bucket will re-initialize the bucket in the "no assignment"
-state, restarting the reports. This is explained in more details at
+RLQS server connection failures) within predetermined [1]_ time, such buckets will eventually be
+purged from memory. Subsequent requests matched into the bucket will re-initialize the bucket
+in the "no assignment" state, restarting the reports. This is explained in more details at
 :ref:`Rate Limit Quota Service (RLQS) <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
 
-.. [1] Enqueuing (blocking) requests while waiting for the initial assigned is not currently supported.
-.. [2] The exact time to wait for the initial assignment is chosen by the filter, and may vary based on the implementation.
+.. [1] The exact time to wait for the initial assignment is chosen by the filter, and may vary based on the implementation.
 
 Example 1
 ^^^^^^^^^
