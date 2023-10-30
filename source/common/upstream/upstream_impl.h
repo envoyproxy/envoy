@@ -391,7 +391,8 @@ public:
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagsGet(enumToInt(HealthFlag::FAILED_ACTIVE_HC) |
                        enumToInt(HealthFlag::FAILED_OUTLIER_CHECK) |
-                       enumToInt(HealthFlag::FAILED_EDS_HEALTH))) {
+                       enumToInt(HealthFlag::FAILED_EDS_HEALTH) |
+                       enumToInt(HealthFlag::DRAINING_EDS_HEALTH))) {
       return Host::Health::Unhealthy;
     }
 

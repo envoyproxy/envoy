@@ -439,6 +439,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   // Clear all old EDS health flags first.
   HostImpl::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   HostImpl::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+  HostImpl::healthFlagClear(Host::HealthFlag::DRAINING_EDS_HEALTH);
 
   // Set the appropriate EDS health flag.
   switch (health_status) {
