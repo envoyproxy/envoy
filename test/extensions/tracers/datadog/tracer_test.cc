@@ -272,7 +272,6 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
       // This is the only case, at least in this test, where Envoy's decision
       // affects the resulting sampling priority.
       {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::DATADOG, -1},
-      // Same here.
       {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::W3C, 0},
 
       {__LINE__, -1, true, datadog::tracing::PropagationStyle::DATADOG, -1},
