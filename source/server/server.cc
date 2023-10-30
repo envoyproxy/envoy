@@ -899,7 +899,8 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
-          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) && !instance.runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
+      !instance.runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
                     "connections. Configure a "
                     "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
