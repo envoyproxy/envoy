@@ -27,7 +27,7 @@ minor_behavior_changes:
   change: |
     Fixes a bug where sending http2 metadata over a connection that does not support metadata would trigger an ASSERT,
     and then proceed to send the metadata anyway.
-    Protected by envoy_reloadable_features_drop_encoding_metadata_if_not_allowed.
+    Protected by ``envoy.reloadable_features.drop_encoding_metadata_if_not_allowed``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
