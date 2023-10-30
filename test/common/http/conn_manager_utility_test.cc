@@ -1045,7 +1045,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRes
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
-		                                              Protocol::Http2, config_, "",
+                                                  Protocol::Http2, config_, "",
                                                   connection_.stream_info_, node_id_);
 
   EXPECT_EQ(3UL, response_headers.size()) << response_headers;
@@ -1111,7 +1111,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
     EXPECT_TRUE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
     ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
-	                                                  Protocol::Http11, config_, "",
+                                                    Protocol::Http11, config_, "",
                                                     connection_.stream_info_, node_id_);
 
     EXPECT_EQ(0UL, response_headers.size()) << response_headers;

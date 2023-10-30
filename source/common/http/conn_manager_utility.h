@@ -67,10 +67,11 @@ public:
    *         Note that an extension might also be used. If detection fails, the result may contain
    *         options for rejecting the request.
    */
-  static MutateRequestHeadersResult mutateRequestHeaders(RequestHeaderMap& request_headers, Protocol protocol,
-                                                         Network::Connection& connection, ConnectionManagerConfig& config,
-                                                         const Router::Config& route_config, const LocalInfo::LocalInfo& local_info,
-                                                         const StreamInfo::StreamInfo& stream_info);
+  static MutateRequestHeadersResult
+  mutateRequestHeaders(RequestHeaderMap& request_headers, Protocol protocol,
+                       Network::Connection& connection, ConnectionManagerConfig& config,
+                       const Router::Config& route_config, const LocalInfo::LocalInfo& local_info,
+                       const StreamInfo::StreamInfo& stream_info);
   /**
    * Mutates response headers in various ways. This functionality is broken out because of its
    * complexity for ease of testing. See the method itself for detailed comments on what

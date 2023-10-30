@@ -90,18 +90,16 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (!Utility::isUpgrade(request_headers)) {
-    // since java/tomcat relies on Connection: keep-alive request header for http1.1,
-    // retain the same only if connection has keep-alive.
-    // Its optional per RFC2616. 
+    // Per RFC2616, connection keepalive is optional and useful for java/tomcat.
     if (protocol == Protocol::Http11 && request_headers.Connection() &&
-       Envoy::StringUtil::caseFindToken(request_headers.Connection()->value().getStringView(), ",",
-                                        Http::Headers::get().ConnectionValues.KeepAlive)) {
+        Envoy::StringUtil::caseFindToken(request_headers.Connection()->value().getStringView(), ",",
+                                         Http::Headers::get().ConnectionValues.KeepAlive)) {
       if (!Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.retain_keepalive_header_http11")) {
         request_headers.removeConnection();
       }
     } else {
-        request_headers.removeConnection();
+      request_headers.removeConnection();
     }
     request_headers.removeUpgrade();
   }
@@ -521,7 +519,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(
     response_headers.removeTransferEncoding();
     if (protocol == Protocol::Http11) {
       if (!Runtime::runtimeFeatureEnabled(
-               "envoy.reloadable_features.retain_keepalive_header_http11")) {
+              "envoy.reloadable_features.retain_keepalive_header_http11")) {
         response_headers.removeKeepAlive();
       }
     } else {

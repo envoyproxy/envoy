@@ -263,8 +263,8 @@ public:
             headers.setReferenceKey(Headers::get().Status, "200");
           }
           ConnectionManagerUtility::mutateResponseHeaders(
-               headers, &request_.request_headers_, Protocol::Http2, *context_.conn_manager_config_,
-               /*via=*/"", stream_info_, /*node_id=*/"");
+              headers, &request_.request_headers_, Protocol::Http2, *context_.conn_manager_config_,
+              /*via=*/"", stream_info_, /*node_id=*/"");
           state.response_encoder_->encodeHeaders(headers, end_stream);
         } else {
           state.request_encoder_
