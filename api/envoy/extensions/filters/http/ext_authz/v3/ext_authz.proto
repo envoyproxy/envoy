@@ -199,7 +199,7 @@ message ExtAuthz {
   bool include_tls_session = 18;
 
   // Whether to increment cluster statistics (e.g. cluster.<cluster_name>.upstream_rq_*) on authorization failure.
-  // Prefixed with `no_` because proto bool defaults are `false`.
+  // Prefixed with ``no_`` because proto bool defaults are ``false``.
   bool no_charge_cluster_response_stats = 20;
 }
 
