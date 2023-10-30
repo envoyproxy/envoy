@@ -42,6 +42,7 @@ jobs:
         - target: deps
           rbe: false
           managed: true
+          runs-on: envoy-x64-small
     uses: ./.github/workflows/_ci.yml
     name: CI ${{ matrix.target }}
     permissions:
@@ -58,3 +59,4 @@ jobs:
       error-match: |
         ERROR
         ClientConnectorError
+      runs-on: ${{ matrix.runs-on }}
