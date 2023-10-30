@@ -341,7 +341,14 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
   parent_.updateActiveStreamsOnEncode(*this);
-  ASSERT(parent_.allow_metadata_);
+  if (!parent_.allow_metadata_ &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.drop_encoding_metadata_if_not_allowed")) {
+    // Do not submit metadata to the upstream if not allowed by the protocol options.
+    return;
+  } else {
+    ASSERT(parent_.allow_metadata_);
+  }
   NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
   auto sources_vec = metadata_encoder.createSources(metadata_map_vector);
   for (auto& source : sources_vec) {

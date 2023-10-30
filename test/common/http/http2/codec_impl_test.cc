@@ -1124,6 +1124,69 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeClientBody) {
   driveToCompletion();
 }
 
+TEST_P(Http2CodecImplTest, MetadataDisallowedAndFeatureFlagOff) {
+  allow_metadata_ = false;
+
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.drop_encoding_metadata_if_not_allowed", "false"}});
+  initialize();
+
+  // Generates a valid stream_id by sending a request header.
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  MetadataMapVector metadata_map_vector;
+  const int size = 10;
+  for (int i = 0; i < size; i++) {
+    MetadataMap metadata_map = {
+        {"header_key1", "header_value1"},
+        {"header_key2", "header_value2"},
+        {"header_key3", "header_value3"},
+        {"header_key4", "header_value4"},
+    };
+    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  }
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(0);
+  ASSERT_DEATH(request_encoder_->encodeMetadata(metadata_map_vector), "");
+}
+
+TEST_P(Http2CodecImplTest, MetadataDisallowedAndFeatureFlagOn) {
+  allow_metadata_ = false;
+
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.drop_encoding_metadata_if_not_allowed", "true"}});
+  initialize();
+
+  // Generates a valid stream_id by sending a request header.
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  MetadataMapVector metadata_map_vector;
+  const int size = 10;
+  for (int i = 0; i < size; i++) {
+    MetadataMap metadata_map = {
+        {"header_key1", "header_value1"},
+        {"header_key2", "header_value2"},
+        {"header_key3", "header_value3"},
+        {"header_key4", "header_value4"},
+    };
+    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  }
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(0);
+  request_encoder_->encodeMetadata(metadata_map_vector);
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, SmallMetadataVecTest) {
   allow_metadata_ = true;
   initialize();
