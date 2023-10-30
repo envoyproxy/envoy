@@ -27,4 +27,18 @@ message KafkaBroker {
   // upstream broker instead of passing received bytes as is.
   // Disabled by default.
   bool force_response_rewrite = 2;
+
+  oneof broker_address_rewrite_spec {
+    IdBasedBrokerRewriteSpec id_based_broker_address_rewrite_spec = 3;
+  }
+}
+
+message IdBasedBrokerRewriteSpec {
+  repeated IdBasedBrokerRewriteRule rules = 1;
+}
+
+message IdBasedBrokerRewriteRule {
+  uint32 id = 1 [(validate.rules).uint32 = {gte: 0}];
+  string host = 2 [(validate.rules).string = {min_len: 1}];
+  uint32 port = 3 [(validate.rules).uint32 = {lte: 65535}];
 }

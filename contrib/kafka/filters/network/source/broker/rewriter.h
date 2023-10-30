@@ -37,6 +37,8 @@ using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
  */
 class ResponseRewriterImpl : public ResponseRewriter, private Logger::Loggable<Logger::Id::kafka> {
 public:
+  ResponseRewriterImpl(const BrokerFilterConfig& config);
+
   // ResponseCallback
   void onMessage(AbstractResponseSharedPtr response) override;
   void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
@@ -47,6 +49,10 @@ public:
   size_t getStoredResponseCountForTest() const;
 
 private:
+  void updateMetadataBrokerAddresses(AbstractResponseSharedPtr& response) const;
+  void updateFindCoordinatorBrokerAddresses(AbstractResponseSharedPtr& response) const;
+
+  BrokerFilterConfig config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
 };
 
