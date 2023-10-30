@@ -157,6 +157,13 @@ jobs:
           pathGPGConfiguredHome: /build/.gnupg
           pathGPGHome: $(Build.StagingDirectory)/.gnupg
       stepsPost:
+      - script: |
+          ./ci/run_envoy_docker.sh './ci/upload_gcs_artifact.sh /build/envoy debs-x64'
+        condition: |
+          succeeded()
+        displayName: "Push debs(x64) to GCS"
+        env:
+          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       - bash: |
           set -e
           rm -rf $(Build.StagingDirectory)/.gnupg
@@ -196,6 +203,13 @@ jobs:
           pathGPGConfiguredHome: /build/.gnupg
           pathGPGHome: $(Build.StagingDirectory)/.gnupg
       stepsPost:
+      - script: |
+          ./ci/run_envoy_docker.sh './ci/upload_gcs_artifact.sh /build/envoy debs-arm64'
+        condition: |
+          succeeded()
+        displayName: "Push debs(arm64) to GCS"
+        env:
+          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       - bash: |
           set -e
           rm -rf $(Build.StagingDirectory)/.gnupg

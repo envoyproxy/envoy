@@ -30,7 +30,7 @@ jobs:
       source: ${{ matrix.source }}
       trusted: ${{ inputs.trusted }}
       repo-ref: ${{ inputs.repo-ref }}
-      runs-on: envoy-x64-small
+      runs-on: ${{ matrix.runs-on || 'envoy-x64-small' }}
       steps-pre: ${{ matrix.steps-pre }}
     strategy:
       fail-fast: false
@@ -73,3 +73,48 @@ jobs:
                 sudo apt-get -qq update -y
                 sudo apt-get -qq install -y --no-install-recommends expect
               shell: bash
+
+        - name: debs (x64)
+          target: verify_distro
+          source: |
+            export ENVOY_DOCKER_IN_DOCKER=1
+          rbe: false
+          steps-pre: |
+            - id: short_name
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.1
+              with:
+                length: 7
+                input: ${{ inputs.repo-ref }}
+            - id: gcp
+              run: |
+                PREFIX=https://storage.googleapis.com/envoy-
+                BUCKET=${{ inputs.trusted && 'postsubmit' || 'pr' }}
+                NAME=%{{ steps.short_name.outputs.string }}
+                echo "url=${PREFIX}${BUCKET}/${NAME}" >> $GITHUB_OUTPUT
+              shell: bash
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.1
+              with:
+                url: %{{ steps.gcp.outputs.url }}/packages.x64.tar.gz
+
+        - name: debs (arm64)
+          target: verify_distro
+          runs-on: envoy-gh-arm64-small
+          source: |
+            export ENVOY_DOCKER_IN_DOCKER=1
+          rbe: false
+          steps-pre: |
+            - id: short_name
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.1
+              with:
+                length: 7
+                input: ${{ inputs.repo-ref }}
+            - id: gcp
+              run: |
+                PREFIX=https://storage.googleapis.com/envoy-
+                BUCKET=${{ inputs.trusted && 'postsubmit' || 'pr' }}
+                NAME=%{{ steps.short_name.outputs.string }}
+                echo "url=${PREFIX}${BUCKET}/${NAME}" >> $GITHUB_OUTPUT
+              shell: bash
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.1
+              with:
+                url: %{{ steps.gcp.outputs.url }}/packages.arm64.tar.gz
