@@ -2,15 +2,6 @@
 
 set -e
 
-function finish {
-  echo "disk space at end of build:"
-  df -h
-}
-trap finish EXIT
-
-echo "disk space at beginning of build:"
-df -h
-
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 
