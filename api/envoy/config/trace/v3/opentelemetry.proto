@@ -45,11 +45,15 @@ message OpenTelemetryConfig {
   // If it is not provided, it will default to "unknown_service:envoy".
   string service_name = 2;
 
+  // An ordered list of resource detectors
+  // [#extension-category: envoy.tracers.opentelemetry.resource_detectors]
+  repeated core.v3.TypedExtensionConfig resource_detectors = 4;
+
   // Specifies the sampler to be used by the OpenTelemetry tracer.
   // The configured sampler implements the Sampler interface defined by the OpenTelemetry specification.
   // This field can be left empty. In this case, the default Envoy sampling decision is used.
   //
   // See: `OpenTelemetry sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#sampler>`_
   // [#extension-category: envoy.tracers.opentelemetry.samplers]
-  core.v3.TypedExtensionConfig sampler = 4;
+  core.v3.TypedExtensionConfig sampler = 5;
 }

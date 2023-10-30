@@ -14,12 +14,6 @@ parameters:
   default:
   - env
   - prechecks
-- name: windowsBuildStageDeps
-  displayName: "Windows stage dependencies"
-  type: object
-  default:
-  - env
-  - prechecks
 - name: checkStageDeps
   displayName: "Check stage dependencies"
   type: object
@@ -60,8 +54,6 @@ stages:
 - stage: prechecks
   displayName: Prechecks
   dependsOn: ["env"]
-  variables:
-    RUN_PRECHECKS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
   jobs:
   - template: stage/prechecks.yml
     parameters:
@@ -72,7 +64,7 @@ stages:
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
-      runPrechecks: variables['RUN_PRECHECKS']
+      runPrechecks: stageDependencies.env.repo.outputs['run.releaseTests']
 
 - stage: linux_x64
   displayName: Linux x64
@@ -167,17 +159,6 @@ stages:
     RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
   jobs:
   - template: stage/macos.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)
-      runBuild: variables['RUN_BUILD']
-
-- stage: windows
-  displayName: Windows
-  dependsOn: ${{ parameters.windowsBuildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-  jobs:
-  - template: stage/windows.yml
     parameters:
       authGCP: $(GcpServiceAccountKey)
       runBuild: variables['RUN_BUILD']
