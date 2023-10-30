@@ -54,8 +54,6 @@ stages:
 - stage: prechecks
   displayName: Prechecks
   dependsOn: ["env"]
-  variables:
-    RUN_PRECHECKS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
   jobs:
   - template: stage/prechecks.yml
     parameters:
@@ -66,7 +64,7 @@ stages:
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
-      runPrechecks: variables['RUN_PRECHECKS']
+      runPrechecks: stageDependencies.env.repo.outputs['run.releaseTests']
 
 - stage: linux_x64
   displayName: Linux x64
