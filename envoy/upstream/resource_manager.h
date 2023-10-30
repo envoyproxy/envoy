@@ -63,9 +63,11 @@ public:
   virtual ResourceLimit& retries() PURE;
 
   /**
-   * @return Resource& retries in backoff.
+   * @return Resource& retries that have been scheduled, i.e. the router has decided that
+             the retry will be attempted but has not yet dispatched the retry to a connection pool.
+             This is either due to backoff or due to dispatcher scheduling for an immediate retry.
    */
-  virtual Resource& retriesInBackoff() PURE;
+  virtual Resource& retriesScheduled() PURE;
 
   /**
    * @return ResourceLimit& active connection pools.

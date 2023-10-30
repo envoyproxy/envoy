@@ -81,9 +81,9 @@ public:
         });
         break;
       case TestResourceType::RetryInBackoff:
-        cluster_.resourceManager(Upstream::ResourcePriority::Default).retriesInBackoff().inc();
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).retriesScheduled().inc();
         resource_manager_cleanup_tasks_.emplace_back([this]() {
-          cluster_.resourceManager(Upstream::ResourcePriority::Default).retriesInBackoff().dec();
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).retriesScheduled().dec();
         });
         break;
       case TestResourceType::Connection:
@@ -251,7 +251,7 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
   EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesScheduled().count());
 
   EXPECT_CALL(callback_ready_, ready());
   retry_schedulable_callback_->invokeCallback();
@@ -261,7 +261,7 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
   EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(remote_refused_stream_reset_, RetryState::Http3Used::No,
@@ -280,7 +280,7 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
   EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailureWithoutTcpFallback) {
@@ -1038,11 +1038,11 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_CALL(callback_ready_, ready());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
-  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesScheduled().count());
   retry_timer_->invokeCallback();
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
 
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(40), _));
@@ -1052,7 +1052,7 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_CALL(callback_ready_, ready());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
-  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesScheduled().count());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
@@ -1075,7 +1075,7 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_CALL(callback_ready_, ready());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesScheduled().count());
   retry_schedulable_callback_->invokeCallback();
   EXPECT_FALSE(retry_disable_http3_);
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
@@ -1108,6 +1108,8 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_EQ(5UL, route_stats_context_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_success_.value());
   EXPECT_EQ(0UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
 }
 
 // Test customized retry back-off intervals.
@@ -1317,11 +1319,11 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   EXPECT_CALL(callback_ready_, ready());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
-  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesScheduled().count());
   retry_timer_->invokeCallback();
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
 
   // reset header not present -> exponential backoff used
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
@@ -1381,7 +1383,7 @@ TEST_F(RouterRetryStateImplTest, CancelDuringExponentialRetryBackoff) {
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
 
   state_.reset();
@@ -1389,7 +1391,7 @@ TEST_F(RouterRetryStateImplTest, CancelDuringExponentialRetryBackoff) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
 }
 
@@ -1417,7 +1419,7 @@ TEST_F(RouterRetryStateImplTest, CancelDuringRatelimitedRetryBackoff) {
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
 
   state_.reset();
@@ -1425,7 +1427,7 @@ TEST_F(RouterRetryStateImplTest, CancelDuringRatelimitedRetryBackoff) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
 }
 
@@ -1451,7 +1453,7 @@ TEST_F(RouterRetryStateImplTest, CancelWhileWaitingForImmediateRetry) {
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(1UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
 
   state_.reset();
@@ -1459,7 +1461,7 @@ TEST_F(RouterRetryStateImplTest, CancelWhileWaitingForImmediateRetry) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
 }
 
@@ -1481,7 +1483,7 @@ TEST_F(RouterRetryStateImplTest, CancelDuringActiveRetry) {
   EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(1UL, cluster_.resource_manager_->retries().count());
 
   state_.reset();
@@ -1489,7 +1491,7 @@ TEST_F(RouterRetryStateImplTest, CancelDuringActiveRetry) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
 }
 
@@ -1503,7 +1505,7 @@ TEST_F(RouterRetryStateImplTest, CancelWithNoActiveRetries) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
 
   state_.reset();
@@ -1511,7 +1513,7 @@ TEST_F(RouterRetryStateImplTest, CancelWithNoActiveRetries) {
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.value());
   EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.value());
-  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(0UL, cluster_.resource_manager_->retriesScheduled().count());
   EXPECT_EQ(0UL, cluster_.resource_manager_->retries().count());
 }
 
@@ -1635,7 +1637,7 @@ TEST_F(RouterRetryStateImplTest, BudgetCountRetriesInBackoff) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
   EXPECT_EQ(RetryStatus::Yes,
             state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
-  EXPECT_EQ(2UL, cluster_.resource_manager_->retriesInBackoff().count());
+  EXPECT_EQ(2UL, cluster_.resource_manager_->retriesScheduled().count());
 }
 
 TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {

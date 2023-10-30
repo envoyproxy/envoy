@@ -168,28 +168,27 @@ void RetryStateImpl::enableBackoffTimer() {
   if (!retry_timer_) {
     retry_timer_ = dispatcher_.createTimer([this]() -> void {
       ASSERT(backoff_callback_ != nullptr);
-      switch (backoff_state_) {
-      case RetryBackoffState::RateLimited:
+      switch (scheduling_state_) {
+      case RetrySchedulingState::RateLimitedBackoff:
         cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.dec();
         break;
-      case RetryBackoffState::Exponential:
+      case RetrySchedulingState::ExponentialBackoff:
         cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.dec();
         break;
-      case RetryBackoffState::NotInBackoff:
+      default:
         IS_ENVOY_BUG(
-            "Retry backoff timer fired while backoff state was RetryBackoffState::NotInBackoff")
+            "Retry backoff timer fired while retry scheduling state was not a backoff state")
       }
 
-      cluster_.resourceManager(priority_).retriesInBackoff().dec();
-      backoff_state_ = RetryBackoffState::NotInBackoff;
+      cluster_.resourceManager(priority_).retriesScheduled().dec();
+      scheduling_state_ = RetrySchedulingState::NotScheduled;
       backoff_callback_();
     });
   }
 
-  cluster_.resourceManager(priority_).retriesInBackoff().inc();
   if (ratelimited_backoff_strategy_ != nullptr) {
     // If we have a backoff strategy based on rate limit feedback from the response we use it.
-    backoff_state_ = RetryBackoffState::RateLimited;
+    scheduling_state_ = RetrySchedulingState::RateLimitedBackoff;
     retry_timer_->enableTimer(
         std::chrono::milliseconds(ratelimited_backoff_strategy_->nextBackOffMs()));
 
@@ -201,7 +200,7 @@ void RetryStateImpl::enableBackoffTimer() {
     cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.inc();
   } else {
     // Otherwise we use a fully jittered exponential backoff algorithm.
-    backoff_state_ = RetryBackoffState::Exponential;
+    scheduling_state_ = RetrySchedulingState::ExponentialBackoff;
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 
     cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.inc();
@@ -282,22 +281,26 @@ void RetryStateImpl::resetRetry() {
     backoff_callback_ = nullptr;
 
     // Need to handle resources/stats if the retry is cancelled while in backoff.
-    switch (backoff_state_) {
-    case RetryBackoffState::RateLimited:
+    switch (scheduling_state_) {
+    case RetrySchedulingState::RateLimitedBackoff:
       cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_active_.dec();
-      cluster_.resourceManager(priority_).retriesInBackoff().dec();
+      cluster_.resourceManager(priority_).retriesScheduled().dec();
       break;
-    case RetryBackoffState::Exponential:
+    case RetrySchedulingState::ExponentialBackoff:
       cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_active_.dec();
-      cluster_.resourceManager(priority_).retriesInBackoff().dec();
+      cluster_.resourceManager(priority_).retriesScheduled().dec();
       break;
     default:;
     }
-    backoff_state_ = RetryBackoffState::NotInBackoff;
+    scheduling_state_ = RetrySchedulingState::NotScheduled;
   }
   if (next_loop_callback_ != nullptr) {
     cluster_.resourceManager(priority_).retries().dec();
     cluster_.trafficStats()->upstream_rq_retry_active_.dec();
+    if (scheduling_state_ == RetrySchedulingState::Immediate) {
+      cluster_.resourceManager(priority_).retriesScheduled().dec();
+      scheduling_state_ = RetrySchedulingState::NotScheduled;
+    }
     next_loop_callback_ = nullptr;
   }
 }
@@ -362,11 +365,19 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
   if (route_stats_context_.has_value()) {
     route_stats_context_->stats().upstream_rq_retry_.inc();
   }
+  // Immediate retries are still considered as "scheduled" because they must
+  // wait for a dispatcher callback before being registered as pending
+  cluster_.resourceManager(priority_).retriesScheduled().inc();
   if (would_retry == RetryDecision::RetryWithBackoff) {
     backoff_callback_ = callback;
     enableBackoffTimer();
   } else {
-    next_loop_callback_ = dispatcher_.createSchedulableCallback(callback);
+    scheduling_state_ = RetrySchedulingState::Immediate;
+    next_loop_callback_ = dispatcher_.createSchedulableCallback([this, callback]() -> void {
+      scheduling_state_ = RetrySchedulingState::NotScheduled;
+      cluster_.resourceManager(priority_).retriesScheduled().dec();
+      callback();
+    });
     next_loop_callback_->scheduleCallbackNextIteration();
   }
   return RetryStatus::Yes;

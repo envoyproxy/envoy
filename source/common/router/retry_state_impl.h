@@ -105,7 +105,7 @@ private:
                  TimeSource& time_source, Upstream::ResourcePriority priority,
                  bool auto_configured_for_http3);
 
-  enum class RetryBackoffState { NotInBackoff, Exponential, RateLimited };
+  enum class RetrySchedulingState { NotScheduled, Immediate, ExponentialBackoff, RateLimitedBackoff };
 
   void enableBackoffTimer();
   void resetRetry();
@@ -141,7 +141,7 @@ private:
   uint32_t retries_remaining_{};
   uint32_t host_selection_max_attempts_;
   Upstream::ResourcePriority priority_;
-  RetryBackoffState backoff_state_;
+  RetrySchedulingState scheduling_state_;
   const bool auto_configured_for_http3_{};
 };
 

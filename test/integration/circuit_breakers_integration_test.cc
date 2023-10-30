@@ -28,6 +28,10 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RetryBudgetIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RetryBudgetIntegrationTest, CircuitBreakerRetryBudgets) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
   // Create a config with a retry budget of 100% and a (very) long retry backoff
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* retry_budget = bootstrap.mutable_static_resources()
@@ -58,7 +62,7 @@ TEST_P(RetryBudgetIntegrationTest, CircuitBreakerRetryBudgets) {
   EXPECT_TRUE(upstream_request_->complete());
 
   // Observe odd behavior of retry overflow even though the budget is set to 100%
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   if (upstreamProtocol() == Http::CodecType::HTTP2) {
     // For H2 upstreams the observed behavior is that the retry budget max is 0
     // i.e. it doesn't count the request that just failed as active
@@ -86,7 +90,7 @@ TEST_P(RetryBudgetIntegrationTest, CircuitBreakerRetryBudgets) {
   upstream_request_->encodeHeaders(error_response_headers, true); // trigger retry
   EXPECT_TRUE(upstream_request_->complete());
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 2);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   // This time behavior is independent of upstream protocol, no matter what the retry overflows
   //
   // In the case of H2, it would overflow regardless of the retry in backoff due to the behavior

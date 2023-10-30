@@ -91,7 +91,7 @@ public:
         retries_(budget_percent, min_retry_concurrency, max_retries, runtime,
                  runtime_key + "retry_budget.", runtime_key + "max_retries",
                  cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_, pending_requests_,
-                 retries_in_backoff_) {}
+                 retries_scheduled_) {}
 
   // Upstream::ResourceManager
   ResourceLimit& connections() override { return connections_; }
@@ -99,7 +99,7 @@ public:
   ResourceLimit& requests() override { return requests_; }
   ResourceLimit& retries() override { return retries_; }
   ResourceLimit& connectionPools() override { return connection_pools_; }
-  Resource& retriesInBackoff() override { return retries_in_backoff_; }
+  Resource& retriesScheduled() override { return retries_scheduled_; }
   uint64_t maxConnectionsPerHost() override { return max_connections_per_host_; }
 
 private:
@@ -110,14 +110,14 @@ private:
                     Runtime::Loader& runtime, const std::string& retry_budget_runtime_key,
                     const std::string& max_retries_runtime_key, Stats::Gauge& open_gauge,
                     Stats::Gauge& remaining, const ResourceLimit& requests,
-                    const ResourceLimit& pending_requests, const Resource& retries_in_backoff)
+                    const ResourceLimit& pending_requests, const Resource& retries_scheduled)
         : runtime_(runtime),
           max_retry_resource_(max_retries, runtime, max_retries_runtime_key, open_gauge, remaining),
           budget_percent_(budget_percent), min_retry_concurrency_(min_retry_concurrency),
           budget_percent_key_(retry_budget_runtime_key + "budget_percent"),
           min_retry_concurrency_key_(retry_budget_runtime_key + "min_retry_concurrency"),
           requests_(requests), pending_requests_(pending_requests),
-          retries_in_backoff_(retries_in_backoff), remaining_(remaining) {}
+          retries_scheduled_(retries_scheduled), remaining_(remaining) {}
 
     // Envoy::ResourceLimit
     bool canCreate() override {
@@ -127,7 +127,7 @@ private:
       clearRemainingGauge();
       // Count the proposed retry towards the active requests, as that is what
       // the retry budget state will be if the retry is allowed.
-      return count() < maxWithAdditionalActive(1);
+      return count() < max();
     }
     void inc() override {
       max_retry_resource_.inc();
@@ -166,7 +166,7 @@ private:
       }
 
       const uint64_t active = requests_.count() + pending_requests_.count() +
-                              retries_in_backoff_.count() + additional_active;
+                              retries_scheduled_.count() + additional_active;
       const double budget_percent = runtime_.snapshot().getDouble(
           budget_percent_key_, budget_percent_ ? *budget_percent_ : 20.0);
       const uint32_t min_retry_concurrency = runtime_.snapshot().getInteger(
@@ -188,7 +188,7 @@ private:
     const std::string min_retry_concurrency_key_;
     const ResourceLimit& requests_;
     const ResourceLimit& pending_requests_;
-    const Resource& retries_in_backoff_;
+    const Resource& retries_scheduled_;
     Stats::Gauge& remaining_;
   };
 
@@ -196,7 +196,7 @@ private:
   ManagedResourceImpl pending_requests_;
   ManagedResourceImpl requests_;
   ManagedResourceImpl connection_pools_;
-  BasicResourceImpl retries_in_backoff_;
+  BasicResourceImpl retries_scheduled_;
   uint64_t max_connections_per_host_;
   RetryBudgetImpl retries_;
 };
