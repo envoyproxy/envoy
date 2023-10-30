@@ -1045,7 +1045,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRes
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
-		                                  Protocol::Http2, config_, "",
+		                                              Protocol::Http2, config_, "",
                                                   connection_.stream_info_, node_id_);
 
   EXPECT_EQ(3UL, response_headers.size()) << response_headers;
@@ -1111,7 +1111,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
     EXPECT_TRUE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
     ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
-	                                            Protocol::Http11, config_, "",
+	                                                  Protocol::Http11, config_, "",
                                                     connection_.stream_info_, node_id_);
 
     EXPECT_EQ(0UL, response_headers.size()) << response_headers;
@@ -2297,8 +2297,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeader
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionKeepAliveRequestHeaderHttp11) {
   TestRequestHeaderMapImpl request_headers{{"connection", "keep-alive"}};
   TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(request_headers, Protocol::Http11));
   EXPECT_FALSE(request_headers.has("connection"));

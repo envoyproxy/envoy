@@ -77,8 +77,7 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 }
 
 ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::mutateRequestHeaders(
-    RequestHeaderMap& request_headers, Protocol protocol,
-    Network::Connection& connection,
+    RequestHeaderMap& request_headers, Protocol protocol, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
     const LocalInfo::LocalInfo& local_info, const StreamInfo::StreamInfo& stream_info) {
 
@@ -92,16 +91,16 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // as we forward them verbatim to the upstream hosts.
   if (!Utility::isUpgrade(request_headers)) {
     // since java/tomcat relies on Connection: keep-alive request header for http1.1,
-    // retain the same only if connection has keep-alive. Since its optional per
-    // RFC https://datatracker.ietf.org/doc/html/rfc2616#section-19.6.2, we are doing
-    // it for ebay use case when protocol is http 1.1
+    // retain the same only if connection has keep-alive.
+    // Its optional per RFC2616. 
     if (protocol == Protocol::Http11 && request_headers.Connection() &&
-      Envoy::StringUtil::caseFindToken(request_headers.Connection()->value().getStringView(), ",",
-                                       Http::Headers::get().ConnectionValues.KeepAlive)) {
-        if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.retain_keepalive_header_http11")) {
-          request_headers.removeConnection();
-        }
-      } else {
+       Envoy::StringUtil::caseFindToken(request_headers.Connection()->value().getStringView(), ",",
+                                        Http::Headers::get().ConnectionValues.KeepAlive)) {
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.retain_keepalive_header_http11")) {
+        request_headers.removeConnection();
+      }
+    } else {
         request_headers.removeConnection();
     }
     request_headers.removeUpgrade();
@@ -490,14 +489,11 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
-                                                     const RequestHeaderMap* request_headers,
-                                                     Protocol protocol,
-                                                     ConnectionManagerConfig& config,
-                                                     const std::string& via,
-                                                     const StreamInfo::StreamInfo& stream_info,
-                                                     absl::string_view proxy_name,
-                                                     bool clear_hop_by_hop) {
+void ConnectionManagerUtility::mutateResponseHeaders(
+    ResponseHeaderMap& response_headers, const RequestHeaderMap* request_headers, Protocol protocol,
+    ConnectionManagerConfig& config, const std::string& via,
+    const StreamInfo::StreamInfo& stream_info, absl::string_view proxy_name,
+    bool clear_hop_by_hop) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -524,7 +520,8 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   if (clear_hop_by_hop) {
     response_headers.removeTransferEncoding();
     if (protocol == Protocol::Http11) {
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.retain_keepalive_header_http11")) {
+      if (!Runtime::runtimeFeatureEnabled(
+               "envoy.reloadable_features.retain_keepalive_header_http11")) {
         response_headers.removeKeepAlive();
       }
     } else {

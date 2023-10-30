@@ -9,6 +9,12 @@ behavior_changes:
     the flag to false explicitly.
     See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
     issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
+- area: http
+  change: |
+    Flip runtime flag ``envoy.reloadable_features.retain_keepalive_header_http11`` to true. Retain keep alive
+    for http1.1 proxy response headers and connection keep-alive for http1.1 request headers.
+    This behavior can be temporarily reverted by setting the flag to false explicitly.
+    See issue https://github.com/envoyproxy/envoy/issues/17613 for more specific detail and examples.
 
 minor_behavior_changes:
 - area: upstream

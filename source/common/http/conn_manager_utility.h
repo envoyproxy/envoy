@@ -67,12 +67,9 @@ public:
    *         Note that an extension might also be used. If detection fails, the result may contain
    *         options for rejecting the request.
    */
-  static MutateRequestHeadersResult mutateRequestHeaders(RequestHeaderMap& request_headers,
-                                                         Protocol protocol,
-                                                         Network::Connection& connection,
-                                                         ConnectionManagerConfig& config,
-                                                         const Router::Config& route_config,
-                                                         const LocalInfo::LocalInfo& local_info,
+  static MutateRequestHeadersResult mutateRequestHeaders(RequestHeaderMap& request_headers, Protocol protocol,
+                                                         Network::Connection& connection, ConnectionManagerConfig& config,
+                                                         const Router::Config& route_config, const LocalInfo::LocalInfo& local_info,
                                                          const StreamInfo::StreamInfo& stream_info);
   /**
    * Mutates response headers in various ways. This functionality is broken out because of its
@@ -93,8 +90,7 @@ public:
    *        cleared. This should only ever be false for envoy-mobile.
    */
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
-                                    const RequestHeaderMap* request_headers,
-                                    Protocol protocol,
+                                    const RequestHeaderMap* request_headers, Protocol protocol,
                                     ConnectionManagerConfig& config, const std::string& via,
                                     const StreamInfo::StreamInfo& stream_info,
                                     absl::string_view proxy_name,
