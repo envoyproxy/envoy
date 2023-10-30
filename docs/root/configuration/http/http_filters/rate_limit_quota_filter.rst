@@ -49,9 +49,9 @@ if it has not yet received a rate limit quota or to the
 :ref:`expired assignment behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>` if
 connection could not be re-established by the time the existing quota expired.
 
-In case RLQS client, for any reason (including RLQS server connection failures), doesn't receive
-the initial bucket assignment within predetermined [2]_ time such bucket eventually will be purged
-from the memory. Any enqueued [1]_ requests will be rejected (only applies when "no assignment behavior"
+In case the RLQS client doesn't receive the initial bucket assignment (for any reason, including
+RLQS server connection failures) within predetermined [2]_ time, such buckets will eventually be
+purged from memory. Any enqueued [1]_ requests will be rejected (only applies when "no assignment behavior"
 is to enqueue). Subsequent requests matched into the bucket will re-initialize the bucket in the "no assignment"
 state, restarting the reports. This is explained in more details at
 :ref:`Rate Limit Quota Service (RLQS) <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
