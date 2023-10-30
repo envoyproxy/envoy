@@ -55,6 +55,7 @@ jobs:
           env: |
             export ENVOY_PUBLISH_DRY_RUN=1
             export ENVOY_COMMIT=${{ inputs.sha }}
+            export ENVOY_REPO=${{ github.repository }}
     uses: ./.github/workflows/_ci.yml
     with:
       target: ${{ matrix.target }}
@@ -111,7 +112,7 @@ jobs:
     # which builds a static version of the docs for the release and commits it to the archive.
     # In turn the archive repo triggers an update in the website so the new release docs are
     # included in the published site
-    if: ${{ inputs.trusted }}
+    if: ${{ inputs.trusted && github.repository == 'envoyproxy/envoy' }}
     runs-on: ubuntu-22.04
     needs:
     - publish
