@@ -79,7 +79,6 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Host& host, std::strin
     }
     break;
   }
-
   }
 }
 

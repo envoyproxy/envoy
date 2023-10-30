@@ -5508,8 +5508,7 @@ TEST(HostPartitionTest, PartitionHosts) {
                    makeTestHost(info, "tcp://127.0.0.1:82", *time_source, zone_b),
                    makeTestHost(info, "tcp://127.0.0.1:83", *time_source, zone_b),
                    makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b),
-                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b)
-  };
+                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b)};
 
   hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
