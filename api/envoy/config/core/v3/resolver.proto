@@ -22,6 +22,14 @@ message DnsResolverOptions {
 
   // Do not use the default search domains; only query hostnames as-is or as aliases.
   bool no_default_search_domain = 2;
+
+  // The initial response timeout in milliseconds given to a name server to reply to a query on the first attempt.
+  // After the initial attempt, the timeout algorithm becomes more intricate, but remains proportionate to this value.
+  // The default is 2000 ms (2 seconds).
+  uint32 dns_resolver_query_timeout_ms = 3 [(validate.rules).uint32 = {gt: 0}];
+
+  // The number of attempts the resolver will make to contact the name server before giving up. The default is 3 tries.
+  uint32 dns_resolver_query_tries = 4 [(validate.rules).uint32 = {gt: 0}];
 }
 
 // DNS resolution configuration which includes the underlying dns resolver addresses and options.

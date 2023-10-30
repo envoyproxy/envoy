@@ -1966,6 +1966,34 @@ TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
   ares_destroy_options(&opts);
 }
 
+class DnsImplAresCustomOptsTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  void updateDnsResolverOptions() override {
+    dns_resolver_options_.set_dns_resolver_query_timeout_ms(1);
+    dns_resolver_options_.set_dns_resolver_query_tries(1);
+  }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresCustomOptsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares timeout and tries are set when custom values are provided.
+TEST_P(DnsImplAresCustomOptsTest, VerifyCustomTimeoutAndTries) {
+  server_->addCName("root.cname.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE(opts.timeout == 1);
+  EXPECT_TRUE(opts.tries == 1);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
 class DnsImplAresFlagsForNoDefaultSearchDomainTest : public DnsImplTest {
 protected:
   bool tcpOnly() const override { return false; }

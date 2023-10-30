@@ -78,6 +78,19 @@ absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
 DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   AresOptions options{};
 
+  // If the timeout is provided in the config, set the timeout to the provided value.
+  if (dns_resolver_options_.dns_resolver_query_timeout_ms() > 0) {
+    options.optmask_ |= ARES_OPT_TIMEOUTMS;
+    options.options_.timeout = dns_resolver_options_.dns_resolver_query_timeout_ms();
+  }
+
+  // If the number of tries is provided in the config, set the number of tries to the provided
+  // value.
+  if (dns_resolver_options_.dns_resolver_query_tries() > 0) {
+    options.optmask_ |= ARES_OPT_TRIES;
+    options.options_.tries = dns_resolver_options_.dns_resolver_query_tries();
+  }
+
   if (dns_resolver_options_.use_tcp_for_dns_lookups()) {
     options.optmask_ |= ARES_OPT_FLAGS;
     options.options_.flags |= ARES_FLAG_USEVC;

@@ -297,6 +297,27 @@ server_config:
     filename: {}
 )EOF";
 
+  static constexpr absl::string_view dns_resolver_custom_options_set = R"EOF(
+stat_prefix: "my_prefix"
+client_config:
+  resolver_timeout: 1s
+  typed_dns_resolver_config:
+    name: envoy.network.dns_resolver.cares
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+      dns_resolver_options:
+        dns_resolver_query_timeout_ms: 5000
+        dns_resolver_query_tries: 3
+      resolvers:
+      - socket_address:
+          address: "1.1.1.1"
+          port_value: 53
+  max_pending_lookups: 256
+server_config:
+  external_dns_table:
+    filename: {}
+)EOF";
+
   const std::string external_dns_table_json = R"EOF(
 {
   "external_retry_count": 3,
@@ -2204,6 +2225,20 @@ TEST_F(DnsFilterTest, DnsResolverOptionsNotSet) {
   EXPECT_EQ(false, dns_resolver_options_.no_default_search_domain());
 }
 
+TEST_F(DnsFilterTest, DnsResolverCustomOptionsSet) {
+  InSequence s;
+
+  std::string temp_path =
+      TestEnvironment::writeStringToFileForTest("dns_table.yaml", max_records_table_yaml);
+  std::string config_to_use = fmt::format(dns_resolver_custom_options_set, temp_path);
+  setup(config_to_use);
+
+  // Verify that the query timeout is 5000ms (5s)
+  EXPECT_EQ(5000, dns_resolver_options_.dns_resolver_query_timeout_ms());
+  // Verify that the query tries is 3
+  EXPECT_EQ(3, dns_resolver_options_.dns_resolver_query_tries());
+}
+
 TEST_F(DnsFilterTest, DnsResolverOptionsSetTrue) {
   InSequence s;
 
@@ -2241,6 +2276,8 @@ client_config:
     dns_resolver_options:
       use_tcp_for_dns_lookups: false
       no_default_search_domain: false
+      dns_resolver_query_timeout_ms: 5000
+      dns_resolver_query_tries: 3
     resolvers:
     - socket_address:
         address: "1.1.1.1"
@@ -2279,6 +2316,8 @@ client_config:
     dns_resolver_options:
       use_tcp_for_dns_lookups: false
       no_default_search_domain: false
+      dns_resolver_query_timeout_ms: 5000
+      dns_resolver_query_tries: 3
     resolvers:
     - socket_address:
         address: "1.1.1.1"

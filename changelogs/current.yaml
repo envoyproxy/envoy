@@ -92,5 +92,12 @@ new_features:
 - area: tracing
   change: |
     Added support for configuring resource detectors on the OpenTelemetry tracer.
+- area: dns resolver
+  change: |
+    added two new options to the ``DnsResolverOptions`` for configuring custom timeouts and tries while resolving DNS
+    queries. Custom timeouts could be configured by specifying :ref:`dns_resolver_query_timeout_ms
+    <envoy_v3_api_field_config.core.v3.DnsResolverOptions.dns_resolver_query_timeout_ms>` and custom tries could be
+    configured by specifying :ref:`dns_resolver_query_tries
+    <envoy_v3_api_field_config.core.v3.DnsResolverOptions.dns_resolver_query_tries>`.
 
 deprecated:
