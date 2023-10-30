@@ -1151,8 +1151,11 @@ TEST_P(Http2CodecImplTest, MetadataDisallowedAndFeatureFlagOff) {
     metadata_map_vector.push_back(std::move(metadata_map_ptr));
   }
 
-  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(0);
-  ASSERT_DEATH(request_encoder_->encodeMetadata(metadata_map_vector), "");
+  // On opt builds, the following line is necessary because the ASSERT that is
+  // triggered doesn't cause death.
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(testing::AnyNumber());
+  EXPECT_DEBUG_DEATH(request_encoder_->encodeMetadata(metadata_map_vector), "");
+  driveToCompletion();
 }
 
 TEST_P(Http2CodecImplTest, MetadataDisallowedAndFeatureFlagOn) {
