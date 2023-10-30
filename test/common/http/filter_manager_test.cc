@@ -69,6 +69,61 @@ public:
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
 };
 
+TEST_F(FilterManagerTest, RequestHeadersOrResponseHeadersAccess) {
+  initialize();
+
+  auto decoder_filter = std::make_shared<NiceMock<MockStreamDecoderFilter>>();
+  auto encoder_filter = std::make_shared<NiceMock<MockStreamEncoderFilter>>();
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
+        manager.applyFilterFactoryCb({}, decoder_factory);
+        auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
+        manager.applyFilterFactoryCb({}, encoder_factory);
+        return true;
+      }));
+  filter_manager_->createFilterChain();
+
+  RequestHeaderMapPtr request_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  RequestTrailerMapPtr request_trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
+  ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"foo", "bar"}}};
+  ResponseHeaderMapPtr informational_headers{
+      new TestResponseHeaderMapImpl{{":status", "100"}, {"foo", "bar"}}};
+
+  EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
+      .Times(2)
+      .WillRepeatedly(Return(makeOptRef(*request_headers)));
+  EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+      .Times(2)
+      .WillRepeatedly(Return(makeOptRef(*response_headers)));
+  EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+      .Times(2)
+      .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+  EXPECT_CALL(filter_manager_callbacks_, responseTrailers())
+      .Times(2)
+      .WillRepeatedly(Return(makeOptRef(*response_trailers)));
+  EXPECT_CALL(filter_manager_callbacks_, informationalHeaders())
+      .Times(2)
+      .WillRepeatedly(Return(makeOptRef(*informational_headers)));
+
+  EXPECT_EQ(decoder_filter->callbacks_->requestHeaders().ptr(), request_headers.get());
+  EXPECT_EQ(decoder_filter->callbacks_->responseHeaders().ptr(), response_headers.get());
+  EXPECT_EQ(decoder_filter->callbacks_->requestTrailers().ptr(), request_trailers.get());
+  EXPECT_EQ(decoder_filter->callbacks_->responseTrailers().ptr(), response_trailers.get());
+  EXPECT_EQ(decoder_filter->callbacks_->informationalHeaders().ptr(), informational_headers.get());
+
+  EXPECT_EQ(encoder_filter->callbacks_->requestHeaders().ptr(), request_headers.get());
+  EXPECT_EQ(encoder_filter->callbacks_->responseHeaders().ptr(), response_headers.get());
+  EXPECT_EQ(encoder_filter->callbacks_->requestTrailers().ptr(), request_trailers.get());
+  EXPECT_EQ(encoder_filter->callbacks_->responseTrailers().ptr(), response_trailers.get());
+  EXPECT_EQ(encoder_filter->callbacks_->informationalHeaders().ptr(), informational_headers.get());
+
+  filter_manager_->destroyFilters();
+}
+
 // Verifies that the local reply persists the gRPC classification even if the request headers are
 // modified.
 TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {

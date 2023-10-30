@@ -352,6 +352,22 @@ OptRef<UpstreamStreamFilterCallbacks> ActiveStreamFilterBase::upstreamCallbacks(
   return parent_.filter_manager_callbacks_.upstreamCallbacks();
 }
 
+RequestHeaderMapOptRef ActiveStreamFilterBase::requestHeaders() {
+  return parent_.filter_manager_callbacks_.requestHeaders();
+}
+RequestTrailerMapOptRef ActiveStreamFilterBase::requestTrailers() {
+  return parent_.filter_manager_callbacks_.requestTrailers();
+}
+ResponseHeaderMapOptRef ActiveStreamFilterBase::informationalHeaders() {
+  return parent_.filter_manager_callbacks_.informationalHeaders();
+}
+ResponseHeaderMapOptRef ActiveStreamFilterBase::responseHeaders() {
+  return parent_.filter_manager_callbacks_.responseHeaders();
+}
+ResponseTrailerMapOptRef ActiveStreamFilterBase::responseTrailers() {
+  return parent_.filter_manager_callbacks_.responseTrailers();
+}
+
 bool ActiveStreamDecoderFilter::canContinue() {
   // It is possible for the connection manager to respond directly to a request even while
   // a filter is trying to continue. If a response has already happened, we should not
@@ -477,19 +493,11 @@ void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers)
   }
 }
 
-ResponseHeaderMapOptRef ActiveStreamDecoderFilter::informationalHeaders() const {
-  return parent_.filter_manager_callbacks_.informationalHeaders();
-}
-
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
   parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
-}
-
-ResponseHeaderMapOptRef ActiveStreamDecoderFilter::responseHeaders() const {
-  return parent_.filter_manager_callbacks_.responseHeaders();
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -500,10 +508,6 @@ void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stre
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
-}
-
-ResponseTrailerMapOptRef ActiveStreamDecoderFilter::responseTrailers() const {
-  return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
 void ActiveStreamDecoderFilter::encodeMetadata(MetadataMapPtr&& metadata_map_ptr) {

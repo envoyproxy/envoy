@@ -441,6 +441,37 @@ public:
    * @return absl::string_view the name of the filter as configured in the filter chain.
    */
   virtual absl::string_view filterConfigName() const PURE;
+
+  /**
+   * The downstream request headers if present.
+   */
+  virtual RequestHeaderMapOptRef requestHeaders() PURE;
+
+  /**
+   * The downstream request trailers if present.
+   */
+  virtual RequestTrailerMapOptRef requestTrailers() PURE;
+
+  /**
+   * Retrieves a pointer to the continue headers if present.
+   */
+  virtual ResponseHeaderMapOptRef informationalHeaders() PURE;
+
+  /**
+   * Retrieves a pointer to the response headers if present.
+   * Note that response headers might be set multiple times (e.g. if a local reply is issued after
+   * headers have been received but before headers have been encoded), so it is not safe in general
+   * to assume that any set of headers will be valid for the duration of the stream.
+   */
+  virtual ResponseHeaderMapOptRef responseHeaders() PURE;
+
+  /**
+   * Retrieves a pointer to the last response trailers if present.
+   * Note that response headers might be set multiple times (e.g. if a local reply is issued after
+   * headers have been received but before headers have been encoded), so it is not safe in general
+   * to assume that any set of headers will be valid for the duration of the stream.
+   */
+  virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 };
 
 class DecoderFilterWatermarkCallbacks {
@@ -609,12 +640,6 @@ public:
   virtual void encode1xxHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
-   * Returns the headers provided to encode1xxHeaders. Returns absl::nullopt if
-   * no headers have been provided yet.
-   */
-  virtual ResponseHeaderMapOptRef informationalHeaders() const PURE;
-
-  /**
    * Called with headers to be encoded, optionally indicating end of stream.
    *
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
@@ -631,12 +656,6 @@ public:
                              absl::string_view details) PURE;
 
   /**
-   * Returns the headers provided to encodeHeaders. Returns absl::nullopt if no headers have been
-   * provided yet.
-   */
-  virtual ResponseHeaderMapOptRef responseHeaders() const PURE;
-
-  /**
    * Called with data to be encoded, optionally indicating end of stream.
    * @param data supplies the data to be encoded.
    * @param end_stream supplies whether this is the last data frame.
@@ -648,12 +667,6 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
-
-  /**
-   * Returns the trailers provided to encodeTrailers. Returns absl::nullopt if no headers have been
-   * provided yet.
-   */
-  virtual ResponseTrailerMapOptRef responseTrailers() const PURE;
 
   /**
    * Called with metadata to be encoded.

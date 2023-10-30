@@ -82,8 +82,6 @@ stages:
       - env
       macBuildStageDeps:
       - env
-      windowsBuildStageDeps:
-      - env
 
 # Postsubmit main/release branches
 - ${{ if eq(variables.pipelinePostsubmit, true) }}:
@@ -97,6 +95,4 @@ stages:
       checkStageDeps:
       - env
       macBuildStageDeps:
-      - env
-      windowsBuildStageDeps:
       - env
