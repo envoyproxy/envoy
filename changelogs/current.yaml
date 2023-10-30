@@ -92,5 +92,8 @@ new_features:
 - area: tracing
   change: |
     Added support for configuring resource detectors on the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added support to configure a sampler for the OpenTelemetry tracer.
 
 deprecated:
