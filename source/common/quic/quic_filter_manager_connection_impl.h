@@ -211,8 +211,8 @@ private:
 
   // ConnectionManagerImpl should always be the last filter. Its onRead() is only called once to
   // trigger ReadFilter::onNewConnection() and the rest incoming data bypasses these filters.
-  // Its filter have the same life time as this connection. If the connection gets defer-deleted,
-  // they will be defer-deleted together.
+  // It has the same life time as this connection, so do all the filters. If the connection gets
+  // defer-deleted, they will be defer-deleted together.
   std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
