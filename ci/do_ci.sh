@@ -483,6 +483,7 @@ case $CI_TARGET in
         TODAY_DATE=$(date -u -I"date")
         export TODAY_DATE
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
+              --//tools/dependency:preload_cve_data \
               --action_env=TODAY_DATE \
               -- -v warn \
                  -c cves release_dates releases
