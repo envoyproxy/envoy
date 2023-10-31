@@ -36,6 +36,7 @@ RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_convert_legacy_lb_config);
 RUNTIME_GUARD(envoy_reloadable_features_copy_response_code_to_downstream_stream_info);
 RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
+RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 RUNTIME_GUARD(envoy_reloadable_features_detect_and_raise_rst_tcp_connection);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_enable_aws_credentials_file);
@@ -98,9 +99,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
-// TODO(kbaichoo): Make this enabled by default when fairness and chunking
-// are implemented, and we've had more cpu time.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 // TODO(birenroy) flip after a burn-in period
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Used to track if runtime is initialized.

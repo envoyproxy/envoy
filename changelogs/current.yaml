@@ -23,6 +23,11 @@ minor_behavior_changes:
     Added new configuration field :ref:`rate_limited_as_resource_exhausted
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limited_as_resource_exhausted>`
     to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
+- area: http2
+  change: |
+    Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
+    This feature improves flow control within the proxy by deferring work on the receiving end if the other
+    end is backed up.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
