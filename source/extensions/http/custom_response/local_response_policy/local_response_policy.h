@@ -46,6 +46,7 @@ private:
 
   const absl::optional<Envoy::Http::Code> status_code_;
   const std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  const bool  preserve_response_headers_;
 };
 } // namespace CustomResponse
 } // namespace Http

@@ -131,6 +131,10 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
                                    const Http::RequestHeaderMap& request_headers,
                                    const Http::ResponseHeaderMap& response_headers,
                                    const StreamInfo::StreamInfo* stream_info) const {
+  if (saved_headers_) {
+    Http::HeaderMapImpl::copyFrom(headers, *saved_headers_);
+  }
+
   // Removing headers in the headers_to_remove_ list first makes
   // remove-before-add the default behavior as expected by users.
   for (const auto& header : headers_to_remove_) {
@@ -196,6 +200,15 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& header : headers_to_add) {
     headers.addReferenceKey(header.first, header.second);
   }
+}
+
+void HeaderParser::save_headers(Http::ResponseHeaderMap& response_headers) {
+  if (!saved_headers_) {
+    saved_headers_ = Http::ResponseHeaderMapImpl::create();
+  } else {
+    saved_headers_->clear();
+  }
+  Http::HeaderMapImpl::copyFrom(*saved_headers_, response_headers);
 }
 
 Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::StreamInfo& stream_info,

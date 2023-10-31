@@ -43,4 +43,6 @@ message LocalResponsePolicy {
   // remote body, before it is sent to a downstream client.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
       [(validate.rules).repeated = {max_items: 1000}];
+
+  bool preserve_response_headers = 5;
 }
