@@ -377,7 +377,7 @@ public:
           dispatcher = &context_.client_connection_.dispatcher_;
         }
 
-        // With this feature enabled for http2 the codec  may end up creating a
+        // With this feature enabled for http2 the codec may end up creating a
         // schedulable callback the first time it re-enables reading as it's used
         // to process the backed up data if there's any to process.
         if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
