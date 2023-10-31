@@ -387,7 +387,7 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func addQuicCanonicalSuffix(_ suffix: String) -> Self {
-    self.quicCanonicalSuffix.append(suffix)
+    self.quicCanonicalSuffixes.append(suffix)
     return self
   }
 #endif

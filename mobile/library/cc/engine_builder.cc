@@ -458,7 +458,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       entry->set_hostname(host);
       entry->set_port(port);
     }
-    for (const auto& suffix: quic_suffixes_) {
+    for (const auto& suffix : quic_suffixes_) {
       cache_config.mutable_alternate_protocols_cache_options()->add_canonical_suffixes(suffix);
     }
     auto* cache_filter = hcm->add_http_filters();
@@ -829,9 +829,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       entry->set_hostname(host);
       entry->set_port(port);
     }
-    for (const auto& suffix: quic_suffixes_) {
+    for (const auto& suffix : quic_suffixes_) {
       alpn_options.mutable_auto_config()
-                        ->mutable_alternate_protocols_cache_options()->add_canonical_suffixes(suffix);
+          ->mutable_alternate_protocols_cache_options()
+          ->add_canonical_suffixes(suffix);
     }
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
