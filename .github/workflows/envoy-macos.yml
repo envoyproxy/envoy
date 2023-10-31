@@ -17,6 +17,9 @@ concurrency:
 jobs:
   env:
     uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      pull-requests: read
     with:
       prime_build_image: false
       check_mobile_run: false
@@ -39,7 +42,7 @@ jobs:
       runs-on: macos-12-xl
       command_ci:
       command_prefix:
-      repo_ref: ${{ github.event.pull_request.merge_commit_sha }}
+      repo_ref: ${{ needs.env.outputs.repo_ref  }}
       run-du: false
       env: |
         ./ci/mac_ci_setup.sh

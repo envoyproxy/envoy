@@ -20,6 +20,7 @@ jobs:
       prime_build_image: true
     permissions:
       contents: read
+      pull-requests: read
 
   javatestslinux:
     if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}

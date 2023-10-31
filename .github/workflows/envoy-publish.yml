@@ -42,6 +42,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      pull-requests: read
 
   check:
     if: ${{ github.event_name != 'pull_request' }}
