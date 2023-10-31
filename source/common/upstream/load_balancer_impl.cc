@@ -1299,6 +1299,25 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
                                                                 const HostsSource&) {
   HostSharedPtr candidate_host = nullptr;
 
+  // Do full scan if it's required explicitly or the number of choices is equal to or larger than
+  // the hosts size.
+  if ((hosts_to_use.size() <= choice_count_) || enable_full_scan_) {
+    for (const auto& sampled_host : hosts_to_use) {
+      if (candidate_host == nullptr) {
+        // Make a first choice to start the comparisons.
+        candidate_host = sampled_host;
+        continue;
+      }
+
+      const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
+      const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
+      if (sampled_active_rq < candidate_active_rq) {
+        candidate_host = sampled_host;
+      }
+    }
+    return candidate_host;
+  }
+
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
     const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];

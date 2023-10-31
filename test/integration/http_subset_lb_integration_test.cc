@@ -176,7 +176,10 @@ public:
       }
     }
 
-    if (is_hash_lb_) {
+    // The default number of choices for the LEAST_REQUEST policy is 2 hosts, if the number of hosts
+    // is equal to the number of choices, a full scan happens instead, this means that the same host
+    // will be chosen.
+    if (is_hash_lb_ || (GetParam() == envoy::config::cluster::v3::Cluster::LEAST_REQUEST)) {
       EXPECT_EQ(hosts.size(), 1) << "Expected a single unique host to be selected for "
                                  << envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
     } else {

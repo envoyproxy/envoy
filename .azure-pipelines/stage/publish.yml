@@ -292,6 +292,7 @@ jobs:
       publishEnvoy: false
       publishTestResults: false
       env:
+        ENVOY_REPO: $(Build.Repository.Name)
         ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
           ENVOY_HEAD_REF: "$(Build.SourceBranch)"
           ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"

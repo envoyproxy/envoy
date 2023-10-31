@@ -16,7 +16,7 @@ runs:
     env:
       REF: ${{ inputs.ref }}
     shell: bash
-  - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.0.10
+  - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.1
     id: fetch
     with:
       url: "${{ steps.url.outputs.base }}/release.signed.tar.zst"

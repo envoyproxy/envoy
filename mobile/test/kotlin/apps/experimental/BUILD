@@ -34,6 +34,7 @@ kt_android_library(
         artifact("androidx.recyclerview:recyclerview"),
         artifact("androidx.annotation:annotation"),
         artifact("com.google.code.findbugs:jsr305"),
+        artifact("com.google.protobuf:protobuf-javalite"),
     ],
 )
 

@@ -114,7 +114,7 @@ generate_cert_chain() {
             ca_name="i$((x - 1))"
         fi
         echo "$x: $certname $ca_name"
-        generate_ca $certname $ca_name
+        generate_ca "$certname" "$ca_name"
     done
     for x in {1..3}; do
         cat "i${x}_cert.pem" >> test_long_cert_chain.pem

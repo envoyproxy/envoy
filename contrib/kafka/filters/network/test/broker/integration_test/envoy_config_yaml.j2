@@ -10,6 +10,7 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
           stat_prefix: testfilter
+          force_response_rewrite: true
       - name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
