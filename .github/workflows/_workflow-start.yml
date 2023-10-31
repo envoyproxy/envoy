@@ -19,6 +19,7 @@ jobs:
   start:
     runs-on: ubuntu-22.04
     permissions:
+      contents: read
       statuses: write
     steps:
     - uses: actions/checkout@v4
@@ -29,7 +30,7 @@ jobs:
 
     - if: ${{ steps.env.outputs.trusted != 'true' }}
       name: Start status check
-      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.1.1
+      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.1.2
       with:
         authToken: ${{ secrets.GITHUB_TOKEN }}
         context: ${{ inputs.workflow_name }}

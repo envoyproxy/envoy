@@ -16,6 +16,7 @@ on:
     - 'WORKSPACE'
     - '.github/workflows/envoy-prechecks.yml'
     - '.github/workflows/_*.yml'
+    - 'tools/dependency/BUILD'
 
 concurrency:
   group: ${{ github.event.inputs.head_ref || github.run_id }}-${{ github.workflow }}
