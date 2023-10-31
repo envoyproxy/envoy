@@ -184,15 +184,14 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
       // from the map as well.
       connection.close(Network::ConnectionCloseType::NoFlush);
       if (!delete_sessions_immediately && dynamic_cast<QuicFilterManagerConnectionImpl&>(connection)
-                                              .extend_filter_manager_lifetime()) {
+                                              .fix_quic_lifetime_issues()) {
+        // If `envoy.reloadable_features.quic_fix_filter_manager_uaf` is true, the closed sessions need to be deleted right away to consistently handle quic lifetimes. Because upon returning the filter chain configs will be destroyed, and no longer safe to be accessed. If any filters access those configs during destruction, it'll be use-after-free
         delete_sessions_immediately = true;
       }
     }
     ASSERT(connections_by_filter_chain_.find(filter_chain) == connections_by_filter_chain_.end());
     if (delete_sessions_immediately) {
-      // Explicitly destroy closed sessions in the current call stack, because upon returning the
-      // filter chain configs will be destroyed, and no longer safe to be accessed. If any filters
-      // access those configs during destruction, it'll be use-after-free.
+      // Explicitly destroy closed sessions in the current call stack.
       DeleteSessions();
     }
   }
