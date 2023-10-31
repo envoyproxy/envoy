@@ -54,8 +54,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 xdsServerPort;
 @property (nonatomic, strong, nullable) NSString *xdsAuthHeader;
 @property (nonatomic, strong, nullable) NSString *xdsAuthToken;
-@property (nonatomic, strong, nullable) NSString *xdsJwtToken;
-@property (nonatomic, assign) UInt32 xdsJwtTokenLifetimeSeconds;
 @property (nonatomic, strong, nullable) NSString *xdsSslRootCerts;
 @property (nonatomic, strong, nullable) NSString *xdsSni;
 @property (nonatomic, strong, nullable) NSString *rtdsResourceName;
@@ -117,8 +115,6 @@ NS_ASSUME_NONNULL_BEGIN
                                     xdsServerPort:(UInt32)xdsServerPort
                                     xdsAuthHeader:(nullable NSString *)xdsAuthHeader
                                      xdsAuthToken:(nullable NSString *)xdsAuthToken
-                                      xdsJwtToken:(nullable NSString *)xdsJwtToken
-                       xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
                                            xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName

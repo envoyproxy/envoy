@@ -514,6 +514,7 @@ case $CI_TARGET in
         TODAY_DATE=$(date -u -I"date")
         export TODAY_DATE
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
+              --//tools/dependency:preload_cve_data \
               --action_env=TODAY_DATE \
               -- -v warn \
                  -c cves release_dates releases
@@ -788,6 +789,7 @@ case $CI_TARGET in
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
         PUBLISH_ARGS=(
             --publish-commitish="$ENVOY_COMMIT"
@@ -798,7 +800,8 @@ case $CI_TARGET in
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               @envoy_repo//:publish \
-              -- "${PUBLISH_ARGS[@]}"
+              -- --repo="$ENVOY_REPO" \
+                 "${PUBLISH_ARGS[@]}"
         ;;
 
     release|release.server_only)

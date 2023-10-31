@@ -79,8 +79,9 @@ jobs:
           image-tag: ltsc2022
     runs-on: ${{ matrix.runs-on }}
     steps:
-    # TODO(phlax): checkout a more specific commit with safeguards
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.merge_commit_sha }}
     - uses: actions/download-artifact@v3
       with:
         name: windows.release

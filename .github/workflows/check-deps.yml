@@ -31,6 +31,6 @@ jobs:
           TODAY_DATE=$(date -u -I"date")
           export TODAY_DATE
           bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
-          bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
+          bazel run --//tools/dependency:preload_cve_data //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

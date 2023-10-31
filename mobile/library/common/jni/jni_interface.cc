@@ -1310,9 +1310,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean trust_chain_verification, jobjectArray filter_chain, jobjectArray stat_sinks,
     jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
     jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
-    jstring xds_auth_header, jstring xds_auth_token, jstring xds_jwt_token,
-    jlong xds_jwt_token_lifetime, jstring xds_root_certs, jstring xds_sni, jstring node_id,
-    jstring node_region, jstring node_zone, jstring node_sub_zone,
+    jstring xds_auth_header, jstring xds_auth_token, jstring xds_root_certs, jstring xds_sni,
+    jstring node_id, jstring node_region, jstring node_zone, jstring node_sub_zone,
     jbyteArray serialized_node_metadata, jstring cds_resources_locator, jlong cds_timeout_seconds,
     jboolean enable_cds) {
   Envoy::Platform::EngineBuilder builder;
@@ -1339,10 +1338,6 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     if (!native_xds_auth_header.empty()) {
       xds_builder.setAuthenticationToken(std::move(native_xds_auth_header),
                                          getCppString(env, xds_auth_token));
-    }
-    std::string native_jwt_token = getCppString(env, xds_jwt_token);
-    if (!native_jwt_token.empty()) {
-      xds_builder.setJwtAuthenticationToken(std::move(native_jwt_token), xds_jwt_token_lifetime);
     }
     std::string native_root_certs = getCppString(env, xds_root_certs);
     if (!native_root_certs.empty()) {
