@@ -674,7 +674,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
     return this
   }
   
-
   /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
