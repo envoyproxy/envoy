@@ -146,7 +146,7 @@ message HostStatus {
 }
 
 // Health status for a host.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HostHealthStatus {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.HostHealthStatus";
