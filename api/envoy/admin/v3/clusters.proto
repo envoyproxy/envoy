@@ -174,6 +174,10 @@ message HostHealthStatus {
   // The host failed active HC due to timeout.
   bool active_hc_timeout = 8;
 
+  // The host should be excluded from panic, spillover, etc. calculations because it was explicitly
+  // taken out of rotation via EDS draining.
+  bool excluded_via_eds_draining = 9;
+
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
   // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
