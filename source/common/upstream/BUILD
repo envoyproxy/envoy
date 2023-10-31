@@ -619,4 +619,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
+    # Ensure this factory in the source is always linked in.
+    alwayslink = 1,
 )
