@@ -48,16 +48,8 @@ void ResponseRewriterImpl::updateMetadataBrokerAddresses(
     throw new EnvoyException("bug: response class not matching response API key");
   }
   MetadataResponse& data = cast->data_;
-  std::vector<MetadataResponseBroker>& brokers = data.brokers_;
-  for (MetadataResponseBroker& broker : brokers) {
-    const absl::optional<HostAndPort> hostAndPort =
-        config_.findBrokerAddressOverride(broker.node_id_);
-    if (hostAndPort) {
-      ENVOY_LOG(info, "Changing broker [{}] from {}:{} to {}:{}", broker.node_id_, broker.host_,
-                broker.port_, hostAndPort->first, hostAndPort->second);
-      broker.host_ = hostAndPort->first;
-      broker.port_ = hostAndPort->second;
-    }
+  for (MetadataResponseBroker& broker : data.brokers_) {
+    maybeUpdateHostAndPort(broker);
   }
 }
 
@@ -70,28 +62,9 @@ void ResponseRewriterImpl::updateFindCoordinatorBrokerAddresses(
     throw new EnvoyException("bug: response class not matching response API key");
   }
   FindCoordinatorResponse& data = cast->data_;
-
-  {
-    const absl::optional<HostAndPort> hostAndPort =
-        config_.findBrokerAddressOverride(data.node_id_);
-    if (hostAndPort) {
-      ENVOY_LOG(info, "Changing broker [{}] from {}:{} to {}:{}", data.node_id_, data.host_,
-                data.port_, hostAndPort->first, hostAndPort->second);
-      data.host_ = hostAndPort->first;
-      data.port_ = hostAndPort->second;
-    }
-  }
-
-  std::vector<Coordinator>& coordinators = data.coordinators_;
-  for (Coordinator& coordinator : coordinators) {
-    const absl::optional<HostAndPort> hostAndPort =
-        config_.findBrokerAddressOverride(coordinator.node_id_);
-    if (hostAndPort) {
-      ENVOY_LOG(info, "Changing broker [{}] from {}:{} to {}:{}", coordinator.node_id_,
-                coordinator.host_, coordinator.port_, hostAndPort->first, hostAndPort->second);
-      coordinator.host_ = hostAndPort->first;
-      coordinator.port_ = hostAndPort->second;
-    }
+  maybeUpdateHostAndPort(data);
+  for (Coordinator& coordinator : data.coordinators_) {
+    maybeUpdateHostAndPort(coordinator);
   }
 }
 

@@ -52,6 +52,17 @@ private:
   void updateMetadataBrokerAddresses(AbstractResponseSharedPtr& response) const;
   void updateFindCoordinatorBrokerAddresses(AbstractResponseSharedPtr& response) const;
 
+  // Helper function to update various response structures.
+  template <typename T> void maybeUpdateHostAndPort(T& arg) const {
+    const absl::optional<HostAndPort> hostAndPort = config_.findBrokerAddressOverride(arg.node_id_);
+    if (hostAndPort) {
+      ENVOY_LOG(trace, "Changing broker [{}] from {}:{} to {}:{}", arg.node_id_, arg.host_,
+                arg.port_, hostAndPort->first, hostAndPort->second);
+      arg.host_ = hostAndPort->first;
+      arg.port_ = hostAndPort->second;
+    }
+  }
+
   BrokerFilterConfig config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
 };
