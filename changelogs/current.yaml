@@ -94,8 +94,8 @@ new_features:
     Added support for configuring resource detectors on the OpenTelemetry tracer.
 - area: ext_authz
   change: |
-    New config parameter :ref:`no_charge_cluster_response_stats
-    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.no_charge_cluster_response_stats>`
-    for not incrementing cluster statistics on ext_authz response.
+    New config parameter :ref:`charge_cluster_response_stats
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.charge_cluster_response_stats>`
+    for not incrementing cluster statistics on ext_authz response. Default true, no behavior change.
 
 deprecated:
