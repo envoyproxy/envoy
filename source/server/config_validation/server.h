@@ -28,6 +28,7 @@
 #include "source/server/config_validation/api.h"
 #include "source/server/config_validation/cluster_manager.h"
 #include "source/server/config_validation/dns.h"
+#include "source/server/hot_restart_nop_impl.h"
 #include "source/server/server.h"
 
 #include "absl/types/optional.h"
@@ -68,6 +69,7 @@ public:
                      Filesystem::Instance& file_system);
 
   // Server::Instance
+  void run() override { PANIC("not implemented"); }
   OptRef<Admin> admin() override {
     return makeOptRefFromPtr(static_cast<Envoy::Server::Admin*>(admin_.get()));
   }
@@ -85,10 +87,10 @@ public:
     return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
   }
   void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions>) override {}
-  DrainManager& drainManager() override { PANIC("not implemented"); }
+  DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool) override {}
-  HotRestart& hotRestart() override { PANIC("not implemented"); }
+  HotRestart& hotRestart() override { return nop_hot_restart_; }
   Init::Manager& initManager() override { return init_manager_; }
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
@@ -188,6 +190,8 @@ private:
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Server::DrainManagerPtr drain_manager_;
+  HotRestartNopImpl nop_hot_restart_;
 };
 
 } // namespace Server

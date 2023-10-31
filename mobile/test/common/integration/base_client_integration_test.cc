@@ -106,7 +106,10 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
-  stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  {
+    absl::MutexLock l(&engine_lock_);
+    stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  }
 
   stream_prototype_->setOnHeaders(
       [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
@@ -172,7 +175,10 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
   builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
-  engine_ = builder_.build();
+  {
+    absl::MutexLock l(&engine_lock_);
+    engine_ = builder_.build();
+  }
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -182,9 +188,12 @@ void BaseClientIntegrationTest::TearDown() {
   }
   test_server_.reset();
   fake_upstreams_.clear();
-  if (engine_) {
-    engine_->terminate();
-    engine_.reset();
+  {
+    absl::MutexLock l(&engine_lock_);
+    if (engine_) {
+      engine_->terminate();
+      engine_.reset();
+    }
   }
   stream_.reset();
   stream_prototype_.reset();

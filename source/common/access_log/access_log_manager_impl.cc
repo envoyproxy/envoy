@@ -54,8 +54,8 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
   flush_timer_->enableTimer(flush_interval_msec_);
   auto open_result = open();
   if (!open_result.return_value_) {
-    throw EnvoyException(fmt::format("unable to open file '{}': {}", file_->path(),
-                                     open_result.err_->getErrorDetails()));
+    throwEnvoyExceptionOrPanic(fmt::format("unable to open file '{}': {}", file_->path(),
+                                           open_result.err_->getErrorDetails()));
   }
 }
 

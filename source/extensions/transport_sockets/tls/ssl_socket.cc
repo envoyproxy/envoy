@@ -204,6 +204,8 @@ PostIoAction SslSocket::doHandshake() { return info_->doHandshake(); }
 void SslSocket::drainErrorQueue() {
   bool saw_error = false;
   bool saw_counted_error = false;
+  bool new_ssl_failure_format = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.ssl_transport_failure_reason_format");
   while (uint64_t err = ERR_get_error()) {
     if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
       if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
@@ -221,15 +223,19 @@ void SslSocket::drainErrorQueue() {
     saw_error = true;
 
     if (failure_reason_.empty()) {
-      failure_reason_ = "TLS error:";
+      failure_reason_ = new_ssl_failure_format ? "TLS_error:" : "TLS error:";
     }
-    absl::StrAppend(&failure_reason_, " ", err, ":",
+
+    absl::StrAppend(&failure_reason_, new_ssl_failure_format ? "|" : " ", err, ":",
                     absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
                     absl::NullSafeStringView(ERR_func_error_string(err)), ":",
                     absl::NullSafeStringView(ERR_reason_error_string(err)));
   }
 
   if (!failure_reason_.empty()) {
+    if (new_ssl_failure_format) {
+      absl::StrAppend(&failure_reason_, ":TLS_error_end");
+    }
     ENVOY_CONN_LOG(debug, "remote address:{},{}", callbacks_->connection(),
                    callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
                    failure_reason_);

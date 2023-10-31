@@ -36,6 +36,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -46,7 +47,10 @@ import (
 
 var (
 	configNumGenerator uint64
-	configCache        = &sync.Map{} // uint64 -> *anypb.Any
+	configCache        = &sync.Map{} // uint64 -> config(interface{})
+	// From get a cached merged_config_id_ in getMergedConfigId on the C++ side,
+	// to get the merged config by the id on the Go side, 2 seconds should be long enough.
+	delayDeleteTime = time.Second * 2 // 2s
 )
 
 func configFinalize(c *httpConfig) {
@@ -65,11 +69,6 @@ func createConfig(c *C.httpConfig) *httpConfig {
 
 //export envoyGoFilterNewHttpPluginConfig
 func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
-	if !api.CgoCheckDisabled() {
-		cAPI.HttpLog(api.Error, "The Envoy Golang filter requires the `GODEBUG=cgocheck=0` environment variable set.")
-		return 0
-	}
-
 	buf := utils.BytesToSlice(uint64(c.config_ptr), uint64(c.config_len))
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
@@ -100,8 +99,19 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 }
 
 //export envoyGoFilterDestroyHttpPluginConfig
-func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
-	configCache.Delete(id)
+func envoyGoFilterDestroyHttpPluginConfig(id uint64, needDelay int) {
+	if needDelay == 1 {
+		// there is a concurrency race in the c++ side:
+		// 1. when A envoy worker thread is using the cached merged_config_id_ and it will call into Go after some time.
+		// 2. while B envoy worker thread may update the merged_config_id_ in getMergedConfigId, that will delete the id.
+		// so, we delay deleting the id in the Go side.
+		time.AfterFunc(delayDeleteTime, func() {
+			configCache.Delete(id)
+		})
+	} else {
+		// there is no race for non-merged config.
+		configCache.Delete(id)
+	}
 }
 
 //export envoyGoFilterMergeHttpPluginConfig
@@ -125,7 +135,8 @@ func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint
 		return configNum
 
 	} else {
-		// child override parent by default
+		// child override parent by default.
+		// It's safe to reuse the childId, since the merged config have the same life time with the child config.
 		return childId
 	}
 }

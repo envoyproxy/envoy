@@ -116,8 +116,6 @@
                                     xdsServerPort:(UInt32)xdsServerPort
                                     xdsAuthHeader:(nullable NSString *)xdsAuthHeader
                                      xdsAuthToken:(nullable NSString *)xdsAuthToken
-                                      xdsJwtToken:(nullable NSString *)xdsJwtToken
-                       xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
                                            xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName
@@ -172,8 +170,6 @@
   self.xdsServerPort = xdsServerPort;
   self.xdsAuthHeader = xdsAuthHeader;
   self.xdsAuthToken = xdsAuthToken;
-  self.xdsJwtToken = xdsJwtToken;
-  self.xdsJwtTokenLifetimeSeconds = xdsJwtTokenLifetimeSeconds;
   self.xdsSslRootCerts = xdsSslRootCerts;
   self.xdsSni = xdsSni;
   self.rtdsResourceName = rtdsResourceName;
@@ -274,10 +270,6 @@
     if (self.xdsAuthHeader != nil) {
       xdsBuilder.setAuthenticationToken([self.xdsAuthHeader toCXXString],
                                         [self.xdsAuthToken toCXXString]);
-    }
-    if (self.xdsJwtToken != nil) {
-      xdsBuilder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
-                                           self.xdsJwtTokenLifetimeSeconds);
     }
     if (self.xdsSslRootCerts != nil) {
       xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);

@@ -16,7 +16,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.router.v3.Router
           codec_config:
-            name: http
+            name: dubbo
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig
           route_config:

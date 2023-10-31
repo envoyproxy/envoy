@@ -59,6 +59,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "router_filter_interface",
+    hdrs = ["router_filter_interface.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:host_description_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],

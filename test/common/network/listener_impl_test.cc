@@ -39,8 +39,9 @@ static void errorCallbackTest(Address::IpVersion version) {
       Network::Test::getCanonicalLoopbackAddress(version));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Network::ListenerPtr listener =
-      dispatcher->createListener(socket, listener_callbacks, runtime, listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = dispatcher->createListener(socket, listener_callbacks, runtime,
+                                                             listener_config, overload_state);
 
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -72,17 +73,20 @@ class TestTcpListenerImpl : public TcpListenerImpl {
 public:
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
                       Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                      bool bind_to_port, bool ignore_global_conn_limit)
+                      bool bind_to_port, bool ignore_global_conn_limit,
+                      Server::ThreadLocalOverloadStateOptRef overload_state)
       : TestTcpListenerImpl(dispatcher, random_generator, runtime, std::move(socket), cb,
                             bind_to_port, ignore_global_conn_limit,
-                            Network::DefaultMaxConnectionsToAcceptPerSocketEvent) {}
+                            Network::DefaultMaxConnectionsToAcceptPerSocketEvent, overload_state) {}
 
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
                       Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
                       bool bind_to_port, bool ignore_global_conn_limit,
-                      uint32_t max_connections_to_accept_per_socket_event)
+                      uint32_t max_connections_to_accept_per_socket_event,
+                      Server::ThreadLocalOverloadStateOptRef overload_state)
       : TcpListenerImpl(dispatcher, random_generator, runtime, std::move(socket), cb, bind_to_port,
-                        ignore_global_conn_limit, max_connections_to_accept_per_socket_event) {}
+                        ignore_global_conn_limit, max_connections_to_accept_per_socket_event,
+                        overload_state) {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };
@@ -99,13 +103,13 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   Network::MockTcpListenerCallbacks listener_callbacks1;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
-
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                                        listener_callbacks1, true, false);
+                                        listener_callbacks1, true, false, overload_state);
   Network::MockTcpListenerCallbacks listener_callbacks2;
   Network::TestTcpListenerImpl listenerDst(dispatcherImpl(), random_generator, runtime, socketDst,
-                                           listener_callbacks2, false, false);
+                                           listener_callbacks2, false, false, overload_state);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -140,8 +144,9 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener = dispatcher_->createListener(
-      socket, listener_callbacks, scoped_runtime.loader(), listener_config);
+      socket, listener_callbacks, scoped_runtime.loader(), listener_config, overload_state);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -210,8 +215,9 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
   EXPECT_CALL(listener_config, ignoreGlobalConnLimit()).WillOnce(Return(true));
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener = dispatcher_->createListener(
-      socket, listener_callbacks, scoped_runtime.loader(), listener_config);
+      socket, listener_callbacks, scoped_runtime.loader(), listener_config, overload_state);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -256,9 +262,10 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                                        listener_callbacks, true, false);
+                                        listener_callbacks, true, false, overload_state);
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_),
@@ -301,10 +308,10 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   NiceMock<Runtime::MockLoader> runtime;
 
   ASSERT_TRUE(socket->connectionInfoProvider().localAddress()->ip()->isAnyAddress());
-
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                                        listener_callbacks, true, false);
+                                        listener_callbacks, true, false, overload_state);
 
   auto listener_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_),
@@ -345,8 +352,9 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                               listener_callbacks, true, false);
+                               listener_callbacks, true, false, overload_state);
 
   // When listener is disabled, the timer should fire before any connection is accepted.
   listener.disable();
@@ -388,8 +396,9 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                               listener_callbacks, true, false);
+                               listener_callbacks, true, false, overload_state);
 
   listener.setRejectFraction(UnitFloat(0));
 
@@ -421,8 +430,9 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                               listener_callbacks, true, false);
+                               listener_callbacks, true, false, overload_state);
 
   listener.setRejectFraction(UnitFloat(0.5f));
 
@@ -488,8 +498,9 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                               listener_callbacks, true, false);
+                               listener_callbacks, true, false, overload_state);
 
   listener.setRejectFraction(UnitFloat(1));
 
@@ -522,8 +533,9 @@ TEST_P(TcpListenerImplTest, LoadShedPointCanRejectConnection) {
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                               listener_callbacks, true, false);
+                               listener_callbacks, true, false, overload_state);
 
   Server::MockOverloadManager overload_manager;
   Server::MockLoadShedPoint accept_connection_point;
@@ -563,8 +575,9 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   MockConnectionCallbacks connection_callbacks2;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
-                               listener_callbacks, true, false);
+                               listener_callbacks, true, false, overload_state);
 
   Server::MockOverloadManager overload_manager;
   Server::MockLoadShedPoint accept_connection_point;
@@ -627,10 +640,11 @@ TEST_P(TcpListenerImplTest, ShouldOnlyAcceptTheMaxNumberOfConnectionsConfiguredP
   MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   const uint32_t max_connections_to_accept_per_socket_event = 1;
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                listener_callbacks, true, false,
-                               max_connections_to_accept_per_socket_event);
+                               max_connections_to_accept_per_socket_event, overload_state);
 
   // Create two client connections, they should get accepted.
   MockConnectionCallbacks connection_callbacks1;

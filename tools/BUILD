@@ -5,7 +5,7 @@ load(
     "envoy_package",
     "envoy_py_test_binary",
 )
-load("//tools/base:envoy_python.bzl", "envoy_py_namespace")
+load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 

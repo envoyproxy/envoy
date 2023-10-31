@@ -70,10 +70,12 @@ public:
     return Filesystem::WatcherPtr{createFilesystemWatcher_()};
   }
 
-  Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
-                                      const Network::ListenerConfig& listener_config) override {
-    return Network::ListenerPtr{createListener_(std::move(socket), cb, runtime, listener_config)};
+  Network::ListenerPtr
+  createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                 Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
+                 Server::ThreadLocalOverloadStateOptRef overload_state) override {
+    return Network::ListenerPtr{
+        createListener_(std::move(socket), cb, runtime, listener_config, overload_state)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -136,7 +138,8 @@ public:
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
-               Runtime::Loader& runtime, const Network::ListenerConfig& listener_config));
+               Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
+               Server::ThreadLocalOverloadStateOptRef overload_state));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
@@ -220,6 +223,8 @@ public:
 class MockSchedulableCallback : public SchedulableCallback {
 public:
   MockSchedulableCallback(MockDispatcher* dispatcher,
+                          testing::MockFunction<void()>* destroy_cb = nullptr);
+  MockSchedulableCallback(MockDispatcher* dispatcher, std::function<void()> callback,
                           testing::MockFunction<void()>* destroy_cb = nullptr);
   ~MockSchedulableCallback() override;
 
