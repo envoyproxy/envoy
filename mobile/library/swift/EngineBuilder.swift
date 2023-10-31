@@ -812,7 +812,7 @@ open class EngineBuilder: NSObject {
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHttp3: self.enableHttp3,
       quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
-      quicCanonialSuffixes: self.quicCanonialSuffixes,
+      quicCanonicalSuffixes: self.quicCanonicalSuffixes,
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
