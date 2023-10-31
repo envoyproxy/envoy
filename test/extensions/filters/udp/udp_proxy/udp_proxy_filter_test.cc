@@ -1991,9 +1991,7 @@ TEST(TunnelingConfigImplTest, HeadersToAdd) {
   TunnelingConfigImpl config(proto_config, context);
 
   auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
-  config.headerEvaluator().evaluateHeaders(
-      headers, *Http::StaticEmptyHeaders::get().request_headers,
-      *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
   EXPECT_EQ("test_val", headers.getByKey("test_key"));
 }
 

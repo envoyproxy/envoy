@@ -17,11 +17,11 @@ public:
    * from the `bar` field in the stream_info, request headers or response headers.
    *
    * @param headers the target header map to be mutated.
-   * @param format_context context to format the header value.
+   * @param context context to format the header value.
    * @param stream_info the source of values that can be used in the evaluation.
    */
   virtual void evaluateHeaders(Http::HeaderMap& headers,
-                               const Formatter::HttpFormatterContext& format_context,
+                               const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 } // namespace Http

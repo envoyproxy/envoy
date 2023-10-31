@@ -18,10 +18,9 @@ public:
   AppendMutation(const HeaderValueOption& header_value_option)
       : HeadersToAddEntry(header_value_option), header_name_(header_value_option.header().key()) {}
 
-  void evaluateHeaders(Http::HeaderMap& headers,
-                       const Formatter::HttpFormatterContext& format_context,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo& stream_info) const override {
-    const std::string value = formatter_->formatWithContext(format_context, stream_info);
+    const std::string value = formatter_->formatWithContext(context, stream_info);
 
     if (!value.empty() || add_if_empty_) {
       switch (append_action_) {
@@ -83,10 +82,10 @@ HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations) {
 }
 
 void HeaderMutations::evaluateHeaders(Http::HeaderMap& headers,
-                                      const Formatter::HttpFormatterContext& format_context,
+                                      const Formatter::HttpFormatterContext& context,
                                       const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& mutation : header_mutations_) {
-    mutation->evaluateHeaders(headers, format_context, stream_info);
+    mutation->evaluateHeaders(headers, context, stream_info);
   }
 }
 

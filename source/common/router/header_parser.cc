@@ -120,15 +120,13 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const Http::RequestHeaderMap& request_headers,
-                                   const Http::ResponseHeaderMap& response_headers,
+                                   const Formatter::HttpFormatterContext& context,
                                    const StreamInfo::StreamInfo& stream_info) const {
-  evaluateHeaders(headers, request_headers, response_headers, &stream_info);
+  evaluateHeaders(headers, context, &stream_info);
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const Http::RequestHeaderMap& request_headers,
-                                   const Http::ResponseHeaderMap& response_headers,
+                                   const Formatter::HttpFormatterContext& context,
                                    const StreamInfo::StreamInfo* stream_info) const {
   // Removing headers in the headers_to_remove_ list first makes
   // remove-before-add the default behavior as expected by users.
@@ -158,8 +156,7 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& [key, entry] : headers_to_add_) {
     absl::string_view value;
     if (stream_info != nullptr) {
-      value_buffer =
-          entry.formatter_->formatWithContext({&request_headers, &response_headers}, *stream_info);
+      value_buffer = entry.formatter_->formatWithContext(context, *stream_info);
       value = value_buffer;
     } else {
       value = entry.original_value_;

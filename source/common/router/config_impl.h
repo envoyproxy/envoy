@@ -999,7 +999,7 @@ public:
           stream_info.getRequestHeaders() == nullptr
               ? *Http::StaticEmptyHeaders::get().request_headers
               : *stream_info.getRequestHeaders();
-      responseHeaderParser().evaluateHeaders(headers, request_headers, headers, stream_info);
+      responseHeaderParser().evaluateHeaders(headers, {&request_headers, &headers}, stream_info);
       DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,

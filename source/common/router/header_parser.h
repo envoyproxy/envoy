@@ -37,7 +37,7 @@ struct HeadersToAddEntry {
  * between a constant value implementation and a dynamic value implementation based on
  * StreamInfo::StreamInfo fields.
  */
-class HeaderParser {
+class HeaderParser : public Http::HeaderEvaluator {
 public:
   /*
    * @param headers_to_add defines the headers to add during calls to evaluateHeaders
@@ -70,12 +70,10 @@ public:
     return *instance;
   }
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
-                       const Http::ResponseHeaderMap& response_headers,
-                       const StreamInfo::StreamInfo& stream_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
+                       const StreamInfo::StreamInfo& stream_info) const override;
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
-                       const Http::ResponseHeaderMap& response_headers,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo* stream_info) const;
 
   /**
@@ -84,20 +82,13 @@ public:
    * empty.
    */
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
-    evaluateHeaders(headers,
-                    stream_info.getRequestHeaders() != nullptr
-                        ? *stream_info.getRequestHeaders()
-                        : *Http::StaticEmptyHeaders::get().request_headers,
-                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+    evaluateHeaders(headers, {stream_info.getRequestHeaders()}, &stream_info);
   }
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const {
     evaluateHeaders(headers,
-                    stream_info == nullptr
-                        ? *Http::StaticEmptyHeaders::get().request_headers
-                        : (stream_info->getRequestHeaders() != nullptr
-                               ? *stream_info->getRequestHeaders()
-                               : *Http::StaticEmptyHeaders::get().request_headers),
-                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+                    Formatter::HttpFormatterContext{
+                        stream_info == nullptr ? nullptr : stream_info->getRequestHeaders()},
+                    stream_info);
   }
 
   /*
