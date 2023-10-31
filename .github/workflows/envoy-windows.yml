@@ -36,7 +36,7 @@ jobs:
       rbe-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
     with:
       target: ${{ matrix.target }}
-      runs-on: envoy-win19-medium
+      runs-on: envoy-win19-small
       command_ci:
       temp-dir: 'C:\Users\runner\AppData\Local\Temp\bazel-shared'
       run-du: false
@@ -67,13 +67,13 @@ jobs:
         include:
         - target: windows2019
           name: Windows 2019
-          runs-on: envoy-win19-medium
+          runs-on: envoy-win19-small
           build-type: windows
           image-base: mcr.microsoft.com/windows/servercore
           image-tag: ltsc2019
         - target: windows2022
           name: Windows 2022
-          runs-on: envoy-win22-medium
+          runs-on: envoy-win22-small
           build-type: windows-ltsc2022
           image-base: mcr.microsoft.com/windows/nanoserver
           image-tag: ltsc2022

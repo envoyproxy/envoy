@@ -1,13 +1,18 @@
 #include "source/extensions/common/aws/utility.h"
 
+#include "envoy/upstream/cluster_manager.h"
+
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "curl/curl.h"
+#include "fmt/printf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -292,6 +297,57 @@ absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message
   curl_slist_free_all(headers);
 
   return buffer.empty() ? absl::nullopt : absl::optional<std::string>(buffer);
+}
+
+bool Utility::addInternalClusterStatic(
+    Upstream::ClusterManager& cm, absl::string_view cluster_name,
+    const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri) {
+  // Check if local cluster exists with that name.
+  if (cm.getThreadLocalCluster(cluster_name) == nullptr) {
+    // Make sure we run this on main thread.
+    TRY_ASSERT_MAIN_THREAD {
+      envoy::config::cluster::v3::Cluster cluster;
+      absl::string_view host_port;
+      absl::string_view path;
+      Http::Utility::extractHostPathFromUri(uri, host_port, path);
+      const auto host_attributes = Http::Utility::parseAuthority(host_port);
+      const auto host = host_attributes.host_;
+      const auto port = host_attributes.port_ ? host_attributes.port_.value() : 80;
+
+      cluster.set_name(cluster_name);
+      cluster.set_type(cluster_type);
+      cluster.mutable_connect_timeout()->set_seconds(5);
+      cluster.mutable_load_assignment()->set_cluster_name(cluster_name);
+      auto* endpoint = cluster.mutable_load_assignment()
+                           ->add_endpoints()
+                           ->add_lb_endpoints()
+                           ->mutable_endpoint();
+      auto* addr = endpoint->mutable_address();
+      addr->mutable_socket_address()->set_address(host);
+      addr->mutable_socket_address()->set_port_value(port);
+      cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+      envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
+      auto* http_protocol_options =
+          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+      http_protocol_options->set_accept_http_10(true);
+      (*cluster.mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(protocol_options);
+
+      // TODO(suniltheta): use random number generator here for cluster version.
+      cm.addOrUpdateCluster(cluster, "12345");
+      ENVOY_LOG_MISC(info,
+                     "Added a {} internal cluster [name: {}, address:{}:{}] to fetch aws "
+                     "credentials",
+                     cluster_type, cluster_name, host, port);
+    }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      ENVOY_LOG_MISC(error, "Failed to add internal cluster {}: {}", cluster_name, e.what());
+      return false;
+    });
+  }
+  return true;
 }
 
 } // namespace Aws

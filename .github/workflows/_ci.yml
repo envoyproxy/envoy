@@ -125,11 +125,11 @@ jobs:
     steps:
     - if: ${{ inputs.cache_build_image }}
       name: Restore Docker cache (${{ inputs.cache_build_image }})
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.1.2
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.1.3
       with:
         image_tag: ${{ inputs.cache_build_image }}
 
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.2
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.3
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -158,7 +158,7 @@ jobs:
       run: git config --global --add safe.directory /__w/envoy/envoy
 
     - if: ${{ inputs.diskspace_hack }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.2
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.3
     - run: |
         echo "disk space at beginning of build:"
         df -h
@@ -167,12 +167,12 @@ jobs:
 
     - if: ${{ inputs.run_pre }}
       name: Run pre action ${{ inputs.run_pre && format('({0})', inputs.run_pre) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.1.2
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.1.3
       with:
         uses: ${{ inputs.run_pre }}
         with: ${{ inputs.run_pre_with }}
 
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.2
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.3
       name: 'Run CI target ${{ inputs.target }}'
       with:
         catch-errors: ${{ inputs.catch-errors }}
@@ -197,7 +197,7 @@ jobs:
 
     - if: ${{ inputs.run_post }}
       name: Run post action ${{ inputs.run_pre && format('({0})', inputs.run_post) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.1.2
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.1.3
       with:
         uses: ${{ inputs.run_post }}
         with: ${{ inputs.run_post_with }}
