@@ -10,9 +10,9 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
-import "envoy/annotations/deprecation.proto";
-
 import "google/protobuf/wrappers.proto";
+
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
