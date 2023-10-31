@@ -82,13 +82,13 @@ function setup_clang_toolchain() {
 
 if [[ -z "${BUILD_DIR}" ]]; then
     echo "BUILD_DIR not set - defaulting to ~/.cache/envoy-bazel" >&2
-    BUILD_DIR="$(realpath ~/.cache/envoy-bazel)"
+    BUILD_DIR="${HOME}/.cache/envoy-bazel"
 fi
-export BUILD_DIR
 if [[ ! -d "${BUILD_DIR}" ]]; then
     echo "${BUILD_DIR} missing - Creating." >&2
     mkdir -p "${BUILD_DIR}"
 fi
+export BUILD_DIR
 
 # Environment setup.
 export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
