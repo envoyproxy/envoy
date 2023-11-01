@@ -50,7 +50,7 @@ jobs:
       source: ${{ matrix.source }}
       trusted: false
       repo-ref: ${{ inputs.repo-ref }}
-      steps-pre: ${{ inputs.steps-pre }}
+      steps-pre: ${{ matrix.steps-pre }}
     strategy:
       fail-fast: false
       matrix:

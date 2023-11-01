@@ -31,7 +31,7 @@ jobs:
       trusted: ${{ inputs.trusted }}
       repo-ref: ${{ inputs.repo-ref }}
       runs-on: envoy-x64-small
-      steps-pre: ${{ inputs.steps-pre }}
+      steps-pre: ${{ matrix.steps-pre }}
     strategy:
       fail-fast: false
       matrix:
