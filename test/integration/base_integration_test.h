@@ -537,7 +537,7 @@ protected:
   // Timeout to wait for listeners to be created before invoking
   // registerTestServerPorts(), as that needs to know about the bound listener ports.
   // Using 2x default timeout to cover for slow TLS implementations (no inline asm) on slow
-  // computers (e.g., Raspberry Pi) that sometimes time out on TLS listeners herei, or when
+  // computers (e.g., Raspberry Pi) that sometimes time out on TLS listeners, or when
   // the number of listeners in a test is large.
   std::chrono::milliseconds listeners_bound_timeout_ms_{2 * TestUtility::DefaultTimeout};
 
