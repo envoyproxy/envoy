@@ -68,6 +68,10 @@ removed_config_or_runtime:
   change: |
     Removed the deprecated ``envoy.reloadable_features.service_sanitize_non_utf8_strings``
     runtime flag and legacy code path.
+- area: access log
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.format_ports_as_numbers``
+    runtime flag and legacy code path.
 
 new_features:
 - area: filters
