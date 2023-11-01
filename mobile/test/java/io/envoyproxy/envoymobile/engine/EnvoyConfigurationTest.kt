@@ -210,8 +210,9 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("hostname: www.abc.com");
     assertThat(resolvedTemplate).contains("hostname: www.def.com");
     assertThat(resolvedTemplate).contains("port: 443");
-    assertThat(resolvedTemplate).contains("canonical_suffixes: .opq.com");
-    assertThat(resolvedTemplate).contains("canonical_suffixes: .xyz.com");
+    assertThat(resolvedTemplate).contains("canonical_suffixes:");
+    assertThat(resolvedTemplate).contains(".opq.com");
+    assertThat(resolvedTemplate).contains(".xyz.com");
     assertThat(resolvedTemplate).contains("connection_options: 5RTO");
     assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
 
