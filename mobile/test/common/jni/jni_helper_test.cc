@@ -4,6 +4,9 @@
 
 // NOLINT(namespace-envoy)
 
+// This file contains JNI implementation used by
+// `test/java/io/envoyproxy/envoymobile/jni/JniHelperTest.java` unit tests.
+
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getMethodId(
     JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {
   Envoy::JNI::JniHelper jni_helper(env);

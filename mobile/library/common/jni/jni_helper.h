@@ -136,14 +136,14 @@ public:
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getmethodid
    */
-  jmethodID getMethodId(jclass clazz, const char* name, const char* sig);
+  jmethodID getMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
    * Gets the static method with the given signature.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticmethodid
    */
-  jmethodID getStaticMethodId(jclass clazz, const char* name, const char* sig);
+  jmethodID getStaticMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
    * Finds the given `class_name` using Java classloader.

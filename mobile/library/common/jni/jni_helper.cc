@@ -5,14 +5,14 @@
 namespace Envoy {
 namespace JNI {
 
-jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* sig) {
-  jmethodID method_id = env_->GetMethodID(clazz, name, sig);
+jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
+  jmethodID method_id = env_->GetMethodID(clazz, name, signature);
   abortOnException("Failed calling GetMethodID.");
   return method_id;
 }
 
-jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const char* sig) {
-  jmethodID method_id = env_->GetStaticMethodID(clazz, name, sig);
+jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const char* signature) {
+  jmethodID method_id = env_->GetStaticMethodID(clazz, name, signature);
   abortOnException("Failed calling GetStaticMethodID.");
   return method_id;
 }
