@@ -161,6 +161,7 @@ open class EngineBuilder: NSObject {
   private var enableHttp3: Bool = false
 #endif
   private var quicHints: [String: Int] = [:]
+  private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -376,6 +377,17 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func addQuicHint(_ host: String, _ port: Int) -> Self {
     self.quicHints[host] = port
+    return self
+  }
+
+  /// Add a host suffix that's known to support QUIC.
+  ///
+  /// - parameter suffix: the string representation of the host suffix
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addQuicCanonicalSuffix(_ suffix: String) -> Self {
+    self.quicCanonicalSuffixes.append(suffix)
     return self
   }
 #endif
@@ -800,6 +812,7 @@ open class EngineBuilder: NSObject {
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHttp3: self.enableHttp3,
       quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
+      quicCanonicalSuffixes: self.quicCanonicalSuffixes,
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
@@ -873,6 +886,9 @@ private extension EngineBuilder {
     cxxBuilder.enableHttp3(self.enableHttp3)
     for (host, port) in self.quicHints {
       cxxBuilder.addQuicHint(host.toCXX(), Int32(port))
+    }
+    for (suffix) in self.quicCanonicalSuffixes {
+      cxxBuilder.addQuicCanonicalSuffix(suffix.toCXX())
     }
 #endif
     cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
