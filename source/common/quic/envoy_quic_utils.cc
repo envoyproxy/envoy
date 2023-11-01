@@ -286,7 +286,7 @@ void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
   char* new_connection_id_data = new_connection_id.mutable_data();
   const char* old_connection_id_ptr = old_connection_id.data();
   // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  memcpy(new_connection_id_data, old_connection_id_ptr, 4);
+  memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
 }
 
 } // namespace Quic
