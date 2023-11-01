@@ -307,7 +307,7 @@ public:
   jlong getDirectBufferCapacity(jobject buffer);
 
 private:
-  /** Aborts on when Java exception occurred. */
+  /** Aborts when Java exception occurred. */
   void abortOnException(const std::string& message);
 
   JNIEnv* const env_;
