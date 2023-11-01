@@ -751,6 +751,9 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   } else {
     // Drain all write buf since the write failed.
     write_buf_.drain(write_buf_.length());
+    if (result == -EPIPE) {
+      IoUringSocketEntry::onRemoteClose();
+    }
     if (!shutdown_.has_value() && status_ != Closed) {
       WriteParam param{result};
       write_param_ = param;
