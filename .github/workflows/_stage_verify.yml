@@ -46,7 +46,8 @@ jobs:
               uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.1
               with:
                 length: 7
-                input: ${{ inputs.repo-ref }}
+                string: ${{ inputs.repo-ref }}
+                min: 40
             - id: gcp
               run: |
                 PREFIX=https://storage.googleapis.com/envoy-

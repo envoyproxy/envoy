@@ -62,7 +62,8 @@ jobs:
               uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.2
               with:
                 length: 7
-                input: ${{ inputs.repo-ref }}
+                string: ${{ inputs.repo-ref }}
+                min: 40
             - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.2
               with:
                 url: https://storage.googleapis.com/envoy-pr/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
