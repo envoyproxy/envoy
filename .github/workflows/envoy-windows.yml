@@ -17,6 +17,9 @@ concurrency:
 jobs:
   env:
     uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      pull-requests: read
     with:
       prime_build_image: false
       check_mobile_run: false
@@ -39,6 +42,7 @@ jobs:
       runs-on: envoy-win19-small
       command_ci:
       temp-dir: 'C:\Users\runner\AppData\Local\Temp\bazel-shared'
+      repo_ref: ${{ needs.env.outputs.repo_ref  }}
       run-du: false
       upload-name: windows.release
       upload-path: 'C:\Users\runner\AppData\Local\Temp\envoy'
@@ -81,7 +85,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.merge_commit_sha }}
+        ref: ${{ needs.env.outputs.repo_ref  }}
     - uses: actions/download-artifact@v3
       with:
         name: windows.release
