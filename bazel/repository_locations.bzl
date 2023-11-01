@@ -1503,5 +1503,4 @@ def _compiled_protoc_deps(locations, versions):
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
         )
 
-REPOSITORY_LOCATIONS_SPEC["com_github_intel_ipp_crypto_crypto_mb_fips"] = REPOSITORY_LOCATIONS_SPEC["com_github_intel_ipp_crypto_crypto_mb"]
 _compiled_protoc_deps(REPOSITORY_LOCATIONS_SPEC, PROTOC_VERSIONS)

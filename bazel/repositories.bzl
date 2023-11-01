@@ -547,6 +547,8 @@ def _com_github_intel_ipp_crypto_crypto_mb_fips():
         patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
         patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
+        # Use existing ipp-crypto repository location name to avoid redefinition.
+        location_name = "com_github_intel_ipp_crypto_crypto_mb",
     )
 
 def _com_github_intel_qatlib():
