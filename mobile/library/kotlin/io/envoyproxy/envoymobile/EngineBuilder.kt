@@ -664,9 +664,9 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   }
 
   /**
-   * Add a host suffix that's known to speak QUIC
+   * Add a host suffix that's known to speak QUIC.
    *
-   * @param suffix the suffix string
+   * @param suffix the suffix string.
    * @return This builder.
    */
   fun addQuicCanonicalSuffix(suffix: String): EngineBuilder {
