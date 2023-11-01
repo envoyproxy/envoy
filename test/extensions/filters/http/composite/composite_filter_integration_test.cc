@@ -309,6 +309,8 @@ TEST_P(CompositeFilterIntegrationTest, TestMissingDynamicFilter) {
   prependMissingCompositeDynamicFilter("composite-dynamic-missing");
 
   initialize();
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.http_filter.missing-config.config_fail", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
 
