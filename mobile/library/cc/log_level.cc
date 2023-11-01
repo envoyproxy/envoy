@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include "source/common/common/assert.h"
+
 namespace Envoy {
 namespace Platform {
 
@@ -18,7 +20,8 @@ std::string logLevelToString(LogLevel method) {
     }
   }
 
-  throw std::out_of_range("unknown log level type");
+  IS_ENVOY_BUG("unknown log level, defaulting to off");
+  return LOG_LEVEL_LOOKUP[6].second;
 }
 
 LogLevel logLevelFromString(const std::string& str) {
@@ -28,7 +31,8 @@ LogLevel logLevelFromString(const std::string& str) {
     }
   }
 
-  throw std::out_of_range("unknown log level type");
+  IS_ENVOY_BUG("unknown log level, defaulting to off");
+  return LOG_LEVEL_LOOKUP[6].first;
 }
 
 } // namespace Platform
