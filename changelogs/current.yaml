@@ -12,6 +12,12 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: upstream
+  change: |
+    Fixed a reported issue (https://github.com/envoyproxy/envoy/issues/11004) that causes the Least
+    Request load balancer policy to be unfair when the number of hosts are very small, when the number
+    of hosts is smaller than the choice_count, instead of randomly selection hosts from the list, we
+    perform a full scan on it to choose the host with least requests.
 - area: local_rate_limit
   change: |
     Added new configuration field :ref:`rate_limited_as_resource_exhausted
@@ -22,6 +28,11 @@ minor_behavior_changes:
     Added config name of filter that invoking local reply in filter state with key
     ``envoy.filters.network.http_connection_manager.local_reply_owner``.
     See :ref:`the well-known filter state keys <well_known_filter_state>`. for more detail.
+- area: http2
+  change: |
+    Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
+    This feature improves flow control within the proxy by deferring work on the receiving end if the other
+    end is backed up.
 
 
 bug_fixes:
@@ -36,6 +47,9 @@ bug_fixes:
 - area: grpc
   change: |
     Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+- area: redis
+  change: |
+    Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -60,11 +74,48 @@ removed_config_or_runtime:
   change: |
     Removed the deprecated ``envoy.reloadable_features.service_sanitize_non_utf8_strings``
     runtime flag and legacy code path.
+- area: access log
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.format_ports_as_numbers``
+    runtime flag and legacy code path.
 
 new_features:
+- area: filters
+  change: |
+    Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to
+    authenticate user credentials in the HTTP Authentication heaer defined in `RFC7617 <https://tools.ietf.org/html/rfc7617>`_.
+- area: upstream
+  change: |
+    Added :ref:`enable_full_scan <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    option to the least requested load balancer. If set to true, Envoy will perform a full scan on the list of hosts
+    instead of using :ref:`choice_count
+    <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    to select the hosts.
+- area: stats
+  change: |
+    added :ref:`per_endpoint_stats <envoy_v3_api_field_config.cluster.v3.TrackClusterStats.per_endpoint_stats>` to get some metrics
+    for each endpoint in a cluster.
 - area: jwt
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
     These claims will be serialized as JSON and encoded as Base64.
+- area: tcp_proxy
+  change: |
+    added support to TCP Proxy for recording the latency in ``UpstreamTiming`` from when the first
+    initial connection to the upstream cluster was attempted to when either the
+    connection was successfully established or the filiter failed to initialize
+    any connection to the upstream.
+- area: ratelimit
+  change: |
+    Ratelimit supports setting the HTTP status that is returned to the client when the ratelimit server
+    returns an error or cannot be reached with :ref:`status_on_error
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.status_on_error>`
+    configuration flag.
+- area: tracing
+  change: |
+    Added support for configuring resource detectors on the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added support to configure a sampler for the OpenTelemetry tracer.
 
 deprecated:

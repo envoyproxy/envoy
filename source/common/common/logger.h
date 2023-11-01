@@ -39,6 +39,7 @@ const static bool should_log = true;
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
+  FUNCTION(basic_auth)                                                                             \
   FUNCTION(cache_filter)                                                                           \
   FUNCTION(client)                                                                                 \
   FUNCTION(config)                                                                                 \

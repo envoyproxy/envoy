@@ -1,4 +1,5 @@
 load("@base_pip3//:requirements.bzl", "requirement")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_repo//:path.bzl", "PATH")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_genjson", "envoy_pytool_binary")
@@ -10,18 +11,34 @@ envoy_package()
 
 envoy_py_namespace()
 
+bool_flag(
+    name = "preload_cve_data",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "preloaded_cve_data",
+    flag_values = {
+        ":preload_cve_data": "true",
+    },
+)
+
 envoy_entry_point(
     name = "check",
     args = [
         "--repository_locations=$(location //bazel:all_repository_locations)",
         "--cve_config=$(location :cve.yaml)",
-        "--cve_data=$(location :cve_data)",
-    ],
+    ] + select({
+        ":preloaded_cve_data": ["--cve_data=$(location :cve_data)"],
+        "//conditions:default": [],
+    }),
     data = [
         ":cve.yaml",
-        ":cve_data",
         "//bazel:all_repository_locations",
-    ],
+    ] + select({
+        ":preloaded_cve_data": [":cve_data"],
+        "//conditions:default": [],
+    }),
     pkg = "envoy.dependency.check",
     deps = [requirement("orjson")],
 )

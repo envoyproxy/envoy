@@ -530,15 +530,14 @@ public:
       return SubstitutionFormatUtils::unspecifiedValue();
     }
 
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.format_ports_as_numbers")) {
-      if (extraction_type_ == StreamInfoAddressFieldExtractionType::JustPort) {
-        const auto port = StreamInfo::Utility::extractDownstreamAddressJustPort(*address);
-        if (port) {
-          return ValueUtil::numberValue(*port);
-        }
-        return SubstitutionFormatUtils::unspecifiedValue();
+    if (extraction_type_ == StreamInfoAddressFieldExtractionType::JustPort) {
+      const auto port = StreamInfo::Utility::extractDownstreamAddressJustPort(*address);
+      if (port) {
+        return ValueUtil::numberValue(*port);
       }
+      return SubstitutionFormatUtils::unspecifiedValue();
     }
+
     return ValueUtil::stringValue(toString(*address));
   }
 

@@ -52,14 +52,6 @@ XdsBuilder& XdsBuilder::setAuthenticationToken(std::string token_header, std::st
   return *this;
 }
 
-XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
-                                                  const int token_lifetime_in_seconds) {
-  jwt_token_ = std::move(token);
-  jwt_token_lifetime_in_seconds_ =
-      token_lifetime_in_seconds > 0 ? token_lifetime_in_seconds : DefaultJwtTokenLifetimeSeconds;
-  return *this;
-}
-
 XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
   ssl_root_certs_ = std::move(root_certs);
   return *this;
@@ -106,12 +98,6 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
     auto* auth_token_metadata = grpc_service.add_initial_metadata();
     auth_token_metadata->set_key(authentication_token_header_);
     auth_token_metadata->set_value(authentication_token_);
-  } else if (!jwt_token_.empty()) {
-    auto& jwt = *grpc_service.mutable_google_grpc()
-                     ->add_call_credentials()
-                     ->mutable_service_account_jwt_access();
-    jwt.set_json_key(jwt_token_);
-    jwt.set_token_lifetime_seconds(jwt_token_lifetime_in_seconds_);
   }
   if (!sni_.empty()) {
     auto& channel_args =

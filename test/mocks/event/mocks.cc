@@ -77,11 +77,22 @@ MockSchedulableCallback::~MockSchedulableCallback() {
 }
 
 MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher,
+                                                 std::function<void()> callback,
+                                                 testing::MockFunction<void()>* destroy_cb)
+    : dispatcher_(dispatcher), callback_(callback), destroy_cb_(destroy_cb) {
+  ON_CALL(*this, scheduleCallbackCurrentIteration()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, scheduleCallbackNextIteration()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, cancel()).WillByDefault(Assign(&enabled_, false));
+  ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
+}
+
+MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher,
                                                  testing::MockFunction<void()>* destroy_cb)
     : dispatcher_(dispatcher), destroy_cb_(destroy_cb) {
   EXPECT_CALL(*dispatcher, createSchedulableCallback_(_))
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
       .RetiresOnSaturation();
+
   ON_CALL(*this, scheduleCallbackCurrentIteration()).WillByDefault(Assign(&enabled_, true));
   ON_CALL(*this, scheduleCallbackNextIteration()).WillByDefault(Assign(&enabled_, true));
   ON_CALL(*this, cancel()).WillByDefault(Assign(&enabled_, false));
