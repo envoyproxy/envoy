@@ -7,19 +7,19 @@ namespace JNI {
 
 jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
   jmethodID method_id = env_->GetMethodID(clazz, name, signature);
-  abortOnException("Failed calling GetMethodID.");
+  rethrowException();
   return method_id;
 }
 
 jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const char* signature) {
   jmethodID method_id = env_->GetStaticMethodID(clazz, name, signature);
-  abortOnException("Failed calling GetStaticMethodID.");
+  rethrowException();
   return method_id;
 }
 
 LocalRefUniquePtr<jclass> JniHelper::findClass(const char* class_name) {
   LocalRefUniquePtr<jclass> result(env_->FindClass(class_name), LocalRefDeleter(env_));
-  abortOnException("Failed calling FindClass.");
+  rethrowException();
   return result;
 }
 
@@ -50,20 +50,20 @@ LocalRefUniquePtr<jobject> JniHelper::newObject(jclass clazz, jmethodID method_i
   va_start(args, method_id);
   LocalRefUniquePtr<jobject> result(env_->NewObjectV(clazz, method_id, args),
                                     LocalRefDeleter(env_));
-  abortOnException(fmt::format("Failed calling NewObject."));
+  rethrowException();
   va_end(args);
   return result;
 }
 
 LocalRefUniquePtr<jstring> JniHelper::newStringUtf(const char* str) {
   LocalRefUniquePtr<jstring> result(env_->NewStringUTF(str), LocalRefDeleter(env_));
-  abortOnException("Failed calling NewStringUTF.");
+  rethrowException();
   return result;
 }
 
 StringUtfUniquePtr JniHelper::getStringUtfChars(jstring str, jboolean* is_copy) {
   StringUtfUniquePtr result(env_->GetStringUTFChars(str, is_copy), StringUtfDeleter(env_, str));
-  abortOnException("Failed calling GetStringUTFChars.");
+  rethrowException();
   return result;
 }
 
@@ -73,7 +73,7 @@ jsize JniHelper::getArrayLength(jarray array) { return env_->GetArrayLength(arra
   LocalRefUniquePtr<JNI_TYPE> JniHelper::new##JAVA_TYPE##Array(jsize length) {                     \
     LocalRefUniquePtr<JNI_TYPE> result(env_->New##JAVA_TYPE##Array(length),                        \
                                        LocalRefDeleter(env_));                                     \
-    abortOnException("Failed calling New##JAVA_TYPE##Array.");                                     \
+    rethrowException();                                                                            \
     return result;                                                                                 \
   }
 
@@ -100,7 +100,7 @@ LocalRefUniquePtr<jobjectArray> JniHelper::newObjectArray(jsize length, jclass e
     ArrayElementsUniquePtr<JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE> result(                               \
         env_->Get##JAVA_TYPE##ArrayElements(array, is_copy),                                       \
         ArrayElementsDeleter<JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE>(env_, array));                      \
-    abortOnException("Failed calling Get##JAVA_TYPE##ArrayElements.");                             \
+    rethrowException();                                                                            \
     return result;                                                                                 \
   }
 
@@ -116,20 +116,20 @@ DEFINE_GET_ARRAY_ELEMENTS(Boolean, jbooleanArray, jboolean)
 LocalRefUniquePtr<jobject> JniHelper::getObjectArrayElement(jobjectArray array, jsize index) {
   LocalRefUniquePtr<jobject> result(env_->GetObjectArrayElement(array, index),
                                     LocalRefDeleter(env_));
-  abortOnException("Failed calling GetObjectArrayElement.");
+  rethrowException();
   return result;
 }
 
 void JniHelper::setObjectArrayElement(jobjectArray array, jsize index, jobject value) {
   env_->SetObjectArrayElement(array, index, value);
-  abortOnException("Failed calling SetObjectArrayElement.");
+  rethrowException();
 }
 
 PrimitiveArrayCriticalUniquePtr JniHelper::getPrimitiveArrayCritical(jarray array,
                                                                      jboolean* is_copy) {
   PrimitiveArrayCriticalUniquePtr result(env_->GetPrimitiveArrayCritical(array, is_copy),
                                          PrimitiveArrayCriticalDeleter(env_, array));
-  abortOnException("Failed calling GetPrimitiveArrayCritical.");
+  rethrowException();
   return result;
 }
 
@@ -139,7 +139,7 @@ PrimitiveArrayCriticalUniquePtr JniHelper::getPrimitiveArrayCritical(jarray arra
     va_start(args, method_id);                                                                     \
     JNI_TYPE result = env_->Call##JAVA_TYPE##MethodV(object, method_id, args);                     \
     va_end(args);                                                                                  \
-    abortOnException("Failed calling Call##JAVA_TYPE##MethodV.");                                  \
+    rethrowException();                                                                            \
     return result;                                                                                 \
   }
 
@@ -157,7 +157,7 @@ void JniHelper::callVoidMethod(jobject object, jmethodID method_id, ...) {
   va_start(args, method_id);
   env_->CallVoidMethodV(object, method_id, args);
   va_end(args);
-  abortOnException("Failed calling CallVoidMethodV.");
+  rethrowException();
 }
 
 LocalRefUniquePtr<jobject> JniHelper::callObjectMethod(jobject object, jmethodID method_id, ...) {
@@ -166,7 +166,7 @@ LocalRefUniquePtr<jobject> JniHelper::callObjectMethod(jobject object, jmethodID
   LocalRefUniquePtr<jobject> result(env_->CallObjectMethodV(object, method_id, args),
                                     LocalRefDeleter(env_));
   va_end(args);
-  abortOnException("Failed calling CallObjectMethodV.");
+  rethrowException();
   return result;
 }
 
@@ -176,7 +176,7 @@ LocalRefUniquePtr<jobject> JniHelper::callObjectMethod(jobject object, jmethodID
     va_start(args, method_id);                                                                     \
     JNI_TYPE result = env_->CallStatic##JAVA_TYPE##MethodV(clazz, method_id, args);                \
     va_end(args);                                                                                  \
-    abortOnException("Failed calling CallStatic##JAVA_TYPE##MethodV.");                            \
+    rethrowException();                                                                            \
     return result;                                                                                 \
   }
 
@@ -194,7 +194,7 @@ void JniHelper::callStaticVoidMethod(jclass clazz, jmethodID method_id, ...) {
   va_start(args, method_id);
   env_->CallStaticVoidMethodV(clazz, method_id, args);
   va_end(args);
-  abortOnException("Failed calling CallStaticVoidMethodV.");
+  rethrowException();
 }
 
 LocalRefUniquePtr<jobject> JniHelper::callStaticObjectMethod(jclass clazz, jmethodID method_id,
@@ -204,7 +204,7 @@ LocalRefUniquePtr<jobject> JniHelper::callStaticObjectMethod(jclass clazz, jmeth
   LocalRefUniquePtr<jobject> result(env_->CallStaticObjectMethodV(clazz, method_id, args),
                                     LocalRefDeleter(env_));
   va_end(args);
-  abortOnException("Failed calling CallStaticObjectMethodV.");
+  rethrowException();
   return result;
 }
 
@@ -214,12 +214,12 @@ jlong JniHelper::getDirectBufferCapacity(jobject buffer) {
   return result;
 }
 
-void JniHelper::abortOnException(const std::string& message) {
+void JniHelper::rethrowException() {
   if (env_->ExceptionCheck()) {
-    env_->ExceptionDescribe();
+    auto throwable = exceptionOccurred();
     env_->ExceptionClear();
+    env_->Throw(throwable.release());
   }
-  RELEASE_ASSERT(!env_->ExceptionCheck(), message);
 }
 
 } // namespace JNI
