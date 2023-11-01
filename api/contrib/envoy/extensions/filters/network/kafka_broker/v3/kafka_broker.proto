@@ -28,17 +28,32 @@ message KafkaBroker {
   // Disabled by default.
   bool force_response_rewrite = 2;
 
+  // Optional broker address rewrite specification.
+  // Allows the broker filter to rewrite Kafka responses so that all connections established by
+  // the Kafka clients point to Envoy.
+  // This allows Kafka cluster not to configure its 'advertised.listeners' property
+  // (as the necessary re-pointing will be done by this filter).
   oneof broker_address_rewrite_spec {
     IdBasedBrokerRewriteSpec id_based_broker_address_rewrite_spec = 3;
   }
 }
 
 message IdBasedBrokerRewriteSpec {
+  // Repeated rewrite rules.
   repeated IdBasedBrokerRewriteRule rules = 1;
 }
 
 message IdBasedBrokerRewriteRule {
+  // Broker ID to match - if the upstream Kafka cluster returns broker metadata for given ID, the
   uint32 id = 1 [(validate.rules).uint32 = {gte: 0}];
+
+  // The host value to use (resembling the host part of Kafka's advertised.listeners).
+  // The value should point to the Envoy (not Kafka) listener, so that all client traffic goes
+  // through Envoy.
   string host = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The port value to use (resembling the port part of Kafka's advertised.listeners).
+  // The value should point to the Envoy (not Kafka) listener, so that all client traffic goes
+  // through Envoy.
   uint32 port = 3 [(validate.rules).uint32 = {lte: 65535}];
 }
