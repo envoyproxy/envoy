@@ -101,7 +101,7 @@ listener_filters:
           dns_resolver_options:
             use_tcp_for_dns_lookups: false
             no_default_search_domain: false
-            dns_resolver_query_timeout_ms: 1500
+            dns_resolver_query_timeout: 1.5s
             dns_resolver_query_tries: 2
       max_pending_lookups: 256
     server_config:

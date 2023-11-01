@@ -306,7 +306,7 @@ client_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
       dns_resolver_options:
-        dns_resolver_query_timeout_ms: 5000
+        dns_resolver_query_timeout: 5s
         dns_resolver_query_tries: 3
       resolvers:
       - socket_address:
@@ -2234,9 +2234,9 @@ TEST_F(DnsFilterTest, DnsResolverCustomOptionsSet) {
   setup(config_to_use);
 
   // Verify that the query timeout is 5000ms (5s)
-  EXPECT_EQ(5000, dns_resolver_options_.dns_resolver_query_timeout_ms());
+  EXPECT_EQ(5, dns_resolver_options_.dns_resolver_query_timeout().seconds());
   // Verify that the query tries is 3
-  EXPECT_EQ(3, dns_resolver_options_.dns_resolver_query_tries());
+  EXPECT_EQ(3, dns_resolver_options_.dns_resolver_query_tries().value());
 }
 
 TEST_F(DnsFilterTest, DnsResolverOptionsSetTrue) {
@@ -2276,7 +2276,7 @@ client_config:
     dns_resolver_options:
       use_tcp_for_dns_lookups: false
       no_default_search_domain: false
-      dns_resolver_query_timeout_ms: 5000
+      dns_resolver_query_timeout: 5s
       dns_resolver_query_tries: 3
     resolvers:
     - socket_address:
@@ -2316,7 +2316,7 @@ client_config:
     dns_resolver_options:
       use_tcp_for_dns_lookups: false
       no_default_search_domain: false
-      dns_resolver_query_timeout_ms: 5000
+      dns_resolver_query_timeout: 5s
       dns_resolver_query_tries: 3
     resolvers:
     - socket_address:

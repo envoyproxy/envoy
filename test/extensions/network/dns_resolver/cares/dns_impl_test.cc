@@ -1970,8 +1970,8 @@ class DnsImplAresCustomOptsTest : public DnsImplTest {
 protected:
   bool tcpOnly() const override { return false; }
   void updateDnsResolverOptions() override {
-    dns_resolver_options_.set_dns_resolver_query_timeout_ms(1);
-    dns_resolver_options_.set_dns_resolver_query_tries(1);
+    dns_resolver_options_.mutable_dns_resolver_query_timeout()->set_nanos(1000000);
+    dns_resolver_options_.mutable_dns_resolver_query_tries()->set_value(1);
   }
 };
 

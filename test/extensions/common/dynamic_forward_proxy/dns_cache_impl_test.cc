@@ -1098,10 +1098,12 @@ TEST_F(DnsCacheImplTest, CustomTimeoutAndTriesOptionsSet) {
   initialize();
   config_.mutable_dns_resolution_config()
       ->mutable_dns_resolver_options()
-      ->set_dns_resolver_query_timeout_ms(5000);
+      ->mutable_dns_resolver_query_timeout()
+      ->set_seconds(5);
   config_.mutable_dns_resolution_config()
       ->mutable_dns_resolver_options()
-      ->set_dns_resolver_query_tries(3);
+      ->mutable_dns_resolver_query_tries()
+      ->set_value(3);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
@@ -1110,8 +1112,8 @@ TEST_F(DnsCacheImplTest, CustomTimeoutAndTriesOptionsSet) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // Verify that the custom timeout and tries options are set.
-  EXPECT_EQ(5000, cares.dns_resolver_options().dns_resolver_query_timeout_ms());
-  EXPECT_EQ(3, cares.dns_resolver_options().dns_resolver_query_tries());
+  EXPECT_EQ(5, cares.dns_resolver_options().dns_resolver_query_timeout().seconds());
+  EXPECT_EQ(3, cares.dns_resolver_options().dns_resolver_query_tries().value());
 }
 
 TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionSet) {
