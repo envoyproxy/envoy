@@ -29,7 +29,10 @@ bug_fixes:
   change: |
     Fixed a bug that caused the Datadog tracing extension to drop traces that
     should be kept on account of an extracted sampling decision.
-
+- area: quic
+  change: |
+    Fixed a bug in QUIC and HCM interaction which could cause use-after-free during asynchronous certificates retrieval.
+    The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
