@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.basic_auth.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/sensitive.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.basic_auth.v3";
+option java_outer_classname = "BasicAuthProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/basic_auth/v3;basic_authv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Basic Auth]
+// Basic Auth :ref:`configuration overview <config_http_filters_basic_auth>`.
+// [#extension: envoy.filters.http.basic_auth]
+
+// Basic HTTP authentication.
+//
+// Example:
+//
+// .. code-block:: yaml
+//
+//   users:
+//     inline_string: |-
+//       user1:{SHA}hashed_user1_password
+//       user2:{SHA}hashed_user2_password
+//
+message BasicAuth {
+  // Username-password pairs used to verify user credentials in the "Authorization" header.
+  // The value needs to be the htpasswd format.
+  // Reference to https://httpd.apache.org/docs/2.4/programs/htpasswd.html
+  config.core.v3.DataSource users = 1 [(udpa.annotations.sensitive) = true];
+}
