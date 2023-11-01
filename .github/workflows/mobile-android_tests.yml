@@ -17,9 +17,10 @@ jobs:
   env:
     uses: ./.github/workflows/_env.yml
     with:
-      prime_build_image: true
+      prime-build-image: true
     permissions:
       contents: read
+      pull-requests: read
 
   javatestslinux:
     if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
