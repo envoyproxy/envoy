@@ -175,17 +175,16 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
 
   filter_manager_->decodeHeaders(*grpc_headers, true);
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY));
-
-  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY);
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+  auto fs_value =
+      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
+          LocalReplyFilterStateKey);
 
   EXPECT_EQ(fs_value->serializeAsString(), "filter1");
 
-  auto expected = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *expected->mutable_fields();
-  *fields["filter_config_name"].mutable_string_value() = "filter1";
+  auto expected = std::make_unique<ProtobufWkt::StringValue>();
+  expected->set_value("filter1");
   EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
@@ -250,17 +249,16 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
 
   filter_manager_->decodeHeaders(*grpc_headers, true);
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY));
-
-  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY);
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+  auto fs_value =
+      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
+          LocalReplyFilterStateKey);
 
   EXPECT_EQ(fs_value->serializeAsString(), "filter2");
 
-  auto expected = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *expected->mutable_fields();
-  *fields["filter_config_name"].mutable_string_value() = "filter2";
+  auto expected = std::make_unique<ProtobufWkt::StringValue>();
+  expected->set_value("filter2");
   EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
@@ -324,17 +322,16 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY));
-
-  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY);
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+  auto fs_value =
+      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
+          LocalReplyFilterStateKey);
 
   EXPECT_EQ(fs_value->serializeAsString(), "configName1");
 
-  auto expected = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *expected->mutable_fields();
-  *fields["filter_config_name"].mutable_string_value() = "configName1";
+  auto expected = std::make_unique<ProtobufWkt::StringValue>();
+  expected->set_value("configName1");
   EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
@@ -403,16 +400,16 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details2");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY));
-  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY);
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+  auto fs_value =
+      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
+          LocalReplyFilterStateKey);
 
   EXPECT_EQ(fs_value->serializeAsString(), "configName1");
 
-  auto expected = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *expected->mutable_fields();
-  *fields["filter_config_name"].mutable_string_value() = "configName1";
+  auto expected = std::make_unique<ProtobufWkt::StringValue>();
+  expected->set_value("configName1");
   EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
@@ -720,16 +717,16 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
   filter_manager_->decodeMetadata(map);
 
   EXPECT_THAT(*filter_manager_->streamInfo().responseCodeDetails(), "bad_metadata");
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY));
-  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY);
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+  auto fs_value =
+      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
+          LocalReplyFilterStateKey);
 
   EXPECT_EQ(fs_value->serializeAsString(), "filter1");
 
-  auto expected = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *expected->mutable_fields();
-  *fields["filter_config_name"].mutable_string_value() = "filter1";
+  auto expected = std::make_unique<ProtobufWkt::StringValue>();
+  expected->set_value("filter1");
   EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();
@@ -856,16 +853,16 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
   MetadataMap map1 = {{"a", "b"}};
   filter_2->decoder_callbacks_->encodeMetadata(std::make_unique<MetadataMap>(map1));
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY));
-  auto fs_value = filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerType>(
-      FS_LOCAL_REPLAY_KEY);
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+  auto fs_value =
+      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
+          LocalReplyFilterStateKey);
 
   EXPECT_EQ(fs_value->serializeAsString(), "filter2");
 
-  auto expected = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *expected->mutable_fields();
-  *fields["filter_config_name"].mutable_string_value() = "filter2";
+  auto expected = std::make_unique<ProtobufWkt::StringValue>();
+  expected->set_value("filter2");
   EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
 
   filter_manager_->destroyFilters();

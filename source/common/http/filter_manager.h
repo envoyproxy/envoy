@@ -36,17 +36,16 @@ class DownstreamFilterManager;
 
 struct ActiveStreamFilterBase;
 
-constexpr absl::string_view FS_LOCAL_REPLAY_KEY =
+constexpr absl::string_view LocalReplyFilterStateKey =
     "envoy.filters.network.http_connection_manager.local_reply_owner";
-class LocalReplyOwnerType : public StreamInfo::FilterState::Object {
+class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
 public:
-  LocalReplyOwnerType(const std::string& filter_config_name)
+  LocalReplyOwnerObject(const std::string& filter_config_name)
       : filter_config_name(filter_config_name) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::Struct>();
-    auto& fields = *message->mutable_fields();
-    *fields["filter_config_name"].mutable_string_value() = filter_config_name;
+    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    message->set_value(filter_config_name);
     return message;
   }
 
@@ -156,6 +155,16 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   }
 
   Router::RouteConstSharedPtr getRoute() const;
+
+  void setLocalReplyOwnerInformation() {
+    if (!streamInfo().filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey)) {
+      streamInfo().filterState()->setData(
+          LocalReplyFilterStateKey,
+          std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::FilterChain);
+    }
+  }
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because

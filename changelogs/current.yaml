@@ -25,9 +25,9 @@ minor_behavior_changes:
     to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
 - area: filter state
   change: |
-    Added config name of filter that invoking local reply in filter state with key
+    Added config name of filter sending a local reply in filter state with key
     ``envoy.filters.network.http_connection_manager.local_reply_owner``.
-    See :ref:`the well-known filter state keys <well_known_filter_state>`. for more detail.
+    See :ref:`the well-known filter state keys <well_known_filter_state>` for more detail.
 - area: http2
   change: |
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
