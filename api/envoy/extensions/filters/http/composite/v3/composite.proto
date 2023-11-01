@@ -49,7 +49,7 @@ message ExecuteFilterAction {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
   // Only one of ``typed_config`` or ``dynamic_config`` can be set.
-  // [#extension-category: envoy.filters.http.composite]
+  // [#extension-category: envoy.filters.http]
   config.core.v3.TypedExtensionConfig typed_config = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
