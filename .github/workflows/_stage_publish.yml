@@ -50,7 +50,7 @@ jobs:
       source: ${{ matrix.source }}
       trusted: false
       repo-ref: ${{ inputs.repo-ref }}
-      steps-pre: ${{ inputs.steps-pre }}
+      steps-pre: ${{ matrix.steps-pre }}
     strategy:
       fail-fast: false
       matrix:
@@ -62,7 +62,8 @@ jobs:
               uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.2
               with:
                 length: 7
-                input: ${{ inputs.repo-ref }}
+                string: ${{ inputs.repo-ref }}
+                min: 40
             - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.2
               with:
                 url: https://storage.googleapis.com/envoy-pr/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
@@ -125,7 +126,7 @@ jobs:
     needs:
     - publish
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.3
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.5
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"

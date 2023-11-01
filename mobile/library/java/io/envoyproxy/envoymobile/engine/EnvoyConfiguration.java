@@ -40,6 +40,7 @@ public class EnvoyConfiguration {
   public final String http3ConnectionOptions;
   public final String http3ClientConnectionOptions;
   public final Map<String, String> quicHints;
+  public final List<String> quicCanonicalSuffixes;
   public final Boolean enableGzipDecompression;
   public final Boolean enableBrotliDecompression;
   public final Boolean enableSocketTagging;
@@ -109,6 +110,8 @@ public class EnvoyConfiguration {
    *     HTTP/3.
    * @param quicHints                                     A list of host port pairs that's known
    *     to speak QUIC.
+   * @param quicCanonicalSuffixes                         A list of canonical suffixes that are
+   *     known to speak QUIC.
    * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
    *     compression.
@@ -166,11 +169,12 @@ public class EnvoyConfiguration {
       int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
       int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
       String http3ConnectionOptions, String http3ClientConnectionOptions,
-      Map<String, Integer> quicHints, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, boolean enableSocketTagging,
-      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost, int statsFlushSeconds,
-      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      Map<String, Integer> quicHints, List<String> quicCanonicalSuffixes,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
+      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
+      int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
+      int perTryIdleTimeoutSeconds, String appVersion, String appId,
       TrustChainVerification trustChainVerification,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
@@ -200,6 +204,7 @@ public class EnvoyConfiguration {
     for (Map.Entry<String, Integer> hostAndPort : quicHints.entrySet()) {
       this.quicHints.put(hostAndPort.getKey(), String.valueOf(hostAndPort.getValue()));
     }
+    this.quicCanonicalSuffixes = quicCanonicalSuffixes;
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
     this.enableSocketTagging = enableSocketTagging;
@@ -265,20 +270,22 @@ public class EnvoyConfiguration {
     byte[][] dnsPreresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
     byte[][] runtimeGuards = JniBridgeUtility.mapToJniBytes(this.runtimeGuards);
     byte[][] quicHints = JniBridgeUtility.mapToJniBytes(this.quicHints);
+    byte[][] quicSuffixes = JniBridgeUtility.stringsToJniBytes(quicCanonicalSuffixes);
 
     return JniLibrary.createBootstrap(
         grpcStatsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        http3ConnectionOptions, http3ClientConnectionOptions, quicHints, enableGzipDecompression,
-        enableBrotliDecompression, enableSocketTagging, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
-        statsSinks, enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName,
-        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsRootCerts, xdsSni,
-        nodeId, nodeRegion, nodeZone, nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator,
-        cdsTimeoutSeconds, enableCds);
+        http3ConnectionOptions, http3ClientConnectionOptions, quicHints, quicSuffixes,
+        enableGzipDecompression, enableBrotliDecompression, enableSocketTagging,
+        enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+        enforceTrustChainVerification, filterChain, statsSinks,
+        enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName, rtdsTimeoutSeconds,
+        xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsRootCerts, xdsSni, nodeId, nodeRegion,
+        nodeZone, nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator, cdsTimeoutSeconds,
+        enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

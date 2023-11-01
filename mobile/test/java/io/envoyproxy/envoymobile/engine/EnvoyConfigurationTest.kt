@@ -81,6 +81,7 @@ class EnvoyConfigurationTest {
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
+    quicCanonicalSuffixes: MutableList<String> = mutableListOf(".opq.com", ".xyz.com"),
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -133,6 +134,7 @@ class EnvoyConfigurationTest {
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
+      quicCanonicalSuffixes,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
@@ -208,6 +210,9 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("hostname: www.abc.com");
     assertThat(resolvedTemplate).contains("hostname: www.def.com");
     assertThat(resolvedTemplate).contains("port: 443");
+    assertThat(resolvedTemplate).contains("canonical_suffixes:");
+    assertThat(resolvedTemplate).contains(".opq.com");
+    assertThat(resolvedTemplate).contains(".xyz.com");
     assertThat(resolvedTemplate).contains("connection_options: 5RTO");
     assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
 
