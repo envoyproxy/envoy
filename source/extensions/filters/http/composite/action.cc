@@ -16,7 +16,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
       config, validation_visitor);
 
   if (composite_action.has_dynamic_config() && composite_action.has_typed_config()) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
   }
 
