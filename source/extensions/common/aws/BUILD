@@ -41,6 +41,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metadata_fetcher_lib",
+    srcs = ["metadata_fetcher.cc"],
+    hdrs = ["metadata_fetcher.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/http:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "credentials_provider_impl_lib",
     srcs = ["credentials_provider_impl.cc"],
     hdrs = ["credentials_provider_impl.h"],
@@ -63,10 +75,14 @@ envoy_cc_library(
     external_deps = ["curl"],
     deps = [
         "//envoy/http:message_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:empty_string",
         "//source/common/common:matchers_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
 )
 

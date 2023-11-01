@@ -44,6 +44,7 @@ envoy_cc_library(
     ],
     deps = [
         ":filter_config_lib",
+        ":rewriter_lib",
         "//contrib/kafka/filters/network/source:kafka_metrics_lib",
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
         "//contrib/kafka/filters/network/source:kafka_response_codec_lib",
@@ -51,6 +52,20 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "rewriter_lib",
+    srcs = ["rewriter.cc"],
+    hdrs = [
+        "rewriter.h",
+    ],
+    deps = [
+        ":filter_config_lib",
+        "//contrib/kafka/filters/network/source:kafka_response_codec_lib",
+        "//envoy/buffer:buffer_interface",
         "//source/common/common:minimal_logger_lib",
     ],
 )

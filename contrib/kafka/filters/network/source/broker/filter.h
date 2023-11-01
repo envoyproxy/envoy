@@ -7,6 +7,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
+#include "contrib/kafka/filters/network/source/broker/rewriter.h"
 #include "contrib/kafka/filters/network/source/external/request_metrics.h"
 #include "contrib/kafka/filters/network/source/external/response_metrics.h"
 #include "contrib/kafka/filters/network/source/parser.h"
@@ -112,7 +113,8 @@ private:
 /**
  * Implementation of Kafka broker-level filter.
  * Uses two decoders - request and response ones, that are connected using Forwarder instance.
- * There's also a KafkaMetricsFacade, that is listening on codec events.
+ * KafkaMetricsFacade is listening for both request/response events to keep metrics.
+ * ResponseRewriter is listening for response events to capture and rewrite them if needed.
  *
  *        +---------------------------------------------------+
  *        |                                                   |
@@ -124,13 +126,18 @@ private:
  *        |   |                   v                       v   v
  * +------+---+------+       +----+----+        +---------+---+----+
  * |KafkaBrokerFilter|       |Forwarder|        |KafkaMetricsFacade|
- * +----------+------+       +----+----+        +---------+--------+
- *            |                   |                       ^
- *            |                   |                       |
- *            |                   v                       |
- *            |           +-------+-------+               |
- *            +---------->+ResponseDecoder+---------------+
- *                        +---------------+
+ * +------+---+------+       +----+----+        +---------+--------+
+ *        |   |                   |                       ^
+ *        |   |                   |                       |
+ *        |   |                   v                       |
+ *        |   |           +-------+-------+               |
+ *        |   +---------->+ResponseDecoder+---------------+
+ *        |               +-------+-------+
+ *        |                       |
+ *        |                       v
+ *        |               +-------+--------+
+ *        +-------------->+ResponseRewriter+
+ *                        +----------------+
  */
 class KafkaBrokerFilter : public Network::Filter, private Logger::Loggable<Logger::Id::kafka> {
 public:
@@ -145,7 +152,9 @@ public:
   /**
    * Visible for testing.
    */
-  KafkaBrokerFilter(KafkaMetricsFacadeSharedPtr metrics, ResponseDecoderSharedPtr response_decoder,
+  KafkaBrokerFilter(KafkaMetricsFacadeSharedPtr metrics,
+                    ResponseRewriterSharedPtr response_rewriter,
+                    ResponseDecoderSharedPtr response_decoder,
                     RequestDecoderSharedPtr request_decoder);
 
   // Network::ReadFilter
@@ -164,9 +173,11 @@ private:
    * Helper delegate constructor.
    * Passes metrics facade as argument to decoders.
    */
-  KafkaBrokerFilter(const KafkaMetricsFacadeSharedPtr& metrics);
+  KafkaBrokerFilter(const BrokerFilterConfig& filter_config,
+                    const KafkaMetricsFacadeSharedPtr& metrics);
 
   const KafkaMetricsFacadeSharedPtr metrics_;
+  const ResponseRewriterSharedPtr response_rewriter_;
   const ResponseDecoderSharedPtr response_decoder_;
   const RequestDecoderSharedPtr request_decoder_;
 };

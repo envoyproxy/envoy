@@ -23,6 +23,11 @@ minor_behavior_changes:
     Added new configuration field :ref:`rate_limited_as_resource_exhausted
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limited_as_resource_exhausted>`
     to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
+- area: http2
+  change: |
+    Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
+    This feature improves flow control within the proxy by deferring work on the receiving end if the other
+    end is backed up.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -36,6 +41,9 @@ bug_fixes:
 - area: grpc
   change: |
     Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+- area: redis
+  change: |
+    Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -60,8 +68,16 @@ removed_config_or_runtime:
   change: |
     Removed the deprecated ``envoy.reloadable_features.service_sanitize_non_utf8_strings``
     runtime flag and legacy code path.
+- area: access log
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.format_ports_as_numbers``
+    runtime flag and legacy code path.
 
 new_features:
+- area: filters
+  change: |
+    Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to
+    authenticate user credentials in the HTTP Authentication heaer defined in `RFC7617 <https://tools.ietf.org/html/rfc7617>`_.
 - area: upstream
   change: |
     Added :ref:`enable_full_scan <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
@@ -92,6 +108,9 @@ new_features:
 - area: tracing
   change: |
     Added support for configuring resource detectors on the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added support to configure a sampler for the OpenTelemetry tracer.
 - area: ext_authz_filter
   change: |
     added :ref:`with_request_body

@@ -66,8 +66,6 @@ public class EnvoyConfiguration {
   public final Integer xdsPort;
   public final String xdsAuthHeader;
   public final String xdsAuthToken;
-  public final String xdsJwtToken;
-  public final Integer xdsJwtTokenLifetime;
   public final String xdsRootCerts;
   public final String xdsSni;
   public final String nodeId;
@@ -147,9 +145,6 @@ public class EnvoyConfiguration {
    * @param xdsAuthToken                                  the token to send as the authentication
    *                                                      header value to authenticate with the
    *                                                      xDS server.
-   * @param xdsJwtToken                                   the JWT token to use for authenticating
-   *                                                      with the xDS server.
-   * @param xdsJwtTokenLifetime                           the lifetime of the JWT token.
    * @param xdsRootCerts                                  the root certificates to use for the TLS
    *                                                      handshake during connection establishment
    *                                                      with the xDS management server.
@@ -183,10 +178,9 @@ public class EnvoyConfiguration {
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, boolean enablePlatformCertificatesValidation,
       String rtdsResourceName, Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
-      String xdsAuthHeader, String xdsAuthToken, String xdsJwtToken, Integer xdsJwtTokenLifetime,
-      String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
-      String nodeSubZone, Struct nodeMetadata, String cdsResourcesLocator,
-      Integer cdsTimeoutSeconds, boolean enableCds) {
+      String xdsAuthHeader, String xdsAuthToken, String xdsRootCerts, String xdsSni, String nodeId,
+      String nodeRegion, String nodeZone, String nodeSubZone, Struct nodeMetadata,
+      String cdsResourcesLocator, Integer cdsTimeoutSeconds, boolean enableCds) {
     JniLibrary.load();
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -248,8 +242,6 @@ public class EnvoyConfiguration {
     this.xdsPort = xdsPort;
     this.xdsAuthHeader = xdsAuthHeader;
     this.xdsAuthToken = xdsAuthToken;
-    this.xdsJwtToken = xdsJwtToken;
-    this.xdsJwtTokenLifetime = xdsJwtTokenLifetime;
     this.xdsRootCerts = xdsRootCerts;
     this.xdsSni = xdsSni;
     this.nodeId = nodeId;
@@ -284,9 +276,9 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
         statsSinks, enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName,
-        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsJwtToken,
-        xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId, nodeRegion, nodeZone, nodeSubZone,
-        nodeMetadata.toByteArray(), cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsRootCerts, xdsSni,
+        nodeId, nodeRegion, nodeZone, nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator,
+        cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

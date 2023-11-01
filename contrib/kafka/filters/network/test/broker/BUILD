@@ -39,3 +39,12 @@ envoy_cc_test(
         "//test/test_common:test_time_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "rewriter_unit_test",
+    srcs = ["rewriter_unit_test.cc"],
+    deps = [
+        "//contrib/kafka/filters/network/source/broker:rewriter_lib",
+        "//source/common/buffer:buffer_lib",
+    ],
+)

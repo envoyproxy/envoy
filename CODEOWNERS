@@ -192,6 +192,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
+# HTTP Basic Auth
+/*/extensions/filters/http/basic_auth @zhaohuabing @wbpcode
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @alyssawilk @mattklein123
 /*/extensions/http/original_ip_detection/xff @alyssawilk @mattklein123
