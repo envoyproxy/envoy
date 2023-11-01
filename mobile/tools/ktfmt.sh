@@ -11,10 +11,10 @@ readonly ktfmt_url
 ktfmt_sha256="97fc7fbd194d01a9fa45d8147c0552403003d55bac4ab89d84d7bb4d5e3f48de"
 readonly ktfmt_sha256
 
-jdk_url="https://cdn.azul.com/zulu/bin/zulu11.1+23-ea-jdk11-linux_x64.tar.gz"
+jdk_url="https://cdn.azul.com/zulu/bin/zulu11.68.17-ca-jdk11.0.21-linux_x64.tar.gz"
 readonly jdk_url
 
-jdk_sha256="7cd09d542fa5623df5a59447304c3a41c0b682d3ca26b5e9d99e5214cf21fdd7"
+jdk_sha256="725aba257da4bca14959060fea3faf59005eafdc2d5ccc3cb745403c5b60fb27"
 readonly jdk_sha256
 
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
