@@ -1118,85 +1118,7 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
         filter->callbacks_->downstreamCallbacks()->setRoute(nullptr);
         EXPECT_EQ(filter->callbacks_->route().get(), mock_route_2.get());
       },
-      "Should never try to refresh or clear the route cache when it is blocked! "
-      "To temporarily ignore this new constraint, "
-      "set runtime flag "
-      "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` "
-      "to `false`");
-
-  EXPECT_CALL(response_encoder_, encodeData(_, true));
-  expectOnDestroy();
-
-  Buffer::OwnedImpl response_data("ok");
-  filter->callbacks_->encodeData(response_data, true);
-}
-
-TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTestWithRuntimeFeatureDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent", "false"}});
-
-  setup(false, "");
-
-  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
-        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
-        return true;
-      }));
-
-  auto mock_route_0 = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(mock_route_0));
-
-  EXPECT_CALL(*filter, decodeHeaders(_, true))
-      .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
-        EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_EQ("http", headers.getForwardedProtoValue());
-        return FilterHeadersStatus::StopIteration;
-      }));
-
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    return Http::okStatus();
-  }));
-
-  Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input, false);
-
-  filter->callbacks_->downstreamCallbacks()->clearRouteCache();
-  auto mock_route_1 = std::make_shared<NiceMock<Router::MockRoute>>();
-
-  // Refresh cached route after cache is cleared.
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(mock_route_1));
-  EXPECT_EQ(filter->callbacks_->route().get(), mock_route_1.get());
-
-  auto mock_route_2 = std::make_shared<NiceMock<Router::MockRoute>>();
-
-  // We can also set route directly.
-  filter->callbacks_->downstreamCallbacks()->setRoute(mock_route_2);
-  EXPECT_EQ(filter->callbacks_->route().get(), mock_route_2.get());
-
-  ResponseHeaderMapPtr response_headers{
-      new TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "2"}}};
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
-  filter->callbacks_->streamInfo().setResponseCodeDetails("");
-  filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
-
-  // The cached route will be cleared because the runtime feature is disabled.
-  filter->callbacks_->downstreamCallbacks()->clearRouteCache();
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _)).WillOnce(Return(nullptr));
-  EXPECT_EQ(filter->callbacks_->route().get(), nullptr);
-
-  // We can set route after response headers are sent because the runtime feature is disabled.
-  filter->callbacks_->downstreamCallbacks()->setRoute(mock_route_2);
-  EXPECT_EQ(filter->callbacks_->route().get(), mock_route_2.get());
+      "Should never try to refresh or clear the route cache when it is blocked!");
 
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
@@ -3770,7 +3692,7 @@ TEST_F(HttpConnectionManagerImplTest, NoProxyProtocolAdded) {
 }
 
 // Validate that deferred streams are processed with a variety of
-// headers, data and trailer arriving in the same I/O cycle
+// headers, data, metadata, and trailers arriving in the same I/O cycle
 TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
   const int kRequestsSentPerIOCycle = 100;
   EXPECT_CALL(runtime_.snapshot_, getInteger(_, _)).WillRepeatedly(ReturnArg<1>());
@@ -3779,13 +3701,14 @@ TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
   setup(false, "");
 
   // Store the basic request encoder during filter chain setup.
-  std::vector<std::shared_ptr<MockStreamDecoderFilter>> encoder_filters;
+  std::vector<std::shared_ptr<MockStreamDecoderFilter>> decoder_filters;
   int decode_headers_call_count = 0;
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    int mod5 = i % 5;
     std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
-    // Each 4th request is headers only
-    EXPECT_CALL(*filter, decodeHeaders(_, i % 4 == 0 ? true : false))
+    // Each 0th request is headers only
+    EXPECT_CALL(*filter, decodeHeaders(_, mod5 == 0 ? true : false))
         .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
           ++decode_headers_call_count;
           return FilterHeadersStatus::StopIteration;
@@ -3793,18 +3716,24 @@ TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
 
     // Each 1st request is headers and data only
     // Each 2nd request is headers, data and trailers
-    if (i % 4 == 1 || i % 4 == 2) {
-      EXPECT_CALL(*filter, decodeData(_, i % 4 == 1 ? true : false))
+    if (mod5 == 1 || mod5 == 2) {
+      EXPECT_CALL(*filter, decodeData(_, mod5 == 1 ? true : false))
           .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
     }
 
     // Each 3rd request is headers and trailers (no data)
-    if (i % 4 == 2 || i % 4 == 3) {
+    if (mod5 == 2 || mod5 == 3) {
       EXPECT_CALL(*filter, decodeTrailers(_)).WillOnce(Return(FilterTrailersStatus::StopIteration));
     }
 
+    // Each 4th request is headers, metadata, and data.
+    if (mod5 == 4) {
+      EXPECT_CALL(*filter, decodeMetadata(_)).WillOnce(Return(FilterMetadataStatus::Continue));
+      EXPECT_CALL(*filter, decodeData(_, true))
+          .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+    }
     EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-    encoder_filters.push_back(std::move(filter));
+    decoder_filters.push_back(std::move(filter));
   }
 
   uint64_t random_value = 0;
@@ -3814,11 +3743,11 @@ TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .Times(kRequestsSentPerIOCycle)
-      .WillRepeatedly(Invoke([&encoder_filters](FilterChainManager& manager) -> bool {
+      .WillRepeatedly(Invoke([&decoder_filters](FilterChainManager& manager) -> bool {
         static int index = 0;
         int i = index++;
-        FilterFactoryCb factory([&encoder_filters, i](FilterChainFactoryCallbacks& callbacks) {
-          callbacks.addStreamDecoderFilter(encoder_filters[i]);
+        FilterFactoryCb factory([&decoder_filters, i](FilterChainFactoryCallbacks& callbacks) {
+          callbacks.addStreamDecoderFilter(decoder_filters[i]);
         });
         manager.applyFilterFactoryCb({}, factory);
         return true;
@@ -3840,12 +3769,15 @@ TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
           RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
               {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
 
+          MetadataMapPtr metadata = std::make_unique<MetadataMap>();
+          (*metadata)["key1"] = "value1";
+
           RequestTrailerMapPtr trailers{
               new TestRequestTrailerMapImpl{{"key1", "value1"}, {"key2", "value2"}}};
 
           Buffer::OwnedImpl data("data");
 
-          switch (i % 4) {
+          switch (i % 5) {
           case 0:
             decoder_->decodeHeaders(std::move(headers), true);
             break;
@@ -3861,6 +3793,11 @@ TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
           case 3:
             decoder_->decodeHeaders(std::move(headers), false);
             decoder_->decodeTrailers(std::move(trailers));
+            break;
+          case 4:
+            decoder_->decodeHeaders(std::move(headers), false);
+            decoder_->decodeMetadata(std::move(metadata));
+            decoder_->decodeData(data, true);
             break;
           }
         }
@@ -3887,7 +3824,7 @@ TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
 
   ASSERT_EQ(deferred_request_count, kRequestsSentPerIOCycle);
 
-  for (auto& filter : encoder_filters) {
+  for (auto& filter : decoder_filters) {
     ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
     filter->callbacks_->streamInfo().setResponseCodeDetails("");
     filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");

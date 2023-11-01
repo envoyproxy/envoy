@@ -2787,20 +2787,20 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 
   // Host weight is 1.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
   // Host weight is 100.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
   HostVector empty;
   {
     hostSet().runCallbacks(empty, empty);
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
@@ -2823,12 +2823,12 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(2);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 }
 
@@ -2836,7 +2836,8 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -2844,16 +2845,22 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
   hostSet().healthy_hosts_[2]->stats().rq_active_.set(2);
   hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[4]->stats().rq_active_.set(5);
 
   // Creating various load balancer objects with different choice configs.
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(5);
-  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,       runtime_,
+  lr_lb_config.mutable_choice_count()->set_value(3);
+  LeastRequestLoadBalancer lb_3{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
-
+  lr_lb_config.mutable_choice_count()->set_value(4);
+  LeastRequestLoadBalancer lb_4{priority_set_, nullptr,        stats_,       runtime_,
+                                random_,       common_config_, lr_lb_config, simTime()};
+  lr_lb_config.mutable_choice_count()->set_value(6);
+  LeastRequestLoadBalancer lb_6{priority_set_, nullptr,        stats_,       runtime_,
+                                random_,       common_config_, lr_lb_config, simTime()};
   // Verify correct number of choices.
 
   // 0 choices configured should default to P2C.
@@ -2864,20 +2871,78 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
 
-  // 5 choices configured results in P5C.
-  EXPECT_CALL(random_, random()).Times(6).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_5.chooseHost(nullptr));
-
-  // Verify correct host chosen in P5C scenario.
+  // Verify correct host chosen in P3C scenario.
   EXPECT_CALL(random_, random())
-      .Times(6)
+      .Times(4)
       .WillOnce(Return(0))
       .WillOnce(Return(3))
+      .WillOnce(Return(1))
+      .WillOnce(Return(2));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
+
+  // Verify correct host chosen in P4C scenario.
+  EXPECT_CALL(random_, random())
+      .Times(5)
       .WillOnce(Return(0))
       .WillOnce(Return(3))
-      .WillOnce(Return(2))
-      .WillOnce(Return(1));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
+      .WillOnce(Return(1))
+      .WillOnce(Return(1))
+      .WillOnce(Return(2));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_4.chooseHost(nullptr));
+
+  // When the number of hosts is smaller or equal to the number of choices we don't call
+  // random() since we do a full table scan.
+  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_6.chooseHost(nullptr));
+}
+
+TEST_P(LeastRequestLoadBalancerTest, FullScan) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(4);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[2]->stats().rq_active_.set(2);
+  hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[4]->stats().rq_active_.set(5);
+
+  // Creating various load balancer objects with different choice configs.
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  lr_lb_config.mutable_choice_count()->set_value(2);
+  // Enable full table scan on hosts
+  lr_lb_config.mutable_enable_full_scan()->set_value(true);
+  common_config_.mutable_healthy_panic_threshold()->set_value(0);
+
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       1,       lr_lb_config, simTime()};
+  lr_lb_config.mutable_choice_count()->set_value(3);
+  LeastRequestLoadBalancer lb_3{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       1,       lr_lb_config, simTime()};
+  lr_lb_config.mutable_choice_count()->set_value(4);
+  LeastRequestLoadBalancer lb_4{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       1,       lr_lb_config, simTime()};
+  lr_lb_config.mutable_choice_count()->set_value(6);
+  LeastRequestLoadBalancer lb_6{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       1,       lr_lb_config, simTime()};
+
+  // random is called only once every time and is not to select the host.
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_4.chooseHost(nullptr));
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_6.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {

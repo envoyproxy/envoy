@@ -1,19 +1,16 @@
 package io.envoyproxy.envoymobile.engine;
 
+import com.google.protobuf.Struct;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import java.lang.StringBuilder;
-import javax.annotation.Nullable;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
-import io.envoyproxy.envoymobile.engine.JniLibrary;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
@@ -43,6 +40,7 @@ public class EnvoyConfiguration {
   public final String http3ConnectionOptions;
   public final String http3ClientConnectionOptions;
   public final Map<String, String> quicHints;
+  public final List<String> quicCanonicalSuffixes;
   public final Boolean enableGzipDecompression;
   public final Boolean enableBrotliDecompression;
   public final Boolean enableSocketTagging;
@@ -69,14 +67,13 @@ public class EnvoyConfiguration {
   public final Integer xdsPort;
   public final String xdsAuthHeader;
   public final String xdsAuthToken;
-  public final String xdsJwtToken;
-  public final Integer xdsJwtTokenLifetime;
   public final String xdsRootCerts;
   public final String xdsSni;
   public final String nodeId;
   public final String nodeRegion;
   public final String nodeZone;
   public final String nodeSubZone;
+  public final Struct nodeMetadata;
   public final String cdsResourcesLocator;
   public final Integer cdsTimeoutSeconds;
   public final Boolean enableCds;
@@ -113,6 +110,8 @@ public class EnvoyConfiguration {
    *     HTTP/3.
    * @param quicHints                                     A list of host port pairs that's known
    *     to speak QUIC.
+   * @param quicCanonicalSuffixes                         A list of canonical suffixes that are
+   *     known to speak QUIC.
    * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
    *     compression.
@@ -149,9 +148,6 @@ public class EnvoyConfiguration {
    * @param xdsAuthToken                                  the token to send as the authentication
    *                                                      header value to authenticate with the
    *                                                      xDS server.
-   * @param xdsJwtToken                                   the JWT token to use for authenticating
-   *                                                      with the xDS server.
-   * @param xdsTokenLifetime                              the lifetime of the JWT token.
    * @param xdsRootCerts                                  the root certificates to use for the TLS
    *                                                      handshake during connection establishment
    *                                                      with the xDS management server.
@@ -161,6 +157,7 @@ public class EnvoyConfiguration {
    * @param nodeRegion                                    the node region in the Node metadata.
    * @param nodeZone                                      the node zone in the Node metadata.
    * @param nodeSubZone                                   the node sub-zone in the Node metadata.
+   * @param nodeMetadata                                  the node metadata.
    * @param cdsResourcesLocator                           the resources locator for CDS.
    * @param cdsTimeoutSeconds                             the timeout for CDS fetches.
    * @param enableCds                                     enables CDS, used because all CDS params
@@ -172,11 +169,12 @@ public class EnvoyConfiguration {
       int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
       int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
       String http3ConnectionOptions, String http3ClientConnectionOptions,
-      Map<String, Integer> quicHints, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, boolean enableSocketTagging,
-      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost, int statsFlushSeconds,
-      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      Map<String, Integer> quicHints, List<String> quicCanonicalSuffixes,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
+      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
+      int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
+      int perTryIdleTimeoutSeconds, String appVersion, String appId,
       TrustChainVerification trustChainVerification,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
@@ -184,10 +182,9 @@ public class EnvoyConfiguration {
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, boolean enablePlatformCertificatesValidation,
       String rtdsResourceName, Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
-      String xdsAuthHeader, String xdsAuthToken, String xdsJwtToken, Integer xdsJwtTokenLifetime,
-      String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
-      String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
-      boolean enableCds) {
+      String xdsAuthHeader, String xdsAuthToken, String xdsRootCerts, String xdsSni, String nodeId,
+      String nodeRegion, String nodeZone, String nodeSubZone, Struct nodeMetadata,
+      String cdsResourcesLocator, Integer cdsTimeoutSeconds, boolean enableCds) {
     JniLibrary.load();
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -207,6 +204,7 @@ public class EnvoyConfiguration {
     for (Map.Entry<String, Integer> hostAndPort : quicHints.entrySet()) {
       this.quicHints.put(hostAndPort.getKey(), String.valueOf(hostAndPort.getValue()));
     }
+    this.quicCanonicalSuffixes = quicCanonicalSuffixes;
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
     this.enableSocketTagging = enableSocketTagging;
@@ -249,14 +247,13 @@ public class EnvoyConfiguration {
     this.xdsPort = xdsPort;
     this.xdsAuthHeader = xdsAuthHeader;
     this.xdsAuthToken = xdsAuthToken;
-    this.xdsJwtToken = xdsJwtToken;
-    this.xdsJwtTokenLifetime = xdsJwtTokenLifetime;
     this.xdsRootCerts = xdsRootCerts;
     this.xdsSni = xdsSni;
     this.nodeId = nodeId;
     this.nodeRegion = nodeRegion;
     this.nodeZone = nodeZone;
     this.nodeSubZone = nodeSubZone;
+    this.nodeMetadata = nodeMetadata;
     this.cdsResourcesLocator = cdsResourcesLocator;
     this.cdsTimeoutSeconds = cdsTimeoutSeconds;
     this.enableCds = enableCds;
@@ -268,25 +265,27 @@ public class EnvoyConfiguration {
     List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
     Collections.reverse(reverseFilterChain);
 
-    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
-    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
-    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
-    byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
-    byte[][] quic_hints = JniBridgeUtility.mapToJniBytes(quicHints);
+    byte[][] filterChain = JniBridgeUtility.toJniBytes(reverseFilterChain);
+    byte[][] statsSinks = JniBridgeUtility.stringsToJniBytes(statSinks);
+    byte[][] dnsPreresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
+    byte[][] runtimeGuards = JniBridgeUtility.mapToJniBytes(this.runtimeGuards);
+    byte[][] quicHints = JniBridgeUtility.mapToJniBytes(this.quicHints);
+    byte[][] quicSuffixes = JniBridgeUtility.stringsToJniBytes(quicCanonicalSuffixes);
 
     return JniLibrary.createBootstrap(
         grpcStatsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
-        dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve,
+        dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        http3ConnectionOptions, http3ClientConnectionOptions, quic_hints, enableGzipDecompression,
-        enableBrotliDecompression, enableSocketTagging, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filter_chain,
-        stats_sinks, enablePlatformCertificatesValidation, runtime_guards, rtdsResourceName,
-        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsJwtToken,
-        xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId, nodeRegion, nodeZone, nodeSubZone,
-        cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        http3ConnectionOptions, http3ClientConnectionOptions, quicHints, quicSuffixes,
+        enableGzipDecompression, enableBrotliDecompression, enableSocketTagging,
+        enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+        enforceTrustChainVerification, filterChain, statsSinks,
+        enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName, rtdsTimeoutSeconds,
+        xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsRootCerts, xdsSni, nodeId, nodeRegion,
+        nodeZone, nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator, cdsTimeoutSeconds,
+        enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

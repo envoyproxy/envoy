@@ -12,3 +12,13 @@ filegroup(
     name = "changelogs",
     srcs = glob(["*.*.*.yaml"]) + ["current.yaml"],
 )
+
+genrule(
+    name = "summary",
+    outs = ["summary.txt"],
+    cmd = """
+    cat $(location :summary.md) > $@
+    """,
+    tools = ["summary.md"],
+    visibility = ["//visibility:public"],
+)
