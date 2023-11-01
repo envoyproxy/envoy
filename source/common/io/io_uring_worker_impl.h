@@ -289,6 +289,7 @@ protected:
 
   Request* cancel_req_{nullptr};
   Request* write_or_shutdown_cancel_req_{nullptr};
+  Request* close_req_{nullptr};
 
   void closeInternal();
   void submitReadRequest();

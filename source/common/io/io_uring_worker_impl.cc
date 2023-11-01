@@ -784,7 +784,9 @@ void IoUringServerSocket::closeInternal() {
     cleanup();
     return;
   }
-  parent_.submitCloseRequest(*this);
+  if (close_req_ == nullptr) {
+    close_req_ = parent_.submitCloseRequest(*this);
+  }
 }
 
 void IoUringServerSocket::submitReadRequest() {
