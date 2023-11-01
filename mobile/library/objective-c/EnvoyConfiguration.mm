@@ -79,6 +79,7 @@
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                       enableHttp3:(BOOL)enableHttp3
                                         quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
+                            quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -140,6 +141,7 @@
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.enableHttp3 = enableHttp3;
   self.quicHints = quicHints;
+  self.quicCanonicalSuffixes = quicCanonicalSuffixes;
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
@@ -200,6 +202,9 @@
   builder.enableHttp3(self.enableHttp3);
   for (NSString *host in self.quicHints) {
     builder.addQuicHint([host toCXXString], [[self.quicHints objectForKey:host] intValue]);
+  }
+  for (NSString *suffix in self.quicCanonicalSuffixes) {
+    builder.addQuicCanonicalSuffix([suffix toCXXString]);
   }
 #endif
 

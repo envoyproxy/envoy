@@ -1518,10 +1518,14 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
   resetIdleTimer();
-  // After going through filters, the ownership of metadata_map will be passed to terminal filter.
-  // The terminal filter may encode metadata_map to the next hop immediately or store metadata_map
-  // and encode later when connection pool is ready.
-  filter_manager_.decodeMetadata(*metadata_map);
+  if (!state_.deferred_to_next_io_iteration_) {
+    // After going through filters, the ownership of metadata_map will be passed to terminal filter.
+    // The terminal filter may encode metadata_map to the next hop immediately or store metadata_map
+    // and encode later when connection pool is ready.
+    filter_manager_.decodeMetadata(*metadata_map);
+  } else {
+    deferred_metadata_.push(std::move(metadata_map));
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::disarmRequestTimeout() {
@@ -2229,11 +2233,17 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
     return false;
   }
   state_.deferred_to_next_io_iteration_ = false;
-  bool end_stream =
-      state_.deferred_end_stream_ && deferred_data_ == nullptr && request_trailers_ == nullptr;
+  bool end_stream = state_.deferred_end_stream_ && deferred_data_ == nullptr &&
+                    request_trailers_ == nullptr && deferred_metadata_.empty();
   filter_manager_.decodeHeaders(*request_headers_, end_stream);
   if (end_stream) {
     return true;
+  }
+  // Send metadata before data, as data may have an associated end_stream.
+  while (!deferred_metadata_.empty()) {
+    MetadataMapPtr& metadata = deferred_metadata_.front();
+    filter_manager_.decodeMetadata(*metadata);
+    deferred_metadata_.pop();
   }
   // Filter manager will return early from decodeData and decodeTrailers if
   // request has completed.

@@ -161,6 +161,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
   private var quicHints = mutableMapOf<String, Int>()
+  private var quicCanonicalSuffixes = mutableListOf<String>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -663,6 +664,17 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   }
 
   /**
+   * Add a host suffix that's known to speak QUIC.
+   *
+   * @param suffix the suffix string.
+   * @return This builder.
+   */
+  fun addQuicCanonicalSuffix(suffix: String): EngineBuilder {
+    this.quicCanonicalSuffixes.add(suffix)
+    return this
+  }
+
+  /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
    * @return A new instance of Envoy.
@@ -686,6 +698,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         http3ConnectionOptions,
         http3ClientConnectionOptions,
         quicHints,
+        quicCanonicalSuffixes,
         enableGzipDecompression,
         enableBrotliDecompression,
         enableSocketTagging,
