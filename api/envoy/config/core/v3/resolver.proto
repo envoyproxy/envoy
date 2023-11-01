@@ -29,7 +29,8 @@ message DnsResolverOptions {
   // The initial response timeout given to a name server to reply to a query on the first attempt.
   // After the initial attempt, the timeout algorithm becomes more intricate, but remains proportionate to this value.
   // The default is 2 seconds (2000 ms).
-  google.protobuf.Duration dns_resolver_query_timeout = 3 [(validate.rules).duration = {gte {nanos: 1000000}}];
+  google.protobuf.Duration dns_resolver_query_timeout = 3
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // The number of attempts the resolver will make to contact the name server before giving up. The default is 3 tries.
   google.protobuf.UInt32Value dns_resolver_query_tries = 4 [(validate.rules).uint32 = {gte: 1}];
