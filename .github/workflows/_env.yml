@@ -24,20 +24,19 @@ on:
         type: string
         default: 7467652575122d8d54e767a68f141598bd855383
 
-      check_mobile_run:
+      check-mobile-run:
         type: boolean
         default: true
-      prime_build_image:
+      prime-build-image:
         type: boolean
         default: false
-
-      repo_ref:
+      repo-ref:
         type: string
         default:
-      repo_ref_sha:
+      repo-ref-name:
         type: string
         default:
-      repo_ref_name:
+      repo-ref-sha:
         type: string
         default:
 
@@ -76,25 +75,22 @@ on:
         value: ${{ jobs.repo.outputs.mobile_release_validation }}
       mobile_tsan:
         value: ${{ jobs.repo.outputs.mobile_tsan }}
-
-      repo_ref:
-        value: ${{ jobs.repo.outputs.repo_ref }}
-      repo_ref_name:
-        value: ${{ jobs.repo.outputs.repo_ref_name }}
-      repo_ref_sha:
-        value: ${{ jobs.repo.outputs.repo_ref_sha }}
-      repo_ref_sha_short:
-        value: ${{ jobs.repo.outputs.repo_ref_sha_short }}
-      repo_ref_title:
-        value: ${{ jobs.repo.outputs.repo_ref_title }}
-
+      repo-ref:
+        value: ${{ jobs.repo.outputs.repo-ref }}
+      repo-ref-name:
+        value: ${{ jobs.repo.outputs.repo-ref-name }}
+      repo-ref-sha:
+        value: ${{ jobs.repo.outputs.repo-ref-sha }}
+      repo-ref-sha-short:
+        value: ${{ jobs.repo.outputs.repo-ref-sha-short }}
+      repo-ref-title:
+        value: ${{ jobs.repo.outputs.repo-ref-title }}
       trusted:
         value: ${{ jobs.repo.outputs.trusted }}
-
-      version_dev:
-        value: ${{ jobs.repo.outputs.version_dev }}
-      version_patch:
-        value: ${{ jobs.repo.outputs.version_patch }}
+      version-dev:
+        value: ${{ jobs.repo.outputs.version-dev }}
+      version-patch:
+        value: ${{ jobs.repo.outputs.version-patch }}
 
 concurrency:
   group: |
@@ -106,12 +102,11 @@ concurrency:
 
 jobs:
   repo:
-    if: >-
-      ${{
-          (github.repository == 'envoyproxy/envoy'
-           || vars.ENVOY_CI)
-      }}
+    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       build_image_ubuntu: ${{ steps.env.outputs.build_image_ubuntu }}
       build_image_ubuntu_mobile: ${{ steps.env.outputs.build_image_ubuntu_mobile }}
@@ -128,57 +123,68 @@ jobs:
       mobile_ios_tests: ${{ steps.env.outputs.mobile_ios_tests }}
       mobile_release_validation: ${{ steps.env.outputs.mobile_release_validation }}
       mobile_tsan: ${{ steps.env.outputs.mobile_tsan }}
-      repo_ref: ${{ steps.env.outputs.repo_ref }}
-      repo_ref_name: ${{ steps.env.outputs.repo_ref_name }}
-      repo_ref_sha: ${{ steps.env.outputs.repo_ref_sha }}
-      repo_ref_sha_short: ${{ steps.env.outputs.repo_ref_sha_short }}
-      repo_ref_title: ${{ steps.env.outputs.repo_ref_title }}
+      repo-ref: ${{ steps.ref.outputs.value }}
+      repo-ref-name: ${{ steps.env.outputs.repo-ref-name }}
+      repo-ref-sha: ${{ steps.env.outputs.repo-ref-sha }}
+      repo-ref-sha_short: ${{ steps.env.outputs.repo-ref-sha-short }}
+      repo-ref-title: ${{ steps.env.outputs.repo-ref-title }}
       trusted: ${{ steps.env.outputs.trusted }}
-      version_dev: ${{ steps.env.outputs.version_dev }}
-      version_patch: ${{ steps.env.outputs.version_patch }}
+      version-dev: ${{ steps.env.outputs.version-dev }}
+      version-patch: ${{ steps.env.outputs.version-patch }}
     steps:
     - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
-        fetch-depth: ${{ ! (inputs.check_mobile_run || ! startsWith(github.event_name, 'pull_request')) && 1 || 0 }}
+        fetch-depth: ${{ ! (inputs.check-mobile-run || ! startsWith(github.event_name, 'pull_request')) && 1 || 0 }}
         # WARNING: This allows untrusted code to run!!!
         #  If this is set, then anything before or after in the job should be regarded as
         #  compromised.
-        ref: ${{ startsWith(github.event_name, 'pull_request') && inputs.repo_ref || '' }}
+        ref: ${{ startsWith(github.event_name, 'pull_request') && inputs.repo-ref || '' }}
 
     - uses: ./.github/actions/env
       name: Generate environment variables
       id: env
       with:
-        check_mobile_run: ${{ inputs.check_mobile_run }}
-        repo_ref: ${{ inputs.repo_ref }}
-        repo_ref_name: ${{ inputs.repo_ref_name }}
-        repo_ref_sha: ${{ inputs.repo_ref_sha }}
+        check-mobile-run: ${{ inputs.check-mobile-run }}
+        repo-ref: ${{ inputs.repo-ref }}
+        repo-ref-name: ${{ inputs.repo-ref-name }}
+        repo-ref-sha: ${{ inputs.repo-ref-sha }}
         build_image_repo: ${{ inputs.build_image_repo }}
         build_image_tag: ${{ inputs.build_image_tag }}
         build_image_mobile_sha: ${{ inputs.build_image_mobile_sha }}
         build_image_sha: ${{ inputs.build_image_sha }}
+    - uses: envoyproxy/toolshed/gh-actions/github/merge-commit@actions-v0.1.5
+      id: merge-commit
+      if: ${{ github.event_name == 'pull_request_target' }}
+      with:
+        repository: ${{ github.repository }}
+        pr: ${{ github.event.number }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+    - name: 'Set ref'
+      id: ref
+      run: |
+        echo "value=${{ steps.merge-commit.outputs.sha || steps.env.outputs.repo_ref }}" >> $GITHUB_OUTPUT
 
     - name: 'Print env'
       run: |
-        echo "version_dev=${{ steps.env.outputs.version_dev }}"
-        echo "version_patch=${{ steps.env.outputs.version_patch }}"
+        echo "version-dev=${{ steps.env.outputs.version-dev }}"
+        echo "version-patch=${{ steps.env.outputs.version-patch }}"
         echo "trusted=${{ steps.env.outputs.trusted }}"
-        echo "repo_ref=${{ steps.env.outputs.repo_ref }}"
-        echo "repo_ref_name=${{ steps.env.outputs.repo_ref_name }}"
-        echo "repo_ref_pr_number=${{ steps.env.outputs.repo_ref_pr_number }}"
-        echo "repo_ref_sha=${{ steps.env.outputs.repo_ref_sha }}"
-        echo "repo_ref_sha_short=${{ steps.env.outputs.repo_ref_sha_short }}"
-        echo "repo_ref_title=${{ steps.env.outputs.repo_ref_title }}"
+        echo "repo-ref=${{ steps.ref.outputs.value }}"
+        echo "repo-ref-name=${{ steps.env.outputs.repo-ref-name }}"
+        echo "repo-ref-pr-number=${{ steps.env.outputs.repo-ref-pr-number }}"
+        echo "repo-ref-sha=${{ steps.env.outputs.repo-ref-sha }}"
+        echo "repo-ref-sha-short=${{ steps.env.outputs.repo-ref-sha-short }}"
+        echo "repo-ref-title=${{ steps.env.outputs.repo-ref-title }}"
         echo "build_image_ubuntu=${{ steps.env.outputs.build_image_ubuntu }}"
         echo "build_image_ubuntu_mobile=${{ steps.env.outputs.build_image_ubuntu_mobile }}"
         echo
-        if [[ -n "${{ steps.env.outputs.repo_ref_pr_number }}" ]]; then
-            echo "PR: https://github.com/envoyproxy/envoy/pull/${{ steps.env.outputs.repo_ref_pr_number }}"
+        if [[ -n "${{ steps.env.outputs.repo-ref-pr-number }}" ]]; then
+            echo "PR: https://github.com/${{ github.repository }}/pull/${{ steps.env.outputs.repo-ref-pr-number }}"
         fi
 
   cache:
-    if: ${{ inputs.prime_build_image }}
+    if: ${{ inputs.prime-build-image }}
     uses: ./.github/workflows/_cache_docker.yml
     with:
       image_repo: ${{ inputs.build_image_repo }}

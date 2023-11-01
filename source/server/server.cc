@@ -814,15 +814,6 @@ void InstanceImpl::onRuntimeReady() {
       shutdown();
     });
   }
-
-  // TODO (nezdolik): Fully deprecate this runtime key in the next release.
-  if (runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
-    ENVOY_LOG(warn,
-              "Usage of the deprecated runtime key {}, consider switching to "
-              "`envoy.resource_monitors.downstream_connections` instead."
-              "This runtime key will be removed in future.",
-              Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
-  }
 }
 
 void InstanceImpl::startWorkers() {
@@ -908,7 +899,8 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
-          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
+      !instance.runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
                     "connections. Configure a "
                     "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");

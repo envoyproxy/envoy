@@ -26,11 +26,11 @@ jobs:
     - uses: ./.github/actions/env
       id: env
       with:
-        check_mobile_run: false
+        check-mobile-run: false
 
     - if: ${{ steps.env.outputs.trusted != 'true' }}
       name: Start status check
-      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.1.3
+      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.1.5
       with:
         authToken: ${{ secrets.GITHUB_TOKEN }}
         context: ${{ inputs.workflow_name }}

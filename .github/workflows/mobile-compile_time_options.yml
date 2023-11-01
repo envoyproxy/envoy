@@ -19,6 +19,7 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
+      pull-requests: read
 
   cc_test_no_yaml:
     needs: env
@@ -68,10 +69,7 @@ jobs:
         cd mobile
         ./bazelw build \
             --config=mobile-remote-ci \
-             --define=admin_html=disabled \
-             --define=admin_functionality=disabled \
              --define envoy_exceptions=disabled \
-             --define envoy_mobile_listener=disabled  \
              --define=envoy_yaml=disabled \
              --copt=-fno-unwind-tables \
              --copt=-fno-exceptions \
@@ -102,7 +100,6 @@ jobs:
             --config=mobile-remote-ci \
             --define=signal_trace=disabled \
             --define=envoy_mobile_request_compression=disabled \
-            --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             $TARGETS
@@ -135,7 +132,6 @@ jobs:
             --define=envoy_mobile_request_compression=disabled \
             --define=envoy_mobile_stats_reporting=disabled \
             --define=envoy_mobile_swift_cxx_interop=disabled \
-            --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
             --@envoy//bazel:http3=False \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \

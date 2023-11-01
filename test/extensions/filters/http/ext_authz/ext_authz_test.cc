@@ -2378,6 +2378,51 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
                     .value());
 }
 
+// Test that a denied response results in the connection closing with a 401 response to the client.
+TEST_P(HttpFilterTestParam, DeniedResponseWith401NoClusterResponseCodeStats) {
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  charge_cluster_response_stats:
+    value: false
+  )EOF");
+
+  InSequence s;
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Unauthorized;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.denied")
+                    .value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(0, decoder_filter_callbacks_.clusterInfo()
+                   ->statsScope()
+                   .counterFromString("upstream_rq_4xx")
+                   .value());
+}
+
 // Test that a denied response results in the connection closing with a 403 response to the client.
 TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
   InSequence s;

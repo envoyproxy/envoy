@@ -18,13 +18,13 @@ on:
       build_image_ubuntu:
         type: string
         default: ''
-      version_dev:
+      version-dev:
         type: string
         default: ''
       head_ref:
         type: string
         default: ''
-      repo_ref:
+      repo-ref:
         type: string
       sha:
         type: string
@@ -42,35 +42,52 @@ jobs:
   publish_ci:
     if: ${{ ! inputs.trusted }}
     name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_ci.yml
+    with:
+      target: ${{ matrix.target }}
+      rbe: false
+      cache-build-image: ${{ inputs.build_image_ubuntu }}
+      source: ${{ matrix.source }}
+      trusted: false
+      repo-ref: ${{ inputs.repo-ref }}
+      steps-pre: ${{ matrix.steps-pre }}
     strategy:
       fail-fast: false
       matrix:
         include:
         - target: publish
           name: github
-          run_pre: ./.github/actions/publish/release/setup
-          run_pre_with: |
-            ref: ${{ inputs.repo_ref }}
-            bucket: envoy-pr
-          env: |
+          steps-pre: |
+            - id: short_name
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.2
+              with:
+                length: 7
+                string: ${{ inputs.repo-ref }}
+                min: 40
+            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.2
+              with:
+                url: https://storage.googleapis.com/envoy-pr/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
+                path: %{{ runner.temp }}/release.signed
+          source: |
             export ENVOY_PUBLISH_DRY_RUN=1
             export ENVOY_COMMIT=${{ inputs.sha }}
             export ENVOY_REPO=${{ github.repository }}
-    uses: ./.github/workflows/_ci.yml
-    with:
-      target: ${{ matrix.target }}
-      rbe: false
-      managed: true
-      cache_build_image: ${{ inputs.build_image_ubuntu }}
-      run_pre: ${{ matrix.run_pre }}
-      run_pre_with: ${{ matrix.run_pre_with }}
-      env: ${{ matrix.env }}
-      trusted: false
-      repo_ref: ${{ inputs.repo_ref }}
 
   publish:
     if: ${{ inputs.trusted }}
     name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_ci.yml
+    with:
+      target: ${{ matrix.target }}
+      rbe: false
+      cache-build-image: ${{ inputs.build_image_ubuntu }}
+      source: ${{ matrix.source }}
+      trusted: true
+      repo-ref: ${{ inputs.repo-ref }}
+      steps-pre: ${{ inputs.steps-pre }}
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     permissions:
       contents: read
       packages: read
@@ -80,29 +97,21 @@ jobs:
         include:
         - target: publish
           name: github
-          run_pre: ./.github/actions/publish/release/setup
-          run_pre_with: |
-            ref: ${{ inputs.repo_ref }}
-            bucket: envoy-postsubmit
-          env: |
+          steps-pre: |
+            - id: short_name
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.2
+              with:
+                length: 7
+                input: ${{ inputs.repo-ref }}
+            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.2
+              with:
+                url: https://storage.googleapis.com/envoy-postsubmit/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
+                path: %{{ runner.temp }}/release.signed
+          source: |
             export ENVOY_COMMIT=${{ inputs.sha }}
-            if [[ '${{ inputs.version_dev }}' == 'dev' ]]; then
+            if [[ '${{ inputs.version-dev }}' == 'dev' ]]; then
                 export ENVOY_PUBLISH_DRY_RUN=1
             fi
-    uses: ./.github/workflows/_ci.yml
-    with:
-      target: ${{ matrix.target }}
-      rbe: false
-      managed: true
-      cache_build_image: ${{ inputs.build_image_ubuntu }}
-      run_pre: ${{ matrix.run_pre }}
-      run_pre_with: ${{ matrix.run_pre_with }}
-      env: ${{ matrix.env }}
-      trusted: true
-      repo_ref: ${{ inputs.repo_ref }}
-    secrets:
-      app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-      app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
   publish_docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
@@ -117,12 +126,12 @@ jobs:
     needs:
     - publish
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.3
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.5
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
         ref: main
-        repository: ${{ inputs.version_dev == 'dev' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
+        repository: ${{ inputs.version-dev == 'dev' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
         workflow: envoy-sync.yaml
         inputs: |
-          commit_sha: ${{ inputs.version_dev == 'dev' && github.sha || '' }}
+          commit_sha: ${{ inputs.version-dev == 'dev' && github.sha || '' }}

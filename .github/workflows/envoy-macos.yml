@@ -17,9 +17,12 @@ concurrency:
 jobs:
   env:
     uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      pull-requests: read
     with:
-      prime_build_image: false
-      check_mobile_run: false
+      prime-build-image: false
+      check-mobile-run: false
 
   macos:
     needs:
@@ -37,12 +40,15 @@ jobs:
     with:
       target: ${{ matrix.target }}
       runs-on: macos-12-xl
-      command_ci:
-      command_prefix:
-      repo_ref: ${{ github.event.pull_request.merge_commit_sha }}
-      run-du: false
-      env: |
-        ./ci/mac_ci_setup.sh
+      command-ci:
+      command-prefix:
+      repo-ref: ${{ needs.env.outputs.repo_ref }}
+      steps-post:
+      steps-pre: |
+        - run: ./ci/mac_ci_setup.sh
+          shell: bash
+          name: Setup macos
+      source: |
         GCP_SERVICE_ACCOUNT_KEY_PATH=$(mktemp -t gcp_service_account.XXXXXX.json)
         bash -c "echo \"${RBE_KEY}\" | base64 --decode > \"${GCP_SERVICE_ACCOUNT_KEY_PATH}\""
         _BAZEL_BUILD_EXTRA_OPTIONS=(

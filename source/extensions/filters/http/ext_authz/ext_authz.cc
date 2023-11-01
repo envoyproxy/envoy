@@ -380,19 +380,20 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
-
-      Http::CodeStats::ResponseStatInfo info{config_->scope(),
-                                             cluster_->statsScope(),
-                                             empty_stat_name,
-                                             enumToInt(response->status_code),
-                                             true,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             false};
-      config_->httpContext().codeStats().chargeResponseStat(info, false);
+      if (config_->chargeClusterResponseStats()) {
+        Http::CodeStats::ResponseStatInfo info{config_->scope(),
+                                               cluster_->statsScope(),
+                                               empty_stat_name,
+                                               enumToInt(response->status_code),
+                                               true,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               false};
+        config_->httpContext().codeStats().chargeResponseStat(info, false);
+      }
     }
 
     // setResponseFlag must be called before sendLocalReply
