@@ -673,7 +673,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
     this.quicCanonicalSuffixes.add(suffix)
     return this
   }
-  
+
   /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
