@@ -46,6 +46,5 @@ jobs:
             --build_tests_only \
             --action_env=LD_LIBRARY_PATH \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
-            --define envoy_mobile_listener=disabled \
             --config=mobile-remote-ci \
             //test/common/...
