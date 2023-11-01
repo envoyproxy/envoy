@@ -78,7 +78,7 @@ on:
         value: ${{ jobs.repo.outputs.mobile_tsan }}
 
       repo_ref:
-        value: ${{ jobs.ref.outputs.value }}
+        value: ${{ jobs.repo.outputs.repo_ref }}
       repo_ref_name:
         value: ${{ jobs.repo.outputs.repo_ref_name }}
       repo_ref_sha:
@@ -131,7 +131,7 @@ jobs:
       mobile_ios_tests: ${{ steps.env.outputs.mobile_ios_tests }}
       mobile_release_validation: ${{ steps.env.outputs.mobile_release_validation }}
       mobile_tsan: ${{ steps.env.outputs.mobile_tsan }}
-      repo_ref: ${{ steps.env.outputs.repo_ref }}
+      repo_ref: ${{ steps.ref.outputs.value }}
       repo_ref_name: ${{ steps.env.outputs.repo_ref_name }}
       repo_ref_sha: ${{ steps.env.outputs.repo_ref_sha }}
       repo_ref_sha_short: ${{ steps.env.outputs.repo_ref_sha_short }}
