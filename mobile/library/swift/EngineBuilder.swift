@@ -18,7 +18,7 @@ open class XdsBuilder: NSObject {
 
   let xdsServerAddress: String
   let xdsServerPort: UInt32
-  var grpcInitialMetadata: [String: String] = [:]
+  var xdsGrpcInitialMetadata: [String: String] = [:]
   var sslRootCerts: String?
   var sni: String?
   var rtdsResourceName: String?
@@ -55,7 +55,7 @@ open class XdsBuilder: NSObject {
   public func addInitialStreamHeader(
     header: String,
     value: String) -> Self {
-    self.grpcInitialMetadata[header] = value
+    self.xdsGrpcInitialMetadata[header] = value
     return self
   }
 
@@ -793,7 +793,7 @@ open class EngineBuilder: NSObject {
 #if ENVOY_GOOGLE_GRPC
     xdsServerAddress = self.xdsBuilder?.xdsServerAddress
     xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
-    xdsGrpcInitialMetadata = self.xdsBuilder?.xdsGrpcInitialMetadata
+    xdsGrpcInitialMetadata = self.xdsBuilder?.xdsGrpcInitialMetadata ?? [:]
     xdsSslRootCerts = self.xdsBuilder?.sslRootCerts
     xdsSni = self.xdsBuilder?.sni
     rtdsResourceName = self.xdsBuilder?.rtdsResourceName

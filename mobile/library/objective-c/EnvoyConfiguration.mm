@@ -272,8 +272,8 @@
   if (self.xdsServerAddress != nil) {
     Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
     for (NSString *header in self.xdsGrpcInitialMetadata) {
-      builder.addInitialStreamHeader([header toCXXString],
-                                     [[self.quicHints objectForKey:header] toCXXString]);
+      xdsBuilder.addInitialStreamHeader(
+          [header toCXXString], [[self.xdsGrpcInitialMetadata objectForKey:header] toCXXString]);
     }
     if (self.xdsSslRootCerts != nil) {
       xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
