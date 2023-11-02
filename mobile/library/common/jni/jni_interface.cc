@@ -862,7 +862,7 @@ static void jvm_kv_store_remove(envoy_data key, const void* context) {
 
 static void jvm_kv_store_save(envoy_data key, envoy_data value, const void* context) {
   jni_log("[Envoy]", "jvm_kv_store_save");
-  JNIEnv* env = get_env();
+  JNIEnv* env = Envoy::JNI::get_env();
 
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
 
@@ -870,7 +870,7 @@ static void jvm_kv_store_save(envoy_data key, envoy_data value, const void* cont
   jmethodID jmid_save = env->GetMethodID(jcls_JvmKeyValueStoreContext, "save", "([B[B)V");
   jbyteArray j_key = Envoy::JNI::native_data_to_array(env, key);
   jbyteArray j_value = Envoy::JNI::native_data_to_array(env, value);
-  Envoy::JNI::allVoidMethod(env, j_context, jmid_save, j_key, j_value);
+  Envoy::JNI::callVoidMethod(env, j_context, jmid_save, j_key, j_value);
 
   env->DeleteLocalRef(j_value);
   env->DeleteLocalRef(j_key);
@@ -1369,9 +1369,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     }
     builder.setXds(std::move(xds_builder));
 #else
-    throwException(env, "java/lang/UnsupportedOperationException",
-                   "This library does not support xDS. Please use "
-                   "io.envoyproxy.envoymobile:envoy-xds instead.");
+    Envoy::JNI::throwException(env, "java/lang/UnsupportedOperationException",
+                               "This library does not support xDS. Please use "
+                               "io.envoyproxy.envoymobile:envoy-xds instead.");
 #endif
   }
 
