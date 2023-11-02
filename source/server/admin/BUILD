@@ -78,6 +78,7 @@ envoy_cc_library(
         "//source/extensions/http/header_validators/envoy_default:config",
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/extensions/request_id/uuid:config",
+        "//source/server:null_overload_manager_lib",
     ] + envoy_select_admin_html([
         ":admin_html_util",
     ]),

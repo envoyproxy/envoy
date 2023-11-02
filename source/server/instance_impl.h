@@ -13,6 +13,7 @@ public:
 
 protected:
   void maybeCreateHeapShrinker() override;
+  std::unique_ptr<OverloadManager> createOverloadManager() override;
 
 private:
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
