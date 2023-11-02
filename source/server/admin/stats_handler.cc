@@ -177,7 +177,7 @@ Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
   Admin::ParamDescriptor histogram_buckets{Admin::ParamDescriptor::Type::Enum,
                                            "histogram_buckets",
                                            "Histogram bucket display mode",
-                                           {"cumulative", "disjoint", "detailed", "none"}};
+                                           {"cumulative", "disjoint", "detailed", "summary"}};
   Admin::ParamDescriptor format{Admin::ParamDescriptor::Type::Enum,
                                 "format",
                                 "Format to use",

@@ -1461,7 +1461,7 @@ envoy_h1_count{} 1
 }
 
 TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusSummaryEmission) {
-  const std::string url = "/stats?format=prometheus&histogram_buckets=none";
+  const std::string url = "/stats?format=prometheus&histogram_buckets=summary";
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
 

@@ -1,7 +1,5 @@
 #include "source/server/admin/stats_params.h"
 
-#include "utils.h"
-
 namespace Envoy {
 namespace Server {
 
