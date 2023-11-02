@@ -33,7 +33,7 @@ LogLevel logLevelFromString(const std::string& str) {
   }
 
   IS_ENVOY_BUG("unknown log level, defaulting to off");
-  return LOG_LEVEL_LOOKUP[ARRAY_SIZE(LOG_LEVEL_LOOKUP) -1 ].first;
+  return LOG_LEVEL_LOOKUP[ARRAY_SIZE(LOG_LEVEL_LOOKUP) - 1].first;
 }
 
 } // namespace Platform
