@@ -35,7 +35,6 @@ message KafkaBroker {
   // This collection of rules should cover all brokers in the cluster that is being proxied,
   // otherwise some nodes' addresses might leak to the downstream clients.
   oneof broker_address_rewrite_spec {
-
     // Broker address rewrite rules that match by broker ID.
     IdBasedBrokerRewriteSpec id_based_broker_address_rewrite_spec = 3;
   }
