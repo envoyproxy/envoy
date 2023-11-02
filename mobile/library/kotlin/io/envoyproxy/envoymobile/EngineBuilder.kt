@@ -729,7 +729,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         xdsBuilder?.rtdsTimeoutInSeconds ?: 0,
         xdsBuilder?.xdsServerAddress,
         xdsBuilder?.xdsServerPort ?: 0,
-        xdsBuilder?.grpcInitialMetadata,
+        xdsBuilder?.grpcInitialMetadata ?: mapOf<String, String>(),
         xdsBuilder?.sslRootCerts,
         xdsBuilder?.sni,
         nodeId,
