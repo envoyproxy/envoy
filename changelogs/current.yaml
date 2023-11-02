@@ -9,6 +9,10 @@ behavior_changes:
     the flag to false explicitly.
     See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
     issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
+- area: listener
+  change: |
+    undeprecated runtime key ``overload.global_downstream_max_connections`` until :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
 
 minor_behavior_changes:
 - area: upstream
@@ -41,6 +45,10 @@ bug_fixes:
 - area: grpc
   change: |
     Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+- area: quic
+  change: |
+    Fixed a bug in QUIC and HCM interaction which could cause use-after-free during asynchronous certificates retrieval.
+    The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
 - area: redis
   change: |
     Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.
@@ -67,6 +75,10 @@ removed_config_or_runtime:
 - area: grpc
   change: |
     Removed the deprecated ``envoy.reloadable_features.service_sanitize_non_utf8_strings``
+    runtime flag and legacy code path.
+- area: access log
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.format_ports_as_numbers``
     runtime flag and legacy code path.
 
 new_features:
@@ -107,5 +119,20 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a sampler for the OpenTelemetry tracer.
+- area: ext_authz
+  change: |
+    New config parameter :ref:`charge_cluster_response_stats
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.charge_cluster_response_stats>`
+    for not incrementing cluster statistics on ext_authz response. Default true, no behavior change.
+- area: ext_authz
+  change: |
+    forward :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` selected by
+    :ref:`route_metadata_context_namespaces
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.route_metadata_context_namespaces>`
+    and :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` selected by
+    :ref:`route_typed_metadata_context_namespaces
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.route_typed_metadata_context_namespaces>`
+    from the metadata of the selected route to external auth service.
+    This metadata propagation is independent from the dynamic metadata from connection and request.
 
 deprecated:
