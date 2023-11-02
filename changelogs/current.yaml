@@ -142,5 +142,10 @@ new_features:
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.route_typed_metadata_context_namespaces>`
     from the metadata of the selected route to external auth service.
     This metadata propagation is independent from the dynamic metadata from connection and request.
+- area: ext_authz_filter
+  change: |
+    added :ref:`with_request_body
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>` to optionally override
+    the default behavior of sending the request body to the authorization server from the per-route filter.
 
 deprecated:
