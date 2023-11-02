@@ -1196,7 +1196,7 @@ std::string javaByteArrayToString(Envoy::JNI::JniHelper& jni_helper, jbyteArray 
   return ret;
 }
 
-// Converts a java object array to C++ vector of of strings.
+// Converts a java object array to C++ vector of strings.
 std::vector<std::string> javaObjectArrayToStringVector(Envoy::JNI::JniHelper& jni_helper,
                                                        jobjectArray entries) {
   std::vector<std::string> ret;
@@ -1362,7 +1362,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean trust_chain_verification, jobjectArray filter_chain, jobjectArray stat_sinks,
     jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
     jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
-    jstring xds_auth_header, jstring xds_auth_token, jstring xds_root_certs, jstring xds_sni,
+    jobjectArray xds_grpc_initial_metadata, jstring xds_root_certs, jstring xds_sni,
     jstring node_id, jstring node_region, jstring node_zone, jstring node_sub_zone,
     jbyteArray serialized_node_metadata, jstring cds_resources_locator, jlong cds_timeout_seconds,
     jboolean enable_cds) {
@@ -1387,10 +1387,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   if (!native_xds_address.empty()) {
 #ifdef ENVOY_GOOGLE_GRPC
     Envoy::Platform::XdsBuilder xds_builder(std::move(native_xds_address), xds_port);
-    std::string native_xds_auth_header = getCppString(jni_helper, xds_auth_header);
-    if (!native_xds_auth_header.empty()) {
-      xds_builder.setAuthenticationToken(std::move(native_xds_auth_header),
-                                         getCppString(jni_helper, xds_auth_token));
+    auto initial_metadata =
+        javaObjectArrayToStringPairVector(jni_helper, xds_grpc_initial_metadata);
+    for (const std::pair<std::string, std::string>& entry : initial_metadata) {
+      xds_builder.addInitialStreamHeader(entry.first, entry.second);
     }
     std::string native_root_certs = getCppString(jni_helper, xds_root_certs);
     if (!native_root_certs.empty()) {

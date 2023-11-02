@@ -297,29 +297,35 @@ TEST(TestConfig, XdsConfig) {
               IsEmpty());
   EXPECT_THAT(ads_config.grpc_services(0).google_grpc().call_credentials(), SizeIs(0));
 
-  // With authentication credentials.
+  // With initial gRPC metadata.
   xds_builder =
       XdsBuilder(/*xds_server_address=*/"fake-td.googleapis.com", /*xds_server_port=*/12345);
-  xds_builder.setAuthenticationToken(/*header=*/"x-goog-api-key", /*token=*/"A1B2C3");
+  xds_builder.addInitialStreamHeader(/*header=*/"x-goog-api-key", /*value=*/"A1B2C3")
+      .addInitialStreamHeader(/*header=*/"x-android-package",
+                              /*value=*/"com.google.envoymobile.io.myapp");
   xds_builder.setSslRootCerts(/*root_certs=*/"my_root_cert");
   xds_builder.setSni(/*sni=*/"fake-td.googleapis.com");
   engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
-  auto& ads_config_with_tokens = bootstrap->dynamic_resources().ads_config();
-  EXPECT_EQ(ads_config_with_tokens.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).google_grpc().target_uri(),
+  auto& ads_config_with_metadata = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config_with_metadata.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).google_grpc().target_uri(),
             "fake-td.googleapis.com:12345");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).google_grpc().stat_prefix(), "ads");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).google_grpc().stat_prefix(), "ads");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0)
                 .google_grpc()
                 .channel_credentials()
                 .ssl_credentials()
                 .root_certs()
                 .inline_string(),
             "my_root_cert");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).initial_metadata(0).key(), "x-goog-api-key");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).initial_metadata(0).value(), "A1B2C3");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(0).key(), "x-goog-api-key");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(0).value(), "A1B2C3");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(1).key(),
+            "x-android-package");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(1).value(),
+            "com.google.envoymobile.io.myapp");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0)
                 .google_grpc()
                 .channel_args()
                 .args()

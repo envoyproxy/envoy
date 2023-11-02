@@ -53,8 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSString *nodeSubZone;
 @property (nonatomic, strong, nullable) NSString *xdsServerAddress;
 @property (nonatomic, assign) UInt32 xdsServerPort;
-@property (nonatomic, strong, nullable) NSString *xdsAuthHeader;
-@property (nonatomic, strong, nullable) NSString *xdsAuthToken;
+@property (nonatomic, strong) NSDictionary<NSString *, NSString *> *xdsGrpcInitialMetadata;
 @property (nonatomic, strong, nullable) NSString *xdsSslRootCerts;
 @property (nonatomic, strong, nullable) NSString *xdsSni;
 @property (nonatomic, strong, nullable) NSString *rtdsResourceName;
@@ -115,8 +114,8 @@ NS_ASSUME_NONNULL_BEGIN
                                       nodeSubZone:(nullable NSString *)nodeSubZone
                                  xdsServerAddress:(nullable NSString *)xdsServerAddress
                                     xdsServerPort:(UInt32)xdsServerPort
-                                    xdsAuthHeader:(nullable NSString *)xdsAuthHeader
-                                     xdsAuthToken:(nullable NSString *)xdsAuthToken
+                           xdsGrpcInitialMetadata:
+                               (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
                                            xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName

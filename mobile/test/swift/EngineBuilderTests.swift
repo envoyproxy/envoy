@@ -394,7 +394,8 @@ final class EngineBuilderTests: XCTestCase {
 
   func testAddingXdsSecurityConfigurationWhenRunningEnvoy() {
     let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
-      .setAuthenticationToken(header: "x-goog-api-key", token: "A1B2C3")
+      .addInitialStreamHeader(header: "x-goog-api-key", value: "A1B2C3")
+      .addInitialStreamHeader(header: "x-android-package", value: "com.google.myapp")
       .setSslRootCerts(rootCerts: "fake_ssl_root_certs")
       .setSni(sni: "fake_sni_address")
       .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
@@ -404,6 +405,8 @@ final class EngineBuilderTests: XCTestCase {
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("x-goog-api-key"))
     XCTAssertTrue(bootstrapDebugDescription.contains("A1B2C3"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("x-android-package"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("com.google.myapp"))
     XCTAssertTrue(bootstrapDebugDescription.contains("fake_ssl_root_certs"))
     XCTAssertTrue(bootstrapDebugDescription.contains("fake_sni_address"))
   }

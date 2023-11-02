@@ -19,7 +19,7 @@ on:
     - .github/workflows/_*.yml
 
 concurrency:
-  group: ${{ github.event.inputs.head_ref || github.run_id }}-${{ github.workflow }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
