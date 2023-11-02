@@ -69,7 +69,7 @@ public:
     initTokenExtractor();
     auto tokens = extractor_->extract(headers);
     auth_->verify(headers, parent_span_, std::move(tokens), std::move(set_extracted_jwt_data_cb),
-                  std::move(on_complete_cb));
+                  std::move(on_complete_cb), nullptr);
   }
 
   void initTokenExtractor() {
@@ -822,7 +822,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auto tokens = extractor_->extract(headers);
   // callback should not be called.
   std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
-  auth_->verify(headers, parent_span_, std::move(tokens), nullptr, std::move(on_complete_cb));
+  auth_->verify(headers, parent_span_, std::move(tokens), nullptr, std::move(on_complete_cb), nullptr);
 
   // Destroy the authenticating process.
   auth_->onDestroy();
@@ -981,7 +981,7 @@ public:
     };
     auto tokens = extractor_->extract(headers);
     auth_->verify(headers, parent_span_, std::move(tokens), set_extracted_jwt_data_cb,
-                  on_complete_cb);
+                  on_complete_cb, nullptr);
   }
 
   ::google::jwt_verify::JwksPtr jwks_;
