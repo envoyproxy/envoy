@@ -48,7 +48,7 @@ open class XdsBuilder: NSObject {
   ///          .addInitialStreamHeader("X-Android-Cert", sha1KeyFingerprint);
   ///
   /// - parameter header: The HTTP header to add on the gRPC stream's initial metadata.
-  /// - parameter value: The HTTP header value to add on the gRPC stream's initial metadata.
+  /// - parameter value:  The HTTP header value to add on the gRPC stream's initial metadata.
   ///
   /// - returns: This builder.
   @discardableResult
