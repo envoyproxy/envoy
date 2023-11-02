@@ -29,16 +29,22 @@ HttpFormatterContext::HttpFormatterContext(const Http::RequestHeaderMap* request
       log_type_(log_type) {}
 
 const Http::RequestHeaderMap& HttpFormatterContext::requestHeaders() const {
-  return request_headers_ != nullptr ? *request_headers_
-                                     : *Http::StaticEmptyHeaders::get().request_headers;
+  if (request_headers_ == nullptr) {
+    request_headers_ = Http::StaticEmptyHeaders::get().request_headers.get();
+  }
+  return *request_headers_;
 }
 const Http::ResponseHeaderMap& HttpFormatterContext::responseHeaders() const {
-  return response_headers_ != nullptr ? *response_headers_
-                                      : *Http::StaticEmptyHeaders::get().response_headers;
+  if (response_headers_ == nullptr) {
+    response_headers_ = Http::StaticEmptyHeaders::get().response_headers.get();
+  }
+  return *response_headers_;
 }
 const Http::ResponseTrailerMap& HttpFormatterContext::responseTrailers() const {
-  return response_trailers_ != nullptr ? *response_trailers_
-                                       : *Http::StaticEmptyHeaders::get().response_trailers;
+  if (response_trailers_ == nullptr) {
+    response_trailers_ = Http::StaticEmptyHeaders::get().response_trailers.get();
+  }
+  return *response_trailers_;
 }
 
 absl::string_view HttpFormatterContext::localReplyBody() const { return local_reply_body_; }

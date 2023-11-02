@@ -100,9 +100,9 @@ public:
   AccessLog::AccessLogType accessLogType() const;
 
 private:
-  const Http::RequestHeaderMap* request_headers_{};
-  const Http::ResponseHeaderMap* response_headers_{};
-  const Http::ResponseTrailerMap* response_trailers_{};
+  mutable const Http::RequestHeaderMap* request_headers_{};
+  mutable const Http::ResponseHeaderMap* response_headers_{};
+  mutable const Http::ResponseTrailerMap* response_trailers_{};
   absl::string_view local_reply_body_{};
   AccessLog::AccessLogType log_type_{AccessLog::AccessLogType::NotSet};
 };
