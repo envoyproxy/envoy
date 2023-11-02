@@ -33,16 +33,21 @@ message KafkaBroker {
   // the Kafka clients point to Envoy.
   // This allows Kafka cluster not to configure its 'advertised.listeners' property
   // (as the necessary re-pointing will be done by this filter).
+  // This collection of rules should cover all brokers in the cluster that is being proxied,
+  // otherwise some nodes' addresses might leak to the downstream clients.
   oneof broker_address_rewrite_spec {
+
+    // Broker address rewrite rules that match by broker ID.
     IdBasedBrokerRewriteSpec id_based_broker_address_rewrite_spec = 3;
   }
 }
 
+// Collection of rules matching by broker ID.
 message IdBasedBrokerRewriteSpec {
-  // Repeated rewrite rules.
   repeated IdBasedBrokerRewriteRule rules = 1;
 }
 
+// Defines a rule to rewrite
 message IdBasedBrokerRewriteRule {
   // Broker ID to match - if the upstream Kafka cluster returns broker metadata for given ID, the
   uint32 id = 1 [(validate.rules).uint32 = {gte: 0}];
