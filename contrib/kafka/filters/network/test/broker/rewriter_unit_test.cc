@@ -4,7 +4,6 @@
 #include "contrib/kafka/filters/network/source/broker/rewriter.h"
 #include "contrib/kafka/filters/network/source/external/responses.h"
 #include "contrib/kafka/filters/network/test/broker/mock_filter_config.h"
-#include "contrib/kafka/filters/network/test/message_utilities.h"
 #include "gtest/gtest.h"
 
 using testing::_;
