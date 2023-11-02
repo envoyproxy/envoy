@@ -208,6 +208,7 @@ private:
 /**
  * All cluster manager stats. @see stats_macros.h
  */
+// TODO(abeyad): do we still need the warming_clusters metric or can it be deleted?
 #define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE)                                                  \
   COUNTER(cluster_added)                                                                           \
   COUNTER(cluster_modified)                                                                        \
@@ -930,6 +931,8 @@ private:
   bool initialized_{};
   bool ads_mux_initialized_{};
   std::atomic<bool> shutdown_{};
+
+  std::size_t last_recorded_warming_clusters_count_{0};
 };
 
 } // namespace Upstream
