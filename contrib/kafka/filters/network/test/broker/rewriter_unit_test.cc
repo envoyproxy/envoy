@@ -2,7 +2,12 @@
 
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
 #include "contrib/kafka/filters/network/source/broker/rewriter.h"
+#include "contrib/kafka/filters/network/test/broker/mock_filter_config.h"
 #include "gtest/gtest.h"
+
+using testing::_;
+using testing::Return;
+using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +29,7 @@ static Buffer::InstancePtr makeRandomBuffer(const uint32_t size) {
 
 class FakeResponse : public AbstractResponse {
 public:
-  FakeResponse(const size_t size) : AbstractResponse{{0, 0, 0}}, size_{size} {}
+  FakeResponse(const size_t size) : AbstractResponse{ResponseMetadata{-1, 0, 0}}, size_{size} {}
 
   uint32_t computeSize() const override { return size_; };
 
@@ -39,7 +44,7 @@ private:
 
 TEST(ResponseRewriterImplUnitTest, ShouldRewriteBuffer) {
   // given
-  ResponseRewriterImpl testee;
+  ResponseRewriterImpl testee{MockBrokerFilterConfig{}};
 
   auto response1 = std::make_shared<FakeResponse>(7);
   auto response2 = std::make_shared<FakeResponse>(13);
@@ -63,9 +68,14 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteBuffer) {
 }
 
 TEST(ResponseRewriterUnitTest, ShouldCreateProperRewriter) {
-  ResponseRewriterSharedPtr r1 = createRewriter({"aaa", true});
+  MockBrokerFilterConfig c1;
+  EXPECT_CALL(c1, needsResponseRewrite()).WillOnce(Return(true));
+  ResponseRewriterSharedPtr r1 = createRewriter(c1);
   ASSERT_NE(std::dynamic_pointer_cast<ResponseRewriterImpl>(r1), nullptr);
-  ResponseRewriterSharedPtr r2 = createRewriter({"aaa", false});
+
+  MockBrokerFilterConfig c2;
+  EXPECT_CALL(c2, needsResponseRewrite()).WillOnce(Return(false));
+  ResponseRewriterSharedPtr r2 = createRewriter(c2);
   ASSERT_NE(std::dynamic_pointer_cast<DoNothingRewriter>(r2), nullptr);
 }
 
