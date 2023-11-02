@@ -219,7 +219,7 @@ envoy_headers to_native_headers(JniHelper& jni_helper, jobjectArray headers) {
   return to_native_map(jni_helper, headers);
 }
 
-envoy_headers* to_native_headers_ptr(JniHelper&& jni_helper, jobjectArray headers) {
+envoy_headers* to_native_headers_ptr(JniHelper& jni_helper, jobjectArray headers) {
   // Note: This check works for LocalRefs and GlobalRefs, but will not work for WeakGlobalRefs.
   // Such usage would generally be inappropriate anyways; like C++ weak_ptrs, one should
   // acquire a new strong reference before attempting to interact with an object held by
