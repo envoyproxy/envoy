@@ -35,8 +35,7 @@ public:
 
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens,
-              SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
-              AuthenticatorCallback callback,
+              SetExtractedJwtDataCallback set_extracted_jwt_data_cb, AuthenticatorCallback callback,
               ClearRouteCacheCallback) override {
     doVerify(headers, parent_span, &tokens, std::move(set_extracted_jwt_data_cb),
              std::move(callback));

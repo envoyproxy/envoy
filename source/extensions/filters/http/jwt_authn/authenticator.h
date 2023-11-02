@@ -36,8 +36,7 @@ public:
   virtual void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
                       std::vector<JwtLocationConstPtr>&& tokens,
                       SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
-                      AuthenticatorCallback callback,
-                      ClearRouteCacheCallback clear_route_cb) PURE;
+                      AuthenticatorCallback callback, ClearRouteCacheCallback clear_route_cb) PURE;
 
   // Called when the object is about to be destroyed.
   virtual void onDestroy() PURE;

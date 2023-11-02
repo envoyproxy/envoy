@@ -61,8 +61,7 @@ public:
   // Following functions are for Authenticator interface.
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens,
-              SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
-              AuthenticatorCallback callback,
+              SetExtractedJwtDataCallback set_extracted_jwt_data_cb, AuthenticatorCallback callback,
               ClearRouteCacheCallback clear_route_cb) override;
   void onDestroy() override;
 
@@ -375,7 +374,8 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   // Copy JWT claim to header
   bool header_added = false;
   for (const auto& header_and_claim : provider.claim_to_headers()) {
-    header_added |= addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
+    header_added |=
+        addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
   }
   if (provider.clear_route_cache() && header_added) {
     clear_route_cache_ = true;
