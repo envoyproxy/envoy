@@ -2553,9 +2553,18 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   ASSERT_TRUE(tcp_client_->connected());
   // Drop the downstream connection
   tcp_client_->close();
+  // NOTE (soulxu): the connection may closed before all the streams are parsed when
+  // using the io-uring. So we need to check the number of reset streams equal to
+  // the number of streams. Before check the number of reset stream, we need ensure
+  // all the streams are reset by checking the active connection.
+  test_server_->waitForGaugeEq("http.config_test.downstream_cx_active", 0,
+                               TestUtility::DefaultTimeout * 3);
+  auto downstream_rq_total_counter = Envoy::TestUtility::findCounter(
+      test_server_->statStore(), "http.config_test.downstream_rq_total");
   // Test that Envoy can clean-up deferred streams
   // Make the timeout longer to accommodate non optimized builds
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", kRequestsSentPerIOCycle,
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset",
+                                 downstream_rq_total_counter->value(),
                                  TestUtility::DefaultTimeout * 3);
 }
 
