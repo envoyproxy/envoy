@@ -59,12 +59,11 @@ jobs:
           name: github
           steps-pre: |
             - id: short_name
-              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.2
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.6
               with:
                 length: 7
                 string: ${{ inputs.repo-ref }}
-                min: 40
-            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.2
+            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.6
               with:
                 url: https://storage.googleapis.com/envoy-pr/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
                 path: %{{ runner.temp }}/release.signed
@@ -99,16 +98,17 @@ jobs:
           name: github
           steps-pre: |
             - id: short_name
-              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.2
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.6
               with:
                 length: 7
-                input: ${{ inputs.repo-ref }}
-            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.2
+                string: ${{ inputs.repo-ref }}
+            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.6
               with:
                 url: https://storage.googleapis.com/envoy-postsubmit/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
                 path: %{{ runner.temp }}/release.signed
           source: |
             export ENVOY_COMMIT=${{ inputs.sha }}
+            export ENVOY_REPO=${{ github.repository }}
             if [[ '${{ inputs.version-dev }}' == 'dev' ]]; then
                 export ENVOY_PUBLISH_DRY_RUN=1
             fi
