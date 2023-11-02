@@ -16,7 +16,7 @@ Router::GenericConnPoolPtr HttpGenericConnPoolFactory::createGenericConnPool(
     absl::optional<Envoy::Http::Protocol> downstream_protocol,
     Upstream::LoadBalancerContext* ctx) const {
   auto ret =
-      std::make_unique<HttpConnPool>(thread_local_cluster, route_entry, downstream_protocol, ctx);
+      std::make_unique<HttpConnPool>(thread_local_cluster, route_entry.priority(), downstream_protocol, ctx);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 
