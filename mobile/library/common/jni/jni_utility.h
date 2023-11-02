@@ -146,19 +146,19 @@ JNI_UTILITY_DECLARE_CALL_METHOD(Object, jobject)
 // satisfy -Xcheck:jni.
 // See
 // https://docs.oracle.com/en/java/javase/11/docs/specs/jni/functions.html#calling-static-methods
-#define JNI_DECLARE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                        \
+#define JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                \
   JNI_TYPE callStatic##JAVA_TYPE##Method(JniHelper& jni_helper, jclass clazz, jmethodID method_id, \
                                          ...);
 
 void callStaticVoidMethod(JniHelper& jni_helper, jclass clazz, jmethodID method_id, ...);
-JNI_DECLARE_CALL_STATIC_METHOD(Byte, jbyte)
-JNI_DECLARE_CALL_STATIC_METHOD(Char, jchar)
-JNI_DECLARE_CALL_STATIC_METHOD(Short, jshort)
-JNI_DECLARE_CALL_STATIC_METHOD(Int, jint)
-JNI_DECLARE_CALL_STATIC_METHOD(Long, jlong)
-JNI_DECLARE_CALL_STATIC_METHOD(Double, jdouble)
-JNI_DECLARE_CALL_STATIC_METHOD(Boolean, jboolean)
-JNI_DECLARE_CALL_STATIC_METHOD(Object, jobject)
+JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Byte, jbyte)
+JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Char, jchar)
+JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Short, jshort)
+JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Int, jint)
+JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Long, jlong)
+JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Double, jdouble)
+JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Boolean, jboolean)
+JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Object, jobject)
 
 } // namespace JNI
 } // namespace Envoy
