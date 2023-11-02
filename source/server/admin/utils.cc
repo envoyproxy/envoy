@@ -26,7 +26,7 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
 
 // Helper method to get the histogram_buckets parameter. Returns an InvalidArgumentError
 // if the histogram_buckets query parameter is set but the value is not one of "cumulative",
-// "disjoint", "detailed", "summary", or "none". 
+// "disjoint", "detailed", "summary", or "none".
 absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
                                    HistogramBucketsMode& histogram_buckets_mode) {
   absl::optional<std::string> histogram_buckets_query_param =

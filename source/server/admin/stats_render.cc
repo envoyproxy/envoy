@@ -154,7 +154,7 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
   }
 
   switch (histogram_buckets_mode_) {
-  case Utility::HistogramBucketsMode::Unset: 
+  case Utility::HistogramBucketsMode::Unset:
   case Utility::HistogramBucketsMode::Summary: {
     Json::Streamer::MapPtr map = json_->histogram_array_->addMap();
     map->addEntries({{"name", name}});
