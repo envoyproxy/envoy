@@ -16,7 +16,7 @@
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/process_context_impl.h"
-#include "source/server/server.h"
+#include "source/server/server_base.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"

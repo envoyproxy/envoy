@@ -20,7 +20,7 @@
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
-#include "source/server/server.h"
+#include "source/server/server_base.h"
 
 #include "test/integration/server_stats.h"
 #include "test/integration/tcp_dump.h"

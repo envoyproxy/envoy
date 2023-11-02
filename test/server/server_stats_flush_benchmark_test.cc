@@ -5,7 +5,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/stats/thread_local_store.h"
-#include "source/server/server.h"
+#include "source/server/server_base.h"
 
 #include "test/benchmark/main.h"
 #include "test/mocks/stats/mocks.h"

@@ -29,7 +29,7 @@
 #include "source/server/config_validation/cluster_manager.h"
 #include "source/server/config_validation/dns.h"
 #include "source/server/hot_restart_nop_impl.h"
-#include "source/server/server.h"
+#include "source/server/server_base.h"
 
 #include "absl/types/optional.h"
 
