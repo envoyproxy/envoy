@@ -171,4 +171,6 @@ envoy_cc_library(
         ":file_access_log_lib",
         "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
     ],
+    # Ensure this factory in the source is always linked in.
+    alwayslink = 1,
 )

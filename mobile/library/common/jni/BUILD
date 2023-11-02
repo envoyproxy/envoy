@@ -47,6 +47,20 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "jni_helper_lib",
+    srcs = [
+        "jni_helper.cc",
+    ],
+    hdrs = [
+        "jni_helper.h",
+    ],
+    deps = [
+        "//library/common/jni/import:jni_import_lib",
+        "@envoy//source/common/common:assert_lib",
+    ],
+)
+
 # Implementations of the various "native" Java methods for classes
 # in library/java/io/envoyproxy/envoymobile.
 # TODO(RyanTheOptimist): Is there a better name for this? I'm not sure what

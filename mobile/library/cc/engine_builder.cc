@@ -299,6 +299,11 @@ EngineBuilder& EngineBuilder::addQuicHint(std::string host, int port) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
+  quic_suffixes_.emplace_back(std::move(suffix));
+  return *this;
+}
+
 #endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
@@ -452,6 +457,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           cache_config.mutable_alternate_protocols_cache_options()->add_prepopulated_entries();
       entry->set_hostname(host);
       entry->set_port(port);
+    }
+    for (const auto& suffix : quic_suffixes_) {
+      cache_config.mutable_alternate_protocols_cache_options()->add_canonical_suffixes(suffix);
     }
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
@@ -820,6 +828,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
                         ->add_prepopulated_entries();
       entry->set_hostname(host);
       entry->set_port(port);
+    }
+    for (const auto& suffix : quic_suffixes_) {
+      alpn_options.mutable_auto_config()
+          ->mutable_alternate_protocols_cache_options()
+          ->add_canonical_suffixes(suffix);
     }
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
