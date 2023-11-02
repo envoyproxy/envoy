@@ -845,7 +845,7 @@ open class EngineBuilder: NSObject {
       nodeSubZone: self.nodeSubZone,
       xdsServerAddress: xdsServerAddress,
       xdsServerPort: xdsServerPort,
-      xdsGrpcInitialMetadata: self.xdsGrpcInitialMetadata,
+      xdsGrpcInitialMetadata: xdsGrpcInitialMetadata,
       xdsSslRootCerts: xdsSslRootCerts,
       xdsSni: xdsSni,
       rtdsResourceName: rtdsResourceName,
