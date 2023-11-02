@@ -364,8 +364,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count += outputStatType<Stats::TextReadout>(
       response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
-  if (Utility::queryParam(params.query_, "histogram_buckets").has_value() &&
-      params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary) {
+  if (params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary) {
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
   } else {
