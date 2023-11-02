@@ -52,6 +52,14 @@ bug_fixes:
 - area: redis
   change: |
     Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.
+- area: ext_proc
+  change: |
+    Fixed content_length related issues when body mutation by external processor is enabled. ext_proc filter removes the content
+    length header in 1)STREAMED BodySendMode 2) BUFFERED_PARTIAL BodySendMode and 3) BUFFERED BodySendMode + SKIP HeaderSendMode.
+    This will enable chunked-encoding whenever feasible in HTTP1.1. Besides, ext_proc filter keep content length header
+    in BUFFERED BodySendMode + SEND HeaderSendMode. It is now external processor's responsibility to set the content length
+    correctly matched to the mutated body. if those two doesn't match, the mutation will be rejected and local reply with error
+    status will be returned.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -134,5 +142,10 @@ new_features:
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.route_typed_metadata_context_namespaces>`
     from the metadata of the selected route to external auth service.
     This metadata propagation is independent from the dynamic metadata from connection and request.
+- area: ext_authz_filter
+  change: |
+    added :ref:`with_request_body
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>` to optionally override
+    the default behavior of sending the request body to the authorization server from the per-route filter.
 
 deprecated:

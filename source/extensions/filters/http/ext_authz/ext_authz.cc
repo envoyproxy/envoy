@@ -146,14 +146,25 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   request_headers_ = &headers;
-  buffer_data_ = config_->withRequestBody() && !per_route_flags.skip_request_body_buffering_ &&
+  const auto check_settings = per_route_flags.check_settings_;
+  buffer_data_ = (config_->withRequestBody() || check_settings.has_with_request_body()) &&
+                 !check_settings.disable_request_body_buffering() &&
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
                    Http::Utility::isH2UpgradeRequest(headers));
 
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *decoder_callbacks_);
-    if (!config_->allowPartialMessage()) {
-      decoder_callbacks_->setDecoderBufferLimit(config_->maxRequestBytes());
+
+    const auto allow_partial_message =
+        check_settings.has_with_request_body()
+            ? check_settings.with_request_body().allow_partial_message()
+            : config_->allowPartialMessage();
+    const auto max_request_bytes = check_settings.has_with_request_body()
+                                       ? check_settings.with_request_body().max_request_bytes()
+                                       : config_->maxRequestBytes();
+
+    if (!allow_partial_message) {
+      decoder_callbacks_->setDecoderBufferLimit(max_request_bytes);
     }
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -493,17 +504,21 @@ void Filter::continueDecoding() {
 
 Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
   if (route == nullptr) {
-    return PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
+    return PerRouteFlags{
+        true /*skip_check_*/,
+        envoy::extensions::filters::http::ext_authz::v3::CheckSettings() /*check_settings_*/};
   }
 
-  const auto* specific_per_route_config =
+  const auto* specific_check_settings =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
-  if (specific_per_route_config != nullptr) {
-    return PerRouteFlags{specific_per_route_config->disabled(),
-                         specific_per_route_config->disableRequestBodyBuffering()};
+  if (specific_check_settings != nullptr) {
+    return PerRouteFlags{specific_check_settings->disabled(),
+                         specific_check_settings->checkSettings()};
   }
 
-  return PerRouteFlags{false /*skip_check_*/, false /*skip_request_body_buffering_*/};
+  return PerRouteFlags{
+      false /*skip_check_*/,
+      envoy::extensions::filters::http::ext_authz::v3::CheckSettings() /*check_settings_*/};
 }
 
 } // namespace ExtAuthz

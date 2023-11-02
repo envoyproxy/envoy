@@ -26,7 +26,6 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/common/data/utility.h"
-#include "library/common/engine_handle.h"
 #include "library/common/types/c_types.h"
 #include "tools/cpp/runfiles/runfiles.h"
 

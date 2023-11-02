@@ -91,7 +91,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       const auto mut_status = MutationUtils::applyHeaderMutations(
           common_response.header_mutation(), *headers_,
           common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+          shouldRemoveContentLength());
       if (!mut_status.ok()) {
         return mut_status;
       }
@@ -104,8 +105,9 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       ENVOY_LOG(debug, "Replacing complete message");
       // Completely replace the body that may already exist.
       if (common_response.has_body_mutation()) {
-        // Always remove the content-length header if changing the body.
-        // The proxy can restore it later if it needs to.
+        // Remove the content length here because in this case external processor probably won't
+        // properly set the content-length header to match the length of the new body that replaces
+        // the original one.
         headers_->removeContentLength();
         body_replaced_ = true;
         if (bufferedData() == nullptr) {
@@ -229,7 +231,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           const auto mut_status = MutationUtils::applyHeaderMutations(
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+              shouldRemoveContentLength());
           if (!mut_status.ok()) {
             return mut_status;
           }
@@ -237,13 +240,22 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
         }
       }
+
       if (common_response.has_body_mutation()) {
+        if (headers_ != nullptr && headers_->ContentLength() != nullptr) {
+          size_t content_length = 0;
+          // When body mutation by external processor is enabled, content-length header is only
+          // allowed in BUFFERED mode. If its value doesn't match the length of mutated body, the
+          // corresponding body mutation will be rejected and local reply will be sent with an error
+          // message.
+          if (absl::SimpleAtoi(headers_->getContentLengthValue(), &content_length) &&
+              content_length != common_response.body_mutation().body().size()) {
+            return absl::InternalError(
+                "mismatch between content length and the lenght of mutated body");
+          }
+        }
         ENVOY_LOG(debug, "Applying body response to buffered data. State = {}",
                   static_cast<int>(callback_state_));
-        if (headers_ != nullptr) {
-          // Always reset the content length here to prevent later problems.
-          headers_->removeContentLength();
-        }
         modifyBufferedData([&common_response](Buffer::Instance& data) {
           MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
         });
@@ -284,7 +296,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           const auto mut_status = MutationUtils::applyHeaderMutations(
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+              shouldRemoveContentLength());
           if (!mut_status.ok()) {
             return mut_status;
           }
@@ -293,10 +306,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         }
       }
       if (common_response.has_body_mutation()) {
-        if (headers_ != nullptr) {
-          // Always reset the content length here to prevent later problems.
-          headers_->removeContentLength();
-        }
         MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
       }
       if (chunk_data.length() > 0) {

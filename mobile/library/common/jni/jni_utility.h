@@ -10,7 +10,8 @@
 #include "library/common/types/managed_envoy_headers.h"
 #include "library/common/types/matcher_data.h"
 
-// NOLINT(namespace-envoy)
+namespace Envoy {
+namespace JNI {
 
 // TODO(Augustyniak): Replace the usages of this global method with Envoy::JNI::Env::get()
 JNIEnv* get_env();
@@ -160,3 +161,6 @@ DECLARE_CALL_STATIC_METHOD(Long, jlong)
 DECLARE_CALL_STATIC_METHOD(Double, jdouble)
 DECLARE_CALL_STATIC_METHOD(Boolean, jboolean)
 DECLARE_CALL_STATIC_METHOD(Object, jobject)
+
+} // namespace JNI
+} // namespace Envoy

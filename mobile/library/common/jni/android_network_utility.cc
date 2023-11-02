@@ -14,7 +14,7 @@
 
 bool jvm_cert_is_issued_by_known_root(JNIEnv* env, jobject result) {
   jclass jcls_AndroidCertVerifyResult =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
+      Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_isIssuedByKnownRoot =
       env->GetMethodID(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
   Envoy::JNI::Exception::checkAndClear("jvm_cert_is_issued_by_known_root:GetMethodID");
@@ -27,7 +27,7 @@ bool jvm_cert_is_issued_by_known_root(JNIEnv* env, jobject result) {
 
 envoy_cert_verify_status_t jvm_cert_get_status(JNIEnv* env, jobject j_result) {
   jclass jcls_AndroidCertVerifyResult =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
+      Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_getStatus = env->GetMethodID(jcls_AndroidCertVerifyResult, "getStatus", "()I");
   Envoy::JNI::Exception::checkAndClear("jvm_cert_get_status:GetMethodID");
   ASSERT(jmid_getStatus);
@@ -41,7 +41,7 @@ envoy_cert_verify_status_t jvm_cert_get_status(JNIEnv* env, jobject j_result) {
 
 jobjectArray jvm_cert_get_certificate_chain_encoded(JNIEnv* env, jobject result) {
   jclass jcls_AndroidCertVerifyResult =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
+      Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_getCertificateChainEncoded =
       env->GetMethodID(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
   Envoy::JNI::Exception::checkAndClear("jvm_cert_get_certificate_chain_encoded:GetMethodID");
@@ -60,7 +60,7 @@ static void ExtractCertVerifyResult(JNIEnv* env, jobject result, envoy_cert_veri
     *is_issued_by_known_root = jvm_cert_is_issued_by_known_root(env, result);
     jobjectArray chain_byte_array = jvm_cert_get_certificate_chain_encoded(env, result);
     if (chain_byte_array != nullptr) {
-      JavaArrayOfByteArrayToStringVector(env, chain_byte_array, verified_chain);
+      Envoy::JNI::JavaArrayOfByteArrayToStringVector(env, chain_byte_array, verified_chain);
     }
   }
 }
@@ -70,15 +70,15 @@ jobject call_jvm_verify_x509_cert_chain(JNIEnv* env, const std::vector<std::stri
                                         std::string auth_type, absl::string_view hostname) {
   jni_log("[Envoy]", "jvm_verify_x509_cert_chain");
   jclass jcls_AndroidNetworkLibrary =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
+      Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_verifyServerCertificates = env->GetStaticMethodID(
       jcls_AndroidNetworkLibrary, "verifyServerCertificates",
       "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;");
   Envoy::JNI::Exception::checkAndClear("call_jvm_verify_x509_cert_chain:GetStaticMethodID");
-  jobjectArray chain_byte_array = ToJavaArrayOfByteArray(env, cert_chain);
-  jbyteArray auth_string = ToJavaByteArray(env, auth_type);
-  jbyteArray host_string =
-      ToJavaByteArray(env, reinterpret_cast<const uint8_t*>(hostname.data()), hostname.length());
+  jobjectArray chain_byte_array = Envoy::JNI::ToJavaArrayOfByteArray(env, cert_chain);
+  jbyteArray auth_string = Envoy::JNI::ToJavaByteArray(env, auth_type);
+  jbyteArray host_string = Envoy::JNI::ToJavaByteArray(
+      env, reinterpret_cast<const uint8_t*>(hostname.data()), hostname.length());
   jobject result =
       env->CallStaticObjectMethod(jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates,
                                   chain_byte_array, auth_string, host_string);
@@ -96,12 +96,13 @@ static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chai
                                        envoy_cert_verify_status_t* status,
                                        bool* is_issued_by_known_root,
                                        std::vector<std::string>* verified_chain) {
-  JNIEnv* env = get_env();
+  JNIEnv* env = Envoy::JNI::get_env();
   jobject result = call_jvm_verify_x509_cert_chain(env, cert_chain, auth_type, hostname);
   if (Envoy::JNI::Exception::checkAndClear()) {
     *status = CERT_VERIFY_STATUS_NOT_YET_VALID;
   } else {
-    ExtractCertVerifyResult(get_env(), result, status, is_issued_by_known_root, verified_chain);
+    ExtractCertVerifyResult(Envoy::JNI::get_env(), result, status, is_issued_by_known_root,
+                            verified_chain);
     if (Envoy::JNI::Exception::checkAndClear()) {
       *status = CERT_VERIFY_STATUS_FAILED;
     }

@@ -17,10 +17,10 @@
 bool is_cleartext_permitted(absl::string_view hostname) {
 #if defined(__ANDROID_API__)
   envoy_data host = Envoy::Data::Utility::copyToBridgeData(hostname);
-  JNIEnv* env = get_env();
-  jstring java_host = native_data_to_string(env, host);
+  JNIEnv* env = Envoy::JNI::get_env();
+  jstring java_host = Envoy::JNI::native_data_to_string(env, host);
   jclass jcls_AndroidNetworkLibrary =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
+      Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_isCleartextTrafficPermitted = env->GetStaticMethodID(
       jcls_AndroidNetworkLibrary, "isCleartextTrafficPermitted", "(Ljava/lang/String;)Z");
   jboolean result = env->CallStaticBooleanMethod(jcls_AndroidNetworkLibrary,
@@ -36,9 +36,9 @@ bool is_cleartext_permitted(absl::string_view hostname) {
 
 void tag_socket(int ifd, int uid, int tag) {
 #if defined(__ANDROID_API__)
-  JNIEnv* env = get_env();
+  JNIEnv* env = Envoy::JNI::get_env();
   jclass jcls_AndroidNetworkLibrary =
-      find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
+      Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_tagSocket =
       env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "tagSocket", "(III)V");
   env->CallStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_tagSocket, ifd, uid, tag);
