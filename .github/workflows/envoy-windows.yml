@@ -17,9 +17,12 @@ concurrency:
 jobs:
   env:
     uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      pull-requests: read
     with:
-      prime_build_image: false
-      check_mobile_run: false
+      prime-build-image: false
+      check-mobile-run: false
 
   windows:
     needs:
@@ -37,12 +40,13 @@ jobs:
     with:
       target: ${{ matrix.target }}
       runs-on: envoy-win19-small
-      command_ci:
+      command-ci:
+      repo-ref: ${{ needs.env.outputs.repo-ref }}
+      steps-post:
       temp-dir: 'C:\Users\runner\AppData\Local\Temp\bazel-shared'
-      run-du: false
       upload-name: windows.release
       upload-path: 'C:\Users\runner\AppData\Local\Temp\envoy'
-      env: |
+      source: |
         export ENVOY_SHARED_TMP_DIR="C:\Users\runner\AppData\Local\Temp\bazel-shared"
         export ENVOY_DOCKER_BUILD_DIR="C:\Users\runner\AppData\Local\Temp"
         mkdir -p "$ENVOY_SHARED_TMP_DIR"
@@ -81,7 +85,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.merge_commit_sha }}
+        ref: ${{ needs.env.outputs.repo_ref  }}
     - uses: actions/download-artifact@v3
       with:
         name: windows.release

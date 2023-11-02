@@ -242,7 +242,6 @@ message JwtProvider {
   //
   string payload_in_metadata = 9;
 
-  // [#not-implemented-hide:]
   // Normalizes the payload representation in the request metadata.
   NormalizePayload normalize_payload_in_metadata = 18;
 

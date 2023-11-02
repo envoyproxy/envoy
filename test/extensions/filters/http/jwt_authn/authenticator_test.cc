@@ -232,6 +232,38 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
 }
 
+// This test verifies the JWT payload is set.
+TEST_F(AuthenticatorTest, TestSetPayloadWithSpaces) {
+  // Config payload_in_metadata flag
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
+      "my_payload");
+  auto* normalize_payload = (*proto_config_.mutable_providers())[std::string(ProviderName)]
+                                .mutable_normalize_payload_in_metadata();
+  normalize_payload->add_space_delimited_claims("scope");
+  normalize_payload->add_space_delimited_claims("test_string");
+  normalize_payload->add_space_delimited_claims("test_num");
+
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  // Test OK pubkey and its cache
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(GoodTokenWithSpaces)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Only one field is set.
+  EXPECT_EQ(1, out_extracted_data_.fields().size());
+
+  ProtobufWkt::Value expected_payload;
+  TestUtility::loadFromJson(ExpectedPayloadJSONWithSpaces, expected_payload);
+  EXPECT_TRUE(
+      TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
+}
+
 // This test verifies setting only the extracted header to metadata.
 TEST_F(AuthenticatorTest, TestSetHeader) {
   // Set the extracted header to metadata.

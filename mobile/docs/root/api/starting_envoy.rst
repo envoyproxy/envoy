@@ -395,6 +395,23 @@ This allows HTTP/3 to be used for the first request to the hosts and avoid the H
   // Swift
   builder.addQuicHint("www.example.com", 443)
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addQuicCanonicalSuffix``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a canonical suffix that's known to speak QUIC.
+This feature works as a extension to QUIC hints in such way that:
+if `.abc.com` is added to canonical suffix, and `foo.abc.com` is added to QUIC hint, then all requests to
+`*.abc.com` will be considered QUIC ready.
+
+**Example**::
+
+  // Kotlin
+  builder.addQuicCanonicalSuffix(".example.com")
+
+  // Swift
+  builder.addQuicCanonicalSuffix(".example.com")
+
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableSocketTagging``
 ~~~~~~~~~~~~~~~~~~~~~~~
