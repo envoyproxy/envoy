@@ -40,9 +40,9 @@ Runtime update of Fine-Grain Logger is supported with administration interface, 
 3. `POST /logging?paths=file_path1:level1,file_path2:level2...`: Change log level of multiple file paths at once;
 4. `POST /logging?level=<level>`: Change levels of all loggers.
 
-Users can view and change the log level in a granularity of file in runtime through admin page.
+Users can view and change the log level by file granularity at runtime through the admin page.
 
-We also added the file basename, glob ``*`` and ``?`` support for fine-grain loggers. For example, we have the following active loggers with trace level.
+Envoy admin `/logging` supports the file basename, glob ``*`` and ``?`` match for the fine-grain loggers update as well. For example, the following active loggers are active in Envoy right now, and 0 means trace level.
 
 ```
   source/server/admin/admin_filter.cc: 0
