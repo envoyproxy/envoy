@@ -35,6 +35,7 @@ cc_library(
         "jni_utility.h",
     ],
     deps = [
+        ":jni_helper_lib",
         ":jni_support_lib",
         "//library/common/jni/import:jni_import_lib",
         "//library/common/jni/types:jni_env_lib",
