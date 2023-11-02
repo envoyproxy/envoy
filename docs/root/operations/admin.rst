@@ -774,7 +774,7 @@ modify different aspects of the server:
 
   Optional ``histogram_buckets`` query parameter is used to control how histogram metrics get reported.
   If unset, histograms get reported as the "histogram" prometheus metric type, but can also be used to
-  emit prometheus "summary" metrics if set to ``summay``.
+  emit prometheus "summary" metrics if set to ``summary``.
 
   Example histogram output:
 
