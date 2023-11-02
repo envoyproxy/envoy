@@ -124,6 +124,16 @@ new_features:
     New config parameter :ref:`charge_cluster_response_stats
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.charge_cluster_response_stats>`
     for not incrementing cluster statistics on ext_authz response. Default true, no behavior change.
+- area: ext_authz
+  change: |
+    forward :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` selected by
+    :ref:`route_metadata_context_namespaces
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.route_metadata_context_namespaces>`
+    and :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` selected by
+    :ref:`route_typed_metadata_context_namespaces
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.route_typed_metadata_context_namespaces>`
+    from the metadata of the selected route to external auth service.
+    This metadata propagation is independent from the dynamic metadata from connection and request.
 - area: dns resolver
   change: |
     added two new options to the ``DnsResolverOptions`` for configuring custom timeouts and tries while resolving DNS
