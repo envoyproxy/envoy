@@ -951,10 +951,8 @@ private extension EngineBuilder {
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
                                                     Int32(xdsBuilder.xdsServerPort))
-      if let xdsGrpcInitialMetadata = xdsBuilder.xdsGrpcInitialMetadata {
-        for (header, value) in xdsGrpcInitialMetadata {
-          cxxXdsBuilder.addInitialStreamHeader(header.toCXX(), value.toCXX())
-        }
+      for (header, value) in xdsBuilder.xdsGrpcInitialMetadata {
+        cxxXdsBuilder.addInitialStreamHeader(header.toCXX(), value.toCXX())
       }
       if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
         cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
