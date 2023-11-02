@@ -42,7 +42,7 @@ Runtime update of Fine-Grain Logger is supported with administration interface, 
 
 Users can view and change the log level by file granularity at runtime through the admin page.
 
-Envoy admin `/logging` supports the file basename, glob ``*`` and ``?`` match for the fine-grain loggers update as well. For example, the following active loggers are active in Envoy right now, and 0 means trace level.
+Envoy admin `/logging` supports the file basename, glob ``*`` and ``?`` match for the fine-grain loggers update as well. For example, the following loggers are active in Envoy right now, and 0 means trace level.
 
 ```
   source/server/admin/admin_filter.cc: 0
