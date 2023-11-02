@@ -88,6 +88,11 @@ public:
                                      config.metadata_context_namespaces().end()),
         typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
                                            config.typed_metadata_context_namespaces().end()),
+        route_metadata_context_namespaces_(config.route_metadata_context_namespaces().begin(),
+                                           config.route_metadata_context_namespaces().end()),
+        route_typed_metadata_context_namespaces_(
+            config.route_typed_metadata_context_namespaces().begin(),
+            config.route_typed_metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
         charge_cluster_response_stats_(
@@ -169,6 +174,14 @@ public:
     return typed_metadata_context_namespaces_;
   }
 
+  const std::vector<std::string>& routeMetadataContextNamespaces() {
+    return route_metadata_context_namespaces_;
+  }
+
+  const std::vector<std::string>& routeTypedMetadataContextNamespaces() {
+    return route_typed_metadata_context_namespaces_;
+  }
+
   const ExtAuthzFilterStats& stats() const { return stats_; }
 
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
@@ -231,6 +244,8 @@ private:
 
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;
+  const std::vector<std::string> route_metadata_context_namespaces_;
+  const std::vector<std::string> route_typed_metadata_context_namespaces_;
 
   const bool include_peer_certificate_;
   const bool include_tls_session_;
