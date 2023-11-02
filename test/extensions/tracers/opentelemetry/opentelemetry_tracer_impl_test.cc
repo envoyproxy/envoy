@@ -27,6 +27,14 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+class MockResourceProvider : public ResourceProvider {
+public:
+  MOCK_METHOD(Resource, getResource,
+              (const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
+               Server::Configuration::TracerFactoryContext& context),
+              (const));
+};
+
 class OpenTelemetryDriverTest : public testing::Test {
 public:
   OpenTelemetryDriverTest() = default;
@@ -44,7 +52,13 @@ public:
         .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
     ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
-    driver_ = std::make_unique<Driver>(opentelemetry_config, context_);
+    Resource resource;
+    resource.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
+
+    auto mock_resource_provider = NiceMock<MockResourceProvider>();
+    EXPECT_CALL(mock_resource_provider, getResource(_, _)).WillRepeatedly(Return(resource));
+
+    driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
   }
 
   void setupValidDriver() {
@@ -183,6 +197,9 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
   scope_spans:
     spans:
       trace_id: "AAA"
@@ -550,6 +567,9 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
   scope_spans:
     spans:
       trace_id: "AAA"
@@ -659,6 +679,9 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "test-service-name"
+      key: "key1"
+      value:
+        string_value: "val1"
   scope_spans:
     spans:
       trace_id: "AAA"

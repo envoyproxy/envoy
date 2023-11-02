@@ -604,14 +604,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(18443)));
 
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("18443")));
-    }
-
     // Validate for IPv6 address
     address =
         Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 19443)};
@@ -619,14 +611,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("19443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(19443)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("19443")));
-    }
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
@@ -660,14 +644,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(443)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("443")));
-    }
   }
 
   {
@@ -754,14 +730,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(8443)));
 
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("8443")));
-    }
-
     // Validate for IPv6 address
     address =
         Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
@@ -769,14 +737,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("9443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(9443)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("9443")));
-    }
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
@@ -805,14 +765,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("0", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(0)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("0")));
-    }
   }
 
   {
@@ -834,14 +786,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("63443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(63443)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("63443")));
-    }
   }
 
   {

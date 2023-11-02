@@ -796,6 +796,7 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsFixedValue) {
   EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
   EXPECT_EQ("foo", symbol_table_.toString(tags[1].first));
   EXPECT_EQ("bar", symbol_table_.toString(tags[1].second));
+  EXPECT_THAT(store_->fixedTags(), UnorderedElementsAre(Tag{"foo", "bar"}));
 }
 
 TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueNoMatch) {

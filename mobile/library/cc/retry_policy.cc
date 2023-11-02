@@ -3,34 +3,6 @@
 namespace Envoy {
 namespace Platform {
 
-static const std::pair<RetryRule, std::string> RETRY_RULE_LOOKUP[]{
-    {RetryRule::Status5xx, "5xx"},
-    {RetryRule::GatewayError, "gateway-error"},
-    {RetryRule::ConnectFailure, "connect-failure"},
-    {RetryRule::RefusedStream, "refused-stream"},
-    {RetryRule::Retriable4xx, "retriable-4xx"},
-    {RetryRule::RetriableHeaders, "retriable-headers"},
-    {RetryRule::Reset, "reset"},
-};
-
-std::string retryRuleToString(RetryRule retry_rule) {
-  for (const auto& pair : RETRY_RULE_LOOKUP) {
-    if (pair.first == retry_rule) {
-      return pair.second;
-    }
-  }
-  throw std::invalid_argument("invalid retry rule");
-}
-
-RetryRule retryRuleFromString(const std::string& str) {
-  for (const auto& pair : RETRY_RULE_LOOKUP) {
-    if (pair.second == str) {
-      return pair.first;
-    }
-  }
-  throw std::invalid_argument("invalid retry rule");
-}
-
 RawHeaderMap RetryPolicy::asRawHeaderMap() const {
   RawHeaderMap outbound_headers{
       {"x-envoy-max-retries", {std::to_string(max_retry_count)}},
@@ -45,7 +17,7 @@ RawHeaderMap RetryPolicy::asRawHeaderMap() const {
   std::vector<std::string> retry_on_copy;
   retry_on_copy.reserve(retry_on.size());
   for (const auto& retry_rule : retry_on) {
-    retry_on_copy.push_back(retryRuleToString(retry_rule));
+    retry_on_copy.push_back(retry_rule);
   }
 
   if (!retry_status_codes.empty()) {
@@ -89,7 +61,7 @@ RetryPolicy RetryPolicy::fromRawHeaderMap(const RawHeaderMap& headers) {
         has_retriable_status_codes = true;
         continue;
       }
-      retry_policy.retry_on.push_back(retryRuleFromString(retry_rule_str));
+      retry_policy.retry_on.push_back(retry_rule_str);
     }
   }
 

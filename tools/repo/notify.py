@@ -94,6 +94,7 @@ class RepoNotifier(runner.Runner):
                 pull["draft"] or pull["user"]["login"] == "dependabot[bot]"
                 or self.is_waiting(pull))
             if skip:
+                self.log.notice(f"Skipping {pull['title']} {pull['url']}")
                 continue
             yield pull
 
@@ -279,8 +280,8 @@ class RepoNotifier(runner.Runner):
         print(json.dumps(report))
 
     async def send_message(self, channel, text):
+        self.log.notice(f"Slack message ({channel}):\n{text}")
         if self.dry_run:
-            self.log.notice(f"Slack message ({channel}):\n{text}")
             return
         await self.slack_client.chat_postMessage(channel=channel, text=text)
 
@@ -290,8 +291,8 @@ class RepoNotifier(runner.Runner):
             if not (uid := assignees.get(name)):
                 continue
             message = "\n".join(text)
+            self.log.notice(f"Slack message ({name}):\n{message}")
             if self.dry_run:
-                self.log.notice(f"Slack message ({name}):\n{message}")
                 continue
             # Ship texts off to slack.
             try:

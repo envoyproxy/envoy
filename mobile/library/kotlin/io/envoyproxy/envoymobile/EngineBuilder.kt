@@ -33,14 +33,11 @@ class Custom(val yaml: String) : BaseConfiguration()
  */
 open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsServerPort: Int) {
   companion object {
-    private const val DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS: Int = 60 * 60 * 24 * 90 // 90 days
     private const val DEFAULT_XDS_TIMEOUT_IN_SECONDS: Int = 5
   }
 
   internal var authHeader: String? = null
   internal var authToken: String? = null
-  internal var jwtToken: String? = null
-  internal var jwtTokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
   internal var sslRootCerts: String? = null
   internal var sni: String? = null
   internal var rtdsResourceName: String? = null
@@ -60,25 +57,6 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
   fun setAuthenticationToken(header: String, token: String): XdsBuilder {
     this.authHeader = header
     this.authToken = token
-    return this
-  }
-
-  /**
-   * Sets JWT as the authentication method to the xDS management server, using the given token.
-   *
-   * @param token The JWT token used to authenticate the client to the xDS management server.
-   * @param tokenLifetimeInSeconds <optional> The lifetime of the JWT token, in seconds. If none
-   *   (or 0) is specified, then defaultJwtTokenLifetimeSeconds is used.
-   * @return this builder.
-   */
-  fun setJwtAuthenticationToken(
-    token: String,
-    tokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
-  ): XdsBuilder {
-    this.jwtToken = token
-    this.jwtTokenLifetimeInSeconds =
-      if (tokenLifetimeInSeconds > 0) tokenLifetimeInSeconds
-      else DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
     return this
   }
 
@@ -183,6 +161,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
   private var quicHints = mutableMapOf<String, Int>()
+  private var quicCanonicalSuffixes = mutableListOf<String>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -685,6 +664,17 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   }
 
   /**
+   * Add a host suffix that's known to speak QUIC.
+   *
+   * @param suffix the suffix string.
+   * @return This builder.
+   */
+  fun addQuicCanonicalSuffix(suffix: String): EngineBuilder {
+    this.quicCanonicalSuffixes.add(suffix)
+    return this
+  }
+
+  /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
    * @return A new instance of Envoy.
@@ -708,6 +698,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         http3ConnectionOptions,
         http3ClientConnectionOptions,
         quicHints,
+        quicCanonicalSuffixes,
         enableGzipDecompression,
         enableBrotliDecompression,
         enableSocketTagging,
@@ -734,8 +725,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         xdsBuilder?.xdsServerPort ?: 0,
         xdsBuilder?.authHeader,
         xdsBuilder?.authToken,
-        xdsBuilder?.jwtToken,
-        xdsBuilder?.jwtTokenLifetimeInSeconds ?: 0,
         xdsBuilder?.sslRootCerts,
         xdsBuilder?.sni,
         nodeId,

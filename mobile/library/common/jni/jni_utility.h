@@ -124,6 +124,9 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
 /** Parses the proto from Java's byte array and stores the output into `dest` proto. */
 void javaByteArrayToProto(JNIEnv* env, jbyteArray source, Envoy::Protobuf::MessageLite* dest);
 
+/** Throws Java exception with the specified class name and error message. */
+void throwException(JNIEnv* env, const char* java_class_name, const char* message);
+
 // Helper functions for JNI's `Call<Type>Method` with proper exception handling in order to satisfy
 // -Xcheck:jni.
 // See

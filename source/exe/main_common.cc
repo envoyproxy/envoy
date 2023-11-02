@@ -39,10 +39,12 @@ StrippedMainBase::CreateInstanceFunction createFunction() {
          Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
          Buffer::WatermarkFactorySharedPtr watermark_factory) {
         auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
-        return std::make_unique<Server::InstanceImpl>(
-            init_manager, options, time_system, local_address, hooks, restarter, store,
-            access_log_lock, component_factory, std::move(random_generator), tls, thread_factory,
-            file_system, std::move(process_context), watermark_factory);
+        auto server = std::make_unique<Server::InstanceImpl>(
+            init_manager, options, time_system, hooks, restarter, store, access_log_lock,
+            std::move(random_generator), tls, thread_factory, file_system,
+            std::move(process_context), watermark_factory);
+        server->initialize(local_address, component_factory);
+        return server;
       };
 }
 

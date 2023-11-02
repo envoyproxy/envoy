@@ -275,7 +275,13 @@ TEST_F(TcpProxyTest, UpstreamLocalDisconnect) {
 TEST_F(TcpProxyTest, UpstreamRemoteDisconnect) {
   setup(1);
 
+  timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   raiseEventUpstreamConnected(0);
+
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(20), upstream_connection_establishment_latency.value());
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
@@ -296,13 +302,19 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
 
   setup(2, config);
 
+  timeSystem().advanceTimeWait(std::chrono::microseconds(10));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  timeSystem().advanceTimeWait(std::chrono::microseconds(40));
   raiseEventUpstreamConnected(1);
 
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_connect_attempts_exceeded")
                     .value());
   EXPECT_EQ(2U, filter_->getStreamInfo().attemptCount().value());
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(50), upstream_connection_establishment_latency.value());
 }
 
 // Make sure that the tcp proxy code handles reentrant calls to onPoolFailure.
@@ -375,8 +387,15 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
 
   // Try both failure modes
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  timeSystem().advanceTimeWait(std::chrono::microseconds(10));
   raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  timeSystem().advanceTimeWait(std::chrono::microseconds(15));
   raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(25), upstream_connection_establishment_latency.value());
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
@@ -566,11 +585,12 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   v2.set_string_value("v2");
   HashedValue hv0(v0), hv1(v1), hv2(v2);
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
-  filter_->initializeReadFilterCallbacks(filter_callbacks_);
-
   // Expect filter to try to open a connection to cluster1.
   {
+    NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+    filter_->initializeReadFilterCallbacks(filter_callbacks);
+
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
@@ -595,6 +615,10 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
 
   // Expect filter to try to open a connection to cluster2.
   {
+    NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+    filter_->initializeReadFilterCallbacks(filter_callbacks);
+
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(2));
@@ -741,7 +765,13 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(20), upstream_connection_establishment_latency.value());
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
@@ -1337,6 +1367,7 @@ TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
       .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
       .RetiresOnSaturation();
 
+  timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
       .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
@@ -1346,7 +1377,14 @@ TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
 
   setup(1, config);
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
+  timeSystem().advanceTimeWait(std::chrono::microseconds(10));
+
   raiseEventUpstreamConnected(0);
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  // OdCds resolution time isn't included in time to connect to upstream.
+  EXPECT_EQ(std::chrono::microseconds(10), upstream_connection_establishment_latency.value());
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
@@ -1381,6 +1419,11 @@ TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
+
+  // No upstream connection was attempted, so no latency should be recorded.
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_FALSE(upstream_connection_establishment_latency.has_value());
 }
 
 // Test that upstream transport failure message is reflected in access logs.
