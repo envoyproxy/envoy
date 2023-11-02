@@ -7,6 +7,7 @@
 #include "source/common/common/logger.h"
 
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
+#include "contrib/kafka/filters/network/source/external/responses.h"
 #include "contrib/kafka/filters/network/source/response_codec.h"
 
 namespace Envoy {
@@ -46,12 +47,19 @@ public:
   // ResponseRewriter
   void process(Buffer::Instance& buffer) override;
 
+  /**
+   * Mutates response according to config.
+   */
+  void updateMetadataBrokerAddresses(MetadataResponse& response) const;
+
+  /**
+   * Mutates response according to config.
+   */
+  void updateFindCoordinatorBrokerAddresses(FindCoordinatorResponse& response) const;
+
   size_t getStoredResponseCountForTest() const;
 
 private:
-  void updateMetadataBrokerAddresses(AbstractResponseSharedPtr& response) const;
-  void updateFindCoordinatorBrokerAddresses(AbstractResponseSharedPtr& response) const;
-
   // Helper function to update various response structures.
   template <typename T> void maybeUpdateHostAndPort(T& arg) const {
     const absl::optional<HostAndPort> hostAndPort = config_.findBrokerAddressOverride(arg.node_id_);
@@ -63,7 +71,7 @@ private:
     }
   }
 
-  BrokerFilterConfig config_;
+  const BrokerFilterConfig& config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
 };
 

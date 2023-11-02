@@ -1,7 +1,5 @@
 #include "contrib/kafka/filters/network/source/broker/rewriter.h"
 
-#include "contrib/kafka/filters/network/source/external/responses.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -21,49 +19,48 @@ void ResponseRewriterImpl::onFailedParse(ResponseMetadataSharedPtr) {}
 constexpr int16_t METADATA_API_KEY = 3;
 constexpr int16_t FIND_COORDINATOR_API_KEY = 10;
 
+template <typename T> static T& extractResponseData(AbstractResponseSharedPtr& arg) {
+  using TSharedPtr = std::shared_ptr<Response<T>>;
+  TSharedPtr cast = std::dynamic_pointer_cast<typename TSharedPtr::element_type>(arg);
+  if (nullptr == cast) {
+    throw new EnvoyException("bug: response class not matching response API key");
+  } else {
+    return cast->data_;
+  }
+}
+
 void ResponseRewriterImpl::process(Buffer::Instance& buffer) {
   buffer.drain(buffer.length());
   ResponseEncoder encoder{buffer};
   ENVOY_LOG(trace, "emitting {} stored responses", responses_to_rewrite_.size());
   for (auto response : responses_to_rewrite_) {
     switch (response->apiKey()) {
-    case METADATA_API_KEY:
-      updateMetadataBrokerAddresses(response);
+    case METADATA_API_KEY: {
+      auto& mr = extractResponseData<MetadataResponse>(response);
+      updateMetadataBrokerAddresses(mr);
       break;
-    case FIND_COORDINATOR_API_KEY:
-      updateFindCoordinatorBrokerAddresses(response);
+    }
+    case FIND_COORDINATOR_API_KEY: {
+      auto& fcr = extractResponseData<FindCoordinatorResponse>(response);
+      updateFindCoordinatorBrokerAddresses(fcr);
       break;
+    }
     }
     encoder.encode(*response);
   }
   responses_to_rewrite_.erase(responses_to_rewrite_.begin(), responses_to_rewrite_.end());
 }
 
-void ResponseRewriterImpl::updateMetadataBrokerAddresses(
-    AbstractResponseSharedPtr& response) const {
-
-  using MetadataResponseSharedPtr = std::shared_ptr<Response<MetadataResponse>>;
-  MetadataResponseSharedPtr cast = std::dynamic_pointer_cast<Response<MetadataResponse>>(response);
-  if (nullptr == cast) {
-    throw new EnvoyException("bug: response class not matching response API key");
-  }
-  MetadataResponse& data = cast->data_;
-  for (MetadataResponseBroker& broker : data.brokers_) {
+void ResponseRewriterImpl::updateMetadataBrokerAddresses(MetadataResponse& response) const {
+  for (MetadataResponseBroker& broker : response.brokers_) {
     maybeUpdateHostAndPort(broker);
   }
 }
 
 void ResponseRewriterImpl::updateFindCoordinatorBrokerAddresses(
-    AbstractResponseSharedPtr& response) const {
-
-  using FCSharedPtr = std::shared_ptr<Response<FindCoordinatorResponse>>;
-  FCSharedPtr cast = std::dynamic_pointer_cast<Response<FindCoordinatorResponse>>(response);
-  if (nullptr == cast) {
-    throw new EnvoyException("bug: response class not matching response API key");
-  }
-  FindCoordinatorResponse& data = cast->data_;
-  maybeUpdateHostAndPort(data);
-  for (Coordinator& coordinator : data.coordinators_) {
+    FindCoordinatorResponse& response) const {
+  maybeUpdateHostAndPort(response);
+  for (Coordinator& coordinator : response.coordinators_) {
     maybeUpdateHostAndPort(coordinator);
   }
 }

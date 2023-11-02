@@ -62,6 +62,8 @@ private:
   std::vector<RewriteRule> broker_address_rewrite_rules_;
 };
 
+using BrokerFilterConfigSharedPtr = std::shared_ptr<BrokerFilterConfig>;
+
 } // namespace Broker
 } // namespace Kafka
 } // namespace NetworkFilters

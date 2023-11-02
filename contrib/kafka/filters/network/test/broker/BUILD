@@ -48,6 +48,7 @@ envoy_cc_test(
     deps = [
         ":mock_filter_config_test_lib",
         "//contrib/kafka/filters/network/source/broker:rewriter_lib",
+        "//contrib/kafka/filters/network/test:message_utilities",
         "//source/common/buffer:buffer_lib",
     ],
 )
