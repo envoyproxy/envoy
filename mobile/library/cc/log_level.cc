@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Platform {
@@ -21,7 +22,7 @@ std::string logLevelToString(LogLevel method) {
   }
 
   IS_ENVOY_BUG("unknown log level, defaulting to off");
-  return LOG_LEVEL_LOOKUP[6].second;
+  return LOG_LEVEL_LOOKUP[ARRAY_SIZE(LOG_LEVEL_LOOKUP) - 1].second;
 }
 
 LogLevel logLevelFromString(const std::string& str) {
@@ -32,7 +33,7 @@ LogLevel logLevelFromString(const std::string& str) {
   }
 
   IS_ENVOY_BUG("unknown log level, defaulting to off");
-  return LOG_LEVEL_LOOKUP[6].first;
+  return LOG_LEVEL_LOOKUP[ARRAY_SIZE(LOG_LEVEL_LOOKUP) -1 ].first;
 }
 
 } // namespace Platform
