@@ -27,6 +27,8 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
   stream_info_->protocol(Http::Protocol::Http3);
   network_connection_->connectionSocket()->connectionInfoProvider().setSslConnection(
       Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_));
+  fix_quic_lifetime_issues_ =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_fix_filter_manager_uaf");
 }
 
 void QuicFilterManagerConnectionImpl::addWriteFilter(Network::WriteFilterSharedPtr filter) {
@@ -179,7 +181,9 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     network_connection_ = nullptr;
   }
 
-  filter_manager_ = nullptr;
+  if (!fix_quic_lifetime_issues_) {
+    filter_manager_ = nullptr;
+  }
   if (!codec_stats_.has_value()) {
     // The connection was closed before it could be used. Stats are not recorded.
     return;

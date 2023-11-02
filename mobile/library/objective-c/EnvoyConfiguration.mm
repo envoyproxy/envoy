@@ -79,6 +79,7 @@
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                       enableHttp3:(BOOL)enableHttp3
                                         quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
+                            quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -116,8 +117,6 @@
                                     xdsServerPort:(UInt32)xdsServerPort
                                     xdsAuthHeader:(nullable NSString *)xdsAuthHeader
                                      xdsAuthToken:(nullable NSString *)xdsAuthToken
-                                      xdsJwtToken:(nullable NSString *)xdsJwtToken
-                       xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
                                            xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName
@@ -142,6 +141,7 @@
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.enableHttp3 = enableHttp3;
   self.quicHints = quicHints;
+  self.quicCanonicalSuffixes = quicCanonicalSuffixes;
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
@@ -172,8 +172,6 @@
   self.xdsServerPort = xdsServerPort;
   self.xdsAuthHeader = xdsAuthHeader;
   self.xdsAuthToken = xdsAuthToken;
-  self.xdsJwtToken = xdsJwtToken;
-  self.xdsJwtTokenLifetimeSeconds = xdsJwtTokenLifetimeSeconds;
   self.xdsSslRootCerts = xdsSslRootCerts;
   self.xdsSni = xdsSni;
   self.rtdsResourceName = rtdsResourceName;
@@ -204,6 +202,9 @@
   builder.enableHttp3(self.enableHttp3);
   for (NSString *host in self.quicHints) {
     builder.addQuicHint([host toCXXString], [[self.quicHints objectForKey:host] intValue]);
+  }
+  for (NSString *suffix in self.quicCanonicalSuffixes) {
+    builder.addQuicCanonicalSuffix([suffix toCXXString]);
   }
 #endif
 
@@ -274,10 +275,6 @@
     if (self.xdsAuthHeader != nil) {
       xdsBuilder.setAuthenticationToken([self.xdsAuthHeader toCXXString],
                                         [self.xdsAuthToken toCXXString]);
-    }
-    if (self.xdsJwtToken != nil) {
-      xdsBuilder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
-                                           self.xdsJwtTokenLifetimeSeconds);
     }
     if (self.xdsSslRootCerts != nil) {
       xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
