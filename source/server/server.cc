@@ -74,14 +74,15 @@ std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
 
 } // namespace
 
-InstanceImpl::InstanceImpl(
-    Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
-    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-    HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-    ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
-    ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
-    Buffer::WatermarkFactorySharedPtr watermark_factory)
+InstanceImpl::InstanceImpl(Init::Manager& init_manager, const Options& options,
+                           Event::TimeSystem& time_system, ListenerHooks& hooks,
+                           HotRestart& restarter, Stats::StoreRoot& store,
+                           Thread::BasicLockable& access_log_lock,
+                           Random::RandomGeneratorPtr&& random_generator,
+                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+                           Filesystem::Instance& file_system,
+                           std::unique_ptr<ProcessContext> process_context,
+                           Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), live_(false), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields(),
@@ -103,43 +104,7 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
-  std::function set_up_logger = [&] {
-    TRY_ASSERT_MAIN_THREAD {
-      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-          options.logPath(), access_log_manager_, Logger::Registry::getSink());
-    }
-    END_TRY
-    CATCH(const EnvoyException& e, {
-      throw EnvoyException(
-          fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
-    });
-  };
-
-  TRY_ASSERT_MAIN_THREAD {
-    if (!options.logPath().empty()) {
-      set_up_logger();
-    }
-    restarter_.initialize(*dispatcher_, *this);
-    drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(std::move(local_address), component_factory);
-  }
-  END_TRY
-  MULTI_CATCH(
-      const EnvoyException& e,
-      {
-        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
-                  options.configProto().DebugString(), options.configYaml(), options.configPath(),
-                  e.what());
-        terminate();
-        throw;
-      },
-      {
-        ENVOY_LOG(critical, "error initializing due to unknown exception");
-        terminate();
-        throw;
-      });
-}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
 
 InstanceImpl::~InstanceImpl() {
   terminate();
@@ -422,6 +387,45 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
 void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
+  std::function set_up_logger = [&] {
+    TRY_ASSERT_MAIN_THREAD {
+      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
+          options_.logPath(), access_log_manager_, Logger::Registry::getSink());
+    }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      throw EnvoyException(
+          fmt::format("Failed to open log-file '{}'. e.what(): {}", options_.logPath(), e.what()));
+    });
+  };
+
+  TRY_ASSERT_MAIN_THREAD {
+    if (!options_.logPath().empty()) {
+      set_up_logger();
+    }
+    restarter_.initialize(*dispatcher_, *this);
+    drain_manager_ = component_factory.createDrainManager(*this);
+    initializeOrThrow(std::move(local_address), component_factory);
+  }
+  END_TRY
+  MULTI_CATCH(
+      const EnvoyException& e,
+      {
+        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+                  options_.configProto().DebugString(), options_.configYaml(),
+                  options_.configPath(), e.what());
+        terminate();
+        throw;
+      },
+      {
+        ENVOY_LOG(critical, "error initializing due to unknown exception");
+        terminate();
+        throw;
+      });
+}
+
+void InstanceImpl::initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                                     ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options_.restartEpoch(), restarter_.baseId(), restarter_.version());
 
