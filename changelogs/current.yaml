@@ -93,7 +93,7 @@ new_features:
 - area: admin
   change: |
     The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
-    ``histogram_buckets`` query parameter to ``none``.
+    ``histogram_buckets`` query parameter to ``summary``.
 - area: filters
   change: |
     Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to
