@@ -9,7 +9,8 @@
 #include "library/common/jni/types/env.h"
 #include "library/common/jni/types/exception.h"
 
-// NOLINT(namespace-envoy)
+namespace Envoy {
+namespace JNI {
 
 static jobject static_class_loader = nullptr;
 
@@ -451,3 +452,6 @@ DEFINE_CALL_STATIC_METHOD(Long, jlong)
 DEFINE_CALL_STATIC_METHOD(Double, jdouble)
 DEFINE_CALL_STATIC_METHOD(Boolean, jboolean)
 DEFINE_CALL_STATIC_METHOD(Object, jobject)
+
+} // namespace JNI
+} // namespace Envoy

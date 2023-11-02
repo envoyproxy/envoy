@@ -131,6 +131,9 @@ class JniHelper {
 public:
   explicit JniHelper(JNIEnv* env) : env_(env) {}
 
+  /** Gets the underlying `JNIEnv`. */
+  JNIEnv* getEnv();
+
   /**
    * Gets the object method with the given signature.
    *
