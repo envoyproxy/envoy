@@ -376,9 +376,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "server_lib",
-    srcs = ["server.cc"],
-    hdrs = ["server.h"],
+    name = "server_base_lib",
+    srcs = ["server_base.cc"],
+    hdrs = ["server_base.h"],
     external_deps = [
         "abseil_node_hash_map",
         "abseil_optional",
@@ -424,7 +424,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/init:manager_lib",
         "//source/common/local_info:local_info_lib",
-        "//source/common/memory:heap_shrinker_lib",
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -441,6 +440,16 @@ envoy_cc_library(
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "server_lib",
+    srcs = ["server.cc"],
+    hdrs = ["server.h"],
+    deps = [
+        ":server_base_lib",
+        "//source/common/memory:heap_shrinker_lib",
     ],
 )
 
