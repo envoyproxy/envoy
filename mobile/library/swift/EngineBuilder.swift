@@ -18,8 +18,7 @@ open class XdsBuilder: NSObject {
 
   let xdsServerAddress: String
   let xdsServerPort: UInt32
-  var authHeader: String?
-  var authToken: String?
+  var xdsGrpcInitialMetadata: [String: String] = [:]
   var sslRootCerts: String?
   var sni: String?
   var rtdsResourceName: String?
@@ -37,19 +36,26 @@ open class XdsBuilder: NSObject {
     self.xdsServerPort = xdsServerPort
   }
 
-  /// Sets the authentication HTTP header and token value for authentication with the xDS
-  /// management server.
+  /// Adds a header to the initial HTTP metadata headers sent on the gRPC stream.
   ///
-  /// - parameter header: The HTTP authentication header.
-  /// - parameter token:  The authentication token to be sent in the header.
+  /// A common use for the initial metadata headers is for authentication to the xDS management
+  /// server.
+  ///
+  /// For example, if using API keys to authenticate to Traffic Director on GCP (see
+  /// https://cloud.google.com/docs/authentication/api-keys for details), invoke:
+  ///   builder.addInitialStreamHeader("x-goog-api-key", apiKeyToken)
+  ///          .addInitialStreamHeader("X-Android-Package", appPackageName)
+  ///          .addInitialStreamHeader("X-Android-Cert", sha1KeyFingerprint);
+  ///
+  /// - parameter header: The HTTP header to add on the gRPC stream's initial metadata.
+  /// - parameter value:  The HTTP header value to add on the gRPC stream's initial metadata.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setAuthenticationToken(
+  public func addInitialStreamHeader(
     header: String,
-    token: String) -> Self {
-    self.authHeader = header
-    self.authToken = token
+    value: String) -> Self {
+    self.xdsGrpcInitialMetadata[header] = value
     return self
   }
 
@@ -775,8 +781,7 @@ open class EngineBuilder: NSObject {
   func makeConfig() -> EnvoyConfiguration {
     var xdsServerAddress: String?
     var xdsServerPort: UInt32 = 0
-    var xdsAuthHeader: String?
-    var xdsAuthToken: String?
+    var xdsGrpcInitialMetadata: [String: String] = [:]
     var xdsSslRootCerts: String?
     var xdsSni: String?
     var rtdsResourceName: String?
@@ -788,8 +793,7 @@ open class EngineBuilder: NSObject {
 #if ENVOY_GOOGLE_GRPC
     xdsServerAddress = self.xdsBuilder?.xdsServerAddress
     xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
-    xdsAuthHeader = self.xdsBuilder?.authHeader
-    xdsAuthToken = self.xdsBuilder?.authToken
+    xdsGrpcInitialMetadata = self.xdsBuilder?.xdsGrpcInitialMetadata ?? [:]
     xdsSslRootCerts = self.xdsBuilder?.sslRootCerts
     xdsSni = self.xdsBuilder?.sni
     rtdsResourceName = self.xdsBuilder?.rtdsResourceName
@@ -841,8 +845,7 @@ open class EngineBuilder: NSObject {
       nodeSubZone: self.nodeSubZone,
       xdsServerAddress: xdsServerAddress,
       xdsServerPort: xdsServerPort,
-      xdsAuthHeader: xdsAuthHeader,
-      xdsAuthToken: xdsAuthToken,
+      xdsGrpcInitialMetadata: xdsGrpcInitialMetadata,
       xdsSslRootCerts: xdsSslRootCerts,
       xdsSni: xdsSni,
       rtdsResourceName: rtdsResourceName,
@@ -948,9 +951,8 @@ private extension EngineBuilder {
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
                                                     Int32(xdsBuilder.xdsServerPort))
-      if let xdsAuthHeader = xdsBuilder.authHeader {
-        cxxXdsBuilder.setAuthenticationToken(xdsAuthHeader.toCXX(),
-                                             xdsBuilder.authToken?.toCXX() ?? "".toCXX())
+      for (header, value) in xdsBuilder.xdsGrpcInitialMetadata {
+        cxxXdsBuilder.addInitialStreamHeader(header.toCXX(), value.toCXX())
       }
       if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
         cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
