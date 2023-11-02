@@ -30,6 +30,8 @@ on:
         type: string
         default: |
           ERROR
+          error:
+          Error:
       notice-match:
         type: string
         default: |
@@ -78,6 +80,8 @@ on:
         type: string
         default: |
           WARNING
+          warning:
+          Warning:
 
 concurrency:
   group: |
