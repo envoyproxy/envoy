@@ -17,7 +17,7 @@
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
-#include "source/server/server_base.h"
+#include "source/server/server.h"
 
 #include "absl/debugging/symbolize.h"
 #include "absl/strings/str_split.h"

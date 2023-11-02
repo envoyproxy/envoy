@@ -377,8 +377,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "server_base_lib",
-    srcs = ["server_base.cc"],
-    hdrs = ["server_base.h"],
+    srcs = ["server.cc"],
+    hdrs = ["server.h"],
     external_deps = [
         "abseil_node_hash_map",
         "abseil_optional",
@@ -445,8 +445,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "server_lib",
-    srcs = ["server.cc"],
-    hdrs = ["server.h"],
+    srcs = ["instance_impl.cc"],
+    hdrs = ["instance_impl.h"],
     deps = [
         ":server_base_lib",
         "//source/common/memory:heap_shrinker_lib",

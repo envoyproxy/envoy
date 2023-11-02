@@ -13,7 +13,7 @@
 #include "source/exe/process_wide.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
-#include "source/server/server_base.h"
+#include "source/server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "source/common/signal/signal_action.h"
