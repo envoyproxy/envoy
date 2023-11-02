@@ -83,7 +83,7 @@ jobs:
       source: ${{ matrix.source }}
       trusted: true
       repo-ref: ${{ inputs.repo-ref }}
-      steps-pre: ${{ inputs.steps-pre }}
+      steps-pre: ${{ matrix.steps-pre }}
     secrets:
       app-id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
       app-key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
