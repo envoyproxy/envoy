@@ -377,20 +377,24 @@ public:
           dispatcher = &context_.client_connection_.dispatcher_;
         }
 
-        // With this feature enabled for http2 we end up creating a schedulable
-        // callback the first time we re-enable reading as it's used to process
-        // the backed up data.
+        // With this feature enabled for http2 the codec may end up creating a
+        // schedulable callback the first time it re-enables reading as it's used
+        // to process the backed up data if there's any to process.
         if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-          const bool expecting_schedulable_callback_creation =
+          const bool might_schedulable_callback_creation =
               http_protocol_ == Protocol::Http2 && state.read_disable_count_ == 0 && !disable &&
               !state.created_schedulable_callback_;
 
-          if (expecting_schedulable_callback_creation) {
+          if (might_schedulable_callback_creation) {
             ASSERT(dispatcher != nullptr);
             state.created_schedulable_callback_ = true;
-            // The unique pointer of this object will be returned in createSchedulableCallback_ of
-            // dispatcher, so there is no risk of object leak.
-            new Event::MockSchedulableCallback(dispatcher);
+            ON_CALL(*dispatcher, createSchedulableCallback_(_))
+                .WillByDefault(testing::Invoke([dispatcher](std::function<void()> cb) {
+                  // The unique pointer of this object will be returned in
+                  // createSchedulableCallback_ of dispatcher, so there is no risk of this object
+                  // leaking.
+                  return new Event::MockSchedulableCallback(dispatcher, cb);
+                }));
           }
         }
 

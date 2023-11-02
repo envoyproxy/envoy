@@ -106,6 +106,13 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key,
   if (value == nullptr) {
     // prefix route not found, default to catch all route.
     value = catch_all_route_;
+    // prefix route not found, check if catch_all_route is defined to fallback to.
+    if (catch_all_route_ != nullptr) {
+      value = catch_all_route_;
+    } else {
+      // no route found.
+      return value;
+    }
   }
 
   if (value->removePrefix()) {

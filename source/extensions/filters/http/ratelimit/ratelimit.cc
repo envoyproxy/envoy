@@ -219,8 +219,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     } else {
       state_ = State::Responded;
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
-      callbacks_->sendLocalReply(Http::Code::InternalServerError, response_body, nullptr,
-                                 absl::nullopt, RcDetails::get().RateLimitError);
+      callbacks_->sendLocalReply(config_->statusOnError(), response_body, nullptr, absl::nullopt,
+                                 RcDetails::get().RateLimitError);
     }
   } else if (!initiating_call_) {
     appendRequestHeaders(req_headers_to_add);

@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
@@ -153,6 +154,13 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
   EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
   EXPECT_EQ(headers.get_("x-jwt-bool-claim"), "true");
   EXPECT_EQ(headers.get_("x-jwt-int-claim"), "9999");
+
+  // This check verifies whether the claim with non-primitive type are
+  // successfully serialized and added to headers.
+  std::string expected_json = "[\"str1\",\"str2\"]";
+
+  ASSERT_EQ(headers.get_("x-jwt-claim-object-key"),
+            Envoy::Base64::encode(expected_json.data(), expected_json.size()));
 }
 
 // This test verifies when wrong claim is passed in claim_to_headers
@@ -220,6 +228,38 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
 
   ProtobufWkt::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
+  EXPECT_TRUE(
+      TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
+}
+
+// This test verifies the JWT payload is set.
+TEST_F(AuthenticatorTest, TestSetPayloadWithSpaces) {
+  // Config payload_in_metadata flag
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
+      "my_payload");
+  auto* normalize_payload = (*proto_config_.mutable_providers())[std::string(ProviderName)]
+                                .mutable_normalize_payload_in_metadata();
+  normalize_payload->add_space_delimited_claims("scope");
+  normalize_payload->add_space_delimited_claims("test_string");
+  normalize_payload->add_space_delimited_claims("test_num");
+
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  // Test OK pubkey and its cache
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(GoodTokenWithSpaces)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Only one field is set.
+  EXPECT_EQ(1, out_extracted_data_.fields().size());
+
+  ProtobufWkt::Value expected_payload;
+  TestUtility::loadFromJson(ExpectedPayloadJSONWithSpaces, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
 }

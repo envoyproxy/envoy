@@ -1211,9 +1211,9 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jlong connect_time
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
                       jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
                       jstring http3_connection_options, jstring http3_client_connection_options,
-                      jobjectArray quic_hints, jboolean enable_gzip_decompression,
-                      jboolean enable_brotli_decompression, jboolean enable_socket_tagging,
-                      jboolean enable_interface_binding,
+                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
+                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
+                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
                       jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
@@ -1252,6 +1252,11 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jlong connect_time
   for (std::pair<std::string, std::string>& entry : hints) {
     builder.addQuicHint(entry.first, stoi(entry.second));
   }
+  std::vector<std::string> suffixes = javaObjectArrayToStringVector(env, quic_canonical_suffixes);
+  for (std::string& suffix : suffixes) {
+    builder.addQuicCanonicalSuffix(suffix);
+  }
+
 #endif
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
@@ -1301,18 +1306,17 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
     jboolean enable_http3, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
-    jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-    jboolean enable_socket_tagging, jboolean enable_interface_binding,
-    jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
+    jboolean enable_brotli_decompression, jboolean enable_socket_tagging,
+    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray filter_chain, jobjectArray stat_sinks,
     jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
     jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
-    jstring xds_auth_header, jstring xds_auth_token, jstring xds_jwt_token,
-    jlong xds_jwt_token_lifetime, jstring xds_root_certs, jstring xds_sni, jstring node_id,
-    jstring node_region, jstring node_zone, jstring node_sub_zone,
+    jstring xds_auth_header, jstring xds_auth_token, jstring xds_root_certs, jstring xds_sni,
+    jstring node_id, jstring node_region, jstring node_zone, jstring node_sub_zone,
     jbyteArray serialized_node_metadata, jstring cds_resources_locator, jlong cds_timeout_seconds,
     jboolean enable_cds) {
   Envoy::Platform::EngineBuilder builder;
@@ -1322,8 +1326,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                    dns_query_timeout_seconds, dns_min_refresh_seconds, dns_preresolve_hostnames,
                    enable_dns_cache, dns_cache_save_interval_seconds, enable_drain_post_dns_refresh,
                    enable_http3, http3_connection_options, http3_client_connection_options,
-                   quic_hints, enable_gzip_decompression, enable_brotli_decompression,
-                   enable_socket_tagging, enable_interface_binding,
+                   quic_hints, quic_canonical_suffixes, enable_gzip_decompression,
+                   enable_brotli_decompression, enable_socket_tagging, enable_interface_binding,
                    h2_connection_keepalive_idle_interval_milliseconds,
                    h2_connection_keepalive_timeout_seconds, max_connections_per_host,
                    stats_flush_seconds, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
@@ -1331,18 +1335,14 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                    enable_platform_certificates_validation, runtime_guards, node_id, node_region,
                    node_zone, node_sub_zone, serialized_node_metadata, builder);
 
-#ifdef ENVOY_GOOGLE_GRPC
   std::string native_xds_address = getCppString(env, xds_address);
   if (!native_xds_address.empty()) {
+#ifdef ENVOY_GOOGLE_GRPC
     Envoy::Platform::XdsBuilder xds_builder(std::move(native_xds_address), xds_port);
     std::string native_xds_auth_header = getCppString(env, xds_auth_header);
     if (!native_xds_auth_header.empty()) {
       xds_builder.setAuthenticationToken(std::move(native_xds_auth_header),
                                          getCppString(env, xds_auth_token));
-    }
-    std::string native_jwt_token = getCppString(env, xds_jwt_token);
-    if (!native_jwt_token.empty()) {
-      xds_builder.setJwtAuthenticationToken(std::move(native_jwt_token), xds_jwt_token_lifetime);
     }
     std::string native_root_certs = getCppString(env, xds_root_certs);
     if (!native_root_certs.empty()) {
@@ -1362,8 +1362,12 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                                              cds_timeout_seconds);
     }
     builder.setXds(std::move(xds_builder));
-  }
+#else
+    throwException(env, "java/lang/UnsupportedOperationException",
+                   "This library does not support xDS. Please use "
+                   "io.envoyproxy.envoymobile:envoy-xds instead.");
 #endif
+  }
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

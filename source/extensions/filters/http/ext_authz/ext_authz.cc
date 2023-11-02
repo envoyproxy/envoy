@@ -1,6 +1,9 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include <chrono>
+#include <optional>
+#include <string>
+#include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
 
@@ -14,6 +17,46 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+
+namespace {
+
+using MetadataProto = ::envoy::config::core::v3::Metadata;
+
+void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadata,
+                         const std::vector<std::string>& metadata_context_namespaces,
+                         const std::vector<std::string>& typed_metadata_context_namespaces,
+                         MetadataProto& metadata_context) {
+  for (const auto& context_key : metadata_context_namespaces) {
+    for (const MetadataProto* metadata : source_metadata) {
+      if (metadata == nullptr) {
+        continue;
+      }
+      const auto& filter_metadata = metadata->filter_metadata();
+      if (const auto metadata_it = filter_metadata.find(context_key);
+          metadata_it != filter_metadata.end()) {
+        (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+        break;
+      }
+    }
+  }
+
+  for (const auto& context_key : typed_metadata_context_namespaces) {
+    for (const MetadataProto* metadata : source_metadata) {
+      if (metadata == nullptr) {
+        continue;
+      }
+      const auto& typed_filter_metadata = metadata->typed_filter_metadata();
+      if (const auto metadata_it = typed_filter_metadata.find(context_key);
+          metadata_it != typed_filter_metadata.end()) {
+        (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] =
+            metadata_it->second;
+        break;
+      }
+    }
+  }
+}
+
+} // namespace
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   // We only merge context extensions here, and leave boolean flags untouched since those flags are
@@ -41,47 +84,29 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
 
+  // If metadata_context_namespaces or typed_metadata_context_namespaces is specified,
+  // pass matching filter metadata to the ext_authz service.
+  // If metadata key is set in both the connection and request metadata,
+  // then the value will be the request metadata value.
   envoy::config::core::v3::Metadata metadata_context;
+  fillMetadataContext({&decoder_callbacks_->streamInfo().dynamicMetadata(),
+                       &decoder_callbacks_->connection()->streamInfo().dynamicMetadata()},
+                      config_->metadataContextNamespaces(),
+                      config_->typedMetadataContextNamespaces(), metadata_context);
 
-  // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_authz
-  // service. If metadata key is set in both the connection and request metadata then the value
-  // will be the request metadata value.
-  const auto& connection_metadata =
-      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
-  const auto& request_metadata =
-      decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-  for (const auto& context_key : config_->metadataContextNamespaces()) {
-    if (const auto metadata_it = request_metadata.find(context_key);
-        metadata_it != request_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = connection_metadata.find(context_key);
-               metadata_it != connection_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    }
-  }
-
-  // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
-  // ext_authz service. If metadata key is set in both the connection and request metadata then
-  // the value will be the request metadata value.
-  const auto& connection_typed_metadata =
-      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
-  const auto& request_typed_metadata =
-      decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
-  for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
-    if (const auto metadata_it = request_typed_metadata.find(context_key);
-        metadata_it != request_typed_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = connection_typed_metadata.find(context_key);
-               metadata_it != connection_typed_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    }
+  // Fill route_metadata_context from the selected route's metadata.
+  envoy::config::core::v3::Metadata route_metadata_context;
+  if (decoder_callbacks_->route() != nullptr) {
+    fillMetadataContext({&decoder_callbacks_->route()->metadata()},
+                        config_->routeMetadataContextNamespaces(),
+                        config_->routeTypedMetadataContextNamespaces(), route_metadata_context);
   }
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
-      config_->includePeerCertificate(), config_->includeTLSSession(), config_->destinationLabels(),
-      config_->requestHeaderMatchers());
+      std::move(route_metadata_context), check_request_, config_->maxRequestBytes(),
+      config_->packAsBytes(), config_->includePeerCertificate(), config_->includeTLSSession(),
+      config_->destinationLabels(), config_->requestHeaderMatchers());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   // Store start time of ext_authz filter call
@@ -369,19 +394,20 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
-
-      Http::CodeStats::ResponseStatInfo info{config_->scope(),
-                                             cluster_->statsScope(),
-                                             empty_stat_name,
-                                             enumToInt(response->status_code),
-                                             true,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             false};
-      config_->httpContext().codeStats().chargeResponseStat(info, false);
+      if (config_->chargeClusterResponseStats()) {
+        Http::CodeStats::ResponseStatInfo info{config_->scope(),
+                                               cluster_->statsScope(),
+                                               empty_stat_name,
+                                               enumToInt(response->status_code),
+                                               true,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               false};
+        config_->httpContext().codeStats().chargeResponseStat(info, false);
+      }
     }
 
     // setResponseFlag must be called before sendLocalReply

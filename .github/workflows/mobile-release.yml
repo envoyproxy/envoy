@@ -15,6 +15,7 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
+      pull-requests: read
 
   android_release_artifacts:
     if: >-
@@ -119,6 +120,7 @@ jobs:
         version="0.5.0.$(date '+%Y%m%d')"
         python mobile/ci/sonatype_nexus_upload.py \
           --profile_id=$SONATYPE_PROFILE_ID \
+          --artifact_id=envoy \
           --version=$version \
           --files \
             envoy.aar \
@@ -161,14 +163,16 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       working-directory: mobile
       run: |
+        # --define=google_grpc=enabled must be defined last because
+        # --config=mobile-release-android has --define=google_grpc=disabled
         version="0.5.0.$(date '+%Y%m%d')"
         ./bazelw build \
           --config=mobile-remote-release-clang \
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a \
           --define=pom_version="$version" \
-          --define=google_grpc=enabled \
           --config=mobile-release-android \
+          --define=google_grpc=enabled \
           --linkopt=-fuse-ld=lld \
           //:android_xds_dist
     - name: 'Tar artifacts'
@@ -235,6 +239,7 @@ jobs:
         version="0.5.0.$(date '+%Y%m%d')"
         python mobile/ci/sonatype_nexus_upload.py \
           --profile_id=$SONATYPE_PROFILE_ID \
+          --artifact_id=envoy-xds \
           --version=$version \
           --files \
             envoy_xds.aar \
