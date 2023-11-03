@@ -16,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using envoy::config::bootstrap::v3::Bootstrap;
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -32,7 +33,7 @@ public:
   TestAsyncClientManagerImpl(
       Upstream::ClusterManager& cm, ThreadLocal::Instance& tls, TimeSource& time_source,
       Api::Api& api, const Grpc::StatNames& stat_names,
-      const envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig& config)
+      const Bootstrap::GrpcAsyncClientManagerConfig& config)
       : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names, config) {}
   Grpc::AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService&,
                                                     Stats::Scope&, bool) override {
