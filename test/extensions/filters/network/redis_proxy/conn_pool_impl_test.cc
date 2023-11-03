@@ -469,7 +469,7 @@ TEST_F(RedisConnPoolImplTest, RedisConnectionRateLimited) {
   EXPECT_EQ(connectionRateLimited().value(), 1);
 
   // wait for a second and rate limiter should recover
-  tls_.mock_dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(1));
+  tls_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(1));
   Common::Redis::Client::MockPoolRequest new_active_request;
   MockPoolCallbacks new_callbacks;
   Common::Redis::Client::MockClient* new_client = new NiceMock<Common::Redis::Client::MockClient>();
@@ -796,7 +796,7 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
   EXPECT_CALL(*client, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request));
   conn_pool_->makeRequest("hash_key", value, callbacks, transaction_);
 
-  EXPECT_CALL(tls_.mock_dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_));
   client->runHighWatermarkCallbacks();
   client->runLowWatermarkCallbacks();
   client->raiseEvent(Network::ConnectionEvent::RemoteClose);

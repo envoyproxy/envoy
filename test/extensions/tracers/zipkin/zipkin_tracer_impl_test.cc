@@ -53,7 +53,7 @@ public:
         .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
     if (init_timer) {
-      timer_ = new NiceMock<Event::MockTimer>(&tls_.mock_dispatcher_);
+      timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
     }
 
