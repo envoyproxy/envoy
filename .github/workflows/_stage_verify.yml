@@ -43,11 +43,10 @@ jobs:
           rbe: false
           steps-pre: |
             - id: short_name
-              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.1
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.7
               with:
                 length: 7
                 string: ${{ inputs.repo-ref }}
-                min: 40
             - id: gcp
               run: |
                 PREFIX=https://storage.googleapis.com/envoy-
@@ -55,20 +54,17 @@ jobs:
                 NAME=%{{ steps.short_name.outputs.string }}
                 echo "url=${PREFIX}${BUCKET}/${NAME}" >> $GITHUB_OUTPUT
               shell: bash
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.1
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
               with:
-                url: |
-                  %{{ steps.gcp.outputs.url }}/envoy.tar
+                url: %{{ steps.gcp.outputs.url }}/docker/envoy.tar
                 variant: dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.1
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
               with:
-                url: |
-                  %{{ steps.gcp.outputs.url }}/envoy-contrib.tar
+                url: %{{ steps.gcp.outputs.url }}/docker/envoy-contrib.tar
                 variant: contrib-dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.1
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
               with:
-                url: |
-                  %{{ steps.gcp.outputs.url }}/envoy-google-vrp.tar
+                url: %{{ steps.gcp.outputs.url }}/docker/envoy-google-vrp.tar
                 variant: google-vrp-dev
             - run: docker images | grep envoy
               shell: bash

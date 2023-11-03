@@ -95,7 +95,7 @@ on:
 concurrency:
   group: |
     ${{ github.actor != 'trigger-release-envoy[bot]'
-        && github.event.inputs.head_ref
+        && github.head_ref
         || github.run_id
     }}-${{ github.workflow }}-env
   cancel-in-progress: true
@@ -153,7 +153,7 @@ jobs:
         build_image_tag: ${{ inputs.build_image_tag }}
         build_image_mobile_sha: ${{ inputs.build_image_mobile_sha }}
         build_image_sha: ${{ inputs.build_image_sha }}
-    - uses: envoyproxy/toolshed/gh-actions/github/merge-commit@actions-v0.1.5
+    - uses: envoyproxy/toolshed/gh-actions/github/merge-commit@actions-v0.1.7
       id: merge-commit
       if: ${{ github.event_name == 'pull_request_target' }}
       with:

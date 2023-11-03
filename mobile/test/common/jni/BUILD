@@ -83,3 +83,23 @@ envoy_mobile_so_to_jni_lib(
     testonly = True,
     native_dep = "libenvoy_jni_with_test_and_listener_extensions.so",
 )
+
+cc_library(
+    name = "jni_helper_test_lib",
+    srcs = [
+        "jni_helper_test.cc",
+    ],
+    deps = [
+        "//library/common/jni:jni_helper_lib",
+    ],
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_helper_test.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_helper_test_lib",
+    ],
+)

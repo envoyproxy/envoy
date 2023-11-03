@@ -59,12 +59,11 @@ jobs:
           name: github
           steps-pre: |
             - id: short_name
-              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.2
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.7
               with:
                 length: 7
                 string: ${{ inputs.repo-ref }}
-                min: 40
-            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.2
+            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.7
               with:
                 url: https://storage.googleapis.com/envoy-pr/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
                 path: %{{ runner.temp }}/release.signed
@@ -84,7 +83,7 @@ jobs:
       source: ${{ matrix.source }}
       trusted: true
       repo-ref: ${{ inputs.repo-ref }}
-      steps-pre: ${{ inputs.steps-pre }}
+      steps-pre: ${{ matrix.steps-pre }}
     secrets:
       app-id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
       app-key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
@@ -99,16 +98,17 @@ jobs:
           name: github
           steps-pre: |
             - id: short_name
-              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.2
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.7
               with:
                 length: 7
-                input: ${{ inputs.repo-ref }}
-            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.2
+                string: ${{ inputs.repo-ref }}
+            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.7
               with:
                 url: https://storage.googleapis.com/envoy-postsubmit/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
                 path: %{{ runner.temp }}/release.signed
           source: |
             export ENVOY_COMMIT=${{ inputs.sha }}
+            export ENVOY_REPO=${{ github.repository }}
             if [[ '${{ inputs.version-dev }}' == 'dev' ]]; then
                 export ENVOY_PUBLISH_DRY_RUN=1
             fi
@@ -126,7 +126,7 @@ jobs:
     needs:
     - publish
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.5
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.7
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
