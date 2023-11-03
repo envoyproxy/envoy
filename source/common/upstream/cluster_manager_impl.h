@@ -930,6 +930,15 @@ private:
   bool initialized_{};
   bool ads_mux_initialized_{};
   std::atomic<bool> shutdown_{};
+
+  // Records the last `warming_clusters_` map size from updateClusterCounts(). This variable is
+  // used for bookkeeping to run the `resume_cds_` cleanup that decrements the pause count and
+  // enables the resumption of DiscoveryRequests for the Cluster type url.
+  //
+  // The `warming_clusters` gauge is not suitable for this purpose, because different environments
+  // (e.g. mobile) may have different stats enabled, leading to the gauge not having a reliable
+  // previous warming clusters size value.
+  std::size_t last_recorded_warming_clusters_count_{0};
 };
 
 } // namespace Upstream

@@ -1009,16 +1009,16 @@ void ClusterManagerImpl::updateClusterCounts() {
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   if (all_clusters_initialized && ads_mux_) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-    const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
-    if (previous_warming == 0 && !warming_clusters_.empty()) {
+    if (last_recorded_warming_clusters_count_ == 0 && !warming_clusters_.empty()) {
       resume_cds_ = ads_mux_->pause(type_url);
-    } else if (previous_warming > 0 && warming_clusters_.empty()) {
+    } else if (last_recorded_warming_clusters_count_ > 0 && warming_clusters_.empty()) {
       ASSERT(resume_cds_ != nullptr);
       resume_cds_.reset();
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
+  last_recorded_warming_clusters_count_ = warming_clusters_.size();
 }
 
 ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view cluster) {
