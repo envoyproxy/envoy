@@ -1294,12 +1294,12 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jstring grpc_stats_doma
   builder.setHttp3ClientConnectionOptions(
       getCppString(jni_helper, http3_client_connection_options));
   auto hints = javaObjectArrayToStringPairVector(jni_helper, quic_hints);
-  for (std::pair<std::string, std::string>& entry : hints) {
+  for (const std::pair<std::string, std::string>& entry : hints) {
     builder.addQuicHint(entry.first, stoi(entry.second));
   }
   std::vector<std::string> suffixes =
       javaObjectArrayToStringVector(jni_helper, quic_canonical_suffixes);
-  for (std::string& suffix : suffixes) {
+  for (const std::string& suffix : suffixes) {
     builder.addQuicCanonicalSuffix(suffix);
   }
 
