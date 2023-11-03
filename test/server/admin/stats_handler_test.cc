@@ -298,7 +298,7 @@ TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
   EXPECT_EQ("usage: /stats?histogram_buckets=(cumulative|disjoint|detailed|summary)\n",
-          code_response.second);
+            code_response.second);
 }
 
 TEST_F(AdminStatsTest, HandlerStatsJsonNoHistograms) {
