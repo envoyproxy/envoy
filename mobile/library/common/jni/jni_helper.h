@@ -310,8 +310,8 @@ public:
   jlong getDirectBufferCapacity(jobject buffer);
 
 private:
-  /** Handles the Java exception occurred. */
-  void handleException();
+  /** Rethrows the Java exception occurred. */
+  void rethrowException();
 
   JNIEnv* const env_;
 };
