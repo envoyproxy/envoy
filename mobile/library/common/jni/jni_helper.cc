@@ -5,6 +5,8 @@
 namespace Envoy {
 namespace JNI {
 
+JNIEnv* JniHelper::getEnv() { return env_; }
+
 jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
   jmethodID method_id = env_->GetMethodID(clazz, name, signature);
   rethrowException();

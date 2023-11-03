@@ -64,7 +64,7 @@ public:
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
 
-        // `pack_as_bytes_` should be true when configured with an http service because there is no
+        // `pack_as_bytes_` should be true when configured with the HTTP service because there is no
         // difference to where the body is written in http requests, and a value of false here will
         // cause non UTF-8 body content to be changed when it doesn't need to.
         pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
@@ -280,9 +280,17 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
-        disable_request_body_buffering_(config.has_check_settings() &&
-                                        config.check_settings().disable_request_body_buffering()),
-        disabled_(config.disabled()) {}
+        check_settings_(config.has_check_settings()
+                            ? config.check_settings()
+                            : envoy::extensions::filters::http::ext_authz::v3::CheckSettings()),
+        disabled_(config.disabled()) {
+    if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
+        config.check_settings().has_with_request_body()) {
+      ExceptionUtil::throwEnvoyException(
+          "Invalid configuration for check_settings. Only one of disable_request_body_buffering or "
+          "with_request_body can be set.");
+    }
+  }
 
   void merge(const FilterConfigPerRoute& other);
 
@@ -295,13 +303,15 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  bool disableRequestBodyBuffering() const { return disable_request_body_buffering_; }
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings checkSettings() const {
+    return check_settings_;
+  }
 
 private:
-  // We save the context extensions as a protobuf map instead of an std::map as this allows us to
+  // We save the context extensions as a protobuf map instead of a std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
-  bool disable_request_body_buffering_;
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   bool disabled_;
 };
 
@@ -348,7 +358,7 @@ private:
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
     const bool skip_check_;
-    const bool skip_request_body_buffering_;
+    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   };
   PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
@@ -359,7 +369,7 @@ private:
 
   // FilterReturn is used to capture what the return code should be to the filter chain.
   // if this filter is either in the middle of calling the service or the result is denied then
-  // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
+  // the filter chain should stop. Otherwise, the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
 
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);

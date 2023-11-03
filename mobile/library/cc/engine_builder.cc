@@ -26,6 +26,7 @@
 #endif
 
 #include "source/common/http/matching/inputs.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "absl/strings/str_join.h"
@@ -46,9 +47,11 @@ namespace Platform {
 XdsBuilder::XdsBuilder(std::string xds_server_address, const int xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
-XdsBuilder& XdsBuilder::setAuthenticationToken(std::string token_header, std::string token) {
-  authentication_token_header_ = std::move(token_header);
-  authentication_token_ = std::move(token);
+XdsBuilder& XdsBuilder::addInitialStreamHeader(std::string header, std::string value) {
+  envoy::config::core::v3::HeaderValue header_value;
+  header_value.set_key(std::move(header));
+  header_value.set_value(std::move(value));
+  xds_initial_grpc_metadata_.emplace_back(std::move(header_value));
   return *this;
 }
 
@@ -94,11 +97,11 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
         ->set_inline_string(ssl_root_certs_);
   }
 
-  if (!authentication_token_header_.empty() && !authentication_token_.empty()) {
-    auto* auth_token_metadata = grpc_service.add_initial_metadata();
-    auth_token_metadata->set_key(authentication_token_header_);
-    auth_token_metadata->set_value(authentication_token_);
+  if (!xds_initial_grpc_metadata_.empty()) {
+    grpc_service.mutable_initial_metadata()->Assign(xds_initial_grpc_metadata_.begin(),
+                                                    xds_initial_grpc_metadata_.end());
   }
+
   if (!sni_.empty()) {
     auto& channel_args =
         *grpc_service.mutable_google_grpc()->mutable_channel_args()->mutable_args();
@@ -135,6 +138,7 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
     auto* list =
         bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
     list->add_patterns()->set_exact("cluster_manager.active_clusters");
+    list->add_patterns()->set_exact("cluster_manager.warming_clusters");
     list->add_patterns()->set_exact("cluster_manager.cluster_added");
     list->add_patterns()->set_exact("cluster_manager.cluster_updated");
     list->add_patterns()->set_exact("cluster_manager.cluster_removed");
