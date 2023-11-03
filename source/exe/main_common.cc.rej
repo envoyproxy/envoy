@@ -1,0 +1,10 @@
+--- source/exe/main_common.cc	2023-10-24 12:54:43.000000000 -0700
++++ source/exe/main_common.cc	2023-10-31 14:43:33.000000000 -0700
+@@ -7,6 +7,7 @@
+ 
+ #include "third_party/envoy/src/api/envoy/config/listener/v3/listener.pb.h"
+ 
++#include "third_party/envoy/src/envoy/server/process_context.h"
+ #include "third_party/envoy/src/source/common/common/compiler_requirements.h"
+ #include "third_party/envoy/src/source/common/common/logger.h"
+ #include "third_party/envoy/src/source/common/common/perf_annotation.h"
