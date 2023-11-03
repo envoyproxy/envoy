@@ -46,9 +46,9 @@ message IdBasedBrokerRewriteSpec {
   repeated IdBasedBrokerRewriteRule rules = 1;
 }
 
-// Defines a rule to rewrite
+// Defines a rule to rewrite broker address data.
 message IdBasedBrokerRewriteRule {
-  // Broker ID to match - if the upstream Kafka cluster returns broker metadata for given ID, the
+  // Broker ID to match.
   uint32 id = 1 [(validate.rules).uint32 = {gte: 0}];
 
   // The host value to use (resembling the host part of Kafka's advertised.listeners).
