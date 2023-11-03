@@ -152,6 +152,26 @@ const char GoodToken[] = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc
                          "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
 
 // Payload:
+// {
+//   "iss": "https://example.com",
+//   "sub": "test@example.com",
+//   "exp": 2001001001,
+//   "aud": "example_service",
+//   "scope": "read write",
+//   "test_string": "test_value",
+//   "test_num": 1337
+// }
+const char GoodTokenWithSpaces[] =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMS"
+    "wiYXVkIjoiZXhhbXBsZV9zZXJ2aWNlIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwidGVzdF9zdHJpbmciOiJ0ZXN0X3ZhbHVl"
+    "IiwidGVzdF9udW0iOjEzMzd9.cKTwWSJgS0TZ3Ajc9QrAA50Me7j1zVv9YzDT_"
+    "2UE5jlCs5vWkdWjUb2r7MYaqximXj3affDZdDsUxMaqqR7lWT2EbxOoEceBkCMmakgSs8tjZ210w0YTU0OyhrrxsyxUpsp"
+    "PeRzPIHQTUdN7zU_KkMcUU1yDSlnJxqlYXyTL9E-DhTnLwoOdgFGiQs-md_QJfdOFgXQqU71EZ-"
+    "Ofxen8EFl10wbzHubMHGLJqVfFzK-iuVr2P0OZ0ymWvPGwQdlVMojHx3P0Yb8MRbhdW04hCJq-_"
+    "fTE1RNb6ja1JBFQbyGcQTtWVSdkHZ_C8syd8s-aK4C8_VhwNEDviOVrHPbztw";
+
+// Payload:
 // {"iss":"https://example.com","sub":"test@example.com","exp":null}
 const char NonExpiringToken[] =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
@@ -268,6 +288,19 @@ const char ExpectedPayloadJSON[] = R"(
   "sub":"test@example.com",
   "exp":2001001001,
   "aud":"example_service"
+}
+)";
+
+// Base64 decoded Payload with space-delimited claims JSON
+const char ExpectedPayloadJSONWithSpaces[] = R"(
+{
+  "iss":"https://example.com",
+  "sub":"test@example.com",
+  "exp":2001001001,
+  "aud":"example_service",
+  "scope":["read","write"],
+  "test_string":["test_value"],
+  "test_num":1337
 }
 )";
 

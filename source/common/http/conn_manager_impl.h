@@ -520,6 +520,7 @@ private:
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
+    std::queue<MetadataMapPtr> deferred_metadata_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

@@ -26,7 +26,6 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/common/data/utility.h"
-#include "library/common/engine_handle.h"
 #include "library/common/types/c_types.h"
 #include "tools/cpp/runfiles/runfiles.h"
 
@@ -72,9 +71,9 @@ public:
 
     Platform::XdsBuilder xds_builder(/*xds_server_address=*/std::string(TD_API_ENDPOINT),
                                      /*xds_server_port=*/443);
-    xds_builder.setAuthenticationToken("x-goog-api-key", std::string(api_key));
-    xds_builder.setSslRootCerts(std::move(root_certs));
-    xds_builder.addClusterDiscoveryService();
+    xds_builder.addInitialStreamHeader("x-goog-api-key", std::string(api_key))
+        .setSslRootCerts(std::move(root_certs))
+        .addClusterDiscoveryService();
     builder_.addLogLevel(Platform::LogLevel::trace)
         .setNodeId(absl::Substitute("projects/$0/networks/default/nodes/111222333444", PROJECT_ID))
         .setXds(std::move(xds_builder));
