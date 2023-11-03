@@ -38,6 +38,7 @@ DOM
 Gasd
 GiB
 IPTOS
+OTEL
 Repick
 Reserializer
 SION
@@ -822,6 +823,7 @@ hostnames
 hostset
 hotrestart
 hrefs
+htpasswd
 huffman
 hystrix
 idempotency

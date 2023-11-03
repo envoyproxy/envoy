@@ -71,10 +71,12 @@ EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
          Buffer::WatermarkFactorySharedPtr watermark_factory) {
         // TODO(alyssawilk) use InstanceLite not InstanceImpl.
         auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
-        return std::make_unique<Server::InstanceImpl>(
-            init_manager, options, time_system, local_address, hooks, restarter, store,
-            access_log_lock, component_factory, std::move(random_generator), tls, thread_factory,
-            file_system, std::move(process_context), watermark_factory);
+        auto server = std::make_unique<Server::InstanceImpl>(
+            init_manager, options, time_system, hooks, restarter, store, access_log_lock,
+            std::move(random_generator), tls, thread_factory, file_system,
+            std::move(process_context), watermark_factory);
+        server->initialize(local_address, component_factory);
+        return server;
       };
   base_ = std::make_unique<StrippedMainBase>(
       *options_, real_time_system_, default_listener_hooks_, prod_component_factory_,

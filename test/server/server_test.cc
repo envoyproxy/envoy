@@ -258,12 +258,12 @@ protected:
                                              : std::make_unique<Init::ManagerImpl>("Server");
 
     server_ = std::make_unique<InstanceImpl>(
-        *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart_,
-        stats_store_, fakelock_, component_factory_,
+        *init_manager_, options_, time_system_, hooks, restart_, stats_store_, fakelock_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
+    server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                        component_factory_);
     EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
 
@@ -277,11 +277,11 @@ protected:
     thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
     init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
-        *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
-        stats_store_, fakelock_, component_factory_,
+        *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+    server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                        component_factory_);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
@@ -1302,13 +1302,13 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_.reset(new InstanceImpl(
+      *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr));
   EXPECT_THROW_WITH_MESSAGE(
-      server_.reset(new InstanceImpl(*init_manager_, options_, time_system_,
-                                     std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
-                                     hooks_, restart_, stats_store_, fakelock_, component_factory_,
-                                     std::make_unique<NiceMock<Random::MockRandomGenerator>>(),
-                                     *thread_local_, Thread::threadFactoryForTest(),
-                                     Filesystem::fileSystemForTest(), nullptr)),
+      server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                          component_factory_),
       EnvoyException,
       "At least one of --config-path or --config-yaml or Options::configProto() should be "
       "non-empty");

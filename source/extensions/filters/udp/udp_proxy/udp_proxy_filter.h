@@ -457,7 +457,7 @@ private:
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
-    void continueFilterChain() override { parent_.onContinueFilterChain(this); }
+    bool continueFilterChain() override { return parent_.onContinueFilterChain(this); }
     void injectDatagramToFilterChain(Network::UdpRecvData& data) override {
       parent_.onInjectReadDatagramToFilterChain(this, data);
     }
@@ -509,13 +509,13 @@ private:
       return absl::nullopt;
     }
 
-    void onNewSession();
+    bool onNewSession();
     void onData(Network::UdpRecvData& data);
     void processUpstreamDatagram(Network::UdpRecvData& data);
     void writeDownstream(Network::UdpRecvData& data);
     void resetIdleTimer();
 
-    virtual void createUpstream() PURE;
+    virtual bool createUpstream() PURE;
     virtual void writeUpstream(Network::UdpRecvData& data) PURE;
     virtual void onIdleTimer() PURE;
 
@@ -525,7 +525,7 @@ private:
 
     uint64_t sessionId() const { return session_id_; };
     StreamInfo::StreamInfo& streamInfo() { return udp_session_info_; };
-    void onContinueFilterChain(ActiveReadFilter* filter);
+    bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
 
@@ -595,7 +595,7 @@ private:
     ~UdpActiveSession() override = default;
 
     // ActiveSession
-    void createUpstream() override;
+    bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
 
@@ -644,7 +644,7 @@ private:
     ~TunnelingActiveSession() override = default;
 
     // ActiveSession
-    void createUpstream() override;
+    bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
 
@@ -666,7 +666,7 @@ private:
   private:
     using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
 
-    void establishUpstreamConnection();
+    bool establishUpstreamConnection();
     bool createConnectionPool();
     void maybeBufferDatagram(Network::UdpRecvData& data);
     void flushBuffer();

@@ -9,6 +9,10 @@ behavior_changes:
     the flag to false explicitly.
     See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
     issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
+- area: listener
+  change: |
+    undeprecated runtime key ``overload.global_downstream_max_connections`` until :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
 
 minor_behavior_changes:
 - area: upstream
@@ -23,6 +27,11 @@ minor_behavior_changes:
     Added new configuration field :ref:`rate_limited_as_resource_exhausted
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limited_as_resource_exhausted>`
     to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
+- area: http2
+  change: |
+    Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
+    This feature improves flow control within the proxy by deferring work on the receiving end if the other
+    end is backed up.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -40,6 +49,21 @@ bug_fixes:
   change: |
     Fixed a bug that caused the Datadog tracing extension to drop traces that
     should be kept on account of an extracted sampling decision.
+- area: quic
+  change: |
+    Fixed a bug in QUIC and HCM interaction which could cause use-after-free during asynchronous certificates retrieval.
+    The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
+- area: redis
+  change: |
+    Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.
+- area: ext_proc
+  change: |
+    Fixed content_length related issues when body mutation by external processor is enabled. ext_proc filter removes the content
+    length header in 1)STREAMED BodySendMode 2) BUFFERED_PARTIAL BodySendMode and 3) BUFFERED BodySendMode + SKIP HeaderSendMode.
+    This will enable chunked-encoding whenever feasible in HTTP1.1. Besides, ext_proc filter keep content length header
+    in BUFFERED BodySendMode + SEND HeaderSendMode. It is now external processor's responsibility to set the content length
+    correctly matched to the mutated body. if those two doesn't match, the mutation will be rejected and local reply with error
+    status will be returned.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -64,8 +88,16 @@ removed_config_or_runtime:
   change: |
     Removed the deprecated ``envoy.reloadable_features.service_sanitize_non_utf8_strings``
     runtime flag and legacy code path.
+- area: access log
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.format_ports_as_numbers``
+    runtime flag and legacy code path.
 
 new_features:
+- area: filters
+  change: |
+    Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to
+    authenticate user credentials in the HTTP Authentication heaer defined in `RFC7617 <https://tools.ietf.org/html/rfc7617>`_.
 - area: upstream
   change: |
     Added :ref:`enable_full_scan <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
@@ -77,7 +109,6 @@ new_features:
   change: |
     added :ref:`per_endpoint_stats <envoy_v3_api_field_config.cluster.v3.TrackClusterStats.per_endpoint_stats>` to get some metrics
     for each endpoint in a cluster.
-
 - area: jwt
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
@@ -94,5 +125,31 @@ new_features:
     returns an error or cannot be reached with :ref:`status_on_error
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.status_on_error>`
     configuration flag.
+- area: tracing
+  change: |
+    Added support for configuring resource detectors on the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added support to configure a sampler for the OpenTelemetry tracer.
+- area: ext_authz
+  change: |
+    New config parameter :ref:`charge_cluster_response_stats
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.charge_cluster_response_stats>`
+    for not incrementing cluster statistics on ext_authz response. Default true, no behavior change.
+- area: ext_authz
+  change: |
+    forward :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` selected by
+    :ref:`route_metadata_context_namespaces
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.route_metadata_context_namespaces>`
+    and :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` selected by
+    :ref:`route_typed_metadata_context_namespaces
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.route_typed_metadata_context_namespaces>`
+    from the metadata of the selected route to external auth service.
+    This metadata propagation is independent from the dynamic metadata from connection and request.
+- area: ext_authz_filter
+  change: |
+    added :ref:`with_request_body
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>` to optionally override
+    the default behavior of sending the request body to the authorization server from the per-route filter.
 
 deprecated:
