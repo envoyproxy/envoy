@@ -51,13 +51,18 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   cm_.checkActiveStaticCluster(config.envoy_grpc().cluster_name());
 }
 
-AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
-                                               ThreadLocal::Instance& tls, TimeSource& time_source,
-                                               Api::Api& api, const StatNames& stat_names)
+AsyncClientManagerImpl::AsyncClientManagerImpl(
+    Upstream::ClusterManager& cm, ThreadLocal::Instance& tls, TimeSource& time_source,
+    Api::Api& api, const StatNames& stat_names,
+    const envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig& config)
     : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names),
       raw_async_client_cache_(tls_) {
-  raw_async_client_cache_.set([](Event::Dispatcher& dispatcher) {
-    return std::make_shared<RawAsyncClientCache>(dispatcher);
+
+  auto entry_timeout_interval =
+      std::chrono::seconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(config, entry_expiration_time, 50));
+
+  raw_async_client_cache_.set([&entry_timeout_interval](Event::Dispatcher& dispatcher) {
+    return std::make_shared<RawAsyncClientCache>(dispatcher, entry_timeout_interval);
   });
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
@@ -163,8 +168,9 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClientWithHas
   return client;
 }
 
-AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher) {
+AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(
+    Event::Dispatcher& dispatcher, std::chrono::seconds entry_timeout_interval)
+    : dispatcher_(dispatcher), entry_timeout_interval_(entry_timeout_interval) {
   cache_eviction_timer_ = dispatcher.createTimer([this] { evictEntriesAndResetEvictionTimer(); });
 }
 
@@ -185,6 +191,7 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
     const GrpcServiceConfigWithHashKey& config_with_hash_key) {
   auto it = lru_map_.find(config_with_hash_key);
   if (it == lru_map_.end()) {
+    ENVOY_LOG_MISC(info, "it == lru_map_.end()");
     return nullptr;
   }
   const auto cache_entry = it->second;
@@ -205,7 +212,7 @@ void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTi
   MonotonicTime now = dispatcher_.timeSource().monotonicTime();
   // Evict all the entries that have expired.
   while (!lru_list_.empty()) {
-    MonotonicTime next_expire = lru_list_.back().accessed_time_ + EntryTimeoutInterval;
+    MonotonicTime next_expire = lru_list_.back().accessed_time_ + entry_timeout_interval_;
     std::chrono::seconds time_to_next_expire_sec =
         std::chrono::duration_cast<std::chrono::seconds>(next_expire - now);
     // since 'now' and 'next_expire' are in nanoseconds, the following condition is to
