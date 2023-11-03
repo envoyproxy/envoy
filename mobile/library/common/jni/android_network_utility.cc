@@ -16,11 +16,10 @@ bool jvm_cert_is_issued_by_known_root(Envoy::JNI::JniHelper& jni_helper, jobject
   jclass jcls_AndroidCertVerifyResult =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_isIssuedByKnownRoot =
-      jni_helper.getEnv()->GetMethodID(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
+      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
   Envoy::JNI::Exception::checkAndClear("jvm_cert_is_issued_by_known_root:GetMethodID");
   ASSERT(jmid_isIssuedByKnownRoot);
-  bool is_issued_by_known_root =
-      jni_helper.getEnv()->CallBooleanMethod(result, jmid_isIssuedByKnownRoot);
+  bool is_issued_by_known_root = jni_helper.callBooleanMethod(result, jmid_isIssuedByKnownRoot);
   Envoy::JNI::Exception::checkAndClear("jvm_cert_is_issued_by_known_root:CallBooleanMethod");
   jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidCertVerifyResult);
   return is_issued_by_known_root;
@@ -31,12 +30,12 @@ envoy_cert_verify_status_t jvm_cert_get_status(Envoy::JNI::JniHelper& jni_helper
   jclass jcls_AndroidCertVerifyResult =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_getStatus =
-      jni_helper.getEnv()->GetMethodID(jcls_AndroidCertVerifyResult, "getStatus", "()I");
+      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "getStatus", "()I");
   Envoy::JNI::Exception::checkAndClear("jvm_cert_get_status:GetMethodID");
   ASSERT(jmid_getStatus);
   envoy_cert_verify_status_t result = CERT_VERIFY_STATUS_FAILED;
-  result = static_cast<envoy_cert_verify_status_t>(
-      jni_helper.getEnv()->CallIntMethod(j_result, jmid_getStatus));
+  result =
+      static_cast<envoy_cert_verify_status_t>(jni_helper.callIntMethod(j_result, jmid_getStatus));
   Envoy::JNI::Exception::checkAndClear("jvm_cert_get_status:CallIntMethod");
 
   jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidCertVerifyResult);
@@ -47,8 +46,8 @@ jobjectArray jvm_cert_get_certificate_chain_encoded(Envoy::JNI::JniHelper& jni_h
                                                     jobject result) {
   jclass jcls_AndroidCertVerifyResult =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
-  jmethodID jmid_getCertificateChainEncoded = jni_helper.getEnv()->GetMethodID(
-      jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
+  jmethodID jmid_getCertificateChainEncoded =
+      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
   Envoy::JNI::Exception::checkAndClear("jvm_cert_get_certificate_chain_encoded:GetMethodID");
   jobjectArray certificate_chain = static_cast<jobjectArray>(
       jni_helper.getEnv()->CallObjectMethod(result, jmid_getCertificateChainEncoded));

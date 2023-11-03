@@ -52,13 +52,13 @@ void jni_delete_const_global_ref(const void* context) {
 
 int unbox_integer(JniHelper& jni_helper, jobject boxedInteger) {
   jclass jcls_Integer = jni_helper.getEnv()->FindClass("java/lang/Integer");
-  jmethodID jmid_intValue = jni_helper.getEnv()->GetMethodID(jcls_Integer, "intValue", "()I");
+  jmethodID jmid_intValue = jni_helper.getMethodId(jcls_Integer, "intValue", "()I");
   jni_helper.getEnv()->DeleteLocalRef(jcls_Integer);
-  return callIntMethod(jni_helper, boxedInteger, jmid_intValue);
+  return jni_helper.callIntMethod(boxedInteger, jmid_intValue);
 }
 
 envoy_data array_to_native_data(JniHelper& jni_helper, jbyteArray j_data) {
-  size_t data_length = static_cast<size_t>(jni_helper.getEnv()->GetArrayLength(j_data));
+  size_t data_length = static_cast<size_t>(jni_helper.getArrayLength(j_data));
   return array_to_native_data(jni_helper, j_data, data_length);
 }
 
@@ -136,9 +136,9 @@ jlongArray native_final_stream_intel_to_array(JniHelper& jni_helper,
 
 jobject native_map_to_map(JniHelper& jni_helper, envoy_map map) {
   jclass jcls_hashMap = jni_helper.getEnv()->FindClass("java/util/HashMap");
-  jmethodID jmid_hashMapInit = jni_helper.getEnv()->GetMethodID(jcls_hashMap, "<init>", "(I)V");
+  jmethodID jmid_hashMapInit = jni_helper.getMethodId(jcls_hashMap, "<init>", "(I)V");
   jobject j_hashMap = jni_helper.getEnv()->NewObject(jcls_hashMap, jmid_hashMapInit, map.length);
-  jmethodID jmid_hashMapPut = jni_helper.getEnv()->GetMethodID(
+  jmethodID jmid_hashMapPut = jni_helper.getMethodId(
       jcls_hashMap, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     auto key = native_data_to_string(jni_helper, map.entries[i].key);
@@ -160,7 +160,7 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data) {
     // We skip checking hasArray() because only direct ByteBuffers or array-backed ByteBuffers
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
-    jmethodID jmid_array = jni_helper.getEnv()->GetMethodID(jcls_ByteBuffer, "array", "()[B");
+    jmethodID jmid_array = jni_helper.getMethodId(jcls_ByteBuffer, "array", "()[B");
     jbyteArray array = static_cast<jbyteArray>(callObjectMethod(jni_helper, j_data, jmid_array));
     jni_helper.getEnv()->DeleteLocalRef(jcls_ByteBuffer);
 
@@ -182,7 +182,7 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data, size_t d
     // We skip checking hasArray() because only direct ByteBuffers or array-backed ByteBuffers
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
-    jmethodID jmid_array = jni_helper.getEnv()->GetMethodID(jcls_ByteBuffer, "array", "()[B");
+    jmethodID jmid_array = jni_helper.getMethodId(jcls_ByteBuffer, "array", "()[B");
     jbyteArray array = static_cast<jbyteArray>(callObjectMethod(jni_helper, j_data, jmid_array));
     jni_helper.getEnv()->DeleteLocalRef(jcls_ByteBuffer);
 
@@ -241,7 +241,7 @@ envoy_stats_tags to_native_tags(JniHelper& jni_helper, jobjectArray tags) {
 envoy_map to_native_map(JniHelper& jni_helper, jobjectArray entries) {
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
-  envoy_map_size_t length = jni_helper.getEnv()->GetArrayLength(entries);
+  envoy_map_size_t length = jni_helper.getArrayLength(entries);
   if (length == 0) {
     return {0, nullptr};
   }
@@ -314,13 +314,13 @@ void JavaArrayOfByteArrayToStringVector(JniHelper& jni_helper, jobjectArray arra
                                         std::vector<std::string>* out) {
   ASSERT(out);
   ASSERT(array);
-  size_t len = jni_helper.getEnv()->GetArrayLength(array);
+  size_t len = jni_helper.getArrayLength(array);
   out->resize(len);
 
   for (size_t i = 0; i < len; ++i) {
     jbyteArray bytes_array =
         static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i));
-    jsize bytes_len = jni_helper.getEnv()->GetArrayLength(bytes_array);
+    jsize bytes_len = jni_helper.getArrayLength(bytes_array);
     // It doesn't matter if the array returned by GetByteArrayElements is a copy
     // or not, as the data will be simply be copied into C++ owned memory below.
     jbyte* bytes = jni_helper.getEnv()->GetByteArrayElements(bytes_array, /*isCopy=*/nullptr);
@@ -340,7 +340,7 @@ void JavaArrayOfByteToString(JniHelper& jni_helper, jbyteArray jbytes, std::stri
 
 void JavaArrayOfByteToBytesVector(JniHelper& jni_helper, jbyteArray array,
                                   std::vector<uint8_t>* out) {
-  const size_t len = jni_helper.getEnv()->GetArrayLength(array);
+  const size_t len = jni_helper.getArrayLength(array);
   out->resize(len);
 
   // It doesn't matter if the array returned by GetByteArrayElements is a copy
@@ -370,7 +370,7 @@ MatcherData::Type StringToType(std::string type_as_string) {
 
 std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, jobjectArray array,
                                                       std::string& cluster_name_out) {
-  const size_t len = jni_helper.getEnv()->GetArrayLength(array);
+  const size_t len = jni_helper.getArrayLength(array);
   std::vector<MatcherData> ret;
   if (len == 0) {
     return ret;
@@ -405,7 +405,7 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, job
 void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
                           Envoy::Protobuf::MessageLite* dest) {
   jbyte* bytes = jni_helper.getEnv()->GetByteArrayElements(source, /* isCopy= */ nullptr);
-  jsize size = jni_helper.getEnv()->GetArrayLength(source);
+  jsize size = jni_helper.getArrayLength(source);
   bool success = dest->ParseFromArray(bytes, size);
   RELEASE_ASSERT(success, "Failed to parse protobuf message.");
   jni_helper.getEnv()->ReleaseByteArrayElements(source, bytes, 0);
@@ -424,27 +424,6 @@ void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
 
 // TODO(fredyw): Delete these functions are replaced them with the ones from JniHelper
 
-void throwException(JniHelper& jni_helper, const char* java_class_name, const char* message) {
-  jclass java_class = jni_helper.getEnv()->FindClass(java_class_name);
-  jint error = jni_helper.getEnv()->ThrowNew(java_class, message);
-  RELEASE_ASSERT(error == JNI_OK, "Failed to throw an exception.");
-  jni_helper.getEnv()->DeleteLocalRef(java_class);
-}
-
-void callVoidMethod(JniHelper& jni_helper, jobject object, jmethodID method_id, ...) {
-  va_list args;
-  va_start(args, method_id);
-  jni_helper.getEnv()->CallVoidMethodV(object, method_id, args);
-  va_end(args);
-  Envoy::JNI::Exception::checkAndClear();
-}
-
-JNI_UTILITY_DEFINE_CALL_METHOD(Char, jchar)
-JNI_UTILITY_DEFINE_CALL_METHOD(Short, jshort)
-JNI_UTILITY_DEFINE_CALL_METHOD(Int, jint)
-JNI_UTILITY_DEFINE_CALL_METHOD(Long, jlong)
-JNI_UTILITY_DEFINE_CALL_METHOD(Double, jdouble)
-JNI_UTILITY_DEFINE_CALL_METHOD(Boolean, jboolean)
 JNI_UTILITY_DEFINE_CALL_METHOD(Object, jobject)
 
 #define JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                 \
@@ -458,20 +437,6 @@ JNI_UTILITY_DEFINE_CALL_METHOD(Object, jobject)
     return result;                                                                                 \
   }
 
-void callStaticVoidMethod(JniHelper& jni_helper, jclass clazz, jmethodID method_id, ...) {
-  va_list args;
-  va_start(args, method_id);
-  jni_helper.getEnv()->CallStaticVoidMethodV(clazz, method_id, args);
-  va_end(args);
-  Envoy::JNI::Exception::checkAndClear();
-}
-
-JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(Char, jchar)
-JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(Short, jshort)
-JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(Int, jint)
-JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(Long, jlong)
-JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(Double, jdouble)
-JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(Boolean, jboolean)
 JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(Object, jobject)
 
 } // namespace JNI
