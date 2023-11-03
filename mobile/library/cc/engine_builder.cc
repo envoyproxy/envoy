@@ -26,6 +26,7 @@
 #endif
 
 #include "source/common/http/matching/inputs.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "absl/strings/str_join.h"
@@ -46,17 +47,11 @@ namespace Platform {
 XdsBuilder::XdsBuilder(std::string xds_server_address, const int xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
-XdsBuilder& XdsBuilder::setAuthenticationToken(std::string token_header, std::string token) {
-  authentication_token_header_ = std::move(token_header);
-  authentication_token_ = std::move(token);
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
-                                                  const int token_lifetime_in_seconds) {
-  jwt_token_ = std::move(token);
-  jwt_token_lifetime_in_seconds_ =
-      token_lifetime_in_seconds > 0 ? token_lifetime_in_seconds : DefaultJwtTokenLifetimeSeconds;
+XdsBuilder& XdsBuilder::addInitialStreamHeader(std::string header, std::string value) {
+  envoy::config::core::v3::HeaderValue header_value;
+  header_value.set_key(std::move(header));
+  header_value.set_value(std::move(value));
+  xds_initial_grpc_metadata_.emplace_back(std::move(header_value));
   return *this;
 }
 
@@ -102,17 +97,11 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
         ->set_inline_string(ssl_root_certs_);
   }
 
-  if (!authentication_token_header_.empty() && !authentication_token_.empty()) {
-    auto* auth_token_metadata = grpc_service.add_initial_metadata();
-    auth_token_metadata->set_key(authentication_token_header_);
-    auth_token_metadata->set_value(authentication_token_);
-  } else if (!jwt_token_.empty()) {
-    auto& jwt = *grpc_service.mutable_google_grpc()
-                     ->add_call_credentials()
-                     ->mutable_service_account_jwt_access();
-    jwt.set_json_key(jwt_token_);
-    jwt.set_token_lifetime_seconds(jwt_token_lifetime_in_seconds_);
+  if (!xds_initial_grpc_metadata_.empty()) {
+    grpc_service.mutable_initial_metadata()->Assign(xds_initial_grpc_metadata_.begin(),
+                                                    xds_initial_grpc_metadata_.end());
   }
+
   if (!sni_.empty()) {
     auto& channel_args =
         *grpc_service.mutable_google_grpc()->mutable_channel_args()->mutable_args();
@@ -313,6 +302,11 @@ EngineBuilder& EngineBuilder::addQuicHint(std::string host, int port) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
+  quic_suffixes_.emplace_back(std::move(suffix));
+  return *this;
+}
+
 #endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
@@ -466,6 +460,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           cache_config.mutable_alternate_protocols_cache_options()->add_prepopulated_entries();
       entry->set_hostname(host);
       entry->set_port(port);
+    }
+    for (const auto& suffix : quic_suffixes_) {
+      cache_config.mutable_alternate_protocols_cache_options()->add_canonical_suffixes(suffix);
     }
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
@@ -834,6 +831,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
                         ->add_prepopulated_entries();
       entry->set_hostname(host);
       entry->set_port(port);
+    }
+    for (const auto& suffix : quic_suffixes_) {
+      alpn_options.mutable_auto_config()
+          ->mutable_alternate_protocols_cache_options()
+          ->add_canonical_suffixes(suffix);
     }
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);

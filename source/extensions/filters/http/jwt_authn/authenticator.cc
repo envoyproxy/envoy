@@ -12,6 +12,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/str_split.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/struct_utils.h"
 #include "jwt_verify_lib/verify.h"
@@ -75,6 +76,9 @@ private:
 
   // Handle Good Jwt either Cache JWT or verified public key.
   void handleGoodJwt(bool cache_hit);
+
+  // Normalize and set the payload metadata.
+  void setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload);
 
   // Calls the callback with status.
   void doneWithStatus(const Status& status);
@@ -373,9 +377,8 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     if (!provider.header_in_metadata().empty()) {
       set_extracted_jwt_data_cb_(provider.header_in_metadata(), jwt_->header_pb_);
     }
-
     if (!provider.payload_in_metadata().empty()) {
-      set_extracted_jwt_data_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
+      setPayloadMetadata(jwt_->payload_pb_);
     }
   }
   if (provider_ && !cache_hit) {
@@ -383,6 +386,27 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     jwks_data_->getJwtCache().insert(curr_token_->token(), std::move(owned_jwt_));
   }
   doneWithStatus(Status::Ok);
+}
+
+void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload) {
+  const auto& provider = jwks_data_->getJwtProvider();
+  const auto& normalize = provider.normalize_payload_in_metadata();
+  if (normalize.space_delimited_claims().size() == 0) {
+    set_extracted_jwt_data_cb_(provider.payload_in_metadata(), jwt_payload);
+  }
+  // Make a temporary copy to normalize the JWT struct.
+  ProtobufWkt::Struct out_payload = jwt_payload;
+  for (const auto& claim : normalize.space_delimited_claims()) {
+    const auto& it = jwt_payload.fields().find(claim);
+    if (it != jwt_payload.fields().end() && it->second.has_string_value()) {
+      const auto list = absl::StrSplit(it->second.string_value(), ' ', absl::SkipEmpty());
+      for (const auto& elt : list) {
+        (*out_payload.mutable_fields())[claim].mutable_list_value()->add_values()->set_string_value(
+            elt);
+      }
+    }
+  }
+  set_extracted_jwt_data_cb_(provider.payload_in_metadata(), out_payload);
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
