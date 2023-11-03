@@ -250,7 +250,7 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithConfig) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Bootstrap::GrpcAsyncClientManagerConfig aync_manager_config;
-  aync_manager_config.mutable_entry_timeout()->MergeFrom(
+  aync_manager_config.mutable_entry_expiration_time()->MergeFrom(
       ProtobufUtil::TimeUtil::SecondsToDuration(20));
 
   createAsyncClientManager(aync_manager_config);
