@@ -779,6 +779,7 @@ modify different aspects of the server:
   Example histogram output:
 
   .. code-block:: text
+
     # TYPE envoy_server_initialization_time_ms histogram
     envoy_server_initialization_time_ms_bucket{le="0.5"} 0
     envoy_server_initialization_time_ms_bucket{le="1"} 0
@@ -806,6 +807,7 @@ modify different aspects of the server:
   Example summary output:
 
   .. code-block:: text
+
     # TYPE envoy_server_initialization_time_ms summary
     envoy_server_initialization_time_ms{quantile="0"} 110.00000000000001
     envoy_server_initialization_time_ms{quantile="0.25"} 112.50000000000001
