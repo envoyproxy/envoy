@@ -359,7 +359,8 @@ public:
     return nullptr;
   }
 
-  FuzzCluster* selectClusterByThreadLocalCluster(Upstream::ThreadLocalCluster& thread_local_cluster) {
+  FuzzCluster*
+  selectClusterByThreadLocalCluster(Upstream::ThreadLocalCluster& thread_local_cluster) {
     for (auto& cluster : clusters_) {
       if (&cluster->tlc_ == &thread_local_cluster) {
         return cluster.get();
@@ -406,8 +407,7 @@ public:
   Router::GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        Upstream::ResourcePriority,
-                        absl::optional<Envoy::Http::Protocol> protocol,
+                        Upstream::ResourcePriority, absl::optional<Envoy::Http::Protocol> protocol,
                         Upstream::LoadBalancerContext*) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       return nullptr;
