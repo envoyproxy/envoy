@@ -147,5 +147,9 @@ new_features:
     added :ref:`with_request_body
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>` to optionally override
     the default behavior of sending the request body to the authorization server from the per-route filter.
+- area: grpc async client
+  change: |
+    added :ref:`grpc_async_client_manager_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig.grpc_async_client_manager_config>`
+    to control the cached grpc client eviction time in the cache.
 
 deprecated:

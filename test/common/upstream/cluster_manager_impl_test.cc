@@ -1479,7 +1479,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   create(parseBootstrapFromV3Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
-  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+  EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection));
   auto conn_data = cluster_manager_->getThreadLocalCluster("cluster_1")->tcpConn(nullptr);
   EXPECT_EQ(connection, conn_data.connection_.get());
@@ -2235,7 +2235,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   ON_CALL(*cluster2->info_, features())
       .WillByDefault(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
-  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+  EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(*connection, setBufferLimits(_));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
@@ -2685,7 +2685,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
         }));
     create(parseBootstrapFromV3Yaml(yaml));
 
-    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(connection1));
     conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
@@ -2697,11 +2697,11 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
 
     connection1 = new NiceMock<Network::MockClientConnection>();
-    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(connection1));
     conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
-    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(connection2));
     conn_info2 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
   }
@@ -2758,7 +2758,7 @@ TEST_P(ClusterManagerLifecycleTest, DoNotCloseTcpConnectionsOnHealthFailure) {
       }));
   create(parseBootstrapFromV3Yaml(yaml));
 
-  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+  EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection1));
   conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
@@ -2876,7 +2876,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   cp1->idle_cb_ = nullptr;
   tcp1->idle_cb_();
   tcp1->idle_cb_ = nullptr;
-  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(2);
+  EXPECT_CALL(factory_.tls_.mock_dispatcher_, deferredDelete_(_)).Times(2);
   cp1_high->idle_cb_();
   cp1_high->idle_cb_ = nullptr;
   tcp1_high->idle_cb_();
@@ -3064,7 +3064,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   EXPECT_NE(tcp2_example_com, tcp1_high);
   EXPECT_NE(tcp2_example_com, tcp2_high);
 
-  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(6);
+  EXPECT_CALL(factory_.tls_.mock_dispatcher_, deferredDelete_(_)).Times(6);
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
@@ -4800,7 +4800,7 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
   EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
   EXPECT_CALL(*connection, addWriteFilter(_));
   EXPECT_CALL(*connection, addFilter(_)).Times(0);
-  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+  EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection));
   auto conn_data = cluster_manager_->getThreadLocalCluster("cluster_1")->tcpConn(nullptr);
   EXPECT_EQ(connection, conn_data.connection_.get());
@@ -5111,7 +5111,7 @@ public:
     }
     EXPECT_CALL(socket, ipVersion())
         .WillRepeatedly(testing::Return(Network::Address::IpVersion::v4));
-    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Invoke([this, &names_vals, expect_success, &socket](
                              Network::Address::InstanceConstSharedPtr,
                              Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
@@ -5147,7 +5147,7 @@ public:
   }
 
   void expectNoSocketOptions() {
-    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(
             Invoke([this](Network::Address::InstanceConstSharedPtr,
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
@@ -5581,7 +5581,7 @@ public:
                                    absl::optional<int> keepalive_time,
                                    absl::optional<int> keepalive_interval) {
     if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
-      EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+      EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
           .WillOnce(
               Invoke([this](Network::Address::InstanceConstSharedPtr,
                             Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
@@ -5600,7 +5600,7 @@ public:
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     NiceMock<Network::MockConnectionSocket> socket;
-    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Invoke([this, &socket](Network::Address::InstanceConstSharedPtr,
                                          Network::Address::InstanceConstSharedPtr,
                                          Network::TransportSocketPtr&,
@@ -5659,7 +5659,7 @@ public:
 
   void expectOnlyNoSigpipeOptions() {
     NiceMock<Network::MockConnectionSocket> socket;
-    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Invoke([this, &socket](Network::Address::InstanceConstSharedPtr,
                                          Network::Address::InstanceConstSharedPtr,
                                          Network::TransportSocketPtr&,
@@ -5682,7 +5682,7 @@ public:
   }
 
   void expectNoSocketOptions() {
-    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(factory_.tls_.mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(
             Invoke([this](Network::Address::InstanceConstSharedPtr,
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
