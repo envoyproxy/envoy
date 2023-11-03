@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Formatter {
 
-const std::regex& commandWithArgsRegex() {
+const std::regex& SubstitutionFormatParser::commandWithArgsRegex() {
   // The following regex is used to check validity of the formatter command and to
   // extract groups.
   // The formatter command has the following format:
