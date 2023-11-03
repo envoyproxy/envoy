@@ -149,7 +149,7 @@ new_features:
     the default behavior of sending the request body to the authorization server from the per-route filter.
 - area: grpc async client
   change: |
-    added :ref:`grpc_async_client_manager_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig.grpc_async_client_manager_config>`
+    added :ref:`grpc_async_client_manager_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.grpc_async_client_manager_config>`
     to control the cached grpc client eviction time in the cache.
 
 deprecated:
