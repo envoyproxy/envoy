@@ -367,6 +367,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   case Utility::HistogramBucketsMode::Summary:
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
+    break;
   // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics, but are here
   // to preserve backwards compatibility.
   case Utility::HistogramBucketsMode::Unset:
@@ -375,6 +376,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   case Utility::HistogramBucketsMode::Disjoint:
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
+    break;
   }
 
   // Note: This assumes that there is no overlap in stat name between per-endpoint stats and all
