@@ -41,18 +41,18 @@ constexpr absl::string_view LocalReplyFilterStateKey =
 class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
 public:
   LocalReplyOwnerObject(const std::string& filter_config_name)
-      : filter_config_name(filter_config_name) {}
+      : filter_config_name_(filter_config_name) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto message = std::make_unique<ProtobufWkt::StringValue>();
-    message->set_value(filter_config_name);
+    message->set_value(filter_config_name_);
     return message;
   }
 
-  absl::optional<std::string> serializeAsString() const override { return filter_config_name; }
+  absl::optional<std::string> serializeAsString() const override { return filter_config_name_; }
 
 private:
-  const std::string filter_config_name;
+  const std::string filter_config_name_;
 };
 
 /**
@@ -156,15 +156,10 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 
   Router::RouteConstSharedPtr getRoute() const;
 
-  void setLocalReplyOwnerInformation() {
-    if (!streamInfo().filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey)) {
-      streamInfo().filterState()->setData(
-          LocalReplyFilterStateKey,
-          std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::FilterChain);
-    }
-  }
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because

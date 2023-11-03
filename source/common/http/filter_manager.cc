@@ -368,6 +368,22 @@ ResponseTrailerMapOptRef ActiveStreamFilterBase::responseTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
+void ActiveStreamFilterBase::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+
+  if (!streamInfo().filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey)) {
+    streamInfo().filterState()->setData(
+        LocalReplyFilterStateKey,
+        std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+}
+
 bool ActiveStreamDecoderFilter::canContinue() {
   // It is possible for the connection manager to respond directly to a request even while
   // a filter is trying to continue. If a response has already happened, we should not
@@ -481,9 +497,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
 
-  setLocalReplyOwnerInformation();
-
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+  ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
@@ -1726,9 +1740,7 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
 
-  setLocalReplyOwnerInformation();
-
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+  ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {

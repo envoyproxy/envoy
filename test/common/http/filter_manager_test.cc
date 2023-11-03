@@ -59,6 +59,19 @@ public:
     };
   }
 
+  void validateFilterStateData(const std::string& expectedName) {
+    ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+        LocalReplyFilterStateKey));
+    auto fs_value =
+        filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
+            LocalReplyFilterStateKey);
+    EXPECT_EQ(fs_value->serializeAsString(), expectedName);
+
+    auto expected = std::make_unique<ProtobufWkt::StringValue>();
+    expected->set_value(expectedName);
+    EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  }
+
   std::unique_ptr<FilterManager> filter_manager_;
   NiceMock<MockFilterManagerCallbacks> filter_manager_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -155,7 +168,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({"filter1", "filter1"}, factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, factory);
         return true;
       }));
 
@@ -175,17 +188,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
 
   filter_manager_->decodeHeaders(*grpc_headers, true);
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
-      LocalReplyFilterStateKey));
-  auto fs_value =
-      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
-          LocalReplyFilterStateKey);
-
-  EXPECT_EQ(fs_value->serializeAsString(), "filter1");
-
-  auto expected = std::make_unique<ProtobufWkt::StringValue>();
-  expected->set_value("filter1");
-  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  validateFilterStateData("configName1");
 
   filter_manager_->destroyFilters();
 }
@@ -219,10 +222,10 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({"filter1", "filter1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
 
         auto stream_factory = createStreamFilterFactoryCb(encoder_filter);
-        manager.applyFilterFactoryCb({"filter2", "filter2"}, stream_factory);
+        manager.applyFilterFactoryCb({"configName2", "filterName2"}, stream_factory);
         return true;
       }));
 
@@ -249,17 +252,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
 
   filter_manager_->decodeHeaders(*grpc_headers, true);
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
-      LocalReplyFilterStateKey));
-  auto fs_value =
-      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
-          LocalReplyFilterStateKey);
-
-  EXPECT_EQ(fs_value->serializeAsString(), "filter2");
-
-  auto expected = std::make_unique<ProtobufWkt::StringValue>();
-  expected->set_value("filter2");
-  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  validateFilterStateData("configName2");
 
   filter_manager_->destroyFilters();
 }
@@ -322,17 +315,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
-      LocalReplyFilterStateKey));
-  auto fs_value =
-      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
-          LocalReplyFilterStateKey);
-
-  EXPECT_EQ(fs_value->serializeAsString(), "configName1");
-
-  auto expected = std::make_unique<ProtobufWkt::StringValue>();
-  expected->set_value("configName1");
-  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  validateFilterStateData("configName1");
 
   filter_manager_->destroyFilters();
 }
@@ -400,17 +383,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details2");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
-      LocalReplyFilterStateKey));
-  auto fs_value =
-      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
-          LocalReplyFilterStateKey);
-
-  EXPECT_EQ(fs_value->serializeAsString(), "configName1");
-
-  auto expected = std::make_unique<ProtobufWkt::StringValue>();
-  expected->set_value("configName1");
-  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  validateFilterStateData("configName1");
 
   filter_manager_->destroyFilters();
 }
@@ -614,9 +587,9 @@ TEST_F(FilterManagerTest, MetadataContinueAll) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"filter1", "filter1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
         decoder_factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"filter2", "filter2"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName2", "filterName2"}, decoder_factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -686,9 +659,9 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"filter1", "filter1"}, factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, factory);
         factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"filter2", "filter2"}, factory);
+        manager.applyFilterFactoryCb({"configName2", "filterName2"}, factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -717,17 +690,8 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
   filter_manager_->decodeMetadata(map);
 
   EXPECT_THAT(*filter_manager_->streamInfo().responseCodeDetails(), "bad_metadata");
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
-      LocalReplyFilterStateKey));
-  auto fs_value =
-      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
-          LocalReplyFilterStateKey);
 
-  EXPECT_EQ(fs_value->serializeAsString(), "filter1");
-
-  auto expected = std::make_unique<ProtobufWkt::StringValue>();
-  expected->set_value("filter1");
-  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  validateFilterStateData("configName1");
 
   filter_manager_->destroyFilters();
 }
@@ -742,9 +706,9 @@ TEST_F(FilterManagerTest, MetadataContinueAllFollowedByHeadersLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"filter1", "filter1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
         decoder_factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"filter2", "filter2"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName2", "filterName2"}, decoder_factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -786,9 +750,9 @@ TEST_F(FilterManagerTest, MetadataContinueAllFollowedByHeadersLocalReplyRuntimeF
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"filter1", "filter1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
         decoder_factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"filter2", "filter2"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName2", "filterName2"}, decoder_factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -826,9 +790,9 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"filter1", "filter1"}, factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, factory);
         factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"filter2", "filter2"}, factory);
+        manager.applyFilterFactoryCb({"configName2", "filterName2"}, factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -853,17 +817,7 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
   MetadataMap map1 = {{"a", "b"}};
   filter_2->decoder_callbacks_->encodeMetadata(std::make_unique<MetadataMap>(map1));
 
-  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
-      LocalReplyFilterStateKey));
-  auto fs_value =
-      filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
-          LocalReplyFilterStateKey);
-
-  EXPECT_EQ(fs_value->serializeAsString(), "filter2");
-
-  auto expected = std::make_unique<ProtobufWkt::StringValue>();
-  expected->set_value("filter2");
-  EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  validateFilterStateData("configName2");
 
   filter_manager_->destroyFilters();
 }
@@ -875,7 +829,7 @@ TEST_F(FilterManagerTest, IdleTimerResets) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"filter1", "filter1"}, factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, factory);
         return true;
       }));
   filter_manager_->createFilterChain();
