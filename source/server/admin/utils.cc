@@ -39,6 +39,7 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
       histogram_buckets_mode = HistogramBucketsMode::Disjoint;
     } else if (histogram_buckets_query_param.value() == "detailed") {
       histogram_buckets_mode = HistogramBucketsMode::Detailed;
+    // "none" is a synonym for "summary", and exists to maintain backwards compatibility
     } else if (histogram_buckets_query_param.value() == "summary" ||
                histogram_buckets_query_param.value() == "none") {
       histogram_buckets_mode = HistogramBucketsMode::Summary;

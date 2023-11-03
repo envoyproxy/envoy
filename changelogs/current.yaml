@@ -147,5 +147,4 @@ new_features:
     from the metadata of the selected route to external auth service.
     This metadata propagation is independent from the dynamic metadata from connection and request.
 
-
 deprecated:

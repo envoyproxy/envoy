@@ -363,10 +363,16 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count += outputStatType<Stats::TextReadout>(
       response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
-  if (params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary) {
+  switch (params.histogram_buckets_mode_) {
+  case Utility::HistogramBucketsMode::Summary:
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
-  } else {
+  // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics, but are here
+  // to preserve backwards compatibility.
+  case Utility::HistogramBucketsMode::Unset:
+  case Utility::HistogramBucketsMode::Cumulative:
+  case Utility::HistogramBucketsMode::Detailed:
+  case Utility::HistogramBucketsMode::Disjoint:
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
   }
