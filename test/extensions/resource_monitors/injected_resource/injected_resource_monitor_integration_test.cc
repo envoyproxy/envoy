@@ -42,14 +42,6 @@ public:
     codec_client_.reset();
   }
 
-  IntegrationCodecClientPtr makeRawHttpConnection(
-      Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
-    IntegrationCodecClientPtr codec =
-        HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
-    return codec;
-  }
-
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       const std::string overload_config =

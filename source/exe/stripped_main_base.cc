@@ -95,6 +95,7 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     logging_context_ =
         std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                           restarter_->logLock(), options_.logFormatEscaped());
+    process_context_ = std::move(process_context);
     break;
   }
 }
