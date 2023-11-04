@@ -113,6 +113,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
+// TODO(suniltheta): Once the newly added http async technique proves effective and
+// is stabilized get rid of this feature flag and code path that relies on libcurl.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_libcurl_to_fetch_aws_credentials);
 // TODO(adisuissa): enable by default once this is tested in prod.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 // TODO(#10646) change to true when UHV is sufficiently tested

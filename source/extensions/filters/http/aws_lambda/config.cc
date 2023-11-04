@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/aws_lambda/config.h"
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
@@ -45,7 +46,8 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), Extensions::Common::Aws::Utility::fetchMetadata);
+          context.api(), makeOptRef(context.getServerFactoryContext()),
+          Extensions::Common::Aws::Utility::fetchMetadata);
 
   auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
       service_name, region, std::move(credentials_provider),
