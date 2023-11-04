@@ -39,7 +39,6 @@ envoy_cc_library(
     deps = [
         ":config_utility_lib",
         ":context_lib",
-        ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
         ":reset_header_parser_lib",
@@ -421,30 +420,14 @@ envoy_cc_library(
     ],
     hdrs = ["header_parser.h"],
     deps = [
-        ":header_formatter_lib",
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "header_formatter_lib",
-    hdrs = ["header_formatter.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        "//envoy/router:string_accessor_interface",
-        "//envoy/stream_info:filter_state_interface",
-        "//envoy/stream_info:stream_info_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/config:metadata_lib",
-        "//source/common/formatter:substitution_formatter_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/json:json_loader_lib",
     ],
 )
 
