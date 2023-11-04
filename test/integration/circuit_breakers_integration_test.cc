@@ -2,8 +2,6 @@
 
 #include "test/integration/http_protocol_integration.h"
 
-#include "http_integration.h"
-
 namespace Envoy {
 namespace {
 
