@@ -165,8 +165,11 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
 
 void RetryStateImpl::enableBackoffTimer() {
+  ENVOY_LOG_MISC(debug, "enabling backoff timer for retry");
+
   if (!retry_timer_) {
     retry_timer_ = dispatcher_.createTimer([this]() -> void {
+      ENVOY_LOG_MISC(debug, "backoff timer for retry has fired");
       ASSERT(backoff_callback_ != nullptr);
       switch (scheduling_state_) {
       case RetrySchedulingState::RateLimitedBackoff:
@@ -298,6 +301,7 @@ void RetryStateImpl::resetRetry() {
     cluster_.resourceManager(priority_).retries().dec();
     cluster_.trafficStats()->upstream_rq_retry_active_.dec();
     if (scheduling_state_ == RetrySchedulingState::Immediate) {
+      // Request cancelled while waiting for callback
       cluster_.resourceManager(priority_).retriesScheduled().dec();
       scheduling_state_ = RetrySchedulingState::NotScheduled;
     }

@@ -105,7 +105,12 @@ private:
                  TimeSource& time_source, Upstream::ResourcePriority priority,
                  bool auto_configured_for_http3);
 
-  enum class RetrySchedulingState { NotScheduled, Immediate, ExponentialBackoff, RateLimitedBackoff };
+  enum class RetrySchedulingState {
+    NotScheduled,
+    Immediate,
+    ExponentialBackoff,
+    RateLimitedBackoff
+  };
 
   void enableBackoffTimer();
   void resetRetry();

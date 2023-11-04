@@ -484,6 +484,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "retry_budget_integration_test",
+    size = "large",
+    srcs = ["retry_budget_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_flood_integration_test",
     size = "large",
     srcs = [

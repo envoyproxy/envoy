@@ -166,6 +166,45 @@ TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
   EXPECT_EQ(100u, rm.maxConnectionsPerHost());
   rm.retries().dec();
 }
+
+TEST(ResourceManagerImplTest, RetryBudgetIncludeProposedRequest) {
+  NiceMock<Runtime::MockLoader> runtime;
+  Stats::IsolatedStoreImpl store;
+
+  auto stats = clusterCircuitBreakersStats(store);
+
+  ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
+                         1, 0, 3, 100, stats, 100.0, 0);
+
+  EXPECT_EQ(0U, rm.retries().max());
+  EXPECT_EQ(0U, rm.retries().count());
+  EXPECT_TRUE(rm.retries().canCreate());
+}
+
+TEST(ResourceManagerImplTest, RetryBudgetRoundDown) {
+  NiceMock<Runtime::MockLoader> runtime;
+  Stats::IsolatedStoreImpl store;
+
+  auto stats = clusterCircuitBreakersStats(store);
+
+  ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
+                         1, 0, 3, 100, stats, 75.0, 1);
+
+  EXPECT_EQ(1U, rm.retries().max()); // max(floor(0 * 0.75), 1) = 1
+  EXPECT_EQ(0U, rm.retries().count());
+
+  rm.requests().inc();
+
+  EXPECT_EQ(1U, rm.retries().max()); // max(floor(1 * 0.75), 1) = 1
+
+  rm.requests().inc();
+
+  EXPECT_EQ(1U, rm.retries().max()); // max(floor(2 * 0.75), 1) = 1
+
+  rm.requests().inc();
+
+  EXPECT_EQ(2U, rm.retries().max()); // max(floor(3 * 0.75), 1) = 2
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

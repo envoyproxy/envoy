@@ -125,9 +125,29 @@ private:
         return max_retry_resource_.canCreate();
       }
       clearRemainingGauge();
-      // Count the proposed retry towards the active requests, as that is what
-      // the retry budget state will be if the retry is allowed.
-      return count() < max();
+      // Count the proposed retry against the number of active requests.
+      //
+      // There are two cases that are very hard to distinguish between:
+      // 1. We're deciding on a retry when the HTTP stream to the upstream service has already been
+      // destructed.
+      //    This could happen if it was a header-only response, depending on the protocol and codec
+      //    used. In that case, we need to count one additional active request because the retry
+      //    will create another upstream HTTP stream that isn't already counted.
+      // 2. We're deciding on a retry when the upstream HTTP stream isn't yet destructed. This can
+      // happen with
+      //    header-only requests under some protocols/codecs, but more often happens due to upstream
+      //    responses containing a body payload. In that case we make the retry decision when
+      //    decoding the headers, and depending on the result might close the stream early to retry
+      //    separately or let it stream to the client if we don't retry. In that case the upstream
+      //    HTTP stream is still going to be open when deciding on retries.
+      //
+      // Long story short, there might or might not already be an active stream when determining
+      // whether retries exceed the circuit breakers.
+      //
+      // In cases of ambiguity, it's better to tend towards allow than deny, so we add an extra
+      // stream here to include the proposed new upstream HTTP stream assuming the last try's stream
+      // has already been closed.
+      return count() < maxWithAdditionalActive(1);
     }
     void inc() override {
       max_retry_resource_.inc();
