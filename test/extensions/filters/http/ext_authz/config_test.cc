@@ -30,10 +30,10 @@ namespace ExtAuthz {
 
 class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
-  TestAsyncClientManagerImpl(
-      Upstream::ClusterManager& cm, ThreadLocal::Instance& tls, TimeSource& time_source,
-      Api::Api& api, const Grpc::StatNames& stat_names,
-      const Bootstrap::GrpcAsyncClientManagerConfig& config)
+  TestAsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
+                             TimeSource& time_source, Api::Api& api,
+                             const Grpc::StatNames& stat_names,
+                             const Bootstrap::GrpcAsyncClientManagerConfig& config)
       : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names, config) {}
   Grpc::AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService&,
                                                     Stats::Scope&, bool) override {
