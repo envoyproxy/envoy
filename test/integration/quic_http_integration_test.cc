@@ -36,7 +36,6 @@
 #include "test/test_common/utility.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
-#include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
@@ -92,6 +91,8 @@ public:
         return AssertionFailure() << "Timed out waiting for path response\n";
       }
     }
+    waiting_for_path_response_ = false;
+    saw_path_response_ = false;
     return AssertionSuccess();
   }
 
@@ -133,12 +134,42 @@ public:
     return EnvoyQuicClientConnection::OnHandshakeDoneFrame(frame);
   }
 
+  AssertionResult waitForNewCid(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    bool timer_fired = false;
+    if (!saw_new_cid_) {
+      Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
+        timer_fired = true;
+        dispatcher_.exit();
+      }));
+      timer->enableTimer(timeout);
+      waiting_for_new_cid_ = true;
+      dispatcher_.run(Event::Dispatcher::RunType::Block);
+      if (timer_fired) {
+        return AssertionFailure() << "Timed out waiting for new cid\n";
+      }
+    }
+    waiting_for_new_cid_ = false;
+    return AssertionSuccess();
+  }
+
+  bool OnNewConnectionIdFrame(const quic::QuicNewConnectionIdFrame& frame) override {
+    bool ret = EnvoyQuicClientConnection::OnNewConnectionIdFrame(frame);
+    saw_new_cid_ = true;
+    if (waiting_for_new_cid_) {
+      dispatcher_.exit();
+    }
+    saw_new_cid_ = false;
+    return ret;
+  }
+
 private:
   Event::Dispatcher& dispatcher_;
   bool saw_path_response_{false};
   bool saw_handshake_done_{false};
+  bool saw_new_cid_{false};
   bool waiting_for_path_response_{false};
   bool waiting_for_handshake_done_{false};
+  bool waiting_for_new_cid_{false};
   bool validation_failure_on_path_response_{false};
 };
 
@@ -189,7 +220,7 @@ public:
             (host.empty() ? transport_socket_factory_->clientContextConfig()->serverNameIndication()
                           : host),
             static_cast<uint16_t>(port), false},
-        transport_socket_factory_->getCryptoConfig(), &push_promise_index_, *dispatcher_,
+        transport_socket_factory_->getCryptoConfig(), *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
@@ -198,12 +229,13 @@ public:
     return session;
   }
 
-  IntegrationCodecClientPtr makeRawHttpConnection(
-      Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
+  IntegrationCodecClientPtr
+  makeRawHttpConnection(Network::ClientConnectionPtr&& conn,
+                        absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+                        bool wait_till_connected = true) override {
     ENVOY_LOG(debug, "Creating a new client {}",
               conn->connectionInfoProvider().localAddress()->asStringView());
-    return makeRawHttp3Connection(std::move(conn), http2_options, true);
+    return makeRawHttp3Connection(std::move(conn), http2_options, wait_till_connected);
   }
 
   // Create Http3 codec client with the option not to wait for 1-RTT key establishment.
@@ -360,7 +392,6 @@ public:
   }
 
 protected:
-  quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
@@ -798,12 +829,20 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   codec_client_->sendData(*request_encoder_, 1024u, false);
 
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
-  auto old_self_addr = quic_connection_->self_address();
-  EXPECT_CALL(*option, setOption(_, _)).Times(3u);
+
+  for (uint8_t i = 0; i < 5; i++) {
+    auto old_self_addr = quic_connection_->self_address();
+    EXPECT_CALL(*option, setOption(_, _)).Times(3u);
+    quic_connection_->OnPathDegradingDetected();
+    ASSERT_TRUE(quic_connection_->waitForPathResponse());
+    auto self_addr = quic_connection_->self_address();
+    EXPECT_NE(old_self_addr, self_addr);
+    ASSERT_TRUE(quic_connection_->waitForNewCid());
+  }
+
+  // port migration is disabled once socket switch limit is reached.
+  EXPECT_CALL(*option, setOption(_, _)).Times(0);
   quic_connection_->OnPathDegradingDetected();
-  ASSERT_TRUE(quic_connection_->waitForPathResponse());
-  auto self_addr = quic_connection_->self_address();
-  EXPECT_NE(old_self_addr, self_addr);
 
   // Send the rest data.
   codec_client_->sendData(*request_encoder_, 1024u, true);
@@ -1447,9 +1486,9 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
     SocketInterfaceSwap socket_swap(downstreamProtocol() == Http::CodecType::HTTP3
                                         ? Network::Socket::Type::Datagram
                                         : Network::Socket::Type::Stream);
-    Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+    Api::IoErrorPtr ebadf = Network::IoSocketError::getIoSocketEbadfError();
     socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
-    socket_swap.write_matcher_->setWriteOverride(ebadf);
+    socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     timeSystem().advanceTimeWait(std::chrono::seconds(TSAN_TIMEOUT_FACTOR));
   }

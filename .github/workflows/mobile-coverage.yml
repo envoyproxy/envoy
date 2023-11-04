@@ -19,7 +19,7 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
+      pull-requests: read
 
   coverage:
     if: ${{ needs.env.outputs.mobile_coverage == 'true' }}

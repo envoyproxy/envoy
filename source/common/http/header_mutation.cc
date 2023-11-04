@@ -18,10 +18,9 @@ public:
   AppendMutation(const HeaderValueOption& header_value_option)
       : HeadersToAddEntry(header_value_option), header_name_(header_value_option.header().key()) {}
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
-                       const Http::ResponseHeaderMap& response_headers,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo& stream_info) const override {
-    std::string value = formatter_->format(request_headers, response_headers, stream_info);
+    const std::string value = formatter_->formatWithContext(context, stream_info);
 
     if (!value.empty() || add_if_empty_) {
       switch (append_action_) {
@@ -57,8 +56,7 @@ class RemoveMutation : public HeaderEvaluator {
 public:
   RemoveMutation(const std::string& header_name) : header_name_(header_name) {}
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap&,
-                       const Http::ResponseHeaderMap&,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext&,
                        const StreamInfo::StreamInfo&) const override {
     headers.remove(header_name_);
   }
@@ -84,11 +82,10 @@ HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations) {
 }
 
 void HeaderMutations::evaluateHeaders(Http::HeaderMap& headers,
-                                      const Http::RequestHeaderMap& request_headers,
-                                      const Http::ResponseHeaderMap& response_headers,
+                                      const Formatter::HttpFormatterContext& context,
                                       const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& mutation : header_mutations_) {
-    mutation->evaluateHeaders(headers, request_headers, response_headers, stream_info);
+    mutation->evaluateHeaders(headers, context, stream_info);
   }
 }
 

@@ -278,7 +278,7 @@ public:
    * @param visitor supplies the validation visitor that will be used to validate the embedded
    *        Any proto message.
    */
-  virtual LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+  virtual LoadBalancerConfigPtr loadConfig(const Protobuf::Message& config,
                                            ProtobufMessage::ValidationVisitor& visitor) PURE;
 
   std::string category() const override { return "envoy.load_balancing_policies"; }
