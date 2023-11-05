@@ -615,7 +615,7 @@ envoy_cmake(
     },
     lib_source = "@com_github_leethomason_tinyxml2//:all",
     out_static_libs = select({
-        "//bazel:windows_x86_64": ["tinyxml2.lib"],
         "//conditions:default": ["libtinyxml2.a"],
     }),
+    tags = ["skip_on_windows"],
 )
