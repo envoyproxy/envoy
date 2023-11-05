@@ -67,3 +67,14 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 10002
+    transport_socket:
+      name: envoy.transport_sockets.quic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: certs/servercert.pem
+              private_key:
+                filename: certs/serverkey.pem
