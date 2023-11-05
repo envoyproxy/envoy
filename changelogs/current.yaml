@@ -36,6 +36,11 @@ minor_behavior_changes:
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
     This feature improves flow control within the proxy by deferring work on the receiving end if the other
     end is backed up.
+- area: circuit breakers
+  change: |
+    Changed the retry budget behavior so that scheduled retries (e.g. retries in backoff, etc) are counted
+    towards the number of active requests. This makes the retry budget more accurate and provides a tighter
+    decision to signal response delay. This also fixes a case where retries could be rejected even at 100% budget.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
