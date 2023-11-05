@@ -615,7 +615,7 @@ envoy_cmake(
     },
     lib_source = "@com_github_leethomason_tinyxml2//:all",
     linkopts = select({
-        "//bazel:windows_x86_64": ["-llibc"],
+        "//bazel:windows_x86_64": ["-lpthread"],
         "//conditions:default": [],
     }),
     out_static_libs = select({
