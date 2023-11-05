@@ -603,3 +603,19 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
 )
+
+envoy_cmake(
+    name = "tinyxml2",
+    cache_entries = {
+        "BUILD_SHARED_LIBS": "off",
+        "BUILD_STATIC_LIBS": "on",
+        "BUILD_TESTS": "off",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+    },
+    lib_source = "@com_github_leethomason_tinyxml2//:all",
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["tinyxml2.lib"],
+        "//conditions:default": ["libtinyxml2.a"],
+    }),
+)
