@@ -90,8 +90,11 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_rx_reset, Counter, Total requests that were reset remotely
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
+  upstream_rq_retry_active, Gauge, Total number of requests with active retries
   upstream_rq_retry_backoff_exponential, Counter, Total retries using the exponential backoff strategy
+  upstream_rq_retry_backoff_exponential_active, Gauge, Total retries currently in backoff using the exponential backoff strategy
   upstream_rq_retry_backoff_ratelimited, Counter, Total retries using the ratelimited backoff strategy
+  upstream_rq_retry_backoff_ratelimited_active, Gauge, Total retries currently in backoff using the ratelimited backoff strategy
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`

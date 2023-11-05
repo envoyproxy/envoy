@@ -30,8 +30,8 @@ message CircuitBreakers {
   // [#next-free-field: 9]
   message Thresholds {
     message RetryBudget {
-      // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
-      // active pending requests. For example, if there are 100 active requests and the
+      // Specifies the limit on active retries as a percentage of the sum of active requests,
+      // active pending requests, and scheduled retries. For example, if there are 100 active requests and the
       // budget_percent is set to 25, there may be 25 active retries.
       //
       // This parameter is optional. Defaults to 20%.
