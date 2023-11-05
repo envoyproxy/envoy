@@ -122,9 +122,6 @@ void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
 
 // TODO(fredyw): Delete these functions are replaced them with the ones from JniHelper
 
-/** Throws Java exception with the specified class name and error message. */
-void throwException(JniHelper& jni_helper, const char* java_class_name, const char* message);
-
 // Helper functions for JNI's `Call<Type>Method` with proper exception handling in order to satisfy
 // -Xcheck:jni.
 // See
@@ -132,14 +129,6 @@ void throwException(JniHelper& jni_helper, const char* java_class_name, const ch
 #define JNI_UTILITY_DECLARE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                       \
   JNI_TYPE call##JAVA_TYPE##Method(JniHelper& jni_helper, jobject object, jmethodID method_id, ...);
 
-void callVoidMethod(JniHelper& jni_helper, jobject object, jmethodID method_id, ...);
-JNI_UTILITY_DECLARE_CALL_METHOD(Byte, jbyte)
-JNI_UTILITY_DECLARE_CALL_METHOD(Char, jchar)
-JNI_UTILITY_DECLARE_CALL_METHOD(Short, jshort)
-JNI_UTILITY_DECLARE_CALL_METHOD(Int, jint)
-JNI_UTILITY_DECLARE_CALL_METHOD(Long, jlong)
-JNI_UTILITY_DECLARE_CALL_METHOD(Double, jdouble)
-JNI_UTILITY_DECLARE_CALL_METHOD(Boolean, jboolean)
 JNI_UTILITY_DECLARE_CALL_METHOD(Object, jobject)
 
 // Helper functions for JNI's `CallStatic<Type>Method` with proper exception handling in order to
@@ -150,14 +139,6 @@ JNI_UTILITY_DECLARE_CALL_METHOD(Object, jobject)
   JNI_TYPE callStatic##JAVA_TYPE##Method(JniHelper& jni_helper, jclass clazz, jmethodID method_id, \
                                          ...);
 
-void callStaticVoidMethod(JniHelper& jni_helper, jclass clazz, jmethodID method_id, ...);
-JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Byte, jbyte)
-JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Char, jchar)
-JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Short, jshort)
-JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Int, jint)
-JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Long, jlong)
-JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Double, jdouble)
-JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Boolean, jboolean)
 JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Object, jobject)
 
 } // namespace JNI

@@ -121,11 +121,7 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
     }
   }
 
-  config_.headerEvaluator().evaluateHeaders(*headers,
-                                            downstream_info_.getRequestHeaders() == nullptr
-                                                ? *Http::StaticEmptyHeaders::get().request_headers
-                                                : *downstream_info_.getRequestHeaders(),
-                                            *Http::StaticEmptyHeaders::get().response_headers,
+  config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
                                             downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.

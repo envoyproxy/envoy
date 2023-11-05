@@ -15,13 +15,17 @@ behavior_changes:
     <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
 
 minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
+- area: aws
+  change: |
+    uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
+    which is deprecated. To revert this behavior set ``envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials`` to true.
 - area: upstream
   change: |
     Fixed a reported issue (https://github.com/envoyproxy/envoy/issues/11004) that causes the Least
     Request load balancer policy to be unfair when the number of hosts are very small, when the number
     of hosts is smaller than the choice_count, instead of randomly selection hosts from the list, we
     perform a full scan on it to choose the host with least requests.
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: local_rate_limit
   change: |
     Added new configuration field :ref:`rate_limited_as_resource_exhausted

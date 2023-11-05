@@ -43,7 +43,7 @@ static void jvm_on_engine_running(void* context) {
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
   jobject j_context = static_cast<jobject>(context);
   jclass jcls_JvmonEngineRunningContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_onEngineRunning = jni_helper.getEnv()->GetMethodID(
+  jmethodID jmid_onEngineRunning = jni_helper.getMethodId(
       jcls_JvmonEngineRunningContext, "invokeOnEngineRunning", "()Ljava/lang/Object;");
   Envoy::JNI::callObjectMethod(jni_helper, j_context, jmid_onEngineRunning);
 
@@ -64,8 +64,8 @@ static void jvm_on_log(envoy_data data, const void* context) {
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
   jclass jcls_JvmLoggerContext = jni_helper.getEnv()->GetObjectClass(j_context);
   jmethodID jmid_onLog =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmLoggerContext, "log", "(Ljava/lang/String;)V");
-  Envoy::JNI::callVoidMethod(jni_helper, j_context, jmid_onLog, str);
+      jni_helper.getMethodId(jcls_JvmLoggerContext, "log", "(Ljava/lang/String;)V");
+  jni_helper.callVoidMethod(j_context, jmid_onLog, str);
 
   release_envoy_data(data);
   jni_helper.getEnv()->DeleteLocalRef(str);
@@ -93,8 +93,8 @@ static void jvm_on_track(envoy_map events, const void* context) {
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
   jclass jcls_EnvoyEventTracker = jni_helper.getEnv()->GetObjectClass(j_context);
   jmethodID jmid_onTrack =
-      jni_helper.getEnv()->GetMethodID(jcls_EnvoyEventTracker, "track", "(Ljava/util/Map;)V");
-  Envoy::JNI::callVoidMethod(jni_helper, j_context, jmid_onTrack, events_hashmap);
+      jni_helper.getMethodId(jcls_EnvoyEventTracker, "track", "(Ljava/util/Map;)V");
+  jni_helper.callVoidMethod(j_context, jmid_onTrack, events_hashmap);
 
   release_envoy_map(events);
   jni_helper.getEnv()->DeleteLocalRef(events_hashmap);
@@ -209,8 +209,7 @@ static void passHeaders(const char* method, const Envoy::Types::ManagedEnvoyHead
                         jobject j_context) {
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
   jclass jcls_JvmCallbackContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_passHeader =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmCallbackContext, method, "([B[BZ)V");
+  jmethodID jmid_passHeader = jni_helper.getMethodId(jcls_JvmCallbackContext, method, "([B[BZ)V");
   jboolean start_headers = JNI_TRUE;
 
   for (envoy_map_size_t i = 0; i < headers.get().length; i++) {
@@ -226,8 +225,7 @@ static void passHeaders(const char* method, const Envoy::Types::ManagedEnvoyHead
         Envoy::JNI::native_data_to_array(jni_helper, headers.get().entries[i].value);
 
     // Pass this header pair to the platform
-    Envoy::JNI::callVoidMethod(jni_helper, j_context, jmid_passHeader, j_key, j_value,
-                               start_headers);
+    jni_helper.callVoidMethod(j_context, jmid_passHeader, j_key, j_value, start_headers);
     jni_helper.getEnv()->DeleteLocalRef(j_key);
     jni_helper.getEnv()->DeleteLocalRef(j_value);
 
@@ -252,7 +250,7 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
 
   jclass jcls_JvmCallbackContext = jni_helper.getEnv()->GetObjectClass(j_context);
   jmethodID jmid_onHeaders =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmCallbackContext, method, "(JZ[J)Ljava/lang/Object;");
+      jni_helper.getMethodId(jcls_JvmCallbackContext, method, "(JZ[J)Ljava/lang/Object;");
 
   jlongArray j_stream_intel = Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
@@ -278,7 +276,7 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
   jobjectArray noopResult = jni_helper.getEnv()->NewObjectArray(2, jcls_object_array, NULL);
 
   jclass jcls_int = jni_helper.getEnv()->FindClass("java/lang/Integer");
-  jmethodID jmid_intInit = jni_helper.getEnv()->GetMethodID(jcls_int, "<init>", "(I)V");
+  jmethodID jmid_intInit = jni_helper.getMethodId(jcls_int, "<init>", "(I)V");
   jobject j_status = jni_helper.getEnv()->NewObject(jcls_int, jmid_intInit, 0);
   // Set status to "0" (FilterHeadersStatus::Continue). Signal that the intent
   // is to continue the iteration of the filter chain.
@@ -308,7 +306,7 @@ jvm_http_filter_on_request_headers(envoy_headers input_headers, bool end_stream,
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
       "onRequestHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 
-  if (result == NULL || jni_helper.getEnv()->GetArrayLength(result) < 2) {
+  if (result == NULL || jni_helper.getArrayLength(result) < 2) {
     jni_helper.getEnv()->DeleteLocalRef(result);
     return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                          /*headers*/ {}};
@@ -337,7 +335,7 @@ jvm_http_filter_on_response_headers(envoy_headers input_headers, bool end_stream
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
       "onResponseHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 
-  if (result == NULL || jni_helper.getEnv()->GetArrayLength(result) < 2) {
+  if (result == NULL || jni_helper.getArrayLength(result) < 2) {
     jni_helper.getEnv()->DeleteLocalRef(result);
     return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                          /*headers*/ {}};
@@ -365,8 +363,8 @@ static void* jvm_on_data(const char* method, envoy_data data, bool end_stream,
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmCallbackContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_onData = jni_helper.getEnv()->GetMethodID(jcls_JvmCallbackContext, method,
-                                                           "([BZ[J)Ljava/lang/Object;");
+  jmethodID jmid_onData =
+      jni_helper.getMethodId(jcls_JvmCallbackContext, method, "([BZ[J)Ljava/lang/Object;");
 
   jbyteArray j_data = Envoy::JNI::native_data_to_array(jni_helper, data);
   jlongArray j_stream_intel = Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
@@ -393,7 +391,7 @@ static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data,
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_data("onRequestData", data, end_stream, stream_intel, const_cast<void*>(context)));
 
-  if (result == NULL || jni_helper.getEnv()->GetArrayLength(result) < 2) {
+  if (result == NULL || jni_helper.getArrayLength(result) < 2) {
     jni_helper.getEnv()->DeleteLocalRef(result);
     return (envoy_filter_data_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                       /*data*/ {},
@@ -431,7 +429,7 @@ static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_data("onResponseData", data, end_stream, stream_intel, const_cast<void*>(context)));
 
-  if (result == NULL || jni_helper.getEnv()->GetArrayLength(result) < 2) {
+  if (result == NULL || jni_helper.getArrayLength(result) < 2) {
     jni_helper.getEnv()->DeleteLocalRef(result);
     return (envoy_filter_data_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                       /*data*/ {},
@@ -479,7 +477,7 @@ static void* jvm_on_trailers(const char* method, envoy_headers trailers,
 
   jclass jcls_JvmCallbackContext = jni_helper.getEnv()->GetObjectClass(j_context);
   jmethodID jmid_onTrailers =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmCallbackContext, method, "(J[J)Ljava/lang/Object;");
+      jni_helper.getMethodId(jcls_JvmCallbackContext, method, "(J[J)Ljava/lang/Object;");
 
   jlongArray j_stream_intel = Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
@@ -506,7 +504,7 @@ jvm_http_filter_on_request_trailers(envoy_headers trailers, envoy_stream_intel s
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_trailers("onRequestTrailers", trailers, stream_intel, const_cast<void*>(context)));
 
-  if (result == NULL || jni_helper.getEnv()->GetArrayLength(result) < 2) {
+  if (result == NULL || jni_helper.getArrayLength(result) < 2) {
     jni_helper.getEnv()->DeleteLocalRef(result);
     return (envoy_filter_trailers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                           /*trailers*/ {},
@@ -552,7 +550,7 @@ jvm_http_filter_on_response_trailers(envoy_headers trailers, envoy_stream_intel 
   jobjectArray result = static_cast<jobjectArray>(
       jvm_on_trailers("onResponseTrailers", trailers, stream_intel, const_cast<void*>(context)));
 
-  if (result == NULL || jni_helper.getEnv()->GetArrayLength(result) < 2) {
+  if (result == NULL || jni_helper.getArrayLength(result) < 2) {
     jni_helper.getEnv()->DeleteLocalRef(result);
     return (envoy_filter_trailers_status){/*status*/ kEnvoyFilterHeadersStatusStopIteration,
                                           /*trailers*/ {},
@@ -605,10 +603,9 @@ static void jvm_http_filter_set_request_callbacks(envoy_http_filter_callbacks ca
   *on_heap_callbacks = callbacks;
   jlong callback_handle = reinterpret_cast<jlong>(on_heap_callbacks);
 
-  jmethodID jmid_setRequestFilterCallbacks = jni_helper.getEnv()->GetMethodID(
-      jcls_JvmCallbackContext, "setRequestFilterCallbacks", "(J)V");
-  Envoy::JNI::callVoidMethod(jni_helper, j_context, jmid_setRequestFilterCallbacks,
-                             callback_handle);
+  jmethodID jmid_setRequestFilterCallbacks =
+      jni_helper.getMethodId(jcls_JvmCallbackContext, "setRequestFilterCallbacks", "(J)V");
+  jni_helper.callVoidMethod(j_context, jmid_setRequestFilterCallbacks, callback_handle);
 
   jni_helper.getEnv()->DeleteLocalRef(jcls_JvmCallbackContext);
 }
@@ -627,10 +624,9 @@ static void jvm_http_filter_set_response_callbacks(envoy_http_filter_callbacks c
   *on_heap_callbacks = callbacks;
   jlong callback_handle = reinterpret_cast<jlong>(on_heap_callbacks);
 
-  jmethodID jmid_setResponseFilterCallbacks = jni_helper.getEnv()->GetMethodID(
-      jcls_JvmCallbackContext, "setResponseFilterCallbacks", "(J)V");
-  Envoy::JNI::callVoidMethod(jni_helper, j_context, jmid_setResponseFilterCallbacks,
-                             callback_handle);
+  jmethodID jmid_setResponseFilterCallbacks =
+      jni_helper.getMethodId(jcls_JvmCallbackContext, "setResponseFilterCallbacks", "(J)V");
+  jni_helper.callVoidMethod(j_context, jmid_setResponseFilterCallbacks, callback_handle);
 
   jni_helper.getEnv()->DeleteLocalRef(jcls_JvmCallbackContext);
 }
@@ -660,8 +656,8 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
   jlongArray j_stream_intel = Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
 
   jclass jcls_JvmCallbackContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_onResume = jni_helper.getEnv()->GetMethodID(jcls_JvmCallbackContext, method,
-                                                             "(J[BJZ[J)Ljava/lang/Object;");
+  jmethodID jmid_onResume =
+      jni_helper.getMethodId(jcls_JvmCallbackContext, method, "(J[BJZ[J)Ljava/lang/Object;");
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
   jobjectArray result = static_cast<jobjectArray>(Envoy::JNI::callObjectMethod(
@@ -722,8 +718,8 @@ static void* call_jvm_on_complete(envoy_stream_intel stream_intel,
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmObserverContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_onComplete = jni_helper.getEnv()->GetMethodID(
-      jcls_JvmObserverContext, "onComplete", "([J[J)Ljava/lang/Object;");
+  jmethodID jmid_onComplete =
+      jni_helper.getMethodId(jcls_JvmObserverContext, "onComplete", "([J[J)Ljava/lang/Object;");
 
   jlongArray j_stream_intel = Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
   jlongArray j_final_stream_intel =
@@ -746,8 +742,8 @@ static void* call_jvm_on_error(envoy_error error, envoy_stream_intel stream_inte
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmObserverContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_onError = jni_helper.getEnv()->GetMethodID(jcls_JvmObserverContext, "onError",
-                                                            "(I[BI[J[J)Ljava/lang/Object;");
+  jmethodID jmid_onError =
+      jni_helper.getMethodId(jcls_JvmObserverContext, "onError", "(I[BI[J[J)Ljava/lang/Object;");
 
   jbyteArray j_error_message = Envoy::JNI::native_data_to_array(jni_helper, error.message);
   jlongArray j_stream_intel = Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
@@ -783,8 +779,8 @@ static void* call_jvm_on_cancel(envoy_stream_intel stream_intel,
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmObserverContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_onCancel = jni_helper.getEnv()->GetMethodID(jcls_JvmObserverContext, "onCancel",
-                                                             "([J[J)Ljava/lang/Object;");
+  jmethodID jmid_onCancel =
+      jni_helper.getMethodId(jcls_JvmObserverContext, "onCancel", "([J[J)Ljava/lang/Object;");
 
   jlongArray j_stream_intel = Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
   jlongArray j_final_stream_intel =
@@ -834,7 +830,7 @@ static void* jvm_on_send_window_available(envoy_stream_intel stream_intel, void*
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmObserverContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_onSendWindowAvailable = jni_helper.getEnv()->GetMethodID(
+  jmethodID jmid_onSendWindowAvailable = jni_helper.getMethodId(
       jcls_JvmObserverContext, "onSendWindowAvailable", "([J)Ljava/lang/Object;");
 
   jlongArray j_stream_intel = Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
@@ -855,8 +851,7 @@ static envoy_data jvm_kv_store_read(envoy_data key, const void* context) {
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
 
   jclass jcls_JvmKeyValueStoreContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_read =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmKeyValueStoreContext, "read", "([B)[B");
+  jmethodID jmid_read = jni_helper.getMethodId(jcls_JvmKeyValueStoreContext, "read", "([B)[B");
   jbyteArray j_key = Envoy::JNI::native_data_to_array(jni_helper, key);
   jbyteArray j_value =
       (jbyteArray)Envoy::JNI::callObjectMethod(jni_helper, j_context, jmid_read, j_key);
@@ -876,10 +871,9 @@ static void jvm_kv_store_remove(envoy_data key, const void* context) {
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
 
   jclass jcls_JvmKeyValueStoreContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_remove =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmKeyValueStoreContext, "remove", "([B)V");
+  jmethodID jmid_remove = jni_helper.getMethodId(jcls_JvmKeyValueStoreContext, "remove", "([B)V");
   jbyteArray j_key = Envoy::JNI::native_data_to_array(jni_helper, key);
-  Envoy::JNI::callVoidMethod(jni_helper, j_context, jmid_remove, j_key);
+  jni_helper.callVoidMethod(j_context, jmid_remove, j_key);
 
   jni_helper.getEnv()->DeleteLocalRef(j_key);
   jni_helper.getEnv()->DeleteLocalRef(jcls_JvmKeyValueStoreContext);
@@ -892,11 +886,10 @@ static void jvm_kv_store_save(envoy_data key, envoy_data value, const void* cont
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
 
   jclass jcls_JvmKeyValueStoreContext = jni_helper.getEnv()->GetObjectClass(j_context);
-  jmethodID jmid_save =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmKeyValueStoreContext, "save", "([B[B)V");
+  jmethodID jmid_save = jni_helper.getMethodId(jcls_JvmKeyValueStoreContext, "save", "([B[B)V");
   jbyteArray j_key = Envoy::JNI::native_data_to_array(jni_helper, key);
   jbyteArray j_value = Envoy::JNI::native_data_to_array(jni_helper, value);
-  Envoy::JNI::callVoidMethod(jni_helper, j_context, jmid_save, j_key, j_value);
+  jni_helper.callVoidMethod(j_context, jmid_save, j_key, j_value);
 
   jni_helper.getEnv()->DeleteLocalRef(j_value);
   jni_helper.getEnv()->DeleteLocalRef(j_key);
@@ -917,8 +910,8 @@ static const void* jvm_http_filter_init(const void* context) {
 
   jclass jcls_JvmFilterFactoryContext = jni_helper.getEnv()->GetObjectClass(j_context);
   jmethodID jmid_create =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmFilterFactoryContext, "create",
-                                       "()Lio/envoyproxy/envoymobile/engine/JvmFilterContext;");
+      jni_helper.getMethodId(jcls_JvmFilterFactoryContext, "create",
+                             "()Lio/envoyproxy/envoymobile/engine/JvmFilterContext;");
 
   jobject j_filter = Envoy::JNI::callObjectMethod(jni_helper, j_context, jmid_create);
   jni_log_fmt("[Envoy]", "j_filter: %p", j_filter);
@@ -937,7 +930,7 @@ static envoy_data jvm_get_string(const void* context) {
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
   jclass jcls_JvmStringAccessorContext = jni_helper.getEnv()->GetObjectClass(j_context);
   jmethodID jmid_getString =
-      jni_helper.getEnv()->GetMethodID(jcls_JvmStringAccessorContext, "getEnvoyString", "()[B");
+      jni_helper.getMethodId(jcls_JvmStringAccessorContext, "getEnvoyString", "()[B");
   jbyteArray j_data =
       (jbyteArray)Envoy::JNI::callObjectMethod(jni_helper, j_context, jmid_getString);
   envoy_data native_data = Envoy::JNI::array_to_native_data(jni_helper, j_data);
@@ -1188,7 +1181,7 @@ std::string getCppString(Envoy::JNI::JniHelper& jni_helper, jstring java_string)
 
 // Converts a java byte array to a C++ string.
 std::string javaByteArrayToString(Envoy::JNI::JniHelper& jni_helper, jbyteArray j_data) {
-  size_t data_length = static_cast<size_t>(jni_helper.getEnv()->GetArrayLength(j_data));
+  size_t data_length = static_cast<size_t>(jni_helper.getArrayLength(j_data));
   char* critical_data =
       static_cast<char*>(jni_helper.getEnv()->GetPrimitiveArrayCritical(j_data, 0));
   std::string ret(critical_data, data_length);
@@ -1202,7 +1195,7 @@ std::vector<std::string> javaObjectArrayToStringVector(Envoy::JNI::JniHelper& jn
   std::vector<std::string> ret;
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
-  envoy_map_size_t length = jni_helper.getEnv()->GetArrayLength(entries);
+  envoy_map_size_t length = jni_helper.getArrayLength(entries);
   if (length == 0) {
     return ret;
   }
@@ -1225,7 +1218,7 @@ javaObjectArrayToStringPairVector(Envoy::JNI::JniHelper& jni_helper, jobjectArra
   std::vector<std::pair<std::string, std::string>> ret;
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
-  envoy_map_size_t length = jni_helper.getEnv()->GetArrayLength(entries);
+  envoy_map_size_t length = jni_helper.getArrayLength(entries);
   if (length == 0) {
     return ret;
   }
@@ -1294,12 +1287,12 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jstring grpc_stats_doma
   builder.setHttp3ClientConnectionOptions(
       getCppString(jni_helper, http3_client_connection_options));
   auto hints = javaObjectArrayToStringPairVector(jni_helper, quic_hints);
-  for (std::pair<std::string, std::string>& entry : hints) {
+  for (const std::pair<std::string, std::string>& entry : hints) {
     builder.addQuicHint(entry.first, stoi(entry.second));
   }
   std::vector<std::string> suffixes =
       javaObjectArrayToStringVector(jni_helper, quic_canonical_suffixes);
-  for (std::string& suffix : suffixes) {
+  for (const std::string& suffix : suffixes) {
     builder.addQuicCanonicalSuffix(suffix);
   }
 
@@ -1411,9 +1404,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     }
     builder.setXds(std::move(xds_builder));
 #else
-    Envoy::JNI::throwException(jni_helper, "java/lang/UnsupportedOperationException",
-                               "This library does not support xDS. Please use "
-                               "io.envoyproxy.envoymobile:envoy-xds instead.");
+    jni_helper.throwNew("java/lang/UnsupportedOperationException",
+                        "This library does not support xDS. Please use "
+                        "io.envoyproxy.envoymobile:envoy-xds instead.");
 #endif
   }
 
@@ -1462,8 +1455,8 @@ static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
       jcls_AndroidNetworkLibrary, "addTestRootCertificate", "([B)V");
 
   jbyteArray cert_array = Envoy::JNI::ToJavaByteArray(jni_helper, cert, len);
-  Envoy::JNI::callStaticVoidMethod(jni_helper, jcls_AndroidNetworkLibrary,
-                                   jmid_addTestRootCertificate, cert_array);
+  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_addTestRootCertificate,
+                                  cert_array);
   jni_helper.getEnv()->DeleteLocalRef(cert_array);
   jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidNetworkLibrary);
 }
@@ -1476,8 +1469,7 @@ static void jvm_clear_test_root_certificate() {
   jmethodID jmid_clearTestRootCertificates = jni_helper.getEnv()->GetStaticMethodID(
       jcls_AndroidNetworkLibrary, "clearTestRootCertificates", "()V");
 
-  Envoy::JNI::callStaticVoidMethod(jni_helper, jcls_AndroidNetworkLibrary,
-                                   jmid_clearTestRootCertificates);
+  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_clearTestRootCertificates);
   jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidNetworkLibrary);
 }
 
