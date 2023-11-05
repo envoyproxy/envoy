@@ -10,12 +10,12 @@
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/access_log_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/grpc/status.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"

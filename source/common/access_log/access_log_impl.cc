@@ -341,8 +341,7 @@ InstanceSharedPtr makeAccessLogInstance(const envoy::config::accesslog::v3::Acce
     filter = FilterFactory::fromProto(config.filter(), context);
   }
 
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(config);
+  auto& factory = Config::Utility::getAndCheckFactory<AccessLog::AccessLogInstanceFactory>(config);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       config, context.messageValidationVisitor(), factory);
 
