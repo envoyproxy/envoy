@@ -22,11 +22,6 @@ public:
       : BaseIntegrationTest(GetParam(), configToUse()), api_(Api::createApiForTest()),
         counters_(mock_query_buffer_underflow_, mock_record_name_overflow_, query_parsing_failure_,
                   queries_with_additional_rrs_, queries_with_ans_or_authority_rrs_) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'dns_filter.my_prefix.local_a_record_answers' and
-    // stat_prefix 'my_prefix'.
-    skip_tag_extraction_rule_check_ = true;
-
     setupResponseParser();
   }
 

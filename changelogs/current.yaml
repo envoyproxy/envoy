@@ -13,6 +13,11 @@ behavior_changes:
   change: |
     undeprecated runtime key ``overload.global_downstream_max_connections`` until :ref:`downstream connections monitor
     <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
+- area: stats dns_filter
+  change: |
+    Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    dns_filter_myprefix_local_a_record_answers{} to dns_filter_local_a_record_answers{envoy.dns_filter_prefix="myprefix"}.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
