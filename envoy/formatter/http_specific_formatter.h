@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
