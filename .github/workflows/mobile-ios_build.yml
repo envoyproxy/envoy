@@ -171,7 +171,6 @@ jobs:
             --config=ios \
             --config=mobile-remote-ci-macos \
             --define=admin_functionality=enabled \
-            --define envoy_mobile_listener=enabled \
             //test/swift/apps/experimental:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start simulator'
@@ -189,7 +188,6 @@ jobs:
             --config=ios \
             --config=mobile-remote-ci-macos \
             --define=admin_functionality=enabled \
-            --define envoy_mobile_listener=enabled \
             //test/swift/apps/experimental:app &> /tmp/envoy.log &
     - run: |
         sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
