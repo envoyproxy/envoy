@@ -222,8 +222,8 @@ private:
 };
 
 /**
- * This is the base class for the standalone server which stitches together various common components.
- * Some components are optional (so PURE) and can be created or not by subclasses.
+ * This is the base class for the standalone server which stitches together various common
+ * components. Some components are optional (so PURE) and can be created or not by subclasses.
  */
 class InstanceBase : Logger::Loggable<Logger::Id::main>,
                      public Instance,
