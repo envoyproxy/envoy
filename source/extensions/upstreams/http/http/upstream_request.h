@@ -21,11 +21,10 @@ namespace Http {
 class HttpConnPool : public Router::GenericConnPool, public Envoy::Http::ConnectionPool::Callbacks {
 public:
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-               const Router::RouteEntry& route_entry,
+               Upstream::ResourcePriority priority,
                absl::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
-    pool_data_ =
-        thread_local_cluster.httpConnPool(route_entry.priority(), downstream_protocol, ctx);
+    pool_data_ = thread_local_cluster.httpConnPool(priority, downstream_protocol, ctx);
   }
   ~HttpConnPool() override {
     ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
