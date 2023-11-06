@@ -24,8 +24,8 @@ bool is_cleartext_permitted(absl::string_view hostname) {
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_isCleartextTrafficPermitted = jni_helper.getEnv()->GetStaticMethodID(
       jcls_AndroidNetworkLibrary, "isCleartextTrafficPermitted", "(Ljava/lang/String;)Z");
-  jboolean result = jni_helper.callStaticBooleanMethod(jcls_AndroidNetworkLibrary,
-                                                       jmid_isCleartextTrafficPermitted, java_host);
+  jboolean result = jni_helper.callStaticBooleanMethod(
+      jcls_AndroidNetworkLibrary, jmid_isCleartextTrafficPermitted, java_host.get());
   release_envoy_data(host);
   return result == JNI_TRUE;
 #else
