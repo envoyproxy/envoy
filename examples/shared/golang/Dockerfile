@@ -96,4 +96,10 @@ FROM golang-base as golang-ext-proc-upstream
 COPY . /app
 WORKDIR /app/service
 RUN go build -o service
-CMD ["/app/service"]
+HEALTHCHECK \
+    --interval=5s \
+    --timeout=2s \
+    --start-period=10s \
+    --retries=3 \
+    CMD nc -zv 127.0.0.1 10001
+CMD ["/app/service/service", "-p", "10001"]
