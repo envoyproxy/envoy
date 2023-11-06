@@ -2561,10 +2561,15 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
                                TestUtility::DefaultTimeout * 3);
   auto downstream_rq_total_counter = Envoy::TestUtility::findCounter(
       test_server_->statStore(), "http.config_test.downstream_rq_total");
+  auto downstream_rq_completed = Envoy::TestUtility::findCounter(
+      test_server_->statStore(), "http.config_test.downstream_rq_completed");
+  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0,
+                               TestUtility::DefaultTimeout * 3);
   // Test that Envoy can clean-up deferred streams
   // Make the timeout longer to accommodate non optimized builds
   test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset",
-                                 downstream_rq_total_counter->value(),
+                                 downstream_rq_total_counter->value() -
+                                     downstream_rq_completed->value(),
                                  TestUtility::DefaultTimeout * 3);
 }
 
