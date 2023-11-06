@@ -35,6 +35,7 @@ cc_library(
         "jni_utility.h",
     ],
     deps = [
+        ":jni_helper_lib",
         ":jni_support_lib",
         "//library/common/jni/import:jni_import_lib",
         "//library/common/jni/types:jni_env_lib",
@@ -44,6 +45,20 @@ cc_library(
         "//library/common/types:matcher_data_lib",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/protobuf",
+    ],
+)
+
+cc_library(
+    name = "jni_helper_lib",
+    srcs = [
+        "jni_helper.cc",
+    ],
+    hdrs = [
+        "jni_helper.h",
+    ],
+    deps = [
+        "//library/common/jni/import:jni_import_lib",
+        "@envoy//source/common/common:assert_lib",
     ],
 )
 

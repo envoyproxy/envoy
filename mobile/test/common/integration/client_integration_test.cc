@@ -72,7 +72,10 @@ public:
     if (add_quic_hints_) {
       auto address = fake_upstreams_[0]->localAddress();
       auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
-      builder_.addQuicHint("www.lyft.com", upstream_port);
+      // With canonical suffix, having a quic hint of foo.lyft.com will make
+      // www.lyft.com being recognized as QUIC ready.
+      builder_.addQuicCanonicalSuffix(".lyft.com");
+      builder_.addQuicHint("foo.lyft.com", upstream_port);
       ASSERT(test_key_value_store_);
 
       // Force www.lyft.com to resolve to the fake upstream. It's the only domain
