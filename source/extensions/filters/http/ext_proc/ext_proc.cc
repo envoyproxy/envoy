@@ -115,11 +115,35 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()) {
-  if (config.has_overrides()) {
+  if (!config.has_overrides()) {
+    return;
+  }
+
+  const auto& overrides = config.overrides();
+  if (overrides.has_processing_mode()) {
     processing_mode_ = config.overrides().processing_mode();
   }
-  if (config.overrides().has_grpc_service()) {
-    grpc_service_ = config.overrides().grpc_service();
+  if (overrides.has_grpc_service()) {
+    grpc_service_ = overrides.grpc_service();
+  }
+
+  if (!overrides.has_metadata_options()) {
+    return;
+  }
+
+  const auto& md_opts = overrides.metadata_options();
+  if (md_opts.has_forwarding_namespaces()) {
+    untyped_forwarding_namespaces_ =
+        std::vector<std::string>(md_opts.forwarding_namespaces().untyped().begin(),
+                                 md_opts.forwarding_namespaces().untyped().end());
+    typed_forwarding_namespaces_ =
+        std::vector<std::string>(md_opts.forwarding_namespaces().typed().begin(),
+                                 md_opts.forwarding_namespaces().typed().end());
+  }
+  if (md_opts.has_receiving_namespaces()) {
+    untyped_receiving_namespaces_ =
+        std::vector<std::string>(md_opts.receiving_namespaces().untyped().begin(),
+                                 md_opts.receiving_namespaces().untyped().end());
   }
 }
 
@@ -128,6 +152,15 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
   processing_mode_ = src.processing_mode_;
   if (src.grpcService().has_value()) {
     grpc_service_ = src.grpcService();
+  }
+  if (src.untypedForwardingMetadataNamespaces().has_value()) {
+    untyped_forwarding_namespaces_ = src.untypedForwardingMetadataNamespaces();
+  }
+  if (src.typedForwardingMetadataNamespaces().has_value()) {
+    typed_forwarding_namespaces_ = src.typedForwardingMetadataNamespaces();
+  }
+  if (src.untypedReceivingMetadataNamespaces().has_value()) {
+    untyped_receiving_namespaces_ = src.untypedReceivingMetadataNamespaces();
   }
 }
 
@@ -215,6 +248,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
+  addDynamicMetadata(state, req);
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
@@ -548,8 +582,9 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 
 ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                                          bool end_stream) {
-  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
+  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stream {}", data.length(), end_stream);
   ProcessingRequest req;
+  addDynamicMetadata(state, req);
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
@@ -566,6 +601,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
+  addDynamicMetadata(state, req);
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
@@ -619,6 +655,83 @@ void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout)
   stats_.override_message_timeout_received_.inc();
 }
 
+void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
+  // get the callbacks from the ProcessorState. This will be the appropriate
+  // callbacks for the current state of the filter
+  auto* cb = state.callbacks();
+  envoy::config::core::v3::Metadata forwarding_metadata;
+
+  // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_proc
+  // service. If metadata key is set in both the connection and request metadata then the value
+  // will be the request metadata value. The metadata will only be searched for the callbacks
+  // corresponding to the traffic direction at the time of the external processing request.
+  const auto& request_metadata = cb->streamInfo().dynamicMetadata().filter_metadata();
+  for (const auto& context_key : state.untypedForwardingMetadataNamespaces()) {
+    if (const auto metadata_it = request_metadata.find(context_key);
+        metadata_it != request_metadata.end()) {
+      (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (cb->connection().has_value()) {
+      const auto& connection_metadata =
+          cb->connection().value().get().streamInfo().dynamicMetadata().filter_metadata();
+      if (const auto metadata_it = connection_metadata.find(context_key);
+          metadata_it != connection_metadata.end()) {
+        (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+      }
+    }
+  }
+
+  // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
+  // ext_proc service. If metadata key is set in both the connection and request metadata then
+  // the value will be the request metadata value. The metadata will only be searched for the
+  // callbacks corresponding to the traffic direction at the time of the external processing
+  // request.
+  const auto& request_typed_metadata = cb->streamInfo().dynamicMetadata().typed_filter_metadata();
+  for (const auto& context_key : state.typedForwardingMetadataNamespaces()) {
+    if (const auto metadata_it = request_typed_metadata.find(context_key);
+        metadata_it != request_typed_metadata.end()) {
+      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
+    } else if (cb->connection().has_value()) {
+      const auto& connection_typed_metadata =
+          cb->connection().value().get().streamInfo().dynamicMetadata().typed_filter_metadata();
+      if (const auto metadata_it = connection_typed_metadata.find(context_key);
+          metadata_it != connection_typed_metadata.end()) {
+        (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+            metadata_it->second;
+      }
+    }
+  }
+
+  *req.mutable_metadata_context() = forwarding_metadata;
+}
+
+void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                std::unique_ptr<ProcessingResponse>& response) {
+  bool has_receiving_namespaces = state.untypedReceivingMetadataNamespaces().size() > 0;
+  if (!(has_receiving_namespaces && response->has_dynamic_metadata())) {
+    return;
+  }
+
+  if (response->has_dynamic_metadata()) {
+    auto response_metadata = response->dynamic_metadata().fields();
+    auto receiving_namespaces = state.untypedReceivingMetadataNamespaces();
+    for (const auto& context_key : response_metadata) {
+      if (auto metadata_it = std::find(receiving_namespaces.begin(), receiving_namespaces.end(),
+                                       context_key.first);
+          metadata_it != receiving_namespaces.end())
+        cb->streamInfo().setDynamicMetadata(context_key.first,
+                                            response_metadata.at(context_key.first).struct_value());
+    }
+  }
+}
+
+void Filter::setEncoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
+  setDynamicMetadata(encoder_callbacks_, encoding_state_, response);
+}
+void Filter::setDecoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
+  setDynamicMetadata(decoder_callbacks_, decoding_state_, response);
+}
+
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   if (processing_complete_) {
     ENVOY_LOG(debug, "Ignoring stream message received after processing complete");
@@ -649,21 +762,27 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
+    setDecoderDynamicMetadata(response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
+    setEncoderDynamicMetadata(response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
+    setDecoderDynamicMetadata(response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
+    setEncoderDynamicMetadata(response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
+    setDecoderDynamicMetadata(response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
+    setEncoderDynamicMetadata(response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
@@ -673,6 +792,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
     } else {
+      setDecoderDynamicMetadata(response);
       // We won't be sending anything more to the stream after we
       // receive this message.
       ENVOY_LOG(debug, "Sending immediate response");
@@ -876,6 +996,30 @@ void Filter::mergePerRouteConfig() {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *merged_config->grpcService();
     config_with_hash_key_.setConfig(*merged_config->grpcService());
+  }
+  if (merged_config->untypedForwardingMetadataNamespaces()) {
+    ENVOY_LOG(trace,
+              "Setting new untyped forwarding metadata namespaces from per-route configuration");
+    decoding_state_.setUntypedForwardingMetadataNamespaces(
+        *merged_config->untypedForwardingMetadataNamespaces());
+    encoding_state_.setUntypedForwardingMetadataNamespaces(
+        *merged_config->untypedForwardingMetadataNamespaces());
+  }
+  if (merged_config->typedForwardingMetadataNamespaces()) {
+    ENVOY_LOG(trace,
+              "Setting new typed forwarding metadata namespaces from per-route configuration");
+    decoding_state_.setTypedForwardingMetadataNamespaces(
+        *merged_config->typedForwardingMetadataNamespaces());
+    encoding_state_.setTypedForwardingMetadataNamespaces(
+        *merged_config->typedForwardingMetadataNamespaces());
+  }
+  if (merged_config->untypedReceivingMetadataNamespaces()) {
+    ENVOY_LOG(trace,
+              "Setting new untyped receiving metadata namespaces from per-route configuration");
+    decoding_state_.setUntypedReceivingMetadataNamespaces(
+        *merged_config->untypedReceivingMetadataNamespaces());
+    encoding_state_.setUntypedReceivingMetadataNamespaces(
+        *merged_config->untypedReceivingMetadataNamespaces());
   }
 }
 

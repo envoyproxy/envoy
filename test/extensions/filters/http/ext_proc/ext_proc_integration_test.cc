@@ -79,7 +79,7 @@ protected:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_raw_value", header_raw_value_}});
     scoped_runtime_.mergeValues(
-        {{"envoy_reloadable_features_immediate_response_use_filter_mutation_rule",
+        {{"envoy.reloadable_features.immediate_response_use_filter_mutation_rule",
           filter_mutation_rule_}});
 
     config_helper_.addConfigModifier([this, config_option](
@@ -1811,6 +1811,28 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
   });
   verifyDownstreamResponse(*response, 401);
   EXPECT_THAT(response->headers(), HasNoHeader("x-envoy-foo"));
+}
+
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with x-envoy header mutation.
+// The deprecated default checker allows x-envoy headers to be mutated and should
+// override config-level checkers if the runtime guard is disabled.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithDefaultHeaderMutationChecker) {
+  // this is default, but setting explicitly for test clarity
+  filter_mutation_rule_ = "false";
+  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Adding x-envoy header is allowed since default overrides config.
+    hdr->mutable_header()->set_key("x-envoy-foo");
+    hdr->mutable_header()->set_value("bar");
+  });
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_FALSE(response->headers().get(LowerCaseString("x-envoy-foo")).empty());
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {

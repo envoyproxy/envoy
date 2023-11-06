@@ -170,5 +170,13 @@ new_features:
     Ratelimit supports optional additional prefix to use when emitting statistics with :ref:`stat_prefix
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stat_prefix>`
     configuration flag.
+- area: ext_proc
+  change: |
+    added
+    :ref:`metadata_options <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.metadata_options>`
+    config API to enable sending and receiving metadata from/to the external processing server. Both typed and untyped dynamic
+    metadata may be sent to the server. If
+    :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
+    is defined, returned metadata may be written to the specified allowed namespaces.
 
 deprecated:
