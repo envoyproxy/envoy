@@ -59,7 +59,7 @@ func main() {
 	handler := createHandler()
 	h2Server := http2.Server{}
 	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    fmt.Sprintf("0.0.0.0:%d", port),
 		Handler: h2c.NewHandler(handler, &h2Server),
 	}
 	server.ListenAndServe()

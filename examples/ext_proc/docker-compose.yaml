@@ -38,3 +38,5 @@ services:
       context: ./upstream
       dockerfile: ../../shared/golang/Dockerfile
       target: golang-ext-proc-upstream
+    ports:
+      - "10001:10001"
