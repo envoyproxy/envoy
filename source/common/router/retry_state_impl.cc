@@ -165,11 +165,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
 
 void RetryStateImpl::enableBackoffTimer() {
-  ENVOY_LOG_MISC(debug, "enabling backoff timer for retry");
-
   if (!retry_timer_) {
     retry_timer_ = dispatcher_.createTimer([this]() -> void {
-      ENVOY_LOG_MISC(debug, "backoff timer for retry has fired");
       ASSERT(backoff_callback_ != nullptr);
       switch (scheduling_state_) {
       case RetrySchedulingState::RateLimitedBackoff:
