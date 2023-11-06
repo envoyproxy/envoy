@@ -662,6 +662,28 @@ typed_config:
     cleanup();
   }
 
+  void testActionWithoutData(std::string query) {
+    initializeBasicFilter(ACTION, "test.com");
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/test?" + query},
+                                                   {":scheme", "http"},
+                                                   {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+
+    waitForNextUpstreamRequest();
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    codec_client_->close();
+
+    cleanup();
+  }
+
   void testBufferApi(std::string query) {
     initializeBasicFilter(BUFFER, "test.com");
 
@@ -703,6 +725,7 @@ typed_config:
   const std::string PROPERTY{"property"};
   const std::string ACCESSLOG{"access_log"};
   const std::string METRIC{"metric"};
+  const std::string ACTION{"action"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -1109,6 +1132,38 @@ TEST_P(GolangIntegrationTest, DynamicMetadata_Async) {
 
 TEST_P(GolangIntegrationTest, DynamicMetadata_Async_Sleep) {
   testDynamicMetadata("/test?dymeta=1&async=1&sleep=1");
+}
+
+TEST_P(GolangIntegrationTest, DecodeHeadersWithoutData_StopAndBuffer) {
+  testActionWithoutData("decodeHeadersRet=StopAndBuffer");
+}
+
+TEST_P(GolangIntegrationTest, DecodeHeadersWithoutData_StopAndBufferWatermark) {
+  testActionWithoutData("decodeHeadersRet=StopAndBufferWatermark");
+}
+
+TEST_P(GolangIntegrationTest, DecodeHeadersWithoutData_StopAndBuffer_Async) {
+  testActionWithoutData("decodeHeadersRet=StopAndBuffer&aysnc=1");
+}
+
+TEST_P(GolangIntegrationTest, DecodeHeadersWithoutData_StopAndBufferWatermark_Async) {
+  testActionWithoutData("decodeHeadersRet=StopAndBufferWatermark&aysnc=1");
+}
+
+TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBuffer) {
+  testActionWithoutData("encodeHeadersRet=StopAndBuffer");
+}
+
+TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBufferWatermark) {
+  testActionWithoutData("encodeHeadersRet=StopAndBufferWatermark");
+}
+
+TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBuffer_Async) {
+  testActionWithoutData("encodeHeadersRet=StopAndBuffer&aysnc=1");
+}
+
+TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBufferWatermark_Async) {
+  testActionWithoutData("encodeHeadersRet=StopAndBufferWatermark&aysnc=1");
 }
 
 } // namespace Envoy
