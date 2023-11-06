@@ -25,16 +25,13 @@ jobject get_class_loader() {
 jclass find_class(const char* class_name) {
   JniHelper jni_helper(get_env());
   LocalRefUniquePtr<jclass> class_loader = jni_helper.findClass("java/lang/ClassLoader");
-  Envoy::JNI::Exception::checkAndClear("find_class:FindClass");
   jmethodID find_class_method = jni_helper.getMethodId(class_loader.get(), "loadClass",
                                                        "(Ljava/lang/String;)Ljava/lang/Class;");
   Envoy::JNI::Exception::checkAndClear("find_class:GetMethodID");
-  jstring str_class_name = jni_helper.getEnv()->NewStringUTF(class_name);
-  Envoy::JNI::Exception::checkAndClear("find_class:NewStringUTF");
-  jclass clazz = (jclass)(jni_helper.getEnv()->CallObjectMethod(get_class_loader(),
-                                                                find_class_method, str_class_name));
+  LocalRefUniquePtr<jstring> str_class_name = jni_helper.newStringUtf(class_name);
+  jclass clazz = (jclass)(jni_helper.getEnv()->CallObjectMethod(
+      get_class_loader(), find_class_method, str_class_name.get()));
   Envoy::JNI::Exception::checkAndClear("find_class:CallObjectMethod");
-  jni_helper.getEnv()->DeleteLocalRef(str_class_name);
   return clazz;
 }
 
@@ -69,11 +66,10 @@ envoy_data array_to_native_data(JniHelper& jni_helper, jbyteArray j_data, size_t
   return {data_length, native_bytes, free, native_bytes};
 }
 
-jstring native_data_to_string(JniHelper& jni_helper, envoy_data data) {
+LocalRefUniquePtr<jstring> native_data_to_string(JniHelper& jni_helper, envoy_data data) {
   // Ensure we get a null-terminated string, the data coming in via envoy_data might not be.
   std::string str(reinterpret_cast<const char*>(data.bytes), data.length);
-  jstring jstrBuf = jni_helper.getEnv()->NewStringUTF(str.c_str());
-  return jstrBuf;
+  return jni_helper.newStringUtf(str.c_str());
 }
 
 jbyteArray native_data_to_array(JniHelper& jni_helper, envoy_data data) {
@@ -143,9 +139,7 @@ jobject native_map_to_map(JniHelper& jni_helper, envoy_map map) {
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     auto key = native_data_to_string(jni_helper, map.entries[i].key);
     auto value = native_data_to_string(jni_helper, map.entries[i].value);
-    callObjectMethod(jni_helper, j_hashMap, jmid_hashMapPut, key, value);
-    jni_helper.getEnv()->DeleteLocalRef(key);
-    jni_helper.getEnv()->DeleteLocalRef(value);
+    callObjectMethod(jni_helper, j_hashMap, jmid_hashMapPut, key.get(), value.get());
   }
   return j_hashMap;
 }

@@ -59,16 +59,15 @@ static void jvm_on_log(envoy_data data, const void* context) {
   }
 
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
-  jstring str = Envoy::JNI::native_data_to_string(jni_helper, data);
+  Envoy::JNI::LocalRefUniquePtr<jstring> str = Envoy::JNI::native_data_to_string(jni_helper, data);
 
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
   jclass jcls_JvmLoggerContext = jni_helper.getEnv()->GetObjectClass(j_context);
   jmethodID jmid_onLog =
       jni_helper.getMethodId(jcls_JvmLoggerContext, "log", "(Ljava/lang/String;)V");
-  jni_helper.callVoidMethod(j_context, jmid_onLog, str);
+  jni_helper.callVoidMethod(j_context, jmid_onLog, str.get());
 
   release_envoy_data(data);
-  jni_helper.getEnv()->DeleteLocalRef(str);
   jni_helper.getEnv()->DeleteLocalRef(jcls_JvmLoggerContext);
 }
 
@@ -197,10 +196,10 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
   }
 
   Envoy::JNI::JniHelper jni_helper(env);
-  jstring str = Envoy::JNI::native_data_to_string(jni_helper, data);
+  Envoy::JNI::LocalRefUniquePtr<jstring> str = Envoy::JNI::native_data_to_string(jni_helper, data);
   release_envoy_data(data);
 
-  return str;
+  return str.release();
 }
 
 // JvmCallbackContext
