@@ -50,7 +50,8 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
         auto secret_provider = factory_context.secretManager().findStaticTlsCertificateProvider(
             sds_secret_config.name());
         if (!secret_provider) {
-          throw EnvoyException(fmt::format("Unknown static secret: {}", sds_secret_config.name()));
+          throwEnvoyExceptionOrPanic(
+              fmt::format("Unknown static secret: {}", sds_secret_config.name()));
         }
         providers.push_back(secret_provider);
       }
@@ -74,8 +75,8 @@ Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
         factory_context.secretManager().findStaticCertificateValidationContextProvider(
             sds_secret_config.name());
     if (!secret_provider) {
-      throw EnvoyException(fmt::format("Unknown static certificate validation context: {}",
-                                       sds_secret_config.name()));
+      throwEnvoyExceptionOrPanic(fmt::format("Unknown static certificate validation context: {}",
+                                             sds_secret_config.name()));
     }
     return secret_provider;
   }
@@ -133,7 +134,7 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
           factory_context.secretManager().findStaticTlsSessionTicketKeysContextProvider(
               sds_secret_config.name());
       if (!secret_provider) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("Unknown tls session ticket keys: {}", sds_secret_config.name()));
       }
       return secret_provider;
@@ -145,8 +146,8 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
       SessionTicketKeysTypeCase::SESSION_TICKET_KEYS_TYPE_NOT_SET:
     return nullptr;
   default:
-    throw EnvoyException(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
-                                     config.session_ticket_keys_type_case()));
+    throwEnvoyExceptionOrPanic(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
+                                           config.session_ticket_keys_type_case()));
   }
 }
 
@@ -211,7 +212,7 @@ ContextConfigImpl::ContextConfigImpl(
         auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
             *certificate_validation_context_provider_->secret(), api_);
         if (!config_or_status.status().ok()) {
-          throw EnvoyException(std::string(config_or_status.status().message()));
+          throwEnvoyExceptionOrPanic(std::string(config_or_status.status().message()));
         }
         validation_context_config_ = std::move(config_or_status.value());
       }
@@ -257,7 +258,7 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
   auto config_or_status =
       Envoy::Ssl::CertificateValidationContextConfigImpl::create(combined_cvc, api_);
   if (!config_or_status.status().ok()) {
-    throw EnvoyException(std::string(config_or_status.status().message()));
+    throwEnvoyExceptionOrPanic(std::string(config_or_status.status().message()));
   }
   return std::move(config_or_status.value());
 }
@@ -298,7 +299,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
             auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
                 *certificate_validation_context_provider_->secret(), api_);
             if (!config_or_status.status().ok()) {
-              throw EnvoyException(std::string(config_or_status.status().message()));
+              throwEnvoyExceptionOrPanic(std::string(config_or_status.status().message()));
             }
             validation_context_config_ = std::move(config_or_status.value());
             callback();
@@ -362,12 +363,12 @@ ClientContextConfigImpl::ClientContextConfigImpl(
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {
-    throw EnvoyException("SNI names containing NULL-byte are not allowed");
+    throwEnvoyExceptionOrPanic("SNI names containing NULL-byte are not allowed");
   }
   // TODO(PiotrSikora): Support multiple TLS certificates.
   if ((config.common_tls_context().tls_certificates().size() +
        config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1) {
-    throw EnvoyException("Multiple TLS certificates are not supported for client contexts");
+    throwEnvoyExceptionOrPanic("Multiple TLS certificates are not supported for client contexts");
   }
 }
 
@@ -401,6 +402,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
+      disable_stateful_session_resumption_(config.disable_stateful_session_resumption()),
       full_scan_certs_on_sni_mismatch_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, full_scan_certs_on_sni_mismatch,
           !Runtime::runtimeFeatureEnabled(
@@ -421,10 +423,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   if (!capabilities().provides_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
          config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
-      throw EnvoyException("No TLS certificates found for server context");
+      throwEnvoyExceptionOrPanic("No TLS certificates found for server context");
     } else if (!config.common_tls_context().tls_certificates().empty() &&
                !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
-      throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
+      throwEnvoyExceptionOrPanic(
+          "SDS and non-SDS TLS certificates may not be mixed in server contexts");
     }
   }
 
@@ -467,9 +470,9 @@ ServerContextConfigImpl::getSessionTicketKey(const std::string& key_data) {
   static_assert(sizeof(SessionTicketKey) == 80, "Input is expected to be this size");
 
   if (key_data.size() != sizeof(SessionTicketKey)) {
-    throw EnvoyException(fmt::format("Incorrect TLS session ticket key length. "
-                                     "Length {}, expected length {}.",
-                                     key_data.size(), sizeof(SessionTicketKey)));
+    throwEnvoyExceptionOrPanic(fmt::format("Incorrect TLS session ticket key length. "
+                                           "Length {}, expected length {}.",
+                                           key_data.size(), sizeof(SessionTicketKey)));
   }
 
   SessionTicketKey dst_key;

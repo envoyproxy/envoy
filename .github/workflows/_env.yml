@@ -12,13 +12,17 @@ on:
         default: envoyproxy/envoy-build-ubuntu
       build_image_sha:
         type: string
-        default: 50337314a150ed12447c87c1622eac6f611a069888722fb9a426e21ed161cc26
+        default: 8781bc7e431b754c142edbfc937905fdf343db91f3fe19bbf54c362828db9849
       build_image_mobile_sha:
         type: string
-        default: ca26ff05bd3f3a09468242faaf38ae48315e57f0a87c102352162f95ac620e6f
+        default: 292273a428ebb093cc69c2f225c7c4218ff2ea84e0cb6ee80e7a6771a09e026f
+      # this is authoritative, but is not currently used in github ci
+      build_image_gcr_sha:
+        type: string
+        default: af98298b715958527d3c3b42ae968a09223d237c843e129c586b7e76b8c69a0d
       build_image_tag:
         type: string
-        default: 41c5a05d708972d703661b702a63ef5060125c33
+        default: 7467652575122d8d54e767a68f141598bd855383
 
       check_mobile_run:
         type: boolean
@@ -26,10 +30,6 @@ on:
       prime_build_image:
         type: boolean
         default: false
-
-      start_check_status:
-        type: string
-        default:
 
       repo_ref:
         type: string
@@ -42,6 +42,8 @@ on:
         default:
 
     outputs:
+      debug:
+        value: false
       agent_ubuntu:
         value: ubuntu-22.04
       build_image_ubuntu:
@@ -104,7 +106,11 @@ concurrency:
 
 jobs:
   repo:
-    if: github.repository == 'envoyproxy/envoy'
+    if: >-
+      ${{
+          (github.repository == 'envoyproxy/envoy'
+           || vars.ENVOY_CI)
+      }}
     runs-on: ubuntu-22.04
     outputs:
       build_image_ubuntu: ${{ steps.env.outputs.build_image_ubuntu }}
@@ -131,10 +137,15 @@ jobs:
       version_dev: ${{ steps.env.outputs.version_dev }}
       version_patch: ${{ steps.env.outputs.version_patch }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
-        fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
+        fetch-depth: ${{ ! (inputs.check_mobile_run || ! startsWith(github.event_name, 'pull_request')) && 1 || 0 }}
+        # WARNING: This allows untrusted code to run!!!
+        #  If this is set, then anything before or after in the job should be regarded as
+        #  compromised.
+        ref: ${{ startsWith(github.event_name, 'pull_request') && inputs.repo_ref || '' }}
+
     - uses: ./.github/actions/env
       name: Generate environment variables
       id: env
@@ -165,16 +176,6 @@ jobs:
         if [[ -n "${{ steps.env.outputs.repo_ref_pr_number }}" ]]; then
             echo "PR: https://github.com/envoyproxy/envoy/pull/${{ steps.env.outputs.repo_ref_pr_number }}"
         fi
-
-  check:
-    if: ${{ inputs.start_check_status && github.event_name != 'pull_request' }}
-    uses: ./.github/workflows/_workflow-start.yml
-    permissions:
-      contents: read
-      statuses: write
-    with:
-      workflow_name: ${{ inputs.start_check_status }}
-      sha: ${{ inputs.repo_ref_sha }}
 
   cache:
     if: ${{ inputs.prime_build_image }}

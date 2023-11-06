@@ -53,6 +53,30 @@ private:
   HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                                           const ::Envoy::Http::HeaderString& value);
 
+  // This method validates :path header value for HTTP/2 protocol using character set that includes
+  // characters either prohibited by https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC
+  // or where RFC is ambiguous.
+  //
+  // " < > [ ] ^ ` { } \ | # SPACE TAB and all extended ASCII
+  //
+  // NOTE: RFC-3986 is ambiguous about " < > [ ] ^ ` { } \ |
+  // # is only allowed as a fragment separator (and not allowed within the fragment)
+  // SPACE TAB and all extended ASCII are prohibited
+  //
+  // This method is called iff `envoy.uhv.allow_non_compliant_characters_in_path` is
+  // `true`, which is the default value. Note the default will be switched to `false` in the future
+  // for standard compliance.
+  HeaderValidator::HeaderValueValidationResult validatePathHeaderWithAdditionalCharactersHttp2(
+      const ::Envoy::Http::HeaderString& path_header_value);
+
+  // Same method as above but for the HTTP/3 protocol. It does not allow extended ASCII.
+  HeaderValidator::HeaderValueValidationResult validatePathHeaderWithAdditionalCharactersHttp3(
+      const ::Envoy::Http::HeaderString& path_header_value);
+
+  // Chooses path validation method based on the value of the override flag that affects the
+  // validation algorithm.
+  HeaderValidatorFunction getPathValidationMethod();
+
   const HeaderValidatorMap request_header_validator_map_;
 };
 

@@ -17,14 +17,30 @@
 namespace Envoy {
 namespace {
 
+void validateClusters(const Upstream::ClusterManager::ClusterInfoMap& active_cluster_map,
+                      const std::string& cluster, size_t expected_active_clusters,
+                      size_t hosts_expected, size_t healthy_hosts, size_t degraded_hosts) {
+  EXPECT_EQ(expected_active_clusters, active_cluster_map.size());
+  ASSERT_EQ(1, active_cluster_map.count(cluster));
+  const auto& cluster_ref = active_cluster_map.find(cluster)->second;
+  const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
+  EXPECT_EQ(1, hostset_per_priority.size());
+  const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
+  EXPECT_EQ(hosts_expected, host_set->hosts().size());
+  EXPECT_EQ(healthy_hosts, host_set->healthyHosts().size());
+  EXPECT_EQ(degraded_hosts, host_set->degradedHosts().size());
+};
+
 // Integration test for EDS features. EDS is consumed via filesystem
 // subscription.
-class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                           public HttpIntegrationTest {
+class EdsIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   EdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
-        codec_client_type_(envoy::type::v3::HTTP1) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())),
+        codec_client_type_(envoy::type::v3::HTTP1),
+        deferred_cluster_creation_(std::get<1>(GetParam())) {}
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.
@@ -136,6 +152,8 @@ public:
           ->mutable_path_config_source()
           ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
+      bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(
+          deferred_cluster_creation_);
     });
 
     // Set validate_clusters to false to allow us to reference a CDS cluster.
@@ -178,13 +196,15 @@ public:
   void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, nullptr); }
 
   envoy::type::v3::CodecClientType codec_client_type_{};
+  const bool deferred_cluster_creation_{};
   EdsHelper eds_helper_;
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, EdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
 
 // Validates that endpoints can be added and then moved to other priorities without causing crashes.
 // Primarily as a regression test for https://github.com/envoyproxy/envoy/issues/8764
@@ -784,6 +804,95 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   EXPECT_EQ("EDS is ready", response->body());
 
   cleanupUpstreamAndDownstream();
+}
+
+// Test that a deferred EDS cluster can get created inline for a request.
+TEST_P(EdsIntegrationTest, DataplaneTrafficForDeferredCluster) {
+  if (!deferred_cluster_creation_) {
+    GTEST_SKIP() << "Test depends on deferred cluster creation. Skipping.";
+  }
+  autonomous_upstream_ = true;
+
+  initializeTest(false);
+  EndpointSettingOptions options;
+  options.total_endpoints = 4;
+  options.healthy_endpoints = 4;
+  setEndpoints(options);
+
+  options.total_endpoints = 2;
+  options.healthy_endpoints = 2;
+  setEndpoints(options);
+
+  // Check deferred.
+  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
+
+  const auto& active_cluster_map =
+      test_server_->server().clusterManager().clusters().active_clusters_;
+  {
+    const size_t expected_active_cluster = 1;
+    const size_t expected_hosts = 2, healthy_hosts = 2, degraded_hosts = 0;
+    validateClusters(active_cluster_map, "cluster_0", expected_active_cluster, expected_hosts,
+                     healthy_hosts, degraded_hosts);
+  }
+}
+
+// Test that a deferred EDS cluster that was created inline can get EDS updates
+// and receive traffic after the update.
+TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
+  if (!deferred_cluster_creation_) {
+    GTEST_SKIP() << "Test depends on deferred cluster creation. Skipping.";
+  }
+  autonomous_upstream_ = true;
+
+  initializeTest(false, [](envoy::config::cluster::v3::Cluster& cluster) {
+    // Make the cluster a maglev cluster which relies on the load balancer
+    // factory that is created when the cluster is first added.
+    cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::MAGLEV);
+  });
+  EndpointSettingOptions options;
+  options.total_endpoints = 1;
+  options.healthy_endpoints = 1;
+  setEndpoints(options);
+
+  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
+  const auto& active_cluster_map =
+      test_server_->server().clusterManager().clusters().active_clusters_;
+  {
+    const size_t expected_active_cluster = 1;
+    const size_t expected_hosts = 1, healthy_hosts = 1, degraded_hosts = 0;
+    validateClusters(active_cluster_map, "cluster_0", expected_active_cluster, expected_hosts,
+                     healthy_hosts, degraded_hosts);
+  }
+
+  options.total_endpoints = 2;
+  options.healthy_endpoints = 1;
+  options.degraded_endpoints = 1;
+  setEndpoints(options);
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster_0", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+  {
+    const size_t expected_active_cluster = 1;
+    const size_t expected_hosts = 2, healthy_hosts = 1, degraded_hosts = 1;
+    validateClusters(active_cluster_map, "cluster_0", expected_active_cluster, expected_hosts,
+                     healthy_hosts, degraded_hosts);
+  }
 }
 
 } // namespace

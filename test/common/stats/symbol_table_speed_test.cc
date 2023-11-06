@@ -41,6 +41,7 @@ static void bmCreateRace(benchmark::State& state) {
             access.wait();
 
             for (int count = 0; count < 1000; ++count) {
+              // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
               Envoy::Stats::StatNameStorage second(stat_name_string, table);
               second.free(table);
             }

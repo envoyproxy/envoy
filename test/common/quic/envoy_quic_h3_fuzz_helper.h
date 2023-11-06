@@ -1,4 +1,8 @@
+#pragma once
+
 #include <set>
+
+#include "source/common/common/assert.h"
 
 #include "test/common/quic/envoy_quic_h3_fuzz.pb.h"
 

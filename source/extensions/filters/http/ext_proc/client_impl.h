@@ -27,7 +27,7 @@ public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
   ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
-                                   const envoy::config::core::v3::GrpcService& grpc_service,
+                                   const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                    const StreamInfo::StreamInfo& stream_info) override;
 
 private:

@@ -183,7 +183,9 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
                                Api::Api& api) {
-  const std::string contents = api.fileSystem().fileReadToEnd(path);
+  auto file_or_error = api.fileSystem().fileReadToEnd(path);
+  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  const std::string contents = file_or_error.value();
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
@@ -345,24 +347,9 @@ std::string utf8CoerceToStructurallyValid(absl::string_view str, const char repl
 } // namespace
 
 std::string MessageUtil::sanitizeUtf8String(absl::string_view input) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.service_sanitize_non_utf8_strings")) {
-    return std::string(input);
-  }
-
-  // This returns the original string if it was already valid, and returns a pointer to
-  // `result.data()` if it needed to coerce. The coerced string is always
-  // the same length as the source string.
-  //
-  // Initializing `result` to `input` ensures that `result` is correctly sized to receive the
-  // modified string, or in the case where no modification is needed it already contains the correct
-  // value, so `result` can be returned in both cases.
-  //
   // The choice of '!' is somewhat arbitrary, but we wanted to avoid any character that has
   // special semantic meaning in URLs or similar.
-  std::string result = utf8CoerceToStructurallyValid(input, '!');
-
-  return result;
+  return utf8CoerceToStructurallyValid(input, '!');
 }
 
 } // namespace Envoy

@@ -1,9 +1,9 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
@@ -12,7 +12,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val TEST_RESPONSE_FILTER_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 
 class ReceiveDataTest {
 
@@ -23,25 +24,28 @@ class ReceiveDataTest {
   @Test
   fun `response headers and response data call onResponseHeaders and onResponseData`() {
 
-    val engine = EngineBuilder(Standard())
-      .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
-      .build()
+    val engine =
+      EngineBuilder(Standard())
+        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .build()
     val client = engine.streamClient()
 
-    val requestHeaders = RequestHeadersBuilder(
-      method = RequestMethod.GET,
-      scheme = "https",
-      authority = "example.com",
-      path = "/test"
-    )
-      .build()
+    val requestHeaders =
+      RequestHeadersBuilder(
+          method = RequestMethod.GET,
+          scheme = "https",
+          authority = "example.com",
+          path = "/test"
+        )
+        .build()
 
     val headersExpectation = CountDownLatch(1)
     val dataExpectation = CountDownLatch(1)
 
     var status: Int? = null
     var body: ByteBuffer? = null
-    client.newStreamPrototype()
+    client
+      .newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, _, _ ->
         status = responseHeaders.httpStatus
         headersExpectation.countDown()

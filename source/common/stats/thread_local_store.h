@@ -65,7 +65,7 @@ public:
 private:
   Histogram::Unit unit_;
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
-  uint64_t current_active_;
+  uint64_t current_active_{0};
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
   std::thread::id created_thread_id_;
@@ -140,7 +140,7 @@ private:
   HistogramStatisticsImpl cumulative_statistics_;
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
-  bool merged_;
+  bool merged_{false};
   std::atomic<bool> shutting_down_{false};
   std::atomic<uint32_t> ref_count_{0};
   const uint64_t id_; // Index into TlsCache::histogram_cache_.
@@ -224,6 +224,7 @@ public:
   void extractAndAppendTags(StatName name, StatNamePool& pool, StatNameTagVector& tags) override;
   void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                             StatNameTagVector& tags) override;
+  const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
 
 private:
   friend class ThreadLocalStoreTestingPeer;

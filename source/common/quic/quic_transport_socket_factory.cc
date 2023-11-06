@@ -23,10 +23,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
   auto server_config = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       quic_transport.downstream_tls_context(), context);
   // TODO(RyanTheOptimist): support TLS client authentication.
-  if (server_config->requireClientCertificate() &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reject_require_client_certificate_with_quic")) {
-    throw EnvoyException("TLS Client Authentication is not supported over QUIC");
+  if (server_config->requireClientCertificate()) {
+    throwEnvoyExceptionOrPanic("TLS Client Authentication is not supported over QUIC");
   }
 
   auto factory = std::make_unique<QuicServerTransportSocketFactory>(

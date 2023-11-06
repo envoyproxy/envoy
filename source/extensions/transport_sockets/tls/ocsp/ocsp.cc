@@ -19,13 +19,13 @@ template <typename T> T unwrap(ParsingResult<T> res) {
     return absl::get<0>(res);
   }
 
-  throw EnvoyException(std::string(absl::get<1>(res)));
+  throwEnvoyExceptionOrPanic(std::string(absl::get<1>(res)));
 }
 
 unsigned parseTag(CBS& cbs) {
   unsigned tag;
   if (!CBS_get_any_asn1_element(&cbs, nullptr, &tag, nullptr)) {
-    throw EnvoyException("Failed to parse ASN.1 element tag");
+    throwEnvoyExceptionOrPanic("Failed to parse ASN.1 element tag");
   }
   return tag;
 }
@@ -36,7 +36,7 @@ std::unique_ptr<OcspResponse> readDerEncodedOcspResponse(const std::vector<uint8
 
   auto resp = Asn1OcspUtility::parseOcspResponse(cbs);
   if (CBS_len(&cbs) != 0) {
-    throw EnvoyException("Data contained more than a single OCSP response");
+    throwEnvoyExceptionOrPanic("Data contained more than a single OCSP response");
   }
 
   return resp;
@@ -56,7 +56,7 @@ void skipResponderId(CBS& cbs) {
     return;
   }
 
-  throw EnvoyException(absl::StrCat("Unknown choice for Responder ID: ", parseTag(cbs)));
+  throwEnvoyExceptionOrPanic(absl::StrCat("Unknown choice for Responder ID: ", parseTag(cbs)));
 }
 
 void skipCertStatus(CBS& cbs) {
@@ -69,7 +69,7 @@ void skipCertStatus(CBS& cbs) {
         unwrap(
             Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
         unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
-    throw EnvoyException(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
   }
 }
 
@@ -94,16 +94,16 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
       time_source_(time_source) {
 
   if (response_->status_ != OcspResponseStatus::Successful) {
-    throw EnvoyException("OCSP response was unsuccessful");
+    throwEnvoyExceptionOrPanic("OCSP response was unsuccessful");
   }
 
   if (response_->response_ == nullptr) {
-    throw EnvoyException("OCSP response has no body");
+    throwEnvoyExceptionOrPanic("OCSP response has no body");
   }
 
   // We only permit a 1:1 of certificate to response.
   if (response_->response_->getNumCerts() != 1) {
-    throw EnvoyException("OCSP Response must be for one certificate only");
+    throwEnvoyExceptionOrPanic("OCSP Response must be for one certificate only");
   }
 
   auto& this_update = response_->response_->getThisUpdate();
@@ -160,7 +160,7 @@ std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {
 
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    throw EnvoyException("OCSP Response is not a well-formed ASN.1 SEQUENCE");
+    throwEnvoyExceptionOrPanic("OCSP Response is not a well-formed ASN.1 SEQUENCE");
   }
 
   OcspResponseStatus status = Asn1OcspUtility::parseResponseStatus(elem);
@@ -186,7 +186,7 @@ OcspResponseStatus Asn1OcspUtility::parseResponseStatus(CBS& cbs) {
   // }
   CBS status;
   if (!CBS_get_asn1(&cbs, &status, CBS_ASN1_ENUMERATED)) {
-    throw EnvoyException("OCSP ResponseStatus is not a well-formed ASN.1 ENUMERATED");
+    throwEnvoyExceptionOrPanic("OCSP ResponseStatus is not a well-formed ASN.1 ENUMERATED");
   }
 
   auto status_ordinal = *CBS_data(&status);
@@ -204,7 +204,8 @@ OcspResponseStatus Asn1OcspUtility::parseResponseStatus(CBS& cbs) {
   case 6:
     return OcspResponseStatus::Unauthorized;
   default:
-    throw EnvoyException(absl::StrCat("Unknown OCSP Response Status variant: ", status_ordinal));
+    throwEnvoyExceptionOrPanic(
+        absl::StrCat("Unknown OCSP Response Status variant: ", status_ordinal));
   }
 }
 
@@ -217,18 +218,18 @@ ResponsePtr Asn1OcspUtility::parseResponseBytes(CBS& cbs) {
   // }
   CBS elem, response;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    throw EnvoyException("OCSP ResponseBytes is not a well-formed SEQUENCE");
+    throwEnvoyExceptionOrPanic("OCSP ResponseBytes is not a well-formed SEQUENCE");
   }
 
   auto oid_str = unwrap(Asn1Utility::parseOid(elem));
   if (!CBS_get_asn1(&elem, &response, CBS_ASN1_OCTETSTRING)) {
-    throw EnvoyException("Expected ASN.1 OCTETSTRING for response");
+    throwEnvoyExceptionOrPanic("Expected ASN.1 OCTETSTRING for response");
   }
 
   if (oid_str == BasicOcspResponse::OID) {
     return Asn1OcspUtility::parseBasicOcspResponse(response);
   }
-  throw EnvoyException(absl::StrCat("Unknown OCSP Response type with OID: ", oid_str));
+  throwEnvoyExceptionOrPanic(absl::StrCat("Unknown OCSP Response type with OID: ", oid_str));
 }
 
 std::unique_ptr<BasicOcspResponse> Asn1OcspUtility::parseBasicOcspResponse(CBS& cbs) {
@@ -242,7 +243,7 @@ std::unique_ptr<BasicOcspResponse> Asn1OcspUtility::parseBasicOcspResponse(CBS& 
   // }
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    throw EnvoyException("OCSP BasicOCSPResponse is not a wellf-formed ASN.1 SEQUENCE");
+    throwEnvoyExceptionOrPanic("OCSP BasicOCSPResponse is not a wellf-formed ASN.1 SEQUENCE");
   }
   auto response_data = Asn1OcspUtility::parseResponseData(elem);
   // The `signatureAlgorithm` and `signature` are ignored because OCSP
@@ -262,7 +263,7 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
   // }
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    throw EnvoyException("OCSP ResponseData is not a well-formed ASN.1 SEQUENCE");
+    throwEnvoyExceptionOrPanic("OCSP ResponseData is not a well-formed ASN.1 SEQUENCE");
   }
 
   // only support v1, the value of v1 is 0x00
@@ -271,16 +272,15 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
   if (version_cbs.has_value()) {
     auto version = unwrap(Asn1Utility::parseInteger(*version_cbs));
     if (version != "00") {
-      throw EnvoyException(fmt::format("OCSP ResponseData version 0x{} is not supported", version));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("OCSP ResponseData version 0x{} is not supported", version));
     }
   }
 
   skipResponderId(elem);
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
   auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(
-      elem, [](CBS& cbs) -> ParsingResult<SingleResponse> {
-        return ParsingResult<SingleResponse>(parseSingleResponse(cbs));
-      }));
+      elem, [](CBS& cbs) -> ParsingResult<SingleResponse> { return {parseSingleResponse(cbs)}; }));
   // Extensions currently ignored.
 
   return {std::move(responses)};
@@ -296,7 +296,7 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   // }
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    throw EnvoyException("OCSP SingleResponse is not a well-formed ASN.1 SEQUENCE");
+    throwEnvoyExceptionOrPanic("OCSP SingleResponse is not a well-formed ASN.1 SEQUENCE");
   }
 
   auto cert_id = Asn1OcspUtility::parseCertId(elem);
@@ -319,7 +319,7 @@ CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
   // }
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    throw EnvoyException("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
+    throwEnvoyExceptionOrPanic("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
   }
 
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE));

@@ -134,6 +134,7 @@ public:
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
+        disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
         disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())) {}
 
@@ -150,6 +151,7 @@ public:
   }
 
   bool allowModeOverride() const { return allow_mode_override_; }
+  bool disableImmediateResponse() const { return disable_immediate_response_; }
 
   const Filters::Common::MutationRules::Checker& mutationChecker() const {
     return mutation_checker_;
@@ -192,6 +194,9 @@ private:
   const Envoy::ProtobufWkt::Struct filter_metadata_;
   // If set to true, allow the processing mode to be modified by the ext_proc response.
   const bool allow_mode_override_;
+  // If set to true, disable the immediate response from the ext_proc server, which means
+  // closing the stream to the ext_proc server, and no more external processing.
+  const bool disable_immediate_response_;
   // Empty allowed_header_ means allow all.
   const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
@@ -241,13 +246,14 @@ public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client,
          const envoy::config::core::v3::GrpcService& grpc_service)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        grpc_service_(grpc_service), decoding_state_(*this, config->processingMode()),
+        grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
+        decoding_state_(*this, config->processingMode()),
         encoding_state_(*this, config->processingMode()) {}
 
   const FilterConfig& config() const { return *config_; }
 
   ExtProcFilterStats& stats() { return stats_; }
-  ExtProcLoggingInfo& loggingInfo() { return *logging_info_; }
+  ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -264,24 +270,25 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
   // ExternalProcessorCallbacks
-
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
-
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
-
   void onGrpcClose() override;
+  void logGrpcStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
-  void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
-                        bool end_stream);
-
-  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
-                     ProcessorState::CallbackState new_state, bool end_stream);
+  envoy::service::ext_proc::v3::ProcessingRequest
+  setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
+  void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
+                     envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+  bool inHeaderProcessState() {
+    return (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
+            encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
+  }
 
 private:
   void mergePerRouteConfig();
@@ -295,7 +302,7 @@ private:
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   // Return a pair of whether to terminate returning the current result.
-  std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state, bool end_stream);
+  std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 
@@ -304,6 +311,7 @@ private:
   ExtProcFilterStats stats_;
   ExtProcLoggingInfo* logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
 
   // The state of the filter on both the encoding and decoding side.
   DecodingProcessorState decoding_state_;

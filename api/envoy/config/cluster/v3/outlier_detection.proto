@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // See the :ref:`architecture overview <arch_overview_outlier_detection>` for
 // more information on outlier detection.
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message OutlierDetection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.cluster.OutlierDetection";
@@ -161,4 +161,10 @@ message OutlierDetection {
   // See :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>`
   // Defaults to 0s.
   google.protobuf.Duration max_ejection_time_jitter = 22;
+
+  // If active health checking is enabled and a host is ejected by outlier detection, a successful active health check
+  // unejects the host by default and considers it as healthy. Unejection also clears all the outlier detection counters.
+  // To change this default behavior set this config to ``false`` where active health checking will not uneject the host.
+  // Defaults to true.
+  google.protobuf.BoolValue successful_active_health_check_uneject_host = 23;
 }

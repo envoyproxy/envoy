@@ -56,6 +56,7 @@ envoy_cc_library(
     name = "client_interface",
     hdrs = ["client.h"],
     deps = [
+        "//envoy/grpc:async_client_manager_interface",
         "//envoy/grpc:status",
         "//envoy/stream_info:stream_info_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

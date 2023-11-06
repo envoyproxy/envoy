@@ -15,8 +15,8 @@
 #include "source/common/router/upstream_request.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
+#include "quiche/common/capsule.h"
 #include "quiche/common/simple_buffer_allocator.h"
-#include "quiche/quic/core/http/quic_spdy_stream.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,7 +49,7 @@ public:
                                                  Network::SocketCreationOptions{});
   }
 
-  bool valid() { return host_ != nullptr; }
+  bool valid() const override { return host_ != nullptr; }
 
 private:
   Upstream::HostConstSharedPtr host_;

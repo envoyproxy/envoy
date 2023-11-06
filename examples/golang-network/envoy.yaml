@@ -23,5 +23,3 @@ static_resources:
   - name: plainText
     type: ORIGINAL_DST
     lb_policy: CLUSTER_PROVIDED
-    original_dst_lb_config:
-      use_http_header: true

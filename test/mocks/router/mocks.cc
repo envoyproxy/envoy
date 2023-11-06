@@ -74,6 +74,8 @@ MockShadowWriter::~MockShadowWriter() = default;
 MockVirtualHost::MockVirtualHost() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
+  ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
 }
 
 MockVirtualHost::~MockVirtualHost() = default;
@@ -110,7 +112,6 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
-  ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, connectConfig()).WillByDefault(Invoke([this]() {
     return connect_config_.has_value() ? makeOptRef(connect_config_.value()) : absl::nullopt;
   }));
@@ -130,6 +131,8 @@ MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
+  ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
 }
 
 MockConfig::~MockConfig() = default;
@@ -149,6 +152,7 @@ MockRoute::MockRoute() {
   ON_CALL(*this, tracingConfig()).WillByDefault(Return(nullptr));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
+  ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
 }
 MockRoute::~MockRoute() = default;
 

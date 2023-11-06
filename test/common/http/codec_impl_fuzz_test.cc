@@ -66,6 +66,12 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
   h1_settings.accept_http_10_ = settings.accept_http_10();
   h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
 
+  // If the server accepts a HTTP/1.0 then the default host must be valid.
+  if (h1_settings.accept_http_10_ &&
+      !HeaderUtility::authorityIsValid(h1_settings.default_host_for_http_10_)) {
+    throw EnvoyException("Invalid Http1ServerSettings, HTTP/1.0 is enabled and "
+                         "'default_host_for_http_10' has invalid hostname, skipping test.");
+  }
   return h1_settings;
 }
 
@@ -110,6 +116,11 @@ public:
   // explore these violations via MutateAction and SwapAction at the connection
   // buffer level.
   enum class StreamState : int { PendingHeaders, PendingDataOrTrailers, Closed };
+  static absl::string_view streamStateToString(StreamState state) {
+    static std::array<std::string, 3> stream_state_strings = {"PendingHeaders",
+                                                              "PendingDataOrTrailers", "Closed"};
+    return stream_state_strings[static_cast<int>(state)];
+  }
 
   struct DirectionalState {
     // TODO(mattklein123): Split this more clearly into request and response directional state.
@@ -333,6 +344,12 @@ public:
         }
         encoder->getStream().resetStream(
             static_cast<Http::StreamResetReason>(directional_action.reset_stream()));
+        if (http_protocol_ < Protocol::Http2 && response) {
+          // Invoke the stream reset callback in case the HTTP response has been
+          // encoded and then the fuzzer does a reset stream call which for
+          // HTTP/1 should lead to the connection being closed.
+          stream_reset_callback_();
+        }
         request_.stream_state_ = response_.stream_state_ = StreamState::Closed;
       }
       break;
@@ -360,20 +377,24 @@ public:
           dispatcher = &context_.client_connection_.dispatcher_;
         }
 
-        // With this feature enabled for http2 we end up creating a schedulable
-        // callback the first time we re-enable reading as it's used to process
-        // the backed up data.
+        // With this feature enabled for http2 the codec may end up creating a
+        // schedulable callback the first time it re-enables reading as it's used
+        // to process the backed up data if there's any to process.
         if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-          const bool expecting_schedulable_callback_creation =
+          const bool might_schedulable_callback_creation =
               http_protocol_ == Protocol::Http2 && state.read_disable_count_ == 0 && !disable &&
               !state.created_schedulable_callback_;
 
-          if (expecting_schedulable_callback_creation) {
+          if (might_schedulable_callback_creation) {
             ASSERT(dispatcher != nullptr);
             state.created_schedulable_callback_ = true;
-            // The unique pointer of this object will be returned in createSchedulableCallback_ of
-            // dispatcher, so there is no risk of object leak.
-            new Event::MockSchedulableCallback(dispatcher);
+            ON_CALL(*dispatcher, createSchedulableCallback_(_))
+                .WillByDefault(testing::Invoke([dispatcher](std::function<void()> cb) {
+                  // The unique pointer of this object will be returned in
+                  // createSchedulableCallback_ of dispatcher, so there is no risk of this object
+                  // leaking.
+                  return new Event::MockSchedulableCallback(dispatcher, cb);
+                }));
           }
         }
 
@@ -390,16 +411,16 @@ public:
   void streamAction(const test::common::http::StreamAction& stream_action) {
     switch (stream_action.stream_action_selector_case()) {
     case test::common::http::StreamAction::kRequest: {
-      ENVOY_LOG_MISC(debug, "Request stream action on {} in state {} {}", stream_index_,
-                     static_cast<int>(request_.stream_state_),
-                     static_cast<int>(response_.stream_state_));
+      ENVOY_LOG_MISC(debug, "Request stream action on {} in state request({}) response({})",
+                     stream_index_, streamStateToString(request_.stream_state_),
+                     streamStateToString(response_.stream_state_));
       stream_action_active_ = true;
       if (stream_action.has_dispatching_action()) {
         // Simulate some response action while dispatching request headers, data, or trailers. This
         // may happen as a result of a filter sending a direct response.
-        ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state {} {}", stream_index_,
-                       static_cast<int>(request_.stream_state_),
-                       static_cast<int>(response_.stream_state_));
+        ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state request({}) response({})",
+                       stream_index_, streamStateToString(request_.stream_state_),
+                       streamStateToString(response_.stream_state_));
         auto request_action = stream_action.dispatching_action().directional_action_selector_case();
         if (request_action == test::common::http::DirectionalAction::kHeaders) {
           EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _))
@@ -438,9 +459,9 @@ public:
       break;
     }
     case test::common::http::StreamAction::kResponse: {
-      ENVOY_LOG_MISC(debug, "Response stream action on {} in state {} {}", stream_index_,
-                     static_cast<int>(request_.stream_state_),
-                     static_cast<int>(response_.stream_state_));
+      ENVOY_LOG_MISC(debug, "Response stream action on {} in state request({}) response({})",
+                     stream_index_, streamStateToString(request_.stream_state_),
+                     streamStateToString(response_.stream_state_));
       directionalAction(response_, stream_action.response());
       break;
     }

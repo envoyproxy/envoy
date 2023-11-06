@@ -151,7 +151,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           : stream_info.start_time() / 1000;
   test_stream_info->start_time_ = SystemTime(std::chrono::microseconds(start_time));
   if (stream_info.has_response_code()) {
-    test_stream_info->response_code_ = stream_info.response_code().value();
+    test_stream_info->setResponseCode(stream_info.response_code().value());
   }
   auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto upstream_metadata = std::make_shared<envoy::config::core::v3::Metadata>(

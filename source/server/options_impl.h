@@ -240,7 +240,7 @@ private:
  */
 class NoServingException : public EnvoyException {
 public:
-  NoServingException() : EnvoyException("NoServingException") {}
+  NoServingException(const std::string& what) : EnvoyException(what) {}
 };
 
 /**

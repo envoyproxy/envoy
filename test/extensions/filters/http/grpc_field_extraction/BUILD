@@ -55,7 +55,6 @@ envoy_extension_cc_test(
     ],
     data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
-    shard_count = 2,
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:config",
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",

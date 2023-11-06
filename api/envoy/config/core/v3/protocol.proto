@@ -56,7 +56,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -85,7 +85,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
   // The number of timeouts that can occur before port migration is triggered for QUIC clients.
-  // This defaults to 1. If set to 0, port migration will not occur on path degrading.
+  // This defaults to 4. If set to 0, port migration will not occur on path degrading.
   // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
   // This has no effect on server sessions.
   google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
@@ -94,6 +94,14 @@ message QuicProtocolOptions {
   // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
   QuicKeepAliveSettings connection_keepalive = 5;
+
+  // A comma-separated list of strings representing QUIC connection options defined in
+  // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>`_ and to be sent by upstream connections.
+  string connection_options = 6;
+
+  // A comma-separated list of strings representing QUIC client connection options defined in
+  // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>`_ and to be sent by upstream connections.
+  string client_connection_options = 7;
 }
 
 message UpstreamHttpProtocolOptions {

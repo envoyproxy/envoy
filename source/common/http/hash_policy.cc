@@ -142,11 +142,11 @@ public:
 
     const HeaderEntry* header = headers.Path();
     if (header) {
-      Http::Utility::QueryParams query_parameters =
-          Http::Utility::parseQueryString(header->value().getStringView());
-      const auto& iter = query_parameters.find(parameter_name_);
-      if (iter != query_parameters.end()) {
-        hash = HashUtil::xxHash64(iter->second);
+      Http::Utility::QueryParamsMulti query_parameters =
+          Http::Utility::QueryParamsMulti::parseQueryString(header->value().getStringView());
+      const auto val = query_parameters.getFirstValue(parameter_name_);
+      if (val.has_value()) {
+        hash = HashUtil::xxHash64(val.value());
       }
     }
     return hash;
@@ -217,9 +217,9 @@ HashPolicyImpl::HashPolicyImpl(
       hash_impls_.emplace_back(
           new FilterStateHashMethod(hash_policy->filter_state().key(), hash_policy->terminal()));
       break;
-    default:
-      throw EnvoyException(
-          absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
+        POLICY_SPECIFIER_NOT_SET:
+      PANIC("hash policy not set");
     }
   }
 }

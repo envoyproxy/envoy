@@ -99,6 +99,7 @@ envoy_cc_library(
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
         "//envoy/server:listener_manager_interface",
+        "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
         "//source/server:active_listener_base",
     ],
@@ -512,6 +513,7 @@ envoy_cc_library(
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/init:manager_interface",
         "//envoy/server:options_interface",
         "//source/common/common:assert_lib",

@@ -238,8 +238,9 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     redirect |= result.action() == PathNormalizationResult::Action::Redirect;
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.uhv_translate_backslash_to_slash")) {
+  // The `envoy.uhv.allow_non_compliant_characters_in_path` flag allows the \ (back slash)
+  // character, which legacy path normalization was changing to / (forward slash).
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
     translateBackToForwardSlashes(path);
   }
 

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -130,7 +131,7 @@ message ExtraSourceAddress {
   SocketOptionsOverride socket_options = 2;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message BindConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.BindConfig";
 
@@ -150,20 +151,22 @@ message BindConfig {
   // precompiled binaries.
   repeated SocketOption socket_options = 3;
 
-  // Extra source addresses appended to the address specified in the `source_address`
-  // field. This enables to specify multiple source addresses. Currently, only one extra
-  // address can be supported, and the extra address should have a different IP version
-  // with the address in the `source_address` field. The address which has the same IP
-  // version with the target host's address IP version will be used as bind address. If more
-  // than one extra address specified, only the first address matched IP version will be
-  // returned. If there is no same IP version address found, the address in the `source_address`
-  // will be returned.
+  // Extra source addresses appended to the address specified in the ``source_address``
+  // field. This enables to specify multiple source addresses.
+  // The source address selection is determined by :ref:`local_address_selector
+  // <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
   repeated ExtraSourceAddress extra_source_addresses = 5;
 
   // Deprecated by
   // :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>`
   repeated SocketAddress additional_source_addresses = 4
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Custom local address selector to override the default (i.e.
+  // :ref:`DefaultLocalAddressSelector
+  // <envoy_v3_api_msg_config.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`).
+  // [#extension-category: envoy.upstream.local_address_selector]
+  TypedExtensionConfig local_address_selector = 6;
 }
 
 // Addresses specify either a logical or physical address and port, which are

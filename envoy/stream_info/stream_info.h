@@ -231,6 +231,8 @@ struct LocalCloseReasonValues {
       "closing_upstream_tcp_connection_due_to_downstream_remote_close";
   const std::string ClosingUpstreamTcpDueToDownstreamLocalClose =
       "closing_upstream_tcp_connection_due_to_downstream_local_close";
+  const std::string ClosingUpstreamTcpDueToDownstreamResetClose =
+      "closing_upstream_tcp_connection_due_to_downstream_reset_close";
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
 };
@@ -610,12 +612,8 @@ public:
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
-   * @param std::string name denotes the name of the route.
-   */
-  virtual void setRouteName(absl::string_view name) PURE;
-
-  /**
-   * @return std::string& the name of the route.
+   * @return std::string& the name of the route. The name is get from the route() and it is
+   *         empty if there is no route.
    */
   virtual const std::string& getRouteName() const PURE;
 
@@ -842,16 +840,6 @@ public:
   virtual Tracing::Reason traceReason() const PURE;
 
   /**
-   * @param filter_chain_name Network filter chain name of the downstream connection.
-   */
-  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
-
-  /**
-   * @return Network filter chain name of the downstream connection.
-   */
-  virtual const std::string& filterChainName() const PURE;
-
-  /**
    * @param attempt_count, the number of times the request was attempted upstream.
    */
   virtual void setAttemptCount(uint32_t attempt_count) PURE;
@@ -910,6 +898,20 @@ public:
    * @param failure_reason the downstream transport failure reason.
    */
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * Checked by streams after finishing serving the request.
+   * @return bool true if the connection should be drained once this stream has
+   * finished sending and receiving.
+   */
+  virtual bool shouldDrainConnectionUponCompletion() const PURE;
+
+  /**
+   * Called if the connection decides to drain itself after serving this request.
+   * @param should_drain true to close the connection once this stream has
+   * finished sending and receiving.
+   */
+  virtual void setShouldDrainConnectionUponCompletion(bool should_drain) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

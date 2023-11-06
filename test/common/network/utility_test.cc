@@ -113,6 +113,16 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("udp://[a:b:c:d::]:0")->asString());
 }
 
+TEST(NetworkUtility, urlFromDatagramAddress) {
+  // UDP and unix URLs should be reversible with resolveUrl and urlFromDatagramAddress.
+  std::vector<std::string> urls{
+      "udp://[::1]:1", "udp://[a:b:c:d::]:0", "udp://1.2.3.4:1234", "unix://foo", "unix://",
+  };
+  for (const std::string& url : urls) {
+    EXPECT_EQ(url, Utility::urlFromDatagramAddress(*Utility::resolveUrl(url)));
+  }
+}
+
 TEST(NetworkUtility, socketTypeFromUrl) {
   EXPECT_FALSE(Utility::socketTypeFromUrl("foo").ok());
   EXPECT_FALSE(Utility::socketTypeFromUrl("abc://foo").ok());
@@ -683,9 +693,7 @@ TEST(PortRangeListTest, Errors) {
   }
 }
 
-static Address::Ipv4Instance makeFromPort(uint32_t port) {
-  return Address::Ipv4Instance("0.0.0.0", port);
-}
+static Address::Ipv4Instance makeFromPort(uint32_t port) { return {"0.0.0.0", port}; }
 
 TEST(PortRangeListTest, Normal) {
   {

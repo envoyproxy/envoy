@@ -39,7 +39,11 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
 
   Filesystem::InstanceImpl file_system;
   std::string path = absl::StrCat(prefix, leaf);
-  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
+  TRY_ASSERT_MAIN_THREAD {
+    auto file_or_error = file_system.fileReadToEnd(path);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    response.add(file_or_error.value());
+  }
   END_TRY
   catch (EnvoyException& e) {
     response.add(e.what());
@@ -61,7 +65,7 @@ public:
     std::string path = absl::StrCat("source/server/admin/html/", resource_name);
     Filesystem::InstanceImpl file_system;
     TRY_ASSERT_MAIN_THREAD {
-      buf = file_system.fileReadToEnd(path);
+      buf = file_system.fileReadToEnd(path).value();
       ENVOY_LOG_MISC(info, "Read {} bytes from {}", buf.size(), path);
     }
     END_TRY

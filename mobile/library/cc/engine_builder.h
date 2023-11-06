@@ -7,6 +7,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
+#include "source/common/protobuf/protobuf.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 #include "direct_response_testing.h"
@@ -20,7 +22,6 @@
 namespace Envoy {
 namespace Platform {
 
-constexpr int DefaultJwtTokenLifetimeSeconds = 60 * 60 * 24 * 90; // 90 days
 constexpr int DefaultXdsTimeout = 5;
 
 // Forward declaration so it can be referenced by XdsBuilder.
@@ -49,14 +50,16 @@ public:
   //                    requests.
   XdsBuilder(std::string xds_server_address, const int xds_server_port);
 
-  // Sets JWT as the authentication method to the xDS management server, using the given token.
+  // Sets the authentication token in the gRPC headers used to authenticate to the xDS management
+  // server.
   //
-  // `token`: the JWT token used to authenticate the client to the xDS management server.
-  // `token_lifetime_in_seconds`: <optional> the lifetime of the JWT token, in seconds. If none
-  //                              (or 0) is specified, then DefaultJwtTokenLifetimeSeconds is used.
-  XdsBuilder&
-  setJwtAuthenticationToken(std::string token,
-                            int token_lifetime_in_seconds = DefaultJwtTokenLifetimeSeconds);
+  // For example, if using API keys to authenticate to Traffic Director on GCP (see
+  // https://cloud.google.com/docs/authentication/api-keys for details), invoke:
+  //   builder.setAuthenticationToken("x-goog-api-key", api_key_token)
+  //
+  // `token_header`: the header name for which the the `token` will be set as a value.
+  // `token`: the authentication token.
+  XdsBuilder& setAuthenticationToken(std::string token_header, std::string token);
 
   // Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
   // connection. If no root certs are specified, the operating system defaults are used.
@@ -107,8 +110,8 @@ private:
 
   std::string xds_server_address_;
   int xds_server_port_;
-  std::string jwt_token_;
-  int jwt_token_lifetime_in_seconds_ = DefaultJwtTokenLifetimeSeconds;
+  std::string authentication_token_header_;
+  std::string authentication_token_;
   std::string ssl_root_certs_;
   std::string sni_;
   std::string rtds_resource_name_;
@@ -152,6 +155,9 @@ public:
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
 #ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
+  EngineBuilder& setHttp3ConnectionOptions(std::string options);
+  EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
+  EngineBuilder& addQuicHint(std::string host, int port);
 #endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
@@ -161,6 +167,8 @@ public:
   EngineBuilder& setNodeId(std::string node_id);
   // Sets the node.locality field in the Bootstrap configuration.
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
+  // Sets the node.metadata field in the Bootstrap configuration.
+  EngineBuilder& setNodeMetadata(ProtobufWkt::Struct node_metadata);
 #ifdef ENVOY_GOOGLE_GRPC
   // Sets the xDS configuration for the Envoy Mobile engine.
   //
@@ -177,7 +185,7 @@ public:
   EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
 #endif
-  EngineBuilder& addPlatformFilter(std::string name);
+  EngineBuilder& addPlatformFilter(const std::string& name);
 
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
 
@@ -223,6 +231,7 @@ private:
   bool platform_certificates_validation_on_ = false;
   std::string node_id_;
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
+  absl::optional<ProtobufWkt::Struct> node_metadata_ = absl::nullopt;
   bool dns_cache_on_ = false;
   int dns_cache_save_interval_seconds_ = 1;
 
@@ -232,6 +241,9 @@ private:
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
   bool enable_http3_ = true;
+  std::string http3_connection_options_ = "";
+  std::string http3_client_connection_options_ = "";
+  std::vector<std::pair<std::string, int>> quic_hints_;
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;

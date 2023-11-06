@@ -21,6 +21,7 @@ android_library(
         "CronvoyEngineBuilderImpl.java",
         "CronvoyExceptionImpl.java",
         "CronvoyImplVersion.java",
+        "CronvoyLogger.java",
         "CronvoyMetrics.java",
         "CronvoyNetworkExceptionImpl.java",
         "CronvoyPreconditions.java",
@@ -50,6 +51,7 @@ android_library(
         "//library/java/io/envoyproxy/envoymobile/utilities",
         "//library/java/org/chromium/net",
         "//library/java/org/chromium/net/urlconnection",
+        "@maven//:com_google_protobuf_protobuf_javalite",
         artifact("androidx.annotation:annotation"),
     ],
 )

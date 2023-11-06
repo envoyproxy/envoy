@@ -13,6 +13,7 @@
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
+#include "source/common/upstream/default_local_address_selector_factory.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
@@ -36,6 +37,8 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
+#include "source/extensions/load_balancing_policies/cluster_provided/config.h"
+#include "source/extensions/load_balancing_policies/round_robin/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
@@ -174,6 +177,13 @@ void ExtensionRegistry::registerFactories() {
   // Mobile compiles out watchdog support.
   Watchdog::forceRegisterAbortActionFactory();
 
+  // This is required for the default upstream local address selector.
+  Upstream::forceRegisterDefaultUpstreamLocalAddressSelectorFactory();
+
+  // This is required for load balancers of upstreams.
+  Envoy::Extensions::LoadBalancingPolices::ClusterProvided::forceRegisterFactory();
+  Envoy::Extensions::LoadBalancingPolices::RoundRobin::forceRegisterFactory();
+
 #ifdef ENVOY_MOBILE_STATS_REPORTING
   Network::Address::forceRegisterIpResolver();
   Upstream::forceRegisterLogicalDnsClusterFactory();
@@ -198,6 +208,7 @@ void ExtensionRegistry::registerFactories() {
   Network::forceRegisterUdpDefaultWriterFactoryFactory();
   Server::forceRegisterConnectionHandlerFactoryImpl();
   Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
+  Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
   Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
   Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();

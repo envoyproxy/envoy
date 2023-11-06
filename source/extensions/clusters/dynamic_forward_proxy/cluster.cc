@@ -10,6 +10,8 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -18,6 +20,36 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
+
+namespace {
+constexpr absl::string_view DynamicHostFilterStateKey = "envoy.upstream.dynamic_host";
+constexpr absl::string_view DynamicPortFilterStateKey = "envoy.upstream.dynamic_port";
+
+class DynamicHostObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(DynamicHostFilterStateKey); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+class DynamicPortObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(DynamicPortFilterStateKey); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    uint32_t port = 0;
+    if (absl::SimpleAtoi(data, &port)) {
+      return std::make_unique<StreamInfo::UInt32AccessorImpl>(port);
+    }
+    return nullptr;
+  }
+};
+
+} // namespace
+
+REGISTER_FACTORY(DynamicHostObjectFactory, StreamInfo::FilterState::ObjectFactory);
+REGISTER_FACTORY(DynamicPortObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 Cluster::Cluster(
     const envoy::config::cluster::v3::Cluster& cluster,
@@ -40,10 +72,6 @@ Cluster::Cluster(
       enable_sub_cluster_(config.has_sub_clusters_config()) {
 
   if (enable_sub_cluster_) {
-    if (sub_cluster_lb_policy_ ==
-        envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
-      throw EnvoyException("unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
-    }
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
     idle_timer_->enableTimer(sub_cluster_ttl_);
   }
@@ -315,12 +343,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   const Router::StringAccessor* dynamic_host_filter_state = nullptr;
-  if (context->downstreamConnection()) {
+  if (context->requestStreamInfo()) {
     dynamic_host_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
+        context->requestStreamInfo()->filterState().getDataReadOnly<Router::StringAccessor>(
+            DynamicHostFilterStateKey);
   }
 
   absl::string_view raw_host;
@@ -342,12 +368,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                              .resolve(nullptr)
                              .factory_.implementsSecureTransport();
   uint32_t port = is_secure ? 443 : 80;
-  if (context->downstreamConnection()) {
+  if (context->requestStreamInfo()) {
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
+        context->requestStreamInfo()->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+            DynamicPortFilterStateKey);
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
       port = dynamic_port_filter_state->value();
@@ -448,7 +472,7 @@ void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::In
       connection_info_map_[key].end());
 }
 
-std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
@@ -475,8 +499,8 @@ ClusterFactory::createClusterWithConfig(
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
 
-  auto new_cluster =
-      std::make_shared<Cluster>(cluster_config, proto_config, context, cache_manager_factory);
+  auto new_cluster = std::shared_ptr<Cluster>(
+      new Cluster(cluster_config, proto_config, context, cache_manager_factory));
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       factory_context_base);
@@ -487,10 +511,16 @@ ClusterFactory::createClusterWithConfig(
   if (!proto_config.allow_insecure_cluster_options()) {
     if (!options.has_value() ||
         (!options.value().auto_sni() || !options.value().auto_san_validation())) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true unless "
           "allow_insecure_cluster_options is set.");
     }
+  }
+  if (proto_config.has_sub_clusters_config() &&
+      proto_config.sub_clusters_config().lb_policy() ==
+          envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+    return absl::InvalidArgumentError(
+        "unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
   }
 
   auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);

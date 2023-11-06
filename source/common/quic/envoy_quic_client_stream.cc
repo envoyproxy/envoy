@@ -91,8 +91,13 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
       (Http::HeaderUtility::isCapsuleProtocol(headers) ||
-       Http::HeaderUtility::isConnectUdp(headers))) {
+       Http::HeaderUtility::isConnectUdpRequest(headers))) {
     useCapsuleProtocol();
+    if (Http::HeaderUtility::isConnectUdpRequest(headers)) {
+      // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it
+      // bypass the default Datagram queue.
+      session()->SetForceFlushForDefaultQueue(true);
+    }
   }
 #endif
   {
@@ -222,6 +227,10 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
+  if (read_side_closed()) {
+    return;
+  }
+
   if (!headers_decompressed() || header_list.empty()) {
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
                   quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -243,30 +252,45 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     onStreamError(close_connection_upon_invalid_header_, transform_rst);
     return;
   }
+
   const absl::optional<uint64_t> optional_status =
       Http::Utility::getResponseStatusOrNullopt(*headers);
+#ifndef ENVOY_ENABLE_UHV
   if (!optional_status.has_value()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
                   quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
-  const uint64_t status = optional_status.value();
-  if (Http::CodeUtility::is1xx(status)) {
-    // These are Informational 1xx headers, not the actual response headers.
-    set_headers_decompressed(false);
-  }
 
-#ifndef ENVOY_ENABLE_UHV
-  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  // In Envoy, both upgrade requests and extended CONNECT requests are
-  // represented as their HTTP/1 forms, regardless of the HTTP version used.
-  // Therefore, these need to be transformed into their HTTP/1 form.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       !upgrade_protocol_.empty()) {
     Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
   }
+#else
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
+  // In Envoy, both upgrade requests and extended CONNECT requests are
+  // represented as their HTTP/1 forms, regardless of the HTTP version used.
+  // Therefore, these need to be transformed into their HTTP/1 form.
+
+  // In UHV mode the :status header at this point can be malformed, as it is validated
+  // later on in the response_decoder_.decodeHeaders() call.
+  // Account for this here.
+  if (!optional_status.has_value()) {
+    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
+    // request
+    response_decoder_->decodeHeaders(std::move(headers), fin);
+    ConsumeHeaderList();
+    return;
+  }
 #endif
+
+  const uint64_t status = optional_status.value();
+  // TODO(#29071) determine how to handle 101, since it is not supported by HTTP/2
+  if (Http::CodeUtility::is1xx(status)) {
+    // These are Informational 1xx headers, not the actual response headers.
+    set_headers_decompressed(false);
+  }
 
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
   if (is_special_1xx && !decoded_1xx_) {
@@ -493,6 +517,10 @@ void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_->setStreamDecoder(response_decoder_);
 }
 #endif
+
+void EnvoyQuicClientStream::OnInvalidHeaders() {
+  onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+}
 
 } // namespace Quic
 } // namespace Envoy

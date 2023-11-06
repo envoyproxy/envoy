@@ -65,7 +65,22 @@ TEST(PrefixRoutesTest, RoutedToCatchAll) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("c:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_c, router.upstreamPool(key, stream_info)->upstream(""));
+}
+
+TEST(PrefixRoutesTest, MissingCatchAll) {
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+
+  Runtime::MockLoader runtime_;
+
+  PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
+
+  std::string key("c:bar");
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(nullptr, router.upstreamPool(key, stream_info));
 }
 
 TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
@@ -80,7 +95,8 @@ TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
 
   std::string key("ab:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream(""));
 }
 
 TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
@@ -115,9 +131,9 @@ TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.setReadFilterCallback(&filter_callbacks);
   std::string key("removeMe_catchAllKey");
-  EXPECT_EQ(upstream_catch_all, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_catch_all,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream(""));
   EXPECT_EQ("{catchAllKey}-catchAllEnv-subjectCN-{catchAllKey}", key);
 }
 
@@ -152,10 +168,47 @@ TEST(PrefixRoutesTest, TestFormatterWithPrefixRoute) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.setReadFilterCallback(&filter_callbacks);
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream(""));
   EXPECT_EQ("{abc:bar}-test-subjectCN-{abc:bar}", key);
+}
+
+TEST(PrefixRoutesTest, TestFormatterWithPercentInKey) {
+  auto upstream_c = std::make_shared<ConnPool::MockInstance>();
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+  const std::string format =
+      "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
+
+  stream_info.filterState()->setData(
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
+  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterC", upstream_c);
+
+  Runtime::MockLoader runtime_;
+  auto prefix_routes = createPrefixRoutes();
+  {
+    auto* route = prefix_routes.mutable_routes()->Add();
+    route->set_prefix("");
+    route->set_cluster("fake_clusterC");
+    route->set_key_formatter(format);
+  }
+  PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
+  std::string key("%abc:bar%");
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream(""));
+  EXPECT_EQ("{%abc:bar%}-test-subjectCN-{%abc:bar%}", key);
 }
 
 TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
@@ -187,9 +240,9 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.setReadFilterCallback(&filter_callbacks);
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream(""));
   EXPECT_EQ("abc:bar", key);
 }
 
@@ -208,7 +261,8 @@ TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("AB:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream(""));
 }
 
 TEST(PrefixRoutesTest, RemovePrefix) {
@@ -232,7 +286,8 @@ TEST(PrefixRoutesTest, RemovePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream(""));
   EXPECT_EQ(":bar", key);
 }
 
@@ -248,7 +303,8 @@ TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
 
   std::string key("a:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_b, router.upstreamPool(key, stream_info)->upstream(""));
   EXPECT_EQ("a:bar", key);
 }
 
@@ -271,11 +327,13 @@ TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
 
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
   std::string key1("a:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key1)->upstream());
+  EXPECT_EQ(upstream_b, router.upstreamPool(key1, stream_info)->upstream(""));
 
   std::string key2("also_route_to_b:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key2)->upstream());
+  EXPECT_EQ(upstream_b, router.upstreamPool(key2, stream_info)->upstream(""));
 }
 
 TEST(PrefixRoutesTest, DuplicatePrefix) {
@@ -296,6 +354,40 @@ TEST(PrefixRoutesTest, DuplicatePrefix) {
 
   EXPECT_THROW_WITH_MESSAGE(PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_),
                             EnvoyException, "prefix `ab` already exists.")
+}
+
+TEST(PrefixRoutesTest, RouteReadWriteToDiffClusters) {
+  auto upstream_a = std::make_shared<ConnPool::MockInstance>();
+  auto upstream_b = std::make_shared<ConnPool::MockInstance>();
+  auto upstream_c = std::make_shared<ConnPool::MockInstance>();
+  auto upstream_cr = std::make_shared<ConnPool::MockInstance>();
+
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", upstream_a);
+  upstreams.emplace("fake_clusterB", upstream_b);
+  upstreams.emplace("fake_clusterC", upstream_c);
+  upstreams.emplace("fake_clusterCR", upstream_cr);
+
+  Runtime::MockLoader runtime_;
+
+  auto prefix_routes = createPrefixRoutes();
+  prefix_routes.mutable_catch_all_route()->set_cluster("fake_clusterC");
+  auto read_policy = prefix_routes.mutable_catch_all_route()->mutable_read_command_policy();
+  read_policy->set_cluster("fake_clusterCR");
+
+  PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  std::string get_command("GET");
+  std::string set_command("SET");
+
+  std::string key1("c:bar");
+  EXPECT_EQ(upstream_cr, router.upstreamPool(key1, stream_info)->upstream(get_command));
+  EXPECT_EQ(upstream_c, router.upstreamPool(key1, stream_info)->upstream(set_command));
+
+  std::string key2("ab:bar");
+  EXPECT_EQ(upstream_a, router.upstreamPool(key2, stream_info)->upstream(get_command));
+  EXPECT_EQ(upstream_a, router.upstreamPool(key2, stream_info)->upstream(set_command));
 }
 
 TEST(MirrorPolicyImplTest, ShouldMirrorDefault) {

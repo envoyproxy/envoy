@@ -27,6 +27,14 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+class MockResourceProvider : public ResourceProvider {
+public:
+  MOCK_METHOD(Resource, getResource,
+              (const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
+               Server::Configuration::TracerFactoryContext& context),
+              (const));
+};
+
 class OpenTelemetryDriverTest : public testing::Test {
 public:
   OpenTelemetryDriverTest() = default;
@@ -44,7 +52,13 @@ public:
         .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
     ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
-    driver_ = std::make_unique<Driver>(opentelemetry_config, context_);
+    Resource resource;
+    resource.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
+
+    auto mock_resource_provider = NiceMock<MockResourceProvider>();
+    EXPECT_CALL(mock_resource_provider, getResource(_, _)).WillRepeatedly(Return(resource));
+
+    driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
   }
 
   void setupValidDriver() {
@@ -53,6 +67,24 @@ public:
       envoy_grpc:
         cluster_name: fake-cluster
       timeout: 0.250s
+    )EOF";
+    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+    setup(opentelemetry_config);
+  }
+
+  void setupValidDriverWithHttpExporter() {
+    const std::string yaml_string = R"EOF(
+    http_service:
+      http_uri:
+        cluster: "my_o11y_backend"
+        uri: "https://some-o11y.com/otlp/v1/traces"
+        timeout: 0.250s
+      request_headers_to_add:
+      - header:
+          key: "Authorization"
+          value: "auth-token"
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -75,11 +107,41 @@ protected:
   Stats::Scope& scope_{*stats_.rootScope()};
 };
 
+// Tests the tracer initialization with the gRPC exporter
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
   setupValidDriver();
   EXPECT_NE(driver_, nullptr);
 }
 
+// Tests the tracer initialization with the HTTP exporter
+TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfigHttpExporter) {
+  setupValidDriverWithHttpExporter();
+  EXPECT_NE(driver_, nullptr);
+}
+
+// Verifies that the tracer cannot be configured with two exporters at the same time
+TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    http_service:
+      http_uri:
+        cluster: "my_o11y_backend"
+        uri: "https://some-o11y.com/otlp/v1/traces"
+        timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  EXPECT_THROW_WITH_MESSAGE(setup(opentelemetry_config), EnvoyException,
+                            "OpenTelemetry Tracer cannot have both gRPC and HTTP exporters "
+                            "configured. OpenTelemetry tracer will be disabled.");
+  EXPECT_EQ(driver_, nullptr);
+}
+
+// Verifies traceparent/tracestate headers are properly parsed and propagated
 TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   // Set up driver
   setupValidDriver();
@@ -135,6 +197,9 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
   scope_spans:
     spans:
       trace_id: "AAA"
@@ -167,6 +232,7 @@ resource_spans:
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies span is properly created when the incoming request has no traceparent/tracestate headers
 TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
   // Set up driver
   setupValidDriver();
@@ -206,6 +272,7 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
             "00-00000000000000010000000000000002-0000000000000003-01");
 }
 
+// Verifies a span it not created when an invalid traceparent header is received
 TEST_F(OpenTelemetryDriverTest, NullSpanWithPropagationHeaderError) {
   setupValidDriver();
   // Add an invalid OTLP header to the request headers.
@@ -221,6 +288,7 @@ TEST_F(OpenTelemetryDriverTest, NullSpanWithPropagationHeaderError) {
   EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
 }
 
+// Verifies the export happens after one span is created
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
   // Set up driver
   setupValidDriver();
@@ -248,6 +316,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies the export happens only when a second span is created
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   // Set up driver
   setupValidDriver();
@@ -275,6 +344,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   EXPECT_EQ(2U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies the export happens after a timeout
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   timer_ =
       new NiceMock<Event::MockTimer>(&context_.server_factory_context_.thread_local_.dispatcher_);
@@ -307,6 +377,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.timer_flushed").value());
 }
 
+// Verifies child span is related to parent span
 TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
   // Set up driver
   setupValidDriver();
@@ -347,6 +418,125 @@ TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies the span types
+TEST_F(OpenTelemetryDriverTest, SpanType) {
+  // Set up driver
+  setupValidDriver();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  // Mock the random call for generating the parent span's IDs so we can check it later.
+  const uint64_t parent_trace_id_high = 0;
+  const uint64_t parent_trace_id_low = 2;
+  const uint64_t parent_span_id = 3;
+
+  {
+    mock_tracing_config_.spawn_upstream_span_ = false;
+    mock_tracing_config_.operation_name_ = Tracing::OperationName::Ingress;
+
+    NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+        context_.server_factory_context_.api_.random_;
+    {
+      InSequence s;
+
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_high));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_low));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_span_id));
+    }
+
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    EXPECT_NE(span.get(), nullptr);
+
+    // The span type should be SERVER because spawn_upstream_span_ is false and operation_name_ is
+    // Ingress.
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER);
+
+    // The child should only generate a span ID for itself; the trace id should come from the
+    // parent.
+    const uint64_t child_span_id = 3;
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(child_span_id));
+    Tracing::SpanPtr child_span =
+        span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
+
+    // The child span should also be a CLIENT span.
+    EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  }
+
+  {
+    mock_tracing_config_.spawn_upstream_span_ = false;
+    mock_tracing_config_.operation_name_ = Tracing::OperationName::Egress;
+
+    NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+        context_.server_factory_context_.api_.random_;
+    {
+      InSequence s;
+
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_high));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_low));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_span_id));
+    }
+
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    EXPECT_NE(span.get(), nullptr);
+
+    // The span type should be CLIENT because spawn_upstream_span_ is false and operation_name_ is
+    // Egress.
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+
+    // The child should only generate a span ID for itself; the trace id should come from the
+    // parent.
+    const uint64_t child_span_id = 3;
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(child_span_id));
+    Tracing::SpanPtr child_span =
+        span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
+
+    // The child span should also be a CLIENT span.
+    EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  }
+
+  {
+    mock_tracing_config_.spawn_upstream_span_ = true;
+    mock_tracing_config_.operation_name_ = Tracing::OperationName::Egress;
+
+    NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+        context_.server_factory_context_.api_.random_;
+    {
+      InSequence s;
+
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_high));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_low));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_span_id));
+    }
+
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    EXPECT_NE(span.get(), nullptr);
+
+    // The span type should be SERVER because spawn_upstream_span_ is true and this is
+    // downstream span.
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER);
+
+    // The child should only generate a span ID for itself; the trace id should come from the
+    // parent.
+    const uint64_t child_span_id = 3;
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(child_span_id));
+    Tracing::SpanPtr child_span =
+        span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
+
+    // The child span should also be a CLIENT span.
+    EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  }
+}
+
+// Verifies spans are exported with their attributes
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributes) {
   setupValidDriver();
   Http::TestRequestHeaderMapImpl request_headers{
@@ -377,6 +567,9 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
   scope_spans:
     spans:
       trace_id: "AAA"
@@ -412,6 +605,7 @@ resource_spans:
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Not sampled spans are ignored
 TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   setupValidDriver();
   Http::TestRequestHeaderMapImpl request_headers{
@@ -428,6 +622,7 @@ TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies tracer is "disabled" when no exporter is configured
 TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
   const std::string yaml_string = "{}";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
@@ -451,6 +646,7 @@ TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies a custom service name is properly set on exported spans
 TEST_F(OpenTelemetryDriverTest, ExportSpanWithCustomServiceName) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -483,6 +679,9 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "test-service-name"
+      key: "key1"
+      value:
+        string_value: "val1"
   scope_spans:
     spans:
       trace_id: "AAA"
@@ -508,6 +707,38 @@ resource_spans:
   EXPECT_CALL(*mock_stream_ptr_,
               sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _));
   span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies the export using the HTTP exporter
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->name_ =
+      "my_o11y_backend";
+  context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"my_o11y_backend"});
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+          httpAsyncClient())
+      .WillByDefault(ReturnRef(
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
+  setupValidDriverWithHttpExporter();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // Flush after a single span.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  // We should see a call to the async client to export that single span.
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _, _));
+
+  span->finishSpan();
+
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 

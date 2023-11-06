@@ -98,13 +98,39 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   gauge.used_ = true;
   snapshot.gauges_.push_back(gauge);
 
+  Stats::PrimitiveCounter host_counter;
+  host_counter.add(3);
+  Stats::PrimitiveCounterSnapshot host_counter_snap(host_counter);
+  host_counter_snap.setName("test_host_counter");
+  snapshot.host_counters_.push_back(host_counter_snap);
+
+  Stats::PrimitiveGauge host_gauge;
+  host_gauge.add(4);
+  Stats::PrimitiveGaugeSnapshot host_gauge_snap(host_gauge);
+  host_gauge_snap.setName("test_host_gauge");
+  snapshot.host_gauges_.push_back(host_gauge_snap);
+
   sink.flush(snapshot);
-  Network::UdpRecvData data;
-  server.recv(data);
-  EXPECT_EQ("envoy.test_counter:1|c", data.buffer_->toString());
-  Network::UdpRecvData data2;
-  server.recv(data2);
-  EXPECT_EQ("envoy.test_gauge:1|g", data2.buffer_->toString());
+  {
+    Network::UdpRecvData data;
+    server.recv(data);
+    EXPECT_EQ("envoy.test_counter:1|c", data.buffer_->toString());
+  }
+  {
+    Network::UdpRecvData data;
+    server.recv(data);
+    EXPECT_EQ("envoy.test_host_counter:3|c", data.buffer_->toString());
+  }
+  {
+    Network::UdpRecvData data;
+    server.recv(data);
+    EXPECT_EQ("envoy.test_gauge:1|g", data.buffer_->toString());
+  }
+  {
+    Network::UdpRecvData data;
+    server.recv(data);
+    EXPECT_EQ("envoy.test_host_gauge:4|g", data.buffer_->toString());
+  }
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
@@ -142,13 +168,41 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   gauge.setTags(tags);
   snapshot.gauges_.push_back(gauge);
 
+  Stats::PrimitiveCounter host_counter;
+  host_counter.add(3);
+  Stats::PrimitiveCounterSnapshot host_counter_snap(host_counter);
+  host_counter_snap.setTagExtractedName("test_host_counter");
+  host_counter_snap.setTags(tags);
+  snapshot.host_counters_.push_back(host_counter_snap);
+
+  Stats::PrimitiveGauge host_gauge;
+  host_gauge.add(4);
+  Stats::PrimitiveGaugeSnapshot host_gauge_snap(host_gauge);
+  host_gauge_snap.setTagExtractedName("test_host_gauge");
+  host_gauge_snap.setTags(tags);
+  snapshot.host_gauges_.push_back(host_gauge_snap);
+
   sink.flush(snapshot);
-  Network::UdpRecvData data;
-  server.recv(data);
-  EXPECT_EQ("envoy.test_counter:1|c|#node:test", data.buffer_->toString());
-  Network::UdpRecvData data2;
-  server.recv(data2);
-  EXPECT_EQ("envoy.test_gauge:1|g|#node:test", data2.buffer_->toString());
+  {
+    Network::UdpRecvData data;
+    server.recv(data);
+    EXPECT_EQ("envoy.test_counter:1|c|#node:test", data.buffer_->toString());
+  }
+  {
+    Network::UdpRecvData data;
+    server.recv(data);
+    EXPECT_EQ("envoy.test_host_counter:3|c|#node:test", data.buffer_->toString());
+  }
+  {
+    Network::UdpRecvData data;
+    server.recv(data);
+    EXPECT_EQ("envoy.test_gauge:1|g|#node:test", data.buffer_->toString());
+  }
+  {
+    Network::UdpRecvData data;
+    server.recv(data);
+    EXPECT_EQ("envoy.test_host_gauge:4|g|#node:test", data.buffer_->toString());
+  }
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";

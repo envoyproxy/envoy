@@ -12,57 +12,54 @@ jobs:
   displayName: Debs (x64)
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
   timeoutInMinutes: 120
-  pool:
-    vmImage: $(agentUbuntu)
+  pool: envoy-x64-small
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.distribution"
-      itemPattern: "bazel.distribution/x64/packages.x64.tar.gz"
+      artifactName: "distribution"
+      itemPattern: "distribution/x64/packages.x64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
-  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      ENVOY_DOCKER_IN_DOCKER: 1
-      ENVOY_RBE: 1
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-    displayName: "Verify packages"
+  - template: ../ci.yml
+    parameters:
+      ciTarget: verify_distro
+      cacheName: verify_distro
+      publishTestResults: false
+      tmpfsDockerDisabled: true
+      env:
+        ENVOY_DOCKER_IN_DOCKER: 1
 
 - job: packages_arm64
   displayName: Debs (arm64)
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
   timeoutInMinutes: 120
-  pool: "envoy-arm-large"
+  pool: "envoy-arm-small"
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.distribution"
-      itemPattern: "bazel.distribution/arm64/packages.arm64.tar.gz"
+      artifactName: "distribution"
+      itemPattern: "distribution/arm64/packages.arm64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
-  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      ENVOY_DOCKER_IN_DOCKER: 1
-      ENVOY_RBE: 1
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-    displayName: "Verify packages"
+  - template: ../ci.yml
+    parameters:
+      managedAgent: false
+      ciTarget: verify_distro
+      cacheName: verify_distro
+      rbe: false
+      artifactSuffix: ".arm64"
+      publishTestResults: false
+      tmpfsDockerDisabled: true
+      env:
+        ENVOY_DOCKER_IN_DOCKER: 1
 
 - job: verified
   displayName: Verification complete
   dependsOn: ["packages_x64", "packages_arm64"]
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:

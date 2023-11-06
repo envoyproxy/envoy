@@ -53,13 +53,14 @@ protected:
 
   void onWriteEventDone();
 
+  Network::Connection* networkConnection() { return envoy_connection_; }
+
 private:
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;
   // Hosts a list of active sockets, while only the last one is used for writing data.
   // Hosts a single default socket upon construction. New sockets can be pushed in later as a result
   // of QUIC connection migration.
-  // TODO(renjietang): Impose an upper limit.
   std::vector<Network::ConnectionSocketPtr> connection_sockets_;
   // Points to an instance of EnvoyQuicServerSession or EnvoyQuicClientSession.
   Network::Connection* envoy_connection_{nullptr};
