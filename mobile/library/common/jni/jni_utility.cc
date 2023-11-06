@@ -137,8 +137,8 @@ jobject native_map_to_map(JniHelper& jni_helper, envoy_map map) {
   jmethodID jmid_hashMapPut = jni_helper.getMethodId(
       jcls_hashMap.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   for (envoy_map_size_t i = 0; i < map.length; i++) {
-    auto key = native_data_to_string(jni_helper, map.entries[i].key);
-    auto value = native_data_to_string(jni_helper, map.entries[i].value);
+    LocalRefUniquePtr<jstring> key = native_data_to_string(jni_helper, map.entries[i].key);
+    LocalRefUniquePtr<jstring> value = native_data_to_string(jni_helper, map.entries[i].value);
     callObjectMethod(jni_helper, j_hashMap, jmid_hashMapPut, key.get(), value.get());
   }
   return j_hashMap;
