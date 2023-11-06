@@ -497,7 +497,7 @@ public:
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 
   /**
-   * Returns the UpstreamStreamFilterCallbacks for upstream filters.
+   * Returns the UpstreamStreamFilterCallbacks for upstream HTTP filters.
    */
   virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() { return {}; }
 
@@ -518,7 +518,7 @@ public:
   virtual const ScopeTrackedObject& scope() PURE;
 
   /**
-   * Returns a handle to the downstream callbacks, if available.
+   * Returns the DownstreamStreamFilterCallbacks for downstream HTTP filters.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
 };

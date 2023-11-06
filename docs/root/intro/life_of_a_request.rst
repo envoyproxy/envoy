@@ -200,7 +200,7 @@ A brief outline of the life cycle of a request and response using the example co
    capacity.
 8. For each stream an :ref:`Upstream HTTP filter <arch_overview_http_filters>` chain is created and
    runs. By default this only includes the CodecFilter, sending data to the appropriate codec, but if
-   the cluster is configured with an upstream filter chain, that filter chain will be created and run
+   the cluster is configured with an upstream HTTP filter chain, that filter chain will be created and run
    on each stream, which includes creating and running separate filter chains for retries and shadowed
    requests.
 9. The upstream endpoint connection's HTTP/2 codec multiplexes and frames the request’s stream with
@@ -210,7 +210,7 @@ A brief outline of the life cycle of a request and response using the example co
 11. The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
     response is proxied downstream. The response passes through the HTTP filters in the
     :ref:`opposite order <arch_overview_http_filters_ordering>` from the request, starting at the
-    codec filter, traversing any upstream filters, then going through the router filter and passing
+    codec filter, traversing any upstream HTTP filters, then going through the router filter and passing
     through CustomFilter, before being sent downstream.
 12. When the response is complete, the stream is destroyed. Post-request processing will update
     stats, write to the access log and finalize trace spans.
@@ -461,13 +461,13 @@ stream allocated from the HTTP connection pool. It also is responsible for reque
 and affinity.
 
 The router filter is also responsible for the creation and running of the `Upstream HTTP filter <arch_overview_http_filters>`
-chain. By default, upstream filters will start running immediately after headers arrive at the router
+chain. By default, upstream HTTP filters will start running immediately after headers arrive at the router
 filter, however C++ filters can pause until the upstream connection is established if they need to
-inspect the upstream stream or connection. Upstream filter chains are by default configured via cluster
-configuration, so for example a shadowed request can have a separate upstream filter chain for the primary
-and shadowed clusters. Also as the upstream filter chain is upstream of the router filter, it is run per each
+inspect the upstream stream or connection. Upstream HTTP filter chains are by default configured via cluster
+configuration, so for example a shadowed request can have a separate upstream HTTP filter chain for the primary
+and shadowed clusters. Also as the upstream HTTP filter chain is upstream of the router filter, it is run per each
 retry attempt allowing header manipulation per retry and including information about the upstream stream and
-connection. Unlike downstream filters, upstream filters can not alter the route.
+connection. Unlike downstream HTTP filters, upstream HTTP filters can not alter the route.
 
 7. Load balancing
 ^^^^^^^^^^^^^^^^^
