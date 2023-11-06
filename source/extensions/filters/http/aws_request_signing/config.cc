@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -20,7 +21,8 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), Extensions::Common::Aws::Utility::fetchMetadata);
+          context.api(), makeOptRef(context.getServerFactoryContext()),
+          Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigV4HeaderExclusionVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
   auto signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
@@ -41,7 +43,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), Extensions::Common::Aws::Utility::fetchMetadata);
+          context.api(), makeOptRef(context), Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigV4HeaderExclusionVector(
       per_route_config.aws_request_signing().match_excluded_headers().begin(),
       per_route_config.aws_request_signing().match_excluded_headers().end());

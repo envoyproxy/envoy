@@ -19,6 +19,7 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
+      pull-requests: read
 
   androidbuild:
     if: ${{ needs.env.outputs.mobile_android_build == 'true' }}
@@ -275,7 +276,6 @@ jobs:
         ./bazelw build \
             --config=mobile-remote-release-clang \
             --fat_apk_cpu=x86_64 \
-            --define envoy_mobile_listener=enabled \
             --linkopt=-fuse-ld=lld \
             //test/kotlin/apps/experimental:hello_envoy_kt
         "${ANDROID_HOME}"/platform-tools/adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk

@@ -262,6 +262,7 @@ integrations
 iouring
 jkl
 lang
+libcurl
 libsxg
 LLVM
 LPT

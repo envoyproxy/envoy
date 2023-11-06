@@ -5,6 +5,7 @@
 
 #include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
 #include "source/server/config_validation/server.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/common.h"
@@ -217,6 +218,46 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 
   ValidationListenerComponentFactory listener_component_factory(server);
   listener_component_factory.getTcpListenerConfigProviderManager();
+}
+
+class TestObject : public ProcessObject {
+public:
+  void setFlag(bool value) { boolean_flag_ = value; }
+
+  bool boolean_flag_ = true;
+};
+
+TEST_P(ValidationServerTest, NoProcessContext) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+  EXPECT_FALSE(server.processContext().has_value());
+  server.shutdown();
+}
+
+TEST_P(ValidationServerTest, WithProcessContext) {
+  TestObject object;
+  ProcessContextImpl process_context(object);
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest(), process_context);
+  EXPECT_TRUE(server.processContext().has_value());
+  auto context = server.processContext();
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
+  EXPECT_EQ(&object_from_context, &object);
+  EXPECT_TRUE(object_from_context.boolean_flag_);
+
+  object.boolean_flag_ = false;
+  EXPECT_FALSE(object_from_context.boolean_flag_);
+  server.shutdown();
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
