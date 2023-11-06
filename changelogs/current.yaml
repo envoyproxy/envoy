@@ -20,6 +20,11 @@ minor_behavior_changes:
   change: |
     uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
     which is deprecated. To revert this behavior set ``envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials`` to true.
+- area: circuit breakers
+  change: |
+    Changed retry budget behavior so that scheduled retries (e.g. retries in backoff, etc) are counted
+    towards the number of active requests. This makes retry budgets more accurate and provides a tighter
+    decision to signal response delay. This also fixes a case where retries could be rejected even at 100% budget.
 - area: upstream
   change: |
     Fixed a reported issue (https://github.com/envoyproxy/envoy/issues/11004) that causes the Least
@@ -36,11 +41,6 @@ minor_behavior_changes:
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
     This feature improves flow control within the proxy by deferring work on the receiving end if the other
     end is backed up.
-- area: circuit breakers
-  change: |
-    Changed the retry budget behavior so that scheduled retries (e.g. retries in backoff, etc) are counted
-    towards the number of active requests. This makes the retry budget more accurate and provides a tighter
-    decision to signal response delay. This also fixes a case where retries could be rejected even at 100% budget.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

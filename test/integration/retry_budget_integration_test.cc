@@ -68,6 +68,7 @@ public:
     }
     upstream_request_.reset();
     if (expect_conn_closed) {
+      unusable_upstream_conns_.push_back(std::move(free_upstream_conn_));
       free_upstream_conn_.reset();
     }
   }
@@ -118,6 +119,15 @@ public:
         conn.reset();
       }
     }
+    for (auto& conn : unusable_upstream_conns_) {
+      if (conn != nullptr) {
+        AssertionResult result = conn->close();
+        RELEASE_ASSERT(result, result.message());
+        result = conn->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+        conn.reset();
+      }
+    }
     for (auto& client : codec_clients_) {
       if (client->rawConnection().state() == Envoy::Network::Connection::State::Open) {
         // Manually abort ongoing requests (retries still in backoff)
@@ -140,13 +150,14 @@ protected:
 
   std::vector<Envoy::FakeHttpConnectionPtr> busy_upstream_conns_;
   Envoy::FakeHttpConnectionPtr free_upstream_conn_;
+  std::vector<Envoy::FakeHttpConnectionPtr> unusable_upstream_conns_;
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RetryBudgetIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                              Http::CodecType::HTTP3},
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+                              Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RetryBudgetIntegrationTest, NoOpRetryBudget) {
@@ -264,7 +275,7 @@ TEST_P(RetryBudgetIntegrationTest, RetryBudgetRecoupBudgetOnRequestAbandoned) {
   TearDown();
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_retry_active", 0);
 
-  // Next retriable request should get the retry slot
+  // Next retriable request should get the freed retry slot
   createRetryingRequest(false);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_retry_active", 1);
