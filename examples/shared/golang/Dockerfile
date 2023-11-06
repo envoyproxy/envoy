@@ -101,5 +101,5 @@ HEALTHCHECK \
     --timeout=2s \
     --start-period=10s \
     --retries=3 \
-    CMD nc -zv 127.0.0.1 10001
+    CMD curl -f http://localhost:10001/hello || exit 1
 CMD ["/app/service/service", "-p", "10001"]
