@@ -103,6 +103,24 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_setObjectArrayElement(JNIEnv* e
   jni_helper.setObjectArrayElement(array, index, value);
 }
 
+#define DEFINE_JNI_SET_ARRAY_REGION(JAVA_TYPE, JNI_TYPE)                                           \
+  extern "C" JNIEXPORT void JNICALL                                                                \
+      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_set##JAVA_TYPE##ArrayRegion(                \
+          JNIEnv* env, jclass, JNI_TYPE array, jsize start, jsize length, JNI_TYPE buffer) {       \
+    Envoy::JNI::JniHelper jni_helper(env);                                                         \
+    auto c_buffer = jni_helper.get##JAVA_TYPE##ArrayElements(buffer, nullptr);                     \
+    env->Set##JAVA_TYPE##ArrayRegion(array, start, length, c_buffer.get());                        \
+  }
+
+DEFINE_JNI_SET_ARRAY_REGION(Byte, jbyteArray)
+DEFINE_JNI_SET_ARRAY_REGION(Char, jcharArray)
+DEFINE_JNI_SET_ARRAY_REGION(Short, jshortArray)
+DEFINE_JNI_SET_ARRAY_REGION(Int, jintArray)
+DEFINE_JNI_SET_ARRAY_REGION(Long, jlongArray)
+DEFINE_JNI_SET_ARRAY_REGION(Float, jfloatArray)
+DEFINE_JNI_SET_ARRAY_REGION(Double, jdoubleArray)
+DEFINE_JNI_SET_ARRAY_REGION(Boolean, jbooleanArray)
+
 #define DEFINE_JNI_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                \
   extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
       Java_io_envoyproxy_envoymobile_jni_JniHelperTest_call##JAVA_TYPE##Method(                    \

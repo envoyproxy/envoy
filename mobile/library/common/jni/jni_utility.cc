@@ -270,8 +270,8 @@ jobjectArray ToJavaArrayOfObjectArray(JniHelper& jni_helper,
     jbyteArray key = native_data_to_array(jni_helper, map.get().entries[i].key);
     jbyteArray value = native_data_to_array(jni_helper, map.get().entries[i].value);
 
-    jni_helper.getEnv()->SetObjectArrayElement(javaArray, 2 * i, key);
-    jni_helper.getEnv()->SetObjectArrayElement(javaArray, 2 * i + 1, value);
+    jni_helper.setObjectArrayElement(javaArray, 2 * i, key);
+    jni_helper.setObjectArrayElement(javaArray, 2 * i + 1, value);
   }
 
   return javaArray;
@@ -284,7 +284,7 @@ jobjectArray ToJavaArrayOfByteArray(JniHelper& jni_helper, const std::vector<std
   for (size_t i = 0; i < v.size(); ++i) {
     jbyteArray byte_array =
         ToJavaByteArray(jni_helper, reinterpret_cast<const uint8_t*>(v[i].data()), v[i].length());
-    jni_helper.getEnv()->SetObjectArrayElement(joa, i, byte_array);
+    jni_helper.setObjectArrayElement(joa, i, byte_array);
   }
   return joa;
 }
@@ -292,7 +292,7 @@ jobjectArray ToJavaArrayOfByteArray(JniHelper& jni_helper, const std::vector<std
 jbyteArray ToJavaByteArray(JniHelper& jni_helper, const uint8_t* bytes, size_t len) {
   jbyteArray byte_array = jni_helper.getEnv()->NewByteArray(len);
   const jbyte* jbytes = reinterpret_cast<const jbyte*>(bytes);
-  jni_helper.getEnv()->SetByteArrayRegion(byte_array, /*start=*/0, len, jbytes);
+  jni_helper.setByteArrayRegion(byte_array, /*start=*/0, len, jbytes);
   return byte_array;
 }
 
