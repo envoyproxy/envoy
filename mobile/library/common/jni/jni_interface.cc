@@ -272,12 +272,13 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
   // Create a "no operation" result:
   //  1. Tell the filter chain to continue the iteration.
   //  2. Return headers received on as method's input as part of the method's output.
-  jclass jcls_object_array = jni_helper.getEnv()->FindClass("java/lang/Object");
-  jobjectArray noopResult = jni_helper.getEnv()->NewObjectArray(2, jcls_object_array, NULL);
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_object_array =
+      jni_helper.findClass("java/lang/Object");
+  jobjectArray noopResult = jni_helper.getEnv()->NewObjectArray(2, jcls_object_array.get(), NULL);
 
-  jclass jcls_int = jni_helper.getEnv()->FindClass("java/lang/Integer");
-  jmethodID jmid_intInit = jni_helper.getMethodId(jcls_int, "<init>", "(I)V");
-  jobject j_status = jni_helper.getEnv()->NewObject(jcls_int, jmid_intInit, 0);
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_int = jni_helper.findClass("java/lang/Integer");
+  jmethodID jmid_intInit = jni_helper.getMethodId(jcls_int.get(), "<init>", "(I)V");
+  jobject j_status = jni_helper.getEnv()->NewObject(jcls_int.get(), jmid_intInit, 0);
   // Set status to "0" (FilterHeadersStatus::Continue). Signal that the intent
   // is to continue the iteration of the filter chain.
   jni_helper.getEnv()->SetObjectArrayElement(noopResult, 0, j_status);
@@ -285,9 +286,6 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
   // Since the "on headers" call threw an exception set input headers as output headers.
   jni_helper.getEnv()->SetObjectArrayElement(
       noopResult, 1, Envoy::JNI::ToJavaArrayOfObjectArray(jni_helper, headers));
-
-  jni_helper.getEnv()->DeleteLocalRef(jcls_object_array);
-  jni_helper.getEnv()->DeleteLocalRef(jcls_int);
 
   return noopResult;
 }
