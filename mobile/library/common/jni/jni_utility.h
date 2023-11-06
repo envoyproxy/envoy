@@ -76,7 +76,7 @@ jlongArray native_final_stream_intel_to_array(JniHelper& jni_helper,
  */
 jobject native_map_to_map(JniHelper& jni_helper, envoy_map map);
 
-jstring native_data_to_string(JniHelper& jni_helper, envoy_data data);
+LocalRefUniquePtr<jstring> native_data_to_string(JniHelper& jni_helper, envoy_data data);
 
 envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data);
 
