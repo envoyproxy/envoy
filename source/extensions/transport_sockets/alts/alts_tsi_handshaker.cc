@@ -11,6 +11,7 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
+#include "absl/types/span.h"
 #include "src/core/lib/iomgr/exec_ctx.h"
 #include "src/core/tsi/alts/zero_copy_frame_protector/alts_zero_copy_grpc_protector.h"
 
@@ -49,7 +50,8 @@ absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* rece
   }
 
   // Get a handshake message from the handshaker service.
-  absl::string_view in_bytes(reinterpret_cast<const char*>(received_bytes), received_bytes_size);
+  absl::Span<const uint8_t> in_bytes =
+      absl::MakeConstSpan(received_bytes, received_bytes_size);
   HandshakerResp response;
   if (!has_sent_initial_handshake_message_) {
     has_sent_initial_handshake_message_ = true;
@@ -99,17 +101,15 @@ absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* rece
 }
 
 std::size_t AltsTsiHandshaker::computeMaxFrameSize(const grpc::gcp::HandshakerResult& result) {
-  std::size_t max_frame_size = AltsMinFrameSize;
   if (result.max_frame_size() > 0) {
-    max_frame_size = std::min<std::size_t>(result.max_frame_size(), MaxFrameSize);
-    max_frame_size = std::max<std::size_t>(max_frame_size, AltsMinFrameSize);
+    return std::clamp(static_cast<std::size_t>(result.max_frame_size()), AltsMinFrameSize, MaxFrameSize);
   }
-  return max_frame_size;
+  return AltsMinFrameSize;
 }
 
 absl::StatusOr<std::unique_ptr<AltsHandshakeResult>>
 AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
-                                      absl::string_view received_bytes,
+                                      absl::Span<const uint8_t> received_bytes,
                                       std::size_t bytes_consumed) {
   // Validate the HandshakerResult message.
   if (!result.has_peer_identity()) {
@@ -151,8 +151,7 @@ AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
 
   // Calculate the unused bytes.
   std::size_t unused_bytes_size = received_bytes.size() - bytes_consumed;
-  const uint8_t* unused_bytes_ptr =
-      reinterpret_cast<const uint8_t*>(received_bytes.data() + bytes_consumed);
+  const uint8_t* unused_bytes_ptr = received_bytes.data() + bytes_consumed;
   std::vector<uint8_t> unused_bytes(unused_bytes_ptr, unused_bytes_ptr + unused_bytes_size);
 
   // Create and return the AltsHandshakeResult.

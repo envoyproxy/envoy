@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "grpcpp/channel.h"
 #include "grpcpp/client_context.h"
 #include "grpcpp/support/sync_stream.h"
@@ -38,11 +39,11 @@ public:
 
   // Sends a StartServerHandshakeReq message to the ALTS handshaker service and
   // returns the response. This API is blocking.
-  absl::StatusOr<grpc::gcp::HandshakerResp> sendStartServerHandshakeReq(absl::string_view in_bytes);
+  absl::StatusOr<grpc::gcp::HandshakerResp> sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes);
 
   // Sends a NextHandshakeMessageReq message to the ALTS handshaker service and
   // returns the response. This API is blocking.
-  absl::StatusOr<grpc::gcp::HandshakerResp> sendNextHandshakeReq(absl::string_view in_bytes);
+  absl::StatusOr<grpc::gcp::HandshakerResp> sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes);
 
 private:
   static void setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions);

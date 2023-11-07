@@ -6,6 +6,7 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "src/proto/grpc/gcp/handshaker.pb.h"
 #include "src/proto/grpc/gcp/transport_security_common.pb.h"
 
@@ -90,7 +91,7 @@ absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
   return response;
 }
 
-absl::StatusOr<HandshakerResp> AltsProxy::sendStartServerHandshakeReq(absl::string_view in_bytes) {
+absl::StatusOr<HandshakerResp> AltsProxy::sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes) {
   // Prepare the StartServerHandshakeReq message.
   ServerHandshakeParameters server_parameters;
   server_parameters.add_record_protocols(RecordProtocol);
@@ -99,7 +100,7 @@ absl::StatusOr<HandshakerResp> AltsProxy::sendStartServerHandshakeReq(absl::stri
   server_start->add_application_protocols(ApplicationProtocol);
   (*server_start->mutable_handshake_parameters())[HandshakeProtocol::ALTS] = server_parameters;
   setRpcProtocolVersions(server_start->mutable_rpc_versions());
-  server_start->set_in_bytes(std::string(in_bytes));
+  server_start->set_in_bytes(in_bytes.data(), in_bytes.size());
   server_start->set_max_frame_size(MaxFrameSize);
 
   // Send the StartServerHandshakeReq message to the handshaker service and wait
@@ -121,11 +122,11 @@ absl::StatusOr<HandshakerResp> AltsProxy::sendStartServerHandshakeReq(absl::stri
 }
 
 absl::StatusOr<grpc::gcp::HandshakerResp>
-AltsProxy::sendNextHandshakeReq(absl::string_view in_bytes) {
+AltsProxy::sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes) {
   // Prepare the NextHandshakeMessageReq message.
   HandshakerReq request;
   NextHandshakeMessageReq* next = request.mutable_next();
-  next->set_in_bytes(std::string(in_bytes));
+  next->set_in_bytes(in_bytes.data(), in_bytes.size());
 
   // Send the NextHandshakeMessageReq message to the handshaker service and wait
   // for the response.

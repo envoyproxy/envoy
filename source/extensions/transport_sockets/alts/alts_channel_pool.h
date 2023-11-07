@@ -29,7 +29,7 @@ private:
 
   // Use round-robin to select channels from the pool.
   absl::Mutex mu_;
-  std::size_t index_ = 0;
+  std::size_t index_ = 0 ABSL_GUARDED_BY(mu_);
   std::vector<std::shared_ptr<grpc::Channel>> channel_pool_;
 };
 

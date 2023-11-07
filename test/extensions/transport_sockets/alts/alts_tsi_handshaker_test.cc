@@ -68,8 +68,13 @@ public:
   grpc::Status
   DoHandshake(grpc::ServerContext*,
               grpc::ServerReaderWriter<HandshakerResp, HandshakerReq>* stream) override {
-    HandshakerReq request;
     bool is_assisting_client = false;
+    bool is_handshake_complete = false;
+    bool sent_client_finished = false;
+    bool sent_server_init_and_server_finished = false;
+    std::string bytes_from_client;
+    std::string bytes_from_server;
+    HandshakerReq request;
     while (stream->Read(&request)) {
       HandshakerResp response;
       if (request.has_client_start()) {
@@ -90,42 +95,42 @@ public:
           std::string out_frames = absl::StrCat(ServerInit, ServerFinished);
           response.set_out_frames(out_frames);
           response.set_bytes_consumed(out_frames.size());
-          sent_server_init_and_server_finished_ = true;
+          sent_server_init_and_server_finished = true;
         }
-        bytes_from_client_.append(request.server_start().in_bytes());
+        bytes_from_client.append(request.server_start().in_bytes());
       } else if (request.has_next()) {
         std::size_t number_handshake_bytes = request.next().in_bytes().size();
         if (absl::EndsWith(request.next().in_bytes(), ApplicationData)) {
           number_handshake_bytes -= ApplicationData.size();
         }
         if (is_assisting_client) {
-          bytes_from_server_.append(request.next().in_bytes().substr(0, number_handshake_bytes));
+          bytes_from_server.append(request.next().in_bytes().substr(0, number_handshake_bytes));
         } else {
-          bytes_from_client_.append(request.next().in_bytes().substr(0, number_handshake_bytes));
+          bytes_from_client.append(request.next().in_bytes().substr(0, number_handshake_bytes));
         }
         response.set_bytes_consumed(number_handshake_bytes);
 
         // Consider sending the ServerInit and ServerFinished.
-        if (!is_assisting_client && !sent_server_init_and_server_finished_ &&
-            bytes_from_client_ == ClientInit) {
-          sent_server_init_and_server_finished_ = true;
+        if (!is_assisting_client && !sent_server_init_and_server_finished &&
+            bytes_from_client == ClientInit) {
+          sent_server_init_and_server_finished = true;
           response.set_out_frames(absl::StrCat(ServerInit, ServerFinished));
         }
 
         // Consider sending the ClientFinished.
-        if (is_assisting_client && !sent_client_finished_ &&
-            bytes_from_server_ == absl::StrCat(ServerInit, ServerFinished)) {
-          sent_client_finished_ = true;
+        if (is_assisting_client && !sent_client_finished &&
+            bytes_from_server == absl::StrCat(ServerInit, ServerFinished)) {
+          sent_client_finished = true;
           response.set_out_frames(ClientFinished);
         }
 
         // Check if the handshake is complete and, if so, populate the result.
         if (is_assisting_client) {
-          is_handshake_complete_ = (bytes_from_server_ == absl::StrCat(ServerInit, ServerFinished));
+          is_handshake_complete = (bytes_from_server == absl::StrCat(ServerInit, ServerFinished));
         } else {
-          is_handshake_complete_ = (bytes_from_client_ == absl::StrCat(ClientInit, ClientFinished));
+          is_handshake_complete = (bytes_from_client == absl::StrCat(ClientInit, ClientFinished));
         }
-        if (is_handshake_complete_) {
+        if (is_handshake_complete) {
           populateHandshakeResult(response.mutable_result());
         }
       } else {
@@ -137,13 +142,6 @@ public:
     }
     return grpc::Status::OK;
   }
-
-private:
-  bool is_handshake_complete_ = false;
-  bool sent_client_finished_ = false;
-  bool sent_server_init_and_server_finished_ = false;
-  std::string bytes_from_client_;
-  std::string bytes_from_server_;
 };
 
 class CapturingHandshaker {
@@ -258,6 +256,51 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
+TEST_F(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {
+  // Setup.
+  startFakeHandshakerService();
+
+  std::vector<std::unique_ptr<std::thread>> handshake_threads;
+  for (int i = 0; i < 10; ++i) {
+    auto handshake_thread = std::make_unique<std::thread>([this]() {
+      auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
+
+      // Get the ClientInit.
+      {
+        CapturingHandshaker capturing_handshaker;
+        EXPECT_OK(handshaker->next(&capturing_handshaker,
+                                   /*received_bytes=*/nullptr,
+                                   /*received_bytes_size=*/0, onNextDoneImpl));
+        EXPECT_EQ(capturing_handshaker.getBytesToSend(), ClientInit);
+        EXPECT_OK(capturing_handshaker.getStatus());
+        EXPECT_THAT(capturing_handshaker.getAltsHandshakeResult(), IsNull());
+      }
+
+      // Get the ClientFinished and the handshake result.
+      {
+        std::string handshake_message =
+            absl::StrCat(ServerInit, ServerFinished);
+        CapturingHandshaker capturing_handshaker;
+        EXPECT_OK(handshaker->next(
+            &capturing_handshaker,
+            reinterpret_cast<const unsigned char*>(handshake_message.c_str()),
+            handshake_message.size(), onNextDoneImpl));
+        EXPECT_EQ(capturing_handshaker.getBytesToSend(), ClientFinished);
+        EXPECT_OK(capturing_handshaker.getStatus());
+        auto handshake_result = capturing_handshaker.getAltsHandshakeResult();
+        EXPECT_THAT(handshake_result, NotNull());
+        EXPECT_THAT(handshake_result->frame_protector, NotNull());
+        EXPECT_EQ(handshake_result->peer_identity, PeerServiceAccount);
+        EXPECT_EQ(handshake_result->unused_bytes.size(), 0);
+      }
+    });
+    handshake_threads.push_back(std::move(handshake_thread));
+  }
+  for (int i = 0; i < 10; ++i) {
+    handshake_threads[i]->join();
+  }
+}
+
 TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
   // Setup.
   startFakeHandshakerService();
@@ -337,6 +380,53 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   EXPECT_THAT(handshaker->next(&capturing_handshaker, /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInternal));
+}
+
+TEST_F(AltsTsiHandshakerTest, ConcurrentServerSideFullHandshakes) {
+  // Setup.
+  startFakeHandshakerService();
+
+  std::vector<std::unique_ptr<std::thread>> handshake_threads;
+  for (int i = 0; i < 10; ++i) {
+    auto handshake_thread = std::make_unique<std::thread>([this]() {
+      auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
+
+      // Get the ServerInit and ServerFinished.
+      {
+        CapturingHandshaker capturing_handshaker;
+        EXPECT_OK(handshaker->next(
+            &capturing_handshaker,
+            reinterpret_cast<const unsigned char*>(ClientInit.data()),
+            ClientInit.size(), onNextDoneImpl));
+        EXPECT_EQ(capturing_handshaker.getBytesToSend(),
+                  absl::StrCat(ServerInit, ServerFinished));
+        EXPECT_OK(capturing_handshaker.getStatus());
+        EXPECT_THAT(capturing_handshaker.getAltsHandshakeResult(), IsNull());
+      }
+
+      // Get the handshake result.
+      {
+        std::string handshake_message =
+            absl::StrCat(ServerInit, ServerFinished);
+        CapturingHandshaker capturing_handshaker;
+        EXPECT_OK(handshaker->next(
+            &capturing_handshaker,
+            reinterpret_cast<const unsigned char*>(ClientFinished.data()),
+            ClientFinished.size(), onNextDoneImpl));
+        EXPECT_EQ(capturing_handshaker.getBytesToSend(), "");
+        EXPECT_OK(capturing_handshaker.getStatus());
+        auto handshake_result = capturing_handshaker.getAltsHandshakeResult();
+        EXPECT_THAT(handshake_result, NotNull());
+        EXPECT_THAT(handshake_result->frame_protector, NotNull());
+        EXPECT_EQ(handshake_result->peer_identity, PeerServiceAccount);
+        EXPECT_EQ(handshake_result->unused_bytes.size(), 0);
+      }
+    });
+    handshake_threads.push_back(std::move(handshake_thread));
+  }
+  for (int i = 0; i < 10; ++i) {
+    handshake_threads[i]->join();
+  }
 }
 
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
@@ -514,7 +604,7 @@ TEST_F(AltsTsiHandshakerTest, InvalidHandshakeResult) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
-  std::string received_bytes;
+  absl::Span<const uint8_t> received_bytes;
 
   // Fail due to a missing peer identity.
   HandshakerResult handshake_result;

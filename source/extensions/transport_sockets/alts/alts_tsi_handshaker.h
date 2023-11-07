@@ -9,6 +9,7 @@
 #include "source/extensions/transport_sockets/alts/alts_proxy.h"
 #include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
 
+#include "absl/types/span.h"
 #include "grpcpp/channel.h"
 
 namespace Envoy {
@@ -42,7 +43,7 @@ public:
 
   // Exposed for testing purposes only.
   absl::StatusOr<std::unique_ptr<AltsHandshakeResult>>
-  getHandshakeResult(const grpc::gcp::HandshakerResult& result, absl::string_view received_bytes,
+  getHandshakeResult(const grpc::gcp::HandshakerResult& result, absl::Span<const uint8_t> received_bytes,
                      std::size_t bytes_consumed);
   static std::size_t computeMaxFrameSize(const grpc::gcp::HandshakerResult& result);
 
