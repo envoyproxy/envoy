@@ -49,7 +49,7 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
 
 // To make a map serialize deterministically we need to force the order.
 // Here we're going to sort the keys into numerical order for number keys,
-// or lexigraphical order for strings, and then hash them in that order.
+// or lexicographical order for strings, and then hash them in that order.
 uint64_t reflectionHashMapField(const Protobuf::Message& message,
                                 const Protobuf::FieldDescriptor* field, uint64_t seed) {
   using Protobuf::FieldDescriptor;
