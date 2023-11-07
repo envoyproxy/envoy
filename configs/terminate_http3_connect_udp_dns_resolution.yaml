@@ -1,4 +1,5 @@
 # This configuration terminates a CONNECT-UDP request and sends UDP payloads directly over UDP to the target.
+# The configured dynamic forward proxy enables DNS resolution at the proxy to suppot arbitrary target domain names.
 static_resources:
   listeners:
   - name: listener_0
@@ -40,12 +41,18 @@ static_resources:
                   connect_matcher:
                     {}
                 route:
-                  cluster: service_google
+                  cluster: dynamic_forward_proxy_cluster
                   upgrade_configs:
                   - upgrade_type: CONNECT-UDP
                     connect_config:
                       {}
           http_filters:
+          - name: envoy.filters.http.dynamic_forward_proxy
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+              dns_cache_config:
+                name: dynamic_forward_proxy_cache_config
+                dns_lookup_family: V4_ONLY
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -54,17 +61,12 @@ static_resources:
           upgrade_configs:
           - upgrade_type: CONNECT-UDP
   clusters:
-  - name: service_google
-    type: LOGICAL_DNS
-    # Comment out the following line to test on v6 networks
-    dns_lookup_family: V4_ONLY
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: service_google
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: www.google.com
-                port_value: 443
+  - name: dynamic_forward_proxy_cluster
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: V4_ONLY
