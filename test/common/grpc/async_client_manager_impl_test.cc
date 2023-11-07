@@ -200,12 +200,16 @@ public:
         dispatcher_(api_->allocateDispatcher("test_grpc_manager")),
         stat_names_(scope_.symbolTable()) {
     tls_.setDispatcher(dispatcher_.get());
-    createAsyncClientManager(Bootstrap::GrpcAsyncClientManagerConfig());
   }
 
-  void createAsyncClientManager(const Bootstrap::GrpcAsyncClientManagerConfig& config) {
-    async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(cm_, tls_, time_system_, *api_,
-                                                                     stat_names_, config);
+  void initialize(absl::optional<Bootstrap::GrpcAsyncClientManagerConfig> config = absl::nullopt) {
+    if (config.has_value()) {
+      async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
+          cm_, tls_, time_system_, *api_, stat_names_, config.value());
+    } else {
+      async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
+          cm_, tls_, time_system_, *api_, stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
+    }
   }
 
   Upstream::MockClusterManager cm_;
@@ -220,6 +224,7 @@ public:
 };
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
+  initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return());
@@ -227,6 +232,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
+  initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   envoy::config::core::v3::GrpcService grpc_service_c;
@@ -245,15 +251,16 @@ TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
             config_with_hash_key_c.getPreComputedHash());
 }
 
+// Test the client cache time is correctly configured from the async client manager.
 TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithConfig) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Bootstrap::GrpcAsyncClientManagerConfig aync_manager_config;
-  aync_manager_config.mutable_entry_expiration_time()->MergeFrom(
+  aync_manager_config.mutable_max_cached_entry_idle_duration()->MergeFrom(
       ProtobufUtil::TimeUtil::SecondsToDuration(20));
 
-  createAsyncClientManager(aync_manager_config);
+  initialize(aync_manager_config);
 
   RawAsyncClientSharedPtr foo_client_0 =
       async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true);
@@ -273,7 +280,6 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithConfig) {
   for (int i = 0; i < 21; i++) {
     time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                    Event::Dispatcher::RunType::NonBlock);
-    std::cout << i << std::endl;
   }
 
   RawAsyncClientSharedPtr foo_client_3 =
@@ -282,6 +288,7 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithConfig) {
 }
 
 TEST_F(AsyncClientManagerImplTest, RawAsyncClientCache) {
+  initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
@@ -300,6 +307,7 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCache) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
+  initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](const std::string&) {
@@ -311,6 +319,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
+  initialize();
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
@@ -325,6 +334,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
+  initialize();
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
@@ -345,6 +355,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
 }
 
 TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
+  initialize();
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
@@ -363,6 +374,7 @@ TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInValue) {
+  initialize();
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
@@ -383,6 +395,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInValue) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownSkipClusterCheck) {
+  initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 

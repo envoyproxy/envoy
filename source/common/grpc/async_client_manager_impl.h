@@ -65,7 +65,7 @@ public:
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher,
-                                 std::chrono::seconds entry_timeout_interval);
+                                 std::chrono::milliseconds max_cached_entry_idle_duration);
     void setCache(const GrpcServiceConfigWithHashKey& config_with_hash_key,
                   const RawAsyncClientSharedPtr& client);
 
@@ -87,7 +87,7 @@ public:
     absl::flat_hash_map<GrpcServiceConfigWithHashKey, LruList::iterator> lru_map_;
     Event::Dispatcher& dispatcher_;
     Envoy::Event::TimerPtr cache_eviction_timer_;
-    const std::chrono::seconds entry_timeout_interval_;
+    const std::chrono::milliseconds max_cached_entry_idle_duration_;
   };
 
 private:

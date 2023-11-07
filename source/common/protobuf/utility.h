@@ -39,12 +39,6 @@
   ((message).has_##field_name() ? DurationUtil::durationToMilliseconds((message).field_name())     \
                                 : (default_value))
 
-// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, return the
-// default value.
-#define PROTOBUF_GET_SECONDS_OR_DEFAULT(message, field_name, default_value)                        \
-  ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
-                                : (default_value))
-
 // Obtain the string value if the field is set. Otherwise, return the default value.
 #define PROTOBUF_GET_STRING_OR_DEFAULT(message, field_name, default_value)                         \
   (!(message).field_name().empty() ? (message).field_name() : (default_value))
