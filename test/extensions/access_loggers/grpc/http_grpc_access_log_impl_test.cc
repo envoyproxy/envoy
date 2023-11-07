@@ -83,7 +83,7 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _, _, _, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");

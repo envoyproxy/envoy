@@ -16,17 +16,7 @@ void ImplBase::log(const Http::RequestHeaderMap* request_headers,
   Formatter::HttpFormatterContext log_context{
       request_headers, response_headers, response_trailers, {}, access_log_type};
 
-  if (!request_headers) {
-    request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
-  }
-  if (!response_headers) {
-    response_headers = Http::StaticEmptyHeaders::get().response_headers.get();
-  }
-  if (!response_trailers) {
-    response_trailers = Http::StaticEmptyHeaders::get().response_trailers.get();
-  }
-  if (filter_ && !filter_->evaluate(stream_info, *request_headers, *response_headers,
-                                    *response_trailers, access_log_type)) {
+  if (filter_ && !filter_->evaluate(log_context, stream_info)) {
     return;
   }
 
