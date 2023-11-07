@@ -74,17 +74,21 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
   case FieldDescriptor::CPPTYPE_UINT64:
     MAP_SORT_BY(UInt64);
     break;
-  case FieldDescriptor::CPPTYPE_DOUBLE:
-    MAP_SORT_BY(Double);
-    break;
-  case FieldDescriptor::CPPTYPE_FLOAT:
-    MAP_SORT_BY(Float);
-    break;
-  case FieldDescriptor::CPPTYPE_STRING:
-    // TODO: use StringReference
-    MAP_SORT_BY(String);
-    break;
   case FieldDescriptor::CPPTYPE_BOOL:
+    MAP_SORT_BY(Bool);
+    break;
+  case FieldDescriptor::CPPTYPE_STRING: {
+    std::sort(
+        map.begin(), map.end(),
+        [&entry_reflection, &key_field](const Protobuf::Message& a, const Protobuf::Message& b) {
+          std::string scratch_a, scratch_b;
+          return entry_reflection->GetStringReference(a, key_field, &scratch_a) <
+                 entry_reflection->GetStringReference(b, key_field, &scratch_b);
+        });
+    break;
+  }
+  case FieldDescriptor::CPPTYPE_DOUBLE:
+  case FieldDescriptor::CPPTYPE_FLOAT:
   case FieldDescriptor::CPPTYPE_ENUM:
   case FieldDescriptor::CPPTYPE_MESSAGE:
     IS_ENVOY_BUG("invalid map key type");
@@ -126,10 +130,16 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
   case FieldDescriptor::CPPTYPE_ENUM:
     REFLECTION_FOR_EACH(EnumValue, HASH_FIXED);
     break;
-  case FieldDescriptor::CPPTYPE_STRING:
-    // TODO: use StringReference
-    REFLECTION_FOR_EACH(String, HASH_STRING);
-    break;
+  case FieldDescriptor::CPPTYPE_STRING: {
+    std::string scratch;
+    if (field->is_repeated()) {
+      for (int i = 0; i < reflection->FieldSize(message, field); i++) {
+        HASH_STRING(reflection->GetRepeatedStringReference(message, field, i, &scratch));
+      }
+    } else {
+      HASH_STRING(reflection->GetStringReference(message, field, &scratch));
+    }
+  } break;
   case FieldDescriptor::CPPTYPE_MESSAGE:
     if (field->is_map()) {
       return reflectionHashMapField(message, field, seed);
