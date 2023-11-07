@@ -156,5 +156,10 @@ new_features:
     added :ref:`with_request_body
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>` to optionally override
     the default behavior of sending the request body to the authorization server from the per-route filter.
+- area: ratelimit
+  change: |
+    Ratelimit supports optional additional prefix to use when emitting statistics with :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stat_prefix>`
+    configuration flag.
 
 deprecated:
