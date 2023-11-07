@@ -39,8 +39,9 @@ private:
     if constexpr (std::is_same_v<Context, Formatter::HttpFormatterContext>) {
       // This is a special case for the HTTP formatter context to ensure backwards compatibility.
       return "envoy.access_loggers.extension_filters";
+    } else {
+      return fmt::format("envoy.{}.access_loggers.extension_filters", Context::category());
     }
-    return fmt::format("envoy.{}.access_loggers.extension_filters", Context::category());
   }
 
   const std::string category_;
@@ -96,8 +97,9 @@ private:
     if constexpr (std::is_same_v<Context, Formatter::HttpFormatterContext>) {
       // This is a special case for the HTTP formatter context to ensure backwards compatibility.
       return "envoy.access_loggers";
+    } else {
+      return fmt::format("envoy.{}.access_loggers", Context::category());
     }
-    return fmt::format("envoy.{}.access_loggers", Context::category());
   }
 
   const std::string category_;
