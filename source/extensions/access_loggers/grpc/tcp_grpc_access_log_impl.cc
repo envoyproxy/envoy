@@ -32,7 +32,7 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
       });
 }
 
-void TcpGrpcAccessLog::emitLog(const AccessLog::HttpLogContext& context,
+void TcpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;

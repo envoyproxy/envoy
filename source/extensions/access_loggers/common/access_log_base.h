@@ -39,7 +39,7 @@ private:
    * @param stream_info supplies additional information about the request not
    * contained in the request headers.
    */
-  virtual void emitLog(const AccessLog::HttpLogContext& context,
+  virtual void emitLog(const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo& stream_info) PURE;
 
   AccessLog::FilterPtr filter_;

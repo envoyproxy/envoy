@@ -50,7 +50,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
       });
 }
 
-void HttpGrpcAccessLog::emitLog(const AccessLog::HttpLogContext& context,
+void HttpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
                                 const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.

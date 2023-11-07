@@ -12,7 +12,7 @@ FileAccessLog::FileAccessLog(const Filesystem::FilePathAndType& access_log_file_
   log_file_ = log_manager.createAccessLog(access_log_file_info);
 }
 
-void FileAccessLog::emitLog(const AccessLog::HttpLogContext& context,
+void FileAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo& stream_info) {
   log_file_->write(formatter_->formatWithContext(context, stream_info));
 }

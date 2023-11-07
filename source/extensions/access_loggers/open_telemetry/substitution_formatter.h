@@ -28,8 +28,8 @@ class OpenTelemetryFormatter {
 public:
   OpenTelemetryFormatter(const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping);
 
-  ::opentelemetry::proto::common::v1::KeyValueList format(const AccessLog::HttpLogContext& context,
-                                                          const StreamInfo::StreamInfo& info) const;
+  ::opentelemetry::proto::common::v1::KeyValueList
+  format(const Formatter::HttpFormatterContext& context, const StreamInfo::StreamInfo& info) const;
 
 private:
   struct OpenTelemetryFormatMapWrapper;

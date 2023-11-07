@@ -13,7 +13,7 @@ void ImplBase::log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseTrailerMap* response_trailers,
                    const StreamInfo::StreamInfo& stream_info,
                    AccessLog::AccessLogType access_log_type) {
-  AccessLog::HttpLogContext log_context{
+  Formatter::HttpFormatterContext log_context{
       request_headers, response_headers, response_trailers, {}, access_log_type};
 
   if (!request_headers) {

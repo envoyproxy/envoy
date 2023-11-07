@@ -9,9 +9,9 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "http_specific_formatter_interface",
+    name = "http_formatter_context_interface",
     hdrs = [
-        "http_specific_formatter.h",
+        "http_formatter_context.h",
     ],
     deps = [
         "//envoy/http:header_map_interface",
@@ -26,6 +26,7 @@ envoy_cc_library(
         "substitution_formatter_base.h",
     ],
     deps = [
+        ":http_formatter_context_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",
         "//envoy/server:factory_context_interface",

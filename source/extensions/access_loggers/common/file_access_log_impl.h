@@ -19,7 +19,7 @@ public:
 
 private:
   // Common::ImplBase
-  void emitLog(const AccessLog::HttpLogContext& context,
+  void emitLog(const Formatter::HttpFormatterContext& context,
                const StreamInfo::StreamInfo& stream_info) override;
 
   AccessLog::AccessLogFileSharedPtr log_file_;

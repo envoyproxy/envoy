@@ -43,7 +43,7 @@ private:
   };
 
   // Common::ImplBase
-  void emitLog(const AccessLog::HttpLogContext& context,
+  void emitLog(const Formatter::HttpFormatterContext& context,
                const StreamInfo::StreamInfo& info) override;
 
   const TcpGrpcAccessLogConfigConstSharedPtr config_;
