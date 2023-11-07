@@ -21,4 +21,9 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 message KafkaBroker {
   // The prefix to use when emitting :ref:`statistics <config_network_filters_kafka_broker_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Set to true if broker filter should attempt to serialize the received responses from the
+  // upstream broker instead of passing received bytes as is.
+  // Disabled by default.
+  bool force_response_rewrite = 2;
 }

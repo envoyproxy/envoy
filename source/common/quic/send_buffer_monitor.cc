@@ -1,5 +1,7 @@
 #include "source/common/quic/send_buffer_monitor.h"
 
+#include "source/common/common/assert.h"
+
 namespace Envoy {
 namespace Quic {
 

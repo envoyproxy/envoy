@@ -137,51 +137,6 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
    "upstream" TLS loopback connection to encrypt it, then have a TCP listener take the encrypted payload and
    send the ``CONNECT`` upstream.
 
-``CONNECT-UDP`` support
-^^^^^^^^^^^^^^^^^^^^^^^
-.. note::
-   ``CONNECT-UDP`` is in an alpha status and may not be stable enough for use in production.
-   We recommend to use this feature with caution.
-
-``CONNECT-UDP`` (`RFC 9298 <https://www.rfc-editor.org/rfc/rfc9298>`_) allows HTTP clients
-to create UDP tunnels through an HTTP proxy server. Unlike ``CONNECT``, which is limited to
-tunneling TCP, ``CONNECT-UDP`` can be used to proxy UDP-based protocols such as HTTP/3.
-
-``CONNECT-UDP`` support is disabled by default in Envoy. Similar to ``CONNECT``, it can be enabled
-through the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
-by setting the value to the special keyword ``CONNECT-UDP``. Like ``CONNECT``, ``CONNECT-UDP`` requests
-are forwarded to the upstream by default.
-:ref:`connect_config <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>`
-must be set to terminate the requests and forward the payload as UDP datagrams to the target.
-
-Example Configuration
----------------------
-
-The following example configuration makes Envoy forward ``CONNECT-UDP`` requests to the upstream. Note
-that the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
-is set to ``CONNECT-UDP``.
-
-.. literalinclude:: /_configs/repo/proxy_connect_udp_http3_downstream.yaml
-   :language: yaml
-   :linenos:
-   :lines: 27-54
-   :lineno-start: 27
-   :emphasize-lines: 15-16, 25-26
-   :caption: :download:`proxy_connect_udp_http3_downstream.yaml </_configs/repo/proxy_connect_udp_http3_downstream.yaml>`
-
-The following example configuration makes Envoy terminate ``CONNECT-UDP`` requests and send UDP payloads
-to the target. As in this example, the
-:ref:`connect_config <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>`
-must be set to terminate ``CONNECT-UDP`` requests.
-
-.. literalinclude:: /_configs/repo/terminate_http3_connect_udp.yaml
-   :language: yaml
-   :linenos:
-   :lines: 26-57
-   :lineno-start: 26
-   :emphasize-lines: 15-16, 19-22, 29-30
-   :caption: :download:`terminate_http3_connect_udp.yaml </_configs/repo/terminate_http3_connect_udp.yaml>`
-
 .. _tunneling-tcp-over-http:
 
 Tunneling TCP over HTTP
@@ -250,3 +205,94 @@ before starting to stream the downstream TCP data to the upstream.
 
 If you want to decapsulate a ``CONNECT`` request and also do HTTP processing on the decapsulated payload, the easiest way
 to accomplish it is to use :ref:`internal listeners <config_internal_listener>`.
+
+``CONNECT-UDP`` support
+^^^^^^^^^^^^^^^^^^^^^^^
+.. note::
+   ``CONNECT-UDP`` is in an alpha status and may not be stable enough for use in production.
+   We recommend to use this feature with caution.
+
+``CONNECT-UDP`` (`RFC 9298 <https://www.rfc-editor.org/rfc/rfc9298>`_) allows HTTP clients
+to create UDP tunnels through an HTTP proxy server. Unlike ``CONNECT``, which is limited to
+tunneling TCP, ``CONNECT-UDP`` can be used to proxy UDP-based protocols such as HTTP/3.
+
+``CONNECT-UDP`` support is disabled by default in Envoy. Similar to ``CONNECT``, it can be enabled
+through the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
+by setting the value to the special keyword ``CONNECT-UDP``. Like ``CONNECT``, ``CONNECT-UDP`` requests
+are forwarded to the upstream by default.
+:ref:`connect_config <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>`
+must be set to terminate the requests and forward the payload as UDP datagrams to the target.
+
+Example Configuration
+---------------------
+
+The following example configuration makes Envoy forward ``CONNECT-UDP`` requests to the upstream. Note
+that the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
+is set to ``CONNECT-UDP``.
+
+.. literalinclude:: /_configs/repo/proxy_connect_udp_http3_downstream.yaml
+   :language: yaml
+   :linenos:
+   :lines: 27-54
+   :lineno-start: 27
+   :emphasize-lines: 15-16, 25-26
+   :caption: :download:`proxy_connect_udp_http3_downstream.yaml </_configs/repo/proxy_connect_udp_http3_downstream.yaml>`
+
+The following example configuration makes Envoy terminate ``CONNECT-UDP`` requests and send UDP payloads
+to the target. As in this example, the
+:ref:`connect_config <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>`
+must be set to terminate ``CONNECT-UDP`` requests.
+
+.. literalinclude:: /_configs/repo/terminate_http3_connect_udp.yaml
+   :language: yaml
+   :linenos:
+   :lines: 26-57
+   :lineno-start: 26
+   :emphasize-lines: 15-16, 19-22, 29-30
+   :caption: :download:`terminate_http3_connect_udp.yaml </_configs/repo/terminate_http3_connect_udp.yaml>`
+
+.. _tunneling-udp-over-http:
+
+Tunneling UDP over HTTP
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. note::
+   Raw UDP tunneling is in an alpha status and may not be stable enough for use in production.
+   We recommend to use this feature with caution.
+
+Apart from ``CONNECT-UDP`` termination, as described in the section above, Envoy also has support for tunneling raw UDP over HTTP
+``CONNECT`` or HTTP ``POST`` requests, by utilizing the UDP Proxy listener filter. By default, UDP tunneling is disabled, and can be
+enabled by setting the configuration for :ref:`tunneling_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.tunneling_config>`.
+
+.. note::
+   Currently, Envoy only supports UDP tunneling over HTTP/2 streams.
+
+By default, the ``tunneling_config`` will upgrade the connection to create HTTP/2 streams for each UDP session (a UDP session is identified by the datagrams 5-tuple), according
+to the `Proxying UDP in HTTP RFC <https://www.rfc-editor.org/rfc/rfc9298.html>`_. Since this upgrade protocol requires an encapsulation mechanism to preserve the boundaries of the original datagram,
+it's required to apply the :ref:`HTTP Capsule <config_udp_session_filters_http_capsule>` session filter.
+The HTTP/2 streams will be multiplexed over the upstream connection.
+
+As opposed to TCP tunneling, where downstream flow control can be applied by alternately disabling the read from the connection socket, for UDP datagrams, this mechanism is not supported.
+Therefore, when tunneling UDP and a new datagram is received from the downstream, it is either streamed upstream, if the upstream is ready or halted by the UDP Proxy.
+In case the upstream is not ready (for example, when waiting for HTTP response headers), the datagram can either be dropped or buffered until the upstream is ready.
+In such cases, by default, downstream datagrams will be dropped, unless :ref:`buffer_options <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.buffer_options>`
+is set by the ``tunneling_config``. The default buffer limits are modest to try and prevent a lot of unwanted buffered memory, but can and should be adjusted per the required use-case.
+When the upstream becomes ready, the UDP Proxy will first flush all the previously buffered datagrams.
+
+.. note::
+   If ``POST`` is set, the upstream stream does not comply with the connect-udp RFC, and instead it will be a POST request.
+   The path used in the headers will be set from the post_path field, and the headers will not contain the target host and
+   target port, as required by the connect-udp protocol. This option should be used carefully.
+
+Example Configuration
+---------------------
+
+The following example configuration makes Envoy tunnel raw UDP datagrams over an upgraded ``CONNECT-UDP`` requests to the upstream.
+
+.. literalinclude:: /_configs/repo/raw_udp_tunneling_http2.yaml
+   :language: yaml
+   :linenos:
+   :lines: 32-53
+   :lineno-start: 32
+   :emphasize-lines: 4-4, 15-17
+   :caption: :download:`raw_udp_tunneling_http2.yaml </_configs/repo/raw_udp_tunneling_http2.yaml>`

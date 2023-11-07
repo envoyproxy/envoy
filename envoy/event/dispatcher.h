@@ -23,6 +23,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -235,21 +236,11 @@ public:
    * @param listener_config configuration for the TCP listener to be created.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                              Network::TcpListenerCallbacks& cb,
-                                              Runtime::Loader& runtime,
-                                              const Network::ListenerConfig& listener_config) PURE;
+  virtual Network::ListenerPtr
+  createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                 Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
+                 Server::ThreadLocalOverloadStateOptRef overload_state) PURE;
 
-  /**
-   * Creates a logical udp listener on a specific port.
-   * @param socket supplies the socket to listen on.
-   * @param cb supplies the udp listener callbacks to invoke for listener events.
-   * @param config provides the UDP socket configuration.
-   * @return Network::ListenerPtr a new listener that is owned by the caller.
-   */
-  virtual Network::UdpListenerPtr
-  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-                    const envoy::config::core::v3::UdpSocketConfig& config) PURE;
   /**
    * Submits an item for deferred delete. @see DeferredDeletable.
    */

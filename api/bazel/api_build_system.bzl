@@ -11,7 +11,7 @@ load(
     "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
 )
 load(
-    "@envoy//bazel/cc_proto_descriptor_library:builddefs.bzl",
+    "//bazel/cc_proto_descriptor_library:builddefs.bzl",
     "cc_proto_descriptor_library",
 )
 

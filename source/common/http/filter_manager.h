@@ -106,6 +106,11 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
   absl::string_view filterConfigName() const override { return filter_context_.config_name; }
+  RequestHeaderMapOptRef requestHeaders() override;
+  RequestTrailerMapOptRef requestTrailers() override;
+  ResponseHeaderMapOptRef informationalHeaders() override;
+  ResponseHeaderMapOptRef responseHeaders() override;
+  ResponseTrailerMapOptRef responseTrailers() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -218,13 +223,10 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override;
-  ResponseHeaderMapOptRef informationalHeaders() const override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
-  ResponseHeaderMapOptRef responseHeaders() const override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
-  ResponseTrailerMapOptRef responseTrailers() const override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
   void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -495,7 +497,7 @@ public:
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 
   /**
-   * Returns the UpstreamStreamFilterCallbacks for upstream filters.
+   * Returns the UpstreamStreamFilterCallbacks for upstream HTTP filters.
    */
   virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() { return {}; }
 
@@ -516,7 +518,7 @@ public:
   virtual const ScopeTrackedObject& scope() PURE;
 
   /**
-   * Returns a handle to the downstream callbacks, if available.
+   * Returns the DownstreamStreamFilterCallbacks for downstream HTTP filters.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
 };
@@ -918,8 +920,8 @@ private:
   public:
     FilterChainOptionsImpl(Router::RouteConstSharedPtr route) : route_(std::move(route)) {}
 
-    bool filterDisabled(absl::string_view config_name) const override {
-      return route_ != nullptr && route_->filterDisabled(config_name);
+    absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
+      return route_ != nullptr ? route_->filterDisabled(config_name) : absl::nullopt;
     }
 
   private:

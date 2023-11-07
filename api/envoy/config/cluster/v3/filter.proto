@@ -16,8 +16,8 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3;clusterv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Upstream filters]
-// Upstream filters apply to the connections to the upstream cluster hosts.
+// [#protodoc-title: Upstream network filters]
+// Upstream network filters apply to the connections to the upstream cluster hosts.
 
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.cluster.Filter";
@@ -28,7 +28,7 @@ message Filter {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
   // Note that Envoy's :ref:`downstream network
-  // filters <config_network_filters>` are not valid upstream filters.
+  // filters <config_network_filters>` are not valid upstream network filters.
   // Only one of typed_config or config_discovery can be used.
   google.protobuf.Any typed_config = 2;
 

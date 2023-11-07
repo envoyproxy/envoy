@@ -114,26 +114,26 @@ uint64_t fractionalPercentDenominatorToInt(
 
 } // namespace ProtobufPercentHelper
 
-MissingFieldException::MissingFieldException(const std::string& field_name,
-                                             const Protobuf::Message& message)
-    : EnvoyException(
-          fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString())) {}
+MissingFieldException::MissingFieldException(const std::string& message)
+    : EnvoyException(message) {}
 
-ProtoValidationException::ProtoValidationException(const std::string& validation_error,
-                                                   const Protobuf::Message& message)
-    : EnvoyException(fmt::format("Proto constraint validation failed ({}): {}", validation_error,
-                                 message.DebugString())) {
+ProtoValidationException::ProtoValidationException(const std::string& message)
+    : EnvoyException(message) {
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
 void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_name,
                                                     const Protobuf::Message& message) {
-  throw MissingFieldException(field_name, message);
+  std::string error =
+      fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString());
+  throwExceptionOrPanic(MissingFieldException, error);
 }
 
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
-  throw ProtoValidationException(validation_error, message);
+  std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
+                                  message.DebugString());
+  throwExceptionOrPanic(ProtoValidationException, error);
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
@@ -350,12 +350,12 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
-    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                     message.GetDescriptor()->full_name(),
-                                     any_message.DebugString()));
+    throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
+                                           message.GetDescriptor()->full_name(),
+                                           any_message.DebugString()));
 #else
   if (!message.ParseFromString(any_message.value())) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
 #endif
   }
@@ -605,7 +605,7 @@ void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst)
   // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
   // this can fail.
   if (!dst.ParseFromString(src.SerializeAsString())) {
-    throw EnvoyException("Unable to deserialize during wireCast()");
+    throwEnvoyExceptionOrPanic("Unable to deserialize during wireCast()");
   }
 }
 
@@ -728,7 +728,7 @@ absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
 void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
   const auto result = validateDurationNoThrow(duration, max_seconds_value);
   if (!result.ok()) {
-    throw DurationUtil::OutOfRangeException(std::string(result.message()));
+    throwExceptionOrPanic(DurationUtil::OutOfRangeException, std::string(result.message()));
   }
 }
 

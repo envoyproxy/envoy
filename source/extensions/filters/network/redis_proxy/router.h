@@ -46,7 +46,7 @@ class Route {
 public:
   virtual ~Route() = default;
 
-  virtual ConnPool::InstanceSharedPtr upstream() const PURE;
+  virtual ConnPool::InstanceSharedPtr upstream(const std::string& command) const PURE;
 
   virtual const MirrorPolicies& mirrorPolicies() const PURE;
 };

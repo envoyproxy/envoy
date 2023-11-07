@@ -40,8 +40,7 @@ static void bmEvaluateHeaders(benchmark::State& state) {
   HeaderParserPtr header_parser = HeaderParser::configure(headers_to_add);
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    header_parser->evaluateHeaders(*request_header, *request_header,
-                                   *Http::StaticEmptyHeaders::get().response_headers, *stream_info);
+    header_parser->evaluateHeaders(*request_header, {request_header.get()}, *stream_info);
   }
 }
 

@@ -25,6 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
 @property (nonatomic, assign) BOOL enableHttp3;
 @property (nonatomic, strong) NSDictionary<NSString *, NSNumber *> *quicHints;
+@property (nonatomic, strong) NSArray<NSString *> *quicCanonicalSuffixes;
 @property (nonatomic, assign) BOOL enableGzipDecompression;
 @property (nonatomic, assign) BOOL enableBrotliDecompression;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
@@ -52,10 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSString *nodeSubZone;
 @property (nonatomic, strong, nullable) NSString *xdsServerAddress;
 @property (nonatomic, assign) UInt32 xdsServerPort;
-@property (nonatomic, strong, nullable) NSString *xdsAuthHeader;
-@property (nonatomic, strong, nullable) NSString *xdsAuthToken;
-@property (nonatomic, strong, nullable) NSString *xdsJwtToken;
-@property (nonatomic, assign) UInt32 xdsJwtTokenLifetimeSeconds;
+@property (nonatomic, strong) NSDictionary<NSString *, NSString *> *xdsGrpcInitialMetadata;
 @property (nonatomic, strong, nullable) NSString *xdsSslRootCerts;
 @property (nonatomic, strong, nullable) NSString *xdsSni;
 @property (nonatomic, strong, nullable) NSString *rtdsResourceName;
@@ -80,6 +78,7 @@ NS_ASSUME_NONNULL_BEGIN
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                       enableHttp3:(BOOL)enableHttp3
                                         quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
+                            quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -115,10 +114,8 @@ NS_ASSUME_NONNULL_BEGIN
                                       nodeSubZone:(nullable NSString *)nodeSubZone
                                  xdsServerAddress:(nullable NSString *)xdsServerAddress
                                     xdsServerPort:(UInt32)xdsServerPort
-                                    xdsAuthHeader:(nullable NSString *)xdsAuthHeader
-                                     xdsAuthToken:(nullable NSString *)xdsAuthToken
-                                      xdsJwtToken:(nullable NSString *)xdsJwtToken
-                       xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
+                           xdsGrpcInitialMetadata:
+                               (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
                                            xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName

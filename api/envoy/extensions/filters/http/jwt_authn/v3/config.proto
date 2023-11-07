@@ -53,10 +53,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 17]
+// [#next-free-field: 19]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
+
+  // Alters the payload representation in the request dynamic metadata to facilitate its use in matching.
+  message NormalizePayload {
+    // Each claim in this list will be interpreted as a space-delimited string
+    // and converted to a list of strings based on the delimited values.
+    // Example: a token with a claim ``scopes: "email profile"`` is translated
+    // to dynamic metadata  ``scopes: ["email", "profile"]`` if this field is
+    // set value ``["scopes"]``. This special handling of ``scopes`` is
+    // recommended by `RFC8693
+    // <https://datatracker.ietf.org/doc/html/rfc8693#name-scope-scopes-claim>`_.
+    repeated string space_delimited_claims = 1;
+  }
 
   // Specify the `principal <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ that issued
   // the JWT, usually a URL or an email address.
@@ -230,6 +242,9 @@ message JwtProvider {
   //
   string payload_in_metadata = 9;
 
+  // Normalizes the payload representation in the request metadata.
+  NormalizePayload normalize_payload_in_metadata = 18;
+
   // If not empty, similar to :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`,
   // a successfully verified JWT header will be written to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>`
   // as an entry (``protobuf::Struct``) in ``envoy.filters.http.jwt_authn`` ``namespace`` with the
@@ -270,8 +285,8 @@ message JwtProvider {
   //
   string header_in_metadata = 14;
 
-  // If non empty, the failure status `::google::jwt_verify::Status` for a non verified JWT will be written to StreamInfo DynamicMetadata
-  // in the format as: ``namespace`` is the jwt_authn filter name as ````envoy.filters.http.jwt_authn````
+  // If non empty, the failure status ``::google::jwt_verify::Status`` for a non verified JWT will be written to StreamInfo DynamicMetadata
+  // in the format as: ``namespace`` is the jwt_authn filter name as ``envoy.filters.http.jwt_authn``
   // The value is the ``protobuf::Struct``. The values of this field will be ``code`` and ``message``
   // and they will contain the JWT authentication failure status code and a message describing the failure.
   //
@@ -302,8 +317,17 @@ message JwtProvider {
   //     - name: x-jwt-claim-nested-claim
   //       claim: claim.nested.key
   //
-  // This header is only reserved for jwt claim; any other value will be overwrite.
+  // This header is only reserved for jwt claim; any other value will be overwritten.
   repeated JwtClaimToHeader claim_to_headers = 15;
+
+  // Clears route cache in order to allow JWT token to correctly affect
+  // routing decisions. Filter clears all cached routes when:
+  //
+  // 1. The field is set to ``true``.
+  //
+  // 2. At least one ``claim_to_headers`` header is added to the request.
+  //
+  bool clear_route_cache = 17;
 }
 
 // This message specifies JWT Cache configuration.

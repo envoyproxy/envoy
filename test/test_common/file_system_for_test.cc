@@ -19,7 +19,7 @@ struct MemFileInfo {
   FileInfo toFileInfo(absl::string_view path) {
     absl::MutexLock lock(&lock_);
     return {
-        std::string{fileSystemForTest().splitPathFromFilename(path).file_},
+        std::string{fileSystemForTest().splitPathFromFilename(path).value().file_},
         data_.length(),
         FileType::Regular,
         create_time_,
@@ -169,7 +169,7 @@ ssize_t MemfileInstanceImpl::fileSize(const std::string& path) {
   return file_system_->fileSize(path);
 }
 
-std::string MemfileInstanceImpl::fileReadToEnd(const std::string& path) {
+absl::StatusOr<std::string> MemfileInstanceImpl::fileReadToEnd(const std::string& path) {
   {
     absl::MutexLock m(&lock_);
     auto it = files_.find(path);

@@ -270,11 +270,11 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
       (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
-       Http::HeaderUtility::isConnectUdp(*headers))) {
+       Http::HeaderUtility::isConnectUdpRequest(*headers))) {
     useCapsuleProtocol();
     // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it bypass
     // the default Datagram queue.
-    if (Http::HeaderUtility::isConnectUdp(*headers)) {
+    if (Http::HeaderUtility::isConnectUdpRequest(*headers)) {
       session()->SetForceFlushForDefaultQueue(true);
     }
   }

@@ -172,6 +172,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
           }));
   EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
   EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
                                                               {/*can_send_early_data_=*/false,
@@ -179,6 +180,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   EXPECT_NE(nullptr, cancellable);
   async_connect_callback->invokeCallback();
 
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
   EXPECT_EQ(1u, clients.size());
