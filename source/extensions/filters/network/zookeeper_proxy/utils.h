@@ -19,7 +19,7 @@ namespace ZooKeeperProxy {
 /**
  * Helper for extracting ZooKeeper data from a buffer.
  *
- * If at any point a peek is tried beyond max_len, an EnvoyException
+ * If at any point a peek is tried beyond max_len, an EnvoyException <---- reword this comment
  * will be thrown. This is important to protect Envoy against malformed
  * requests (e.g.: when the declared and actual length don't match).
  *
@@ -43,6 +43,46 @@ private:
   uint32_t current_{};
 };
 
+#define ABSL_STATUS_RETURN_IF_STATUS_NOT_OK(status)                                                               \
+  if (!status.ok()) {                                                                                             \
+    return status;                                                                                                \
+  }
+
+#define WRITE_ENVOY_LOG_IF_STATUS_NOT_OK(status, log_level, ...)                                                  \
+  if (!status.ok()) {                                                                                             \
+    ENVOY_LOG(log_level, ##__VA_ARGS__);                                                                          \
+  }
+
+#define COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status)                                                   \
+  if (!status.ok()) {                                                                                             \
+    callbacks_.onDecodeError();                                                                                   \
+    return status;                                                                                                \
+  }
+
+#define COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(status, log_level, ...)                          \
+  if (!status.ok()) {                                                                                             \
+    ENVOY_LOG(log_level, ##__VA_ARGS__);                                                                          \
+    callbacks_.onDecodeError();                                                                                   \
+    return status;                                                                                                \
+  }
+
+#define RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message)                                                  \
+  if (!status.ok()) {                                                                                             \
+    return absl::InvalidArgumentError(message);                                                                   \
+  }
+
+#define COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message)                          \
+  if (!status.ok()) {                                                                                             \
+    callbacks_.onDecodeError();                                                                                   \
+    return absl::InvalidArgumentError(message);                                                                   \
+  }
+
+#define COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message, log_level, ...) \
+  if (!status.ok()) {                                                                                             \
+    ENVOY_LOG(log_level, ##__VA_ARGS__);                                                                          \
+    callbacks_.onDecodeError();                                                                                   \
+    return absl::InvalidArgumentError(message);                                                                   \
+  }
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions

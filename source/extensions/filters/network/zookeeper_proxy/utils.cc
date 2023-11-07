@@ -9,9 +9,7 @@ namespace ZooKeeperProxy {
 
 absl::StatusOr<int32_t> BufferHelper::peekInt32(Buffer::Instance& buffer, uint64_t& offset) {
   absl::Status status = ensureMaxLen(sizeof(int32_t));
-  if (!status.ok()) {
-    return absl::InvalidArgumentError(fmt::format("peekInt32: {}", status.message()));
-  }
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekInt32: {}", status.message()));
 
   const int32_t val = buffer.peekBEInt<int32_t>(offset);
   offset += sizeof(int32_t);
@@ -20,9 +18,7 @@ absl::StatusOr<int32_t> BufferHelper::peekInt32(Buffer::Instance& buffer, uint64
 
 absl::StatusOr<int64_t> BufferHelper::peekInt64(Buffer::Instance& buffer, uint64_t& offset) {
   absl::Status status = ensureMaxLen(sizeof(int64_t));
-  if (!status.ok()) {
-    return absl::InvalidArgumentError(fmt::format("peekInt64: {}", status.message()));
-  }
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekInt64: {}", status.message()));
 
   const int64_t val = buffer.peekBEInt<int64_t>(offset);
   offset += sizeof(int64_t);
@@ -31,9 +27,7 @@ absl::StatusOr<int64_t> BufferHelper::peekInt64(Buffer::Instance& buffer, uint64
 
 absl::StatusOr<bool> BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset) {
   absl::Status status = ensureMaxLen(1);
-  if (!status.ok()) {
-    return absl::InvalidArgumentError(fmt::format("peekBool: {}", status.message()));
-  }
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekBool: {}", status.message()));
 
   const char byte = buffer.peekInt<char, ByteOrder::Host, 1>(offset);
   const bool val = static_cast<bool>(byte);
@@ -44,9 +38,7 @@ absl::StatusOr<bool> BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& 
 absl::StatusOr<std::string> BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset) {
   std::string val;
   const absl::StatusOr<int32_t> len = peekInt32(buffer, offset);
-  if (!len.ok()) {
-    return absl::InvalidArgumentError(fmt::format("peekString: {}", len.status().message()));
-  }
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(len, fmt::format("peekString: {}", len.status().message()));
 
   if (len.value() == 0) {
     return val;
@@ -57,9 +49,7 @@ absl::StatusOr<std::string> BufferHelper::peekString(Buffer::Instance& buffer, u
   }
 
   absl::Status status = ensureMaxLen(len.value());
-  if (!status.ok()) {
-    return absl::InvalidArgumentError(fmt::format("peekString: {}", status.message()));
-  }
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekString: {}", status.message()));
 
   std::unique_ptr<char[]> data(new char[len.value()]);
   buffer.copyOut(offset, len.value(), data.get());
