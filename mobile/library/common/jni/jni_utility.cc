@@ -23,18 +23,15 @@ jobject get_class_loader() {
 }
 
 jclass find_class(const char* class_name) {
-  JNIEnv* env = get_env();
-  jclass class_loader = env->FindClass("java/lang/ClassLoader");
-  Envoy::JNI::Exception::checkAndClear("find_class:FindClass");
-  jmethodID find_class_method =
-      env->GetMethodID(class_loader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+  JniHelper jni_helper(get_env());
+  LocalRefUniquePtr<jclass> class_loader = jni_helper.findClass("java/lang/ClassLoader");
+  jmethodID find_class_method = jni_helper.getMethodId(class_loader.get(), "loadClass",
+                                                       "(Ljava/lang/String;)Ljava/lang/Class;");
   Envoy::JNI::Exception::checkAndClear("find_class:GetMethodID");
-  jstring str_class_name = env->NewStringUTF(class_name);
-  Envoy::JNI::Exception::checkAndClear("find_class:NewStringUTF");
-  jclass clazz =
-      (jclass)(env->CallObjectMethod(get_class_loader(), find_class_method, str_class_name));
+  LocalRefUniquePtr<jstring> str_class_name = jni_helper.newStringUtf(class_name);
+  jclass clazz = (jclass)(jni_helper.getEnv()->CallObjectMethod(
+      get_class_loader(), find_class_method, str_class_name.get()));
   Envoy::JNI::Exception::checkAndClear("find_class:CallObjectMethod");
-  env->DeleteLocalRef(str_class_name);
   return clazz;
 }
 
@@ -51,9 +48,8 @@ void jni_delete_const_global_ref(const void* context) {
 }
 
 int unbox_integer(JniHelper& jni_helper, jobject boxedInteger) {
-  jclass jcls_Integer = jni_helper.getEnv()->FindClass("java/lang/Integer");
-  jmethodID jmid_intValue = jni_helper.getMethodId(jcls_Integer, "intValue", "()I");
-  jni_helper.getEnv()->DeleteLocalRef(jcls_Integer);
+  LocalRefUniquePtr<jclass> jcls_Integer = jni_helper.findClass("java/lang/Integer");
+  jmethodID jmid_intValue = jni_helper.getMethodId(jcls_Integer.get(), "intValue", "()I");
   return jni_helper.callIntMethod(boxedInteger, jmid_intValue);
 }
 
@@ -70,11 +66,10 @@ envoy_data array_to_native_data(JniHelper& jni_helper, jbyteArray j_data, size_t
   return {data_length, native_bytes, free, native_bytes};
 }
 
-jstring native_data_to_string(JniHelper& jni_helper, envoy_data data) {
+LocalRefUniquePtr<jstring> native_data_to_string(JniHelper& jni_helper, envoy_data data) {
   // Ensure we get a null-terminated string, the data coming in via envoy_data might not be.
   std::string str(reinterpret_cast<const char*>(data.bytes), data.length);
-  jstring jstrBuf = jni_helper.getEnv()->NewStringUTF(str.c_str());
-  return jstrBuf;
+  return jni_helper.newStringUtf(str.c_str());
 }
 
 jbyteArray native_data_to_array(JniHelper& jni_helper, envoy_data data) {
@@ -135,19 +130,17 @@ jlongArray native_final_stream_intel_to_array(JniHelper& jni_helper,
 }
 
 jobject native_map_to_map(JniHelper& jni_helper, envoy_map map) {
-  jclass jcls_hashMap = jni_helper.getEnv()->FindClass("java/util/HashMap");
-  jmethodID jmid_hashMapInit = jni_helper.getMethodId(jcls_hashMap, "<init>", "(I)V");
-  jobject j_hashMap = jni_helper.getEnv()->NewObject(jcls_hashMap, jmid_hashMapInit, map.length);
+  LocalRefUniquePtr<jclass> jcls_hashMap = jni_helper.findClass("java/util/HashMap");
+  jmethodID jmid_hashMapInit = jni_helper.getMethodId(jcls_hashMap.get(), "<init>", "(I)V");
+  jobject j_hashMap =
+      jni_helper.getEnv()->NewObject(jcls_hashMap.get(), jmid_hashMapInit, map.length);
   jmethodID jmid_hashMapPut = jni_helper.getMethodId(
-      jcls_hashMap, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+      jcls_hashMap.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   for (envoy_map_size_t i = 0; i < map.length; i++) {
-    auto key = native_data_to_string(jni_helper, map.entries[i].key);
-    auto value = native_data_to_string(jni_helper, map.entries[i].value);
-    callObjectMethod(jni_helper, j_hashMap, jmid_hashMapPut, key, value);
-    jni_helper.getEnv()->DeleteLocalRef(key);
-    jni_helper.getEnv()->DeleteLocalRef(value);
+    LocalRefUniquePtr<jstring> key = native_data_to_string(jni_helper, map.entries[i].key);
+    LocalRefUniquePtr<jstring> value = native_data_to_string(jni_helper, map.entries[i].value);
+    callObjectMethod(jni_helper, j_hashMap, jmid_hashMapPut, key.get(), value.get());
   }
-  jni_helper.getEnv()->DeleteLocalRef(jcls_hashMap);
   return j_hashMap;
 }
 
@@ -156,13 +149,12 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data) {
   jlong data_length = jni_helper.getEnv()->GetDirectBufferCapacity(j_data);
 
   if (data_length < 0) {
-    jclass jcls_ByteBuffer = jni_helper.getEnv()->FindClass("java/nio/ByteBuffer");
+    LocalRefUniquePtr<jclass> jcls_ByteBuffer = jni_helper.findClass("java/nio/ByteBuffer");
     // We skip checking hasArray() because only direct ByteBuffers or array-backed ByteBuffers
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
-    jmethodID jmid_array = jni_helper.getMethodId(jcls_ByteBuffer, "array", "()[B");
+    jmethodID jmid_array = jni_helper.getMethodId(jcls_ByteBuffer.get(), "array", "()[B");
     jbyteArray array = static_cast<jbyteArray>(callObjectMethod(jni_helper, j_data, jmid_array));
-    jni_helper.getEnv()->DeleteLocalRef(jcls_ByteBuffer);
 
     envoy_data native_data = array_to_native_data(jni_helper, array);
     jni_helper.getEnv()->DeleteLocalRef(array);
@@ -178,13 +170,12 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data, size_t d
       static_cast<uint8_t*>(jni_helper.getEnv()->GetDirectBufferAddress(j_data));
 
   if (direct_address == nullptr) {
-    jclass jcls_ByteBuffer = jni_helper.getEnv()->FindClass("java/nio/ByteBuffer");
+    LocalRefUniquePtr<jclass> jcls_ByteBuffer = jni_helper.findClass("java/nio/ByteBuffer");
     // We skip checking hasArray() because only direct ByteBuffers or array-backed ByteBuffers
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
-    jmethodID jmid_array = jni_helper.getMethodId(jcls_ByteBuffer, "array", "()[B");
+    jmethodID jmid_array = jni_helper.getMethodId(jcls_ByteBuffer.get(), "array", "()[B");
     jbyteArray array = static_cast<jbyteArray>(callObjectMethod(jni_helper, j_data, jmid_array));
-    jni_helper.getEnv()->DeleteLocalRef(jcls_ByteBuffer);
 
     envoy_data native_data = array_to_native_data(jni_helper, array, data_length);
     jni_helper.getEnv()->DeleteLocalRef(array);
@@ -251,18 +242,15 @@ envoy_map to_native_map(JniHelper& jni_helper, jobjectArray entries) {
 
   for (envoy_map_size_t i = 0; i < length; i += 2) {
     // Copy native byte array for header key
-    jbyteArray j_key =
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(entries, i));
-    envoy_data entry_key = array_to_native_data(jni_helper, j_key);
+    LocalRefUniquePtr<jbyteArray> j_key = jni_helper.getObjectArrayElement<jbyteArray>(entries, i);
+    envoy_data entry_key = array_to_native_data(jni_helper, j_key.get());
 
     // Copy native byte array for header value
-    jbyteArray j_value =
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(entries, i + 1));
-    envoy_data entry_value = array_to_native_data(jni_helper, j_value);
+    LocalRefUniquePtr<jbyteArray> j_value =
+        jni_helper.getObjectArrayElement<jbyteArray>(entries, i + 1);
+    envoy_data entry_value = array_to_native_data(jni_helper, j_value.get());
 
     entry_array[i / 2] = {entry_key, entry_value};
-    jni_helper.getEnv()->DeleteLocalRef(j_key);
-    jni_helper.getEnv()->DeleteLocalRef(j_value);
   }
 
   envoy_map native_map = {length / 2, entry_array};
@@ -271,29 +259,29 @@ envoy_map to_native_map(JniHelper& jni_helper, jobjectArray entries) {
 
 jobjectArray ToJavaArrayOfObjectArray(JniHelper& jni_helper,
                                       const Envoy::Types::ManagedEnvoyHeaders& map) {
-  jclass jcls_byte_array = jni_helper.getEnv()->FindClass("java/lang/Object");
+  LocalRefUniquePtr<jclass> jcls_byte_array = jni_helper.findClass("java/lang/Object");
   jobjectArray javaArray =
-      jni_helper.getEnv()->NewObjectArray(2 * map.get().length, jcls_byte_array, nullptr);
+      jni_helper.getEnv()->NewObjectArray(2 * map.get().length, jcls_byte_array.get(), nullptr);
 
   for (envoy_map_size_t i = 0; i < map.get().length; i++) {
     jbyteArray key = native_data_to_array(jni_helper, map.get().entries[i].key);
     jbyteArray value = native_data_to_array(jni_helper, map.get().entries[i].value);
 
-    jni_helper.getEnv()->SetObjectArrayElement(javaArray, 2 * i, key);
-    jni_helper.getEnv()->SetObjectArrayElement(javaArray, 2 * i + 1, value);
+    jni_helper.setObjectArrayElement(javaArray, 2 * i, key);
+    jni_helper.setObjectArrayElement(javaArray, 2 * i + 1, value);
   }
 
   return javaArray;
 }
 
 jobjectArray ToJavaArrayOfByteArray(JniHelper& jni_helper, const std::vector<std::string>& v) {
-  jclass jcls_byte_array = jni_helper.getEnv()->FindClass("[B");
-  jobjectArray joa = jni_helper.getEnv()->NewObjectArray(v.size(), jcls_byte_array, nullptr);
+  LocalRefUniquePtr<jclass> jcls_byte_array = jni_helper.findClass("[B");
+  jobjectArray joa = jni_helper.getEnv()->NewObjectArray(v.size(), jcls_byte_array.get(), nullptr);
 
   for (size_t i = 0; i < v.size(); ++i) {
     jbyteArray byte_array =
         ToJavaByteArray(jni_helper, reinterpret_cast<const uint8_t*>(v[i].data()), v[i].length());
-    jni_helper.getEnv()->SetObjectArrayElement(joa, i, byte_array);
+    jni_helper.setObjectArrayElement(joa, i, byte_array);
   }
   return joa;
 }
@@ -301,7 +289,7 @@ jobjectArray ToJavaArrayOfByteArray(JniHelper& jni_helper, const std::vector<std
 jbyteArray ToJavaByteArray(JniHelper& jni_helper, const uint8_t* bytes, size_t len) {
   jbyteArray byte_array = jni_helper.getEnv()->NewByteArray(len);
   const jbyte* jbytes = reinterpret_cast<const jbyte*>(bytes);
-  jni_helper.getEnv()->SetByteArrayRegion(byte_array, /*start=*/0, len, jbytes);
+  jni_helper.setByteArrayRegion(byte_array, /*start=*/0, len, jbytes);
   return byte_array;
 }
 
@@ -318,17 +306,14 @@ void JavaArrayOfByteArrayToStringVector(JniHelper& jni_helper, jobjectArray arra
   out->resize(len);
 
   for (size_t i = 0; i < len; ++i) {
-    jbyteArray bytes_array =
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i));
-    jsize bytes_len = jni_helper.getArrayLength(bytes_array);
+    LocalRefUniquePtr<jbyteArray> bytes_array =
+        jni_helper.getObjectArrayElement<jbyteArray>(array, i);
+    jsize bytes_len = jni_helper.getArrayLength(bytes_array.get());
     // It doesn't matter if the array returned by GetByteArrayElements is a copy
     // or not, as the data will be simply be copied into C++ owned memory below.
-    jbyte* bytes = jni_helper.getEnv()->GetByteArrayElements(bytes_array, /*isCopy=*/nullptr);
-    (*out)[i].assign(reinterpret_cast<const char*>(bytes), bytes_len);
-    // There is nothing to write back, it is always safe to JNI_ABORT.
-    jni_helper.getEnv()->ReleaseByteArrayElements(bytes_array, bytes, JNI_ABORT);
-    // Explicitly delete to keep the local ref count low.
-    jni_helper.getEnv()->DeleteLocalRef(bytes_array);
+    ArrayElementsUniquePtr<jbyteArray, jbyte> bytes =
+        jni_helper.getByteArrayElements(bytes_array.get(), /* is_copy= */ nullptr);
+    (*out)[i].assign(reinterpret_cast<const char*>(bytes.get()), bytes_len);
   }
 }
 
@@ -345,11 +330,10 @@ void JavaArrayOfByteToBytesVector(JniHelper& jni_helper, jbyteArray array,
 
   // It doesn't matter if the array returned by GetByteArrayElements is a copy
   // or not, as the data will be simply be copied into C++ owned memory below.
-  jbyte* jbytes = jni_helper.getEnv()->GetByteArrayElements(array, /*isCopy=*/nullptr);
-  uint8_t* bytes = reinterpret_cast<uint8_t*>(jbytes);
+  ArrayElementsUniquePtr<jbyteArray, jbyte> jbytes =
+      jni_helper.getByteArrayElements(array, /* is_copy= */ nullptr);
+  uint8_t* bytes = reinterpret_cast<uint8_t*>(jbytes.get());
   std::copy(bytes, bytes + len, out->begin());
-  // There is nothing to write back, it is always safe to JNI_ABORT.
-  jni_helper.getEnv()->ReleaseByteArrayElements(array, jbytes, JNI_ABORT);
 }
 
 MatcherData::Type StringToType(std::string type_as_string) {
@@ -387,16 +371,14 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, job
     std::string name;
     std::string type_as_string;
     std::string value;
-    JavaArrayOfByteToString(
-        jni_helper, static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i)),
-        &name);
-    JavaArrayOfByteToString(
-        jni_helper,
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i + 1)),
-        &type_as_string);
-    JavaArrayOfByteToString(
-        jni_helper,
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i + 2)), &value);
+    LocalRefUniquePtr<jbyteArray> element1 = jni_helper.getObjectArrayElement<jbyteArray>(array, i);
+    JavaArrayOfByteToString(jni_helper, element1.get(), &name);
+    LocalRefUniquePtr<jbyteArray> element2 =
+        jni_helper.getObjectArrayElement<jbyteArray>(array, i + 1);
+    JavaArrayOfByteToString(jni_helper, element2.get(), &type_as_string);
+    LocalRefUniquePtr<jbyteArray> element3 =
+        jni_helper.getObjectArrayElement<jbyteArray>(array, i + 2);
+    JavaArrayOfByteToString(jni_helper, element3.get(), &value);
     ret.emplace_back(MatcherData(name, StringToType(type_as_string), value));
   }
   return ret;
@@ -404,11 +386,11 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, job
 
 void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
                           Envoy::Protobuf::MessageLite* dest) {
-  jbyte* bytes = jni_helper.getEnv()->GetByteArrayElements(source, /* isCopy= */ nullptr);
+  ArrayElementsUniquePtr<jbyteArray, jbyte> bytes =
+      jni_helper.getByteArrayElements(source, /* is_copy= */ nullptr);
   jsize size = jni_helper.getArrayLength(source);
-  bool success = dest->ParseFromArray(bytes, size);
+  bool success = dest->ParseFromArray(bytes.get(), size);
   RELEASE_ASSERT(success, "Failed to parse protobuf message.");
-  jni_helper.getEnv()->ReleaseByteArrayElements(source, bytes, 0);
 }
 
 #define JNI_UTILITY_DEFINE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                        \

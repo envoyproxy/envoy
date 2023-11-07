@@ -843,7 +843,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
     if (state_.decoder_filter_chain_aborted_) {
       // If the decoder filter chain has been aborted, then either:
       // 1. This filter has sent a local reply from decode metadata.
-      // 2. This filter is the terminal http filter, and an upstream filter has sent a local reply.
+      // 2. This filter is the terminal http filter, and an upstream HTTP filter has sent a local
+      // reply.
       ASSERT((status == FilterMetadataStatus::StopIterationForLocalReply) ||
              (std::next(entry) == decoder_filters_.end()));
       executeLocalReplyIfPrepared();
@@ -1535,8 +1536,8 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  // This filter chain options is only used for the downstream filter chains for now. So, try to
-  // set valid initial route only when the downstream callbacks is available.
+  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
+  // to set valid initial route only when the downstream callbacks is available.
   FilterChainOptionsImpl options(
       filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
   filter_chain_factory_.createFilterChain(*this, false, options);

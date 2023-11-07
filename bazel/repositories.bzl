@@ -1002,7 +1002,9 @@ def _io_opencensus_cpp():
     )
 
 def _com_github_curl():
-    # Used by OpenCensus Zipkin exporter.
+    # The usage by AWS extensions common utilities is deprecated and will be removed by Q3 2024 after
+    # the deprecation period of 2 releases. Please DO NOT USE curl dependency for any new or existing extensions.
+    # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
     external_http_archive(
         name = "com_github_curl",
         build_file_content = BUILD_ALL_CONTENT + """

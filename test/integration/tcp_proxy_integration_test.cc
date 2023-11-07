@@ -1002,8 +1002,7 @@ TEST_P(TcpProxyIntegrationTest, RecordsUpstreamConnectionTimeLatency) {
         stream_info.upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency().has_value());
   });
 
-  Registry::InjectFactory<Server::Configuration::AccessLogInstanceFactory> factory_register(
-      factory);
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* filter_chain =
@@ -1397,8 +1396,8 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
 
   expectEndpointToMatchRoute([](IntegrationTcpClient& tcp_client) -> std::string {
     // Break the write into two; validate that the first is received before sending the second. This
-    // validates that a downstream filter can use this functionality, even if it can't make a
-    // decision after the first `onData()`.
+    // validates that a downstream network filter can use this functionality, even if it can't make
+    // a decision after the first `onData()`.
     EXPECT_TRUE(tcp_client.write("p", false));
     tcp_client.waitForData("p");
     tcp_client.clearData();

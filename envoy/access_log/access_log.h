@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/formatter/http_formatter_context.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 

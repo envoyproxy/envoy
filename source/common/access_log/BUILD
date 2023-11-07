@@ -22,7 +22,6 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//envoy/http:header_map_interface",
         "//envoy/runtime:runtime_interface",
-        "//envoy/server:access_log_config_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",

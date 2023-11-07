@@ -71,9 +71,8 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmAccessLogConfigTest,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          "envoy.access_loggers.wasm");
+  auto factory = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -88,9 +87,8 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
 }
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          "envoy.access_loggers.wasm");
+  auto factory = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog config;
@@ -135,9 +133,8 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          "envoy.access_loggers.wasm");
+  auto factory = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   const std::string invalid_yaml =
@@ -245,9 +242,8 @@ TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          "envoy.access_loggers.wasm");
+  auto factory = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;

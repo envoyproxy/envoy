@@ -13,6 +13,9 @@ void ImplBase::log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseTrailerMap* response_trailers,
                    const StreamInfo::StreamInfo& stream_info,
                    AccessLog::AccessLogType access_log_type) {
+  Formatter::HttpFormatterContext log_context{
+      request_headers, response_headers, response_trailers, {}, access_log_type};
+
   if (!request_headers) {
     request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
   }
@@ -26,8 +29,8 @@ void ImplBase::log(const Http::RequestHeaderMap* request_headers,
                                     *response_trailers, access_log_type)) {
     return;
   }
-  return emitLog(*request_headers, *response_headers, *response_trailers, stream_info,
-                 access_log_type);
+
+  return emitLog(log_context, stream_info);
 }
 
 } // namespace Common

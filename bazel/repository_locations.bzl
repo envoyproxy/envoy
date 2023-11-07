@@ -1068,7 +1068,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/census-instrumentation/opencensus-cpp/blob/{version}/LICENSE",
     ),
-    # This should be removed, see https://github.com/envoyproxy/envoy/issues/11816.
+    # Curl usage is under deprecation and will be removed by Q3 2024 before v1.31 release in July-2024.
+    # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
     com_github_curl = dict(
         project_name = "curl",
         project_desc = "Library for transferring data with URLs",
@@ -1082,7 +1083,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.http.aws_lambda",
             "envoy.filters.http.aws_request_signing",
             "envoy.grpc_credentials.aws_iam",
-            "envoy.tracers.opencensus",
         ],
         release_date = "2023-10-11",
         cpe = "cpe:2.3:a:haxx:libcurl:*",

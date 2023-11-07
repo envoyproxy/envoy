@@ -54,6 +54,12 @@ void registerMobileProtoDescriptors() {
 
 namespace Envoy {
 
+class ServerLite : public Server::InstanceBase {
+public:
+  using Server::InstanceBase::InstanceBase;
+  void maybeCreateHeapShrinker() override {}
+};
+
 EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
     : options_(std::move(options)) {
 
@@ -69,9 +75,8 @@ EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
          ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
          Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
          Buffer::WatermarkFactorySharedPtr watermark_factory) {
-        // TODO(alyssawilk) use InstanceLite not InstanceImpl.
         auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
-        auto server = std::make_unique<Server::InstanceImpl>(
+        auto server = std::make_unique<ServerLite>(
             init_manager, options, time_system, hooks, restarter, store, access_log_lock,
             std::move(random_generator), tls, thread_factory, file_system,
             std::move(process_context), watermark_factory);
