@@ -102,7 +102,7 @@ public:
     reservable_ = rhs.reservable_;
     drain_trackers_ = std::move(rhs.drain_trackers_);
     account_ = std::move(rhs.account_);
-    releasor_.swap(rhs.releasor);
+    releasor_.swap(rhs.releasor_);
 
     rhs.capacity_ = 0;
     rhs.base_ = nullptr;
