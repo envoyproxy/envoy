@@ -200,12 +200,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "deterministic_hash_lib",
+    srcs = ["deterministic_hash.cc"],
+    hdrs = ["deterministic_hash.h"],
+    deps = [
+        ":protobuf",
+        "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     external_deps = [
         "protobuf",
     ],
     deps = [
+        ":deterministic_hash_lib",
         ":message_validator_lib",
         ":protobuf",
         ":utility_lib_header",
