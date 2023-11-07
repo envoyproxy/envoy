@@ -77,7 +77,7 @@ jobject call_jvm_verify_x509_cert_chain(Envoy::JNI::JniHelper& jni_helper,
   jni_log("[Envoy]", "jvm_verify_x509_cert_chain");
   jclass jcls_AndroidNetworkLibrary =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_verifyServerCertificates = jni_helper.getEnv()->GetStaticMethodID(
+  jmethodID jmid_verifyServerCertificates = jni_helper.getStaticMethodId(
       jcls_AndroidNetworkLibrary, "verifyServerCertificates",
       "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;");
   Envoy::JNI::Exception::checkAndClear("call_jvm_verify_x509_cert_chain:GetStaticMethodID");
