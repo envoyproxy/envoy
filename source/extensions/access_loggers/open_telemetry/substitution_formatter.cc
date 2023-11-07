@@ -125,7 +125,7 @@ OpenTelemetryFormatter::openTelemetryFormatListCallback(
 }
 
 ::opentelemetry::proto::common::v1::KeyValueList
-OpenTelemetryFormatter::format(const AccessLog::HttpLogContext& context,
+OpenTelemetryFormatter::format(const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& info) const {
   OpenTelemetryFormatMapVisitor visitor{
       [&](const std::vector<Formatter::FormatterProviderPtr>& providers) {
