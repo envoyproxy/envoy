@@ -38,11 +38,6 @@ namespace {
     seed = HashUtil::xxHash64(v, seed);                                                            \
   } while (0)
 
-#define HASH_MESSAGE(v)                                                                            \
-  do {                                                                                             \
-    seed = reflectionHashMessage(reflection->GetMessage(message, field), seed);                    \
-  } while (0)
-
 uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed = 0);
 uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor* field, uint64_t seed);
@@ -103,7 +98,6 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
 uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor* field, uint64_t seed) {
   using Protobuf::FieldDescriptor;
-  std::cerr << "field = " << field->DebugString() << std::endl;
   const auto reflection = message.GetReflection();
   switch (field->cpp_type()) {
   case FieldDescriptor::CPPTYPE_INT32:
@@ -131,20 +125,26 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
     REFLECTION_FOR_EACH(EnumValue, HASH_FIXED);
     break;
   case FieldDescriptor::CPPTYPE_STRING: {
-    std::string scratch;
     if (field->is_repeated()) {
-      for (int i = 0; i < reflection->FieldSize(message, field); i++) {
-        HASH_STRING(reflection->GetRepeatedStringReference(message, field, i, &scratch));
+      for (const std::string& str : reflection->GetRepeatedFieldRef<std::string>(message, field)) {
+        HASH_STRING(str);
       }
     } else {
+      std::string scratch;
       HASH_STRING(reflection->GetStringReference(message, field, &scratch));
     }
   } break;
   case FieldDescriptor::CPPTYPE_MESSAGE:
     if (field->is_map()) {
-      return reflectionHashMapField(message, field, seed);
+      seed = reflectionHashMapField(message, field, seed);
+    } else if (field->is_repeated()) {
+      for (const auto& submsg :
+           reflection->GetRepeatedFieldRef<Protobuf::Message>(message, field)) {
+        seed = reflectionHashMessage(submsg, seed);
+      }
+    } else {
+      seed = reflectionHashMessage(reflection->GetMessage(message, field), seed);
     }
-    REFLECTION_FOR_EACH(Message, HASH_MESSAGE);
     break;
   }
   return seed;
