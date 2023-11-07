@@ -23,9 +23,7 @@ public:
   int count() { return count_; };
 
 private:
-  void emitLog(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-               const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-               AccessLog::AccessLogType) override {
+  void emitLog(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&) override {
     count_++;
   }
 

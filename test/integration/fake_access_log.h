@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/access_log_config.h"
+#include "envoy/access_log/access_log_config.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -30,7 +30,7 @@ private:
   LogSignature log_cb_;
 };
 
-class FakeAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class FakeAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,

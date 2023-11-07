@@ -29,11 +29,7 @@ public:
   OpenTelemetryFormatter(const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping);
 
   ::opentelemetry::proto::common::v1::KeyValueList
-  format(const Http::RequestHeaderMap& request_headers,
-         const Http::ResponseHeaderMap& response_headers,
-         const Http::ResponseTrailerMap& response_trailers,
-         const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-         AccessLog::AccessLogType access_log_type) const;
+  format(const Formatter::HttpFormatterContext& context, const StreamInfo::StreamInfo& info) const;
 
 private:
   struct OpenTelemetryFormatMapWrapper;
@@ -77,11 +73,8 @@ private:
   // Methods for doing the actual formatting.
   ::opentelemetry::proto::common::v1::AnyValue
   providersCallback(const std::vector<Formatter::FormatterProviderPtr>& providers,
-                    const Http::RequestHeaderMap& request_headers,
-                    const Http::ResponseHeaderMap& response_headers,
-                    const Http::ResponseTrailerMap& response_trailers,
-                    const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-                    AccessLog::AccessLogType access_log_type) const;
+                    const Formatter::HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& info) const;
   ::opentelemetry::proto::common::v1::AnyValue openTelemetryFormatMapCallback(
       const OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper& format_map,
       const OpenTelemetryFormatMapVisitor& visitor) const;

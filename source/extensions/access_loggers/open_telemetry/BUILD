@@ -62,7 +62,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//envoy/server:access_log_config_interface",
+        "//envoy/access_log:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",

@@ -51,7 +51,7 @@ public:
                AccessLog::AccessLogType));
 };
 
-class TestAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr createAccessLogInstance(
       const Protobuf::Message&, AccessLog::FilterPtr&&,
@@ -82,8 +82,7 @@ public:
 // Validate that access logger gets the right context with access to listener metadata
 TEST_P(ListenerTypedMetadataIntegrationTest, ListenerMetadataPlumbingToAccessLog) {
   TestAccessLogFactory factory;
-  Registry::InjectFactory<Server::Configuration::AccessLogInstanceFactory> factory_register(
-      factory);
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   // Add some typed metadata to the listener.
   ProtobufWkt::StringValue value;
