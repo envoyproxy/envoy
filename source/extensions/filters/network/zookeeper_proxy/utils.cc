@@ -38,7 +38,8 @@ absl::StatusOr<bool> BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& 
 absl::StatusOr<std::string> BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset) {
   std::string val;
   const absl::StatusOr<int32_t> len = peekInt32(buffer, offset);
-  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(len, fmt::format("peekString: {}", len.status().message()));
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(len,
+                                          fmt::format("peekString: {}", len.status().message()));
 
   if (len.value() == 0) {
     return val;
