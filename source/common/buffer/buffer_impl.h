@@ -94,6 +94,7 @@ public:
   }
 
   Slice(Slice&& rhs) noexcept {
+    ENVOY_LOG_MISC(debug, "Slice(Slice&& rhs)");
     capacity_ = rhs.capacity_;
     storage_ = std::move(rhs.storage_);
     base_ = rhs.base_;
@@ -101,7 +102,7 @@ public:
     reservable_ = rhs.reservable_;
     drain_trackers_ = std::move(rhs.drain_trackers_);
     account_ = std::move(rhs.account_);
-    releasor_.swap(rhs.releasor_);
+    releasor_.swap(rhs.releasor);
 
     rhs.capacity_ = 0;
     rhs.base_ = nullptr;
@@ -120,7 +121,11 @@ public:
       reservable_ = rhs.reservable_;
       drain_trackers_ = std::move(rhs.drain_trackers_);
       account_ = std::move(rhs.account_);
-      releasor_.swap(rhs.releasor_);
+      if (releasor_) {
+        releasor_();
+      }
+      releasor_ = rhs.releasor_;
+      rhs.releasor_ = nullptr;
 
       rhs.capacity_ = 0;
       rhs.base_ = nullptr;
