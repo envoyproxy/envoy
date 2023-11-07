@@ -63,7 +63,7 @@ public:
 class AccessLogTest : public testing::Test {
 public:
   AccessLogPtr makeAccessLog(const AnyValue& body_config, const KeyValueList& attributes_config) {
-    ON_CALL(*filter_, evaluate(_, _, _, _, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
     *config_.mutable_body() = body_config;
     *config_.mutable_attributes() = attributes_config;
     config_.mutable_common_config()->set_log_name("test_log");
