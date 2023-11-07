@@ -115,13 +115,6 @@ DEFINE_GET_ARRAY_ELEMENTS(Float, jfloatArray, jfloat)
 DEFINE_GET_ARRAY_ELEMENTS(Double, jdoubleArray, jdouble)
 DEFINE_GET_ARRAY_ELEMENTS(Boolean, jbooleanArray, jboolean)
 
-LocalRefUniquePtr<jobject> JniHelper::getObjectArrayElement(jobjectArray array, jsize index) {
-  LocalRefUniquePtr<jobject> result(env_->GetObjectArrayElement(array, index),
-                                    LocalRefDeleter(env_));
-  rethrowException();
-  return result;
-}
-
 void JniHelper::setObjectArrayElement(jobjectArray array, jsize index, jobject value) {
   env_->SetObjectArrayElement(array, index, value);
   rethrowException();

@@ -242,18 +242,15 @@ envoy_map to_native_map(JniHelper& jni_helper, jobjectArray entries) {
 
   for (envoy_map_size_t i = 0; i < length; i += 2) {
     // Copy native byte array for header key
-    jbyteArray j_key =
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(entries, i));
-    envoy_data entry_key = array_to_native_data(jni_helper, j_key);
+    LocalRefUniquePtr<jbyteArray> j_key = jni_helper.getObjectArrayElement<jbyteArray>(entries, i);
+    envoy_data entry_key = array_to_native_data(jni_helper, j_key.get());
 
     // Copy native byte array for header value
-    jbyteArray j_value =
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(entries, i + 1));
-    envoy_data entry_value = array_to_native_data(jni_helper, j_value);
+    LocalRefUniquePtr<jbyteArray> j_value =
+        jni_helper.getObjectArrayElement<jbyteArray>(entries, i + 1);
+    envoy_data entry_value = array_to_native_data(jni_helper, j_value.get());
 
     entry_array[i / 2] = {entry_key, entry_value};
-    jni_helper.getEnv()->DeleteLocalRef(j_key);
-    jni_helper.getEnv()->DeleteLocalRef(j_value);
   }
 
   envoy_map native_map = {length / 2, entry_array};
@@ -309,17 +306,14 @@ void JavaArrayOfByteArrayToStringVector(JniHelper& jni_helper, jobjectArray arra
   out->resize(len);
 
   for (size_t i = 0; i < len; ++i) {
-    jbyteArray bytes_array =
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i));
-    jsize bytes_len = jni_helper.getArrayLength(bytes_array);
+    LocalRefUniquePtr<jbyteArray> bytes_array =
+        jni_helper.getObjectArrayElement<jbyteArray>(array, i);
+    jsize bytes_len = jni_helper.getArrayLength(bytes_array.get());
     // It doesn't matter if the array returned by GetByteArrayElements is a copy
     // or not, as the data will be simply be copied into C++ owned memory below.
-    jbyte* bytes = jni_helper.getEnv()->GetByteArrayElements(bytes_array, /*isCopy=*/nullptr);
-    (*out)[i].assign(reinterpret_cast<const char*>(bytes), bytes_len);
-    // There is nothing to write back, it is always safe to JNI_ABORT.
-    jni_helper.getEnv()->ReleaseByteArrayElements(bytes_array, bytes, JNI_ABORT);
-    // Explicitly delete to keep the local ref count low.
-    jni_helper.getEnv()->DeleteLocalRef(bytes_array);
+    ArrayElementsUniquePtr<jbyteArray, jbyte> bytes =
+        jni_helper.getByteArrayElements(bytes_array.get(), /* is_copy= */ nullptr);
+    (*out)[i].assign(reinterpret_cast<const char*>(bytes.get()), bytes_len);
   }
 }
 
@@ -336,11 +330,10 @@ void JavaArrayOfByteToBytesVector(JniHelper& jni_helper, jbyteArray array,
 
   // It doesn't matter if the array returned by GetByteArrayElements is a copy
   // or not, as the data will be simply be copied into C++ owned memory below.
-  jbyte* jbytes = jni_helper.getEnv()->GetByteArrayElements(array, /*isCopy=*/nullptr);
-  uint8_t* bytes = reinterpret_cast<uint8_t*>(jbytes);
+  ArrayElementsUniquePtr<jbyteArray, jbyte> jbytes =
+      jni_helper.getByteArrayElements(array, /* is_copy= */ nullptr);
+  uint8_t* bytes = reinterpret_cast<uint8_t*>(jbytes.get());
   std::copy(bytes, bytes + len, out->begin());
-  // There is nothing to write back, it is always safe to JNI_ABORT.
-  jni_helper.getEnv()->ReleaseByteArrayElements(array, jbytes, JNI_ABORT);
 }
 
 MatcherData::Type StringToType(std::string type_as_string) {
@@ -378,16 +371,14 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, job
     std::string name;
     std::string type_as_string;
     std::string value;
-    JavaArrayOfByteToString(
-        jni_helper, static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i)),
-        &name);
-    JavaArrayOfByteToString(
-        jni_helper,
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i + 1)),
-        &type_as_string);
-    JavaArrayOfByteToString(
-        jni_helper,
-        static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, i + 2)), &value);
+    LocalRefUniquePtr<jbyteArray> element1 = jni_helper.getObjectArrayElement<jbyteArray>(array, i);
+    JavaArrayOfByteToString(jni_helper, element1.get(), &name);
+    LocalRefUniquePtr<jbyteArray> element2 =
+        jni_helper.getObjectArrayElement<jbyteArray>(array, i + 1);
+    JavaArrayOfByteToString(jni_helper, element2.get(), &type_as_string);
+    LocalRefUniquePtr<jbyteArray> element3 =
+        jni_helper.getObjectArrayElement<jbyteArray>(array, i + 2);
+    JavaArrayOfByteToString(jni_helper, element3.get(), &value);
     ret.emplace_back(MatcherData(name, StringToType(type_as_string), value));
   }
   return ret;
@@ -395,11 +386,11 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, job
 
 void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
                           Envoy::Protobuf::MessageLite* dest) {
-  jbyte* bytes = jni_helper.getEnv()->GetByteArrayElements(source, /* isCopy= */ nullptr);
+  ArrayElementsUniquePtr<jbyteArray, jbyte> bytes =
+      jni_helper.getByteArrayElements(source, /* is_copy= */ nullptr);
   jsize size = jni_helper.getArrayLength(source);
-  bool success = dest->ParseFromArray(bytes, size);
+  bool success = dest->ParseFromArray(bytes.get(), size);
   RELEASE_ASSERT(success, "Failed to parse protobuf message.");
-  jni_helper.getEnv()->ReleaseByteArrayElements(source, bytes, 0);
 }
 
 #define JNI_UTILITY_DEFINE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                        \
