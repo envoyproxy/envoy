@@ -94,7 +94,6 @@ public:
   }
 
   Slice(Slice&& rhs) noexcept {
-    ENVOY_LOG_MISC(debug, "Slice(Slice&& rhs)");
     capacity_ = rhs.capacity_;
     storage_ = std::move(rhs.storage_);
     base_ = rhs.base_;
