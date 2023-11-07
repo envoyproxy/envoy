@@ -66,7 +66,8 @@ bool MainCommonBase::run() {
   case Server::Mode::Validate:
     return Server::validateConfig(
         options_, Network::Utility::getLocalAddress(options_.localAddressIpVersion()),
-        component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem());
+        component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem(),
+        process_context_ ? ProcessContextOptRef(std::ref(*process_context_)) : absl::nullopt);
   case Server::Mode::InitOnly:
     PERF_DUMP();
     return true;

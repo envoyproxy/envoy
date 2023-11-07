@@ -135,6 +135,22 @@ PrimitiveArrayCriticalUniquePtr JniHelper::getPrimitiveArrayCritical(jarray arra
   return result;
 }
 
+#define DEFINE_SET_ARRAY_REGION(JAVA_TYPE, JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE)                       \
+  void JniHelper::set##JAVA_TYPE##ArrayRegion(JNI_ARRAY_TYPE array, jsize start, jsize length,     \
+                                              const JNI_ELEMENT_TYPE* buffer) {                    \
+    env_->Set##JAVA_TYPE##ArrayRegion(array, start, length, buffer);                               \
+    rethrowException();                                                                            \
+  }
+
+DEFINE_SET_ARRAY_REGION(Byte, jbyteArray, jbyte)
+DEFINE_SET_ARRAY_REGION(Char, jcharArray, jchar)
+DEFINE_SET_ARRAY_REGION(Short, jshortArray, jshort)
+DEFINE_SET_ARRAY_REGION(Int, jintArray, jint)
+DEFINE_SET_ARRAY_REGION(Long, jlongArray, jlong)
+DEFINE_SET_ARRAY_REGION(Float, jfloatArray, jfloat)
+DEFINE_SET_ARRAY_REGION(Double, jdoubleArray, jdouble)
+DEFINE_SET_ARRAY_REGION(Boolean, jbooleanArray, jboolean)
+
 #define DEFINE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                    \
   JNI_TYPE JniHelper::call##JAVA_TYPE##Method(jobject object, jmethodID method_id, ...) {          \
     va_list args;                                                                                  \

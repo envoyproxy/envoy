@@ -19,7 +19,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
     MockTimeSystem time_system_;
     std::unique_ptr<TestStreamInfo> test_stream_info =
         fromStreamInfo(input.stream_info(), time_system_);
-    parser->evaluateHeaders(request_header_map, request_header_map, response_header_map,
+    parser->evaluateHeaders(request_header_map, {&request_header_map, &response_header_map},
                             *test_stream_info);
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {

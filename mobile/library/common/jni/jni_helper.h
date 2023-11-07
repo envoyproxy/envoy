@@ -262,6 +262,24 @@ public:
 
   PrimitiveArrayCriticalUniquePtr getPrimitiveArrayCritical(jarray array, jboolean* is_copy);
 
+  /**
+   * Sets a region of an `array` from a `buffer` with the specified `start` index and `length`.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#setprimitivetypearrayregion-routines
+   */
+#define DECLARE_SET_ARRAY_REGION(JAVA_TYPE, JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE)                      \
+  void set##JAVA_TYPE##ArrayRegion(JNI_ARRAY_TYPE array, jsize start, jsize length,                \
+                                   const JNI_ELEMENT_TYPE* buffer);
+
+  DECLARE_SET_ARRAY_REGION(Byte, jbyteArray, jbyte)
+  DECLARE_SET_ARRAY_REGION(Char, jcharArray, jchar)
+  DECLARE_SET_ARRAY_REGION(Short, jshortArray, jshort)
+  DECLARE_SET_ARRAY_REGION(Int, jintArray, jint)
+  DECLARE_SET_ARRAY_REGION(Long, jlongArray, jlong)
+  DECLARE_SET_ARRAY_REGION(Float, jfloatArray, jfloat)
+  DECLARE_SET_ARRAY_REGION(Double, jdoubleArray, jdouble)
+  DECLARE_SET_ARRAY_REGION(Boolean, jbooleanArray, jboolean)
+
 /** A macro to create `Call<Type>Method` helper function. */
 #define DECLARE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                   \
   JNI_TYPE call##JAVA_TYPE##Method(jobject object, jmethodID method_id, ...);

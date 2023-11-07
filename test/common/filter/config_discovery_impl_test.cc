@@ -289,7 +289,7 @@ public:
   }
 };
 
-// HTTP upstream filter test
+// Upstream HTTP filter test
 class HttpUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           NamedHttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
@@ -323,7 +323,7 @@ public:
   }
 };
 
-// Network upstream filter test
+// Upstream network filter test
 class NetworkUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           Network::FilterFactoryCb, Server::Configuration::UpstreamFactoryContext,

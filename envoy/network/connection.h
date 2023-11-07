@@ -287,7 +287,7 @@ public:
   virtual bool connecting() const PURE;
 
   /**
-   * Write data to the connection. Will iterate through downstream filters with the buffer if any
+   * Write data to the connection. Will iterate through network filters with the buffer if any
    * are installed.
    * @param data Supplies the data to write to the connection.
    * @param end_stream If true, this indicates that this is the last write to the connection. If

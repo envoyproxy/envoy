@@ -41,7 +41,7 @@
 namespace Envoy {
 namespace Router {
 
-// The upstream filter manager class.
+// The upstream HTTP filter manager class.
 class UpstreamFilterManager : public Http::FilterManager {
 public:
   UpstreamFilterManager(Http::FilterManagerCallbacks& filter_manager_callbacks,
@@ -60,8 +60,8 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override {
     return upstream_request_.parent_.callbacks()->streamInfo();
   }
-  // Send local replies via the downstream filter manager.
-  // Local replies will not be seen by upstream filters.
+  // Send local replies via the downstream HTTP filter manager.
+  // Local replies will not be seen by upstream HTTP filters.
   void sendLocalReply(Http::Code code, absl::string_view body,
                       const std::function<void(Http::ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -130,7 +130,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     stream_info_.setUpstreamClusterInfo(*cluster_info);
   }
 
-  // Set up the upstream filter manager.
+  // Set up the upstream HTTP filter manager.
   filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
       *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), connection(),
@@ -224,9 +224,9 @@ void UpstreamRequest::cleanUp() {
     parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
     --downstream_data_disabled_;
   }
-  // The upstream filter chain callbacks own headers/trailers while they are traversing the filter
-  // chain. Make sure to not delete them immediately when the stream ends, as the stream often
-  // ends during filter chain processing and it causes use-after-free violations.
+  // The upstream HTTP filter chain callbacks own headers/trailers while they are traversing the
+  // filter chain. Make sure to not delete them immediately when the stream ends, as the stream
+  // often ends during filter chain processing and it causes use-after-free violations.
   parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
 }
 
@@ -376,7 +376,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   }
 
   // Kick off creation of the upstream connection immediately upon receiving headers.
-  // In future it may be possible for upstream filters to delay this, or influence connection
+  // In future it may be possible for upstream HTTP filters to delay this, or influence connection
   // creation but for now optimize for minimal latency and fetch the connection
   // as soon as possible.
   conn_pool_->newStream(this);
@@ -587,7 +587,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     upstream_info.setUpstreamNumStreams(info.upstreamInfo()->upstreamNumStreams());
   }
 
-  // Upstream filters might have already created/set a filter state.
+  // Upstream HTTP filters might have already created/set a filter state.
   const StreamInfo::FilterStateSharedPtr& filter_state = info.filterState();
   if (!filter_state) {
     upstream_info.setUpstreamFilterState(

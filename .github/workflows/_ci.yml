@@ -99,11 +99,11 @@ jobs:
     steps:
     - if: ${{ inputs.cache-build-image }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.1.7
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.1.8
       with:
         image_tag: ${{ inputs.cache-build-image }}
 
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.7
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -133,21 +133,21 @@ jobs:
 
     - if: ${{ inputs.diskspace-hack }}
       name: Free diskspace
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.7
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.8
     - run: |
         echo "disk space at beginning of build:"
         df -h
       name: "Check disk space at beginning"
       shell: bash
 
-    - uses: envoyproxy/toolshed/gh-actions/using/steps@actions-v0.1.7
+    - uses: envoyproxy/toolshed/gh-actions/using/steps@actions-v0.1.8
       name: Run pre steps
       if: ${{ inputs.steps-pre }}
       with:
         name: ${{ inputs.steps-pre-name }}
         steps: ${{ inputs.steps-pre }}
 
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.7
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.8
       name: 'Run CI target ${{ inputs.target }}'
       with:
         catch-errors: ${{ inputs.catch-errors }}
@@ -170,7 +170,7 @@ jobs:
         BAZEL_FAKE_SCM_REVISION: ${{ github.event_name == 'pull_request' && 'e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9' || '' }}
         CI_TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.event.base.ref || github.ref }}
 
-    - uses: envoyproxy/toolshed/gh-actions/using/steps@actions-v0.1.7
+    - uses: envoyproxy/toolshed/gh-actions/using/steps@actions-v0.1.8
       name: Run post steps
       if: ${{ inputs.steps-post }}
       with:

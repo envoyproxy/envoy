@@ -863,11 +863,8 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers,
-                                   stream_info.getRequestHeaders() == nullptr
-                                       ? *Http::StaticEmptyHeaders::get().request_headers
-                                       : *stream_info.getRequestHeaders(),
-                                   headers, stream_info);
+    header_parser->evaluateHeaders(headers, {stream_info.getRequestHeaders(), &headers},
+                                   stream_info);
   }
 }
 
