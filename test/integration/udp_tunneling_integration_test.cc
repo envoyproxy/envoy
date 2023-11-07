@@ -736,7 +736,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateValidResponseHeaders) {
 )EOF",
                                                             access_log_filename);
 
-  TestConfig config{"host.com",
+  const TestConfig config{"host.com",
                     "target.com",
                     1,
                     30,
@@ -778,7 +778,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeaders) {
 )EOF",
                                                             access_log_filename);
 
-  TestConfig config{"host.com",
+  const TestConfig config{"host.com",
                     "target.com",
                     1,
                     30,
@@ -825,7 +825,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailers) {
 )EOF",
                                                             access_log_filename);
 
-  TestConfig config{"host.com",
+  const TestConfig config{"host.com",
                     "target.com",
                     1,
                     30,
