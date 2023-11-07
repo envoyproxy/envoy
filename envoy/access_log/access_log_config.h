@@ -57,8 +57,7 @@ using ExtensionFilterFactory = ExtensionFilterFactoryBase<Formatter::HttpFormatt
  */
 template <class Context> class AccessLogInstanceFactoryBase : public Config::TypedFactory {
 public:
-  AccessLogInstanceFactoryBase()
-      : category_(fmt::format("envoy.{}.access_loggers", Context::category())) {}
+  AccessLogInstanceFactoryBase() : category_(categoryByType()) {}
 
   ~AccessLogInstanceFactoryBase() override = default;
 
@@ -93,45 +92,18 @@ public:
   std::string category() const override { return category_; }
 
 private:
+  std::string categoryByType() {
+    if constexpr (std::is_same_v<Context, Formatter::HttpFormatterContext>) {
+      // This is a special case for the HTTP formatter context to ensure backwards compatibility.
+      return "envoy.access_loggers";
+    }
+    return fmt::format("envoy.{}.access_loggers", Context::category());
+  }
+
   const std::string category_;
 };
 
-/**
- * Implemented for each AccessLog::Instance and registered via Registry::registerFactory or the
- * convenience class RegisterFactory.
- */
-class AccessLogInstanceFactory : public Config::TypedFactory {
-public:
-  ~AccessLogInstanceFactory() override = default;
-
-  /**
-   * Create a particular AccessLog::Instance implementation from a config proto. If the
-   * implementation is unable to produce a factory with the provided parameters, it should throw an
-   * EnvoyException. The returned pointer should never be nullptr.
-   * @param config the custom configuration for this access log type.
-   * @param filter filter to determine whether a particular request should be logged. If no filter
-   * was specified in the configuration, argument will be nullptr.
-   * @param context access log context through which persistent resources can be accessed.
-   */
-  virtual AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::ListenerAccessLogFactoryContext& context) PURE;
-
-  /**
-   * Create a particular AccessLog::Instance implementation from a config proto. If the
-   * implementation is unable to produce a factory with the provided parameters, it should throw an
-   * EnvoyException. The returned pointer should never be nullptr.
-   * @param config the custom configuration for this access log type.
-   * @param filter filter to determine whether a particular request should be logged. If no filter
-   * was specified in the configuration, argument will be nullptr.
-   * @param context general filter context through which persistent resources can be accessed.
-   */
-  virtual AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::CommonFactoryContext& context) PURE;
-
-  std::string category() const override { return "envoy.access_loggers"; }
-};
+using AccessLogInstanceFactory = AccessLogInstanceFactoryBase<Formatter::HttpFormatterContext>;
 
 } // namespace AccessLog
 } // namespace Envoy

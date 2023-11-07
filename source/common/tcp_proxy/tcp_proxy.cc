@@ -223,10 +223,12 @@ Filter::~Filter() {
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
 
+  Formatter::HttpFormatterContext log_context;
+  log_context.setAccessLogType(AccessLog::AccessLogType::TcpConnectionEnd);
+
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
-                    AccessLog::AccessLogType::TcpConnectionEnd);
+    access_log->log(log_context, getStreamInfo());
   }
 
   ASSERT(generic_conn_pool_ == nullptr);
@@ -852,9 +854,11 @@ void Filter::onUpstreamConnection() {
   }
 
   if (config_->flushAccessLogOnConnected()) {
+    Formatter::HttpFormatterContext log_context;
+    log_context.setAccessLogType(AccessLog::AccessLogType::TcpUpstreamConnected);
+
     for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
-                      AccessLog::AccessLogType::TcpUpstreamConnected);
+      access_log->log(log_context, getStreamInfo());
     }
   }
 }
@@ -878,9 +882,11 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
+  Formatter::HttpFormatterContext log_context;
+  log_context.setAccessLogType(AccessLog::AccessLogType::TcpPeriodic);
+
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
-                    AccessLog::AccessLogType::TcpPeriodic);
+    access_log->log(log_context, getStreamInfo());
   }
   const SystemTime now = read_callbacks_->connection().dispatcher().timeSource().systemTime();
   getStreamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);

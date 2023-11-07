@@ -664,22 +664,13 @@ public:
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
   void log(AccessLog::AccessLogType access_log_type) {
-    RequestHeaderMap* request_headers = nullptr;
-    if (filter_manager_callbacks_.requestHeaders()) {
-      request_headers = filter_manager_callbacks_.requestHeaders().ptr();
-    }
-    ResponseHeaderMap* response_headers = nullptr;
-    if (filter_manager_callbacks_.responseHeaders()) {
-      response_headers = filter_manager_callbacks_.responseHeaders().ptr();
-    }
-    ResponseTrailerMap* response_trailers = nullptr;
-    if (filter_manager_callbacks_.responseTrailers()) {
-      response_trailers = filter_manager_callbacks_.responseTrailers().ptr();
-    }
+    Formatter::HttpFormatterContext log_context{filter_manager_callbacks_.requestHeaders().ptr(),
+                                                filter_manager_callbacks_.responseHeaders().ptr(),
+                                                filter_manager_callbacks_.responseTrailers().ptr()};
+    log_context.setAccessLogType(access_log_type);
 
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers, response_headers, response_trailers, streamInfo(),
-                       access_log_type);
+      log_handler->log(log_context, streamInfo());
     }
   }
 
