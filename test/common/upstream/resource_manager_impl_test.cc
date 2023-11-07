@@ -5,6 +5,7 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -204,6 +205,33 @@ TEST(ResourceManagerImplTest, RetryBudgetRoundDown) {
   rm.requests().inc();
 
   EXPECT_EQ(2U, rm.retries().max()); // max(floor(3 * 0.75), 1) = 2
+}
+
+TEST(ResourceManagerImplTest, RetryBudgetScheduledRetriesFeatureFlag) {
+  NiceMock<Runtime::MockLoader> runtime;
+  Stats::IsolatedStoreImpl store;
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.retry_budget_include_scheduled_retries", "false"}});
+
+  auto stats = clusterCircuitBreakersStats(store);
+
+  ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
+                         1, 0, 3, 100, stats, 100.0, 1);
+
+  EXPECT_EQ(1U, rm.retries().max());
+  EXPECT_EQ(0U, rm.retries().count());
+
+  rm.retriesScheduled().inc();
+  rm.retriesScheduled().inc();
+
+  EXPECT_EQ(1U, rm.retries().max());
+
+  rm.retries().inc();
+  EXPECT_EQ(1U, rm.retries().max());
+  EXPECT_EQ(1U, rm.retries().count());
+  EXPECT_FALSE(rm.retries().canCreate());
 }
 } // namespace
 } // namespace Upstream

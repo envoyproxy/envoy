@@ -454,6 +454,7 @@ envoy_cc_test(
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

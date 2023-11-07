@@ -12,6 +12,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/basic_resource_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -180,13 +181,17 @@ private:
       }
     }
 
-    uint64_t maxWithAdditionalActive(uint64_t additional_active) {
+    uint64_t maxWithAdditionalActive(const uint64_t additional_active) {
       if (!useRetryBudget()) {
         return max_retry_resource_.max();
       }
 
-      const uint64_t active = requests_.count() + pending_requests_.count() +
-                              retries_scheduled_.count() + additional_active;
+      uint64_t active = requests_.count() + pending_requests_.count();
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.retry_budget_include_scheduled_retries")) {
+        // additional_active isn't needed if scheduled retries aren't included in the budget.
+        active += retries_scheduled_.count() + additional_active;
+      }
       const double budget_percent = runtime_.snapshot().getDouble(
           budget_percent_key_, budget_percent_ ? *budget_percent_ : 20.0);
       const uint32_t min_retry_concurrency = runtime_.snapshot().getInteger(
