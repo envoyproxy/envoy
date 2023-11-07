@@ -91,7 +91,8 @@ absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
   return response;
 }
 
-absl::StatusOr<HandshakerResp> AltsProxy::sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes) {
+absl::StatusOr<HandshakerResp>
+AltsProxy::sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes) {
   // Prepare the StartServerHandshakeReq message.
   ServerHandshakeParameters server_parameters;
   server_parameters.add_record_protocols(RecordProtocol);

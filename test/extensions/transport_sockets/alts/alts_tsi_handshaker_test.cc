@@ -278,13 +278,12 @@ TEST_F(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {
 
       // Get the ClientFinished and the handshake result.
       {
-        std::string handshake_message =
-            absl::StrCat(ServerInit, ServerFinished);
+        std::string handshake_message = absl::StrCat(ServerInit, ServerFinished);
         CapturingHandshaker capturing_handshaker;
-        EXPECT_OK(handshaker->next(
-            &capturing_handshaker,
-            reinterpret_cast<const unsigned char*>(handshake_message.c_str()),
-            handshake_message.size(), onNextDoneImpl));
+        EXPECT_OK(
+            handshaker->next(&capturing_handshaker,
+                             reinterpret_cast<const unsigned char*>(handshake_message.c_str()),
+                             handshake_message.size(), onNextDoneImpl));
         EXPECT_EQ(capturing_handshaker.getBytesToSend(), ClientFinished);
         EXPECT_OK(capturing_handshaker.getStatus());
         auto handshake_result = capturing_handshaker.getAltsHandshakeResult();
@@ -394,25 +393,21 @@ TEST_F(AltsTsiHandshakerTest, ConcurrentServerSideFullHandshakes) {
       // Get the ServerInit and ServerFinished.
       {
         CapturingHandshaker capturing_handshaker;
-        EXPECT_OK(handshaker->next(
-            &capturing_handshaker,
-            reinterpret_cast<const unsigned char*>(ClientInit.data()),
-            ClientInit.size(), onNextDoneImpl));
-        EXPECT_EQ(capturing_handshaker.getBytesToSend(),
-                  absl::StrCat(ServerInit, ServerFinished));
+        EXPECT_OK(handshaker->next(&capturing_handshaker,
+                                   reinterpret_cast<const unsigned char*>(ClientInit.data()),
+                                   ClientInit.size(), onNextDoneImpl));
+        EXPECT_EQ(capturing_handshaker.getBytesToSend(), absl::StrCat(ServerInit, ServerFinished));
         EXPECT_OK(capturing_handshaker.getStatus());
         EXPECT_THAT(capturing_handshaker.getAltsHandshakeResult(), IsNull());
       }
 
       // Get the handshake result.
       {
-        std::string handshake_message =
-            absl::StrCat(ServerInit, ServerFinished);
+        std::string handshake_message = absl::StrCat(ServerInit, ServerFinished);
         CapturingHandshaker capturing_handshaker;
-        EXPECT_OK(handshaker->next(
-            &capturing_handshaker,
-            reinterpret_cast<const unsigned char*>(ClientFinished.data()),
-            ClientFinished.size(), onNextDoneImpl));
+        EXPECT_OK(handshaker->next(&capturing_handshaker,
+                                   reinterpret_cast<const unsigned char*>(ClientFinished.data()),
+                                   ClientFinished.size(), onNextDoneImpl));
         EXPECT_EQ(capturing_handshaker.getBytesToSend(), "");
         EXPECT_OK(capturing_handshaker.getStatus());
         auto handshake_result = capturing_handshaker.getAltsHandshakeResult();

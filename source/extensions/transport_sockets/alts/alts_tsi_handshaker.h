@@ -43,8 +43,8 @@ public:
 
   // Exposed for testing purposes only.
   absl::StatusOr<std::unique_ptr<AltsHandshakeResult>>
-  getHandshakeResult(const grpc::gcp::HandshakerResult& result, absl::Span<const uint8_t> received_bytes,
-                     std::size_t bytes_consumed);
+  getHandshakeResult(const grpc::gcp::HandshakerResult& result,
+                     absl::Span<const uint8_t> received_bytes, std::size_t bytes_consumed);
   static std::size_t computeMaxFrameSize(const grpc::gcp::HandshakerResult& result);
 
 private:

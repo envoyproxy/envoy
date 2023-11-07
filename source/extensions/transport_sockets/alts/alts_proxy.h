@@ -39,11 +39,13 @@ public:
 
   // Sends a StartServerHandshakeReq message to the ALTS handshaker service and
   // returns the response. This API is blocking.
-  absl::StatusOr<grpc::gcp::HandshakerResp> sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes);
+  absl::StatusOr<grpc::gcp::HandshakerResp>
+  sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes);
 
   // Sends a NextHandshakeMessageReq message to the ALTS handshaker service and
   // returns the response. This API is blocking.
-  absl::StatusOr<grpc::gcp::HandshakerResp> sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes);
+  absl::StatusOr<grpc::gcp::HandshakerResp>
+  sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes);
 
 private:
   static void setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions);

@@ -50,8 +50,7 @@ absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* rece
   }
 
   // Get a handshake message from the handshaker service.
-  absl::Span<const uint8_t> in_bytes =
-      absl::MakeConstSpan(received_bytes, received_bytes_size);
+  absl::Span<const uint8_t> in_bytes = absl::MakeConstSpan(received_bytes, received_bytes_size);
   HandshakerResp response;
   if (!has_sent_initial_handshake_message_) {
     has_sent_initial_handshake_message_ = true;
@@ -102,7 +101,8 @@ absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* rece
 
 std::size_t AltsTsiHandshaker::computeMaxFrameSize(const grpc::gcp::HandshakerResult& result) {
   if (result.max_frame_size() > 0) {
-    return std::clamp(static_cast<std::size_t>(result.max_frame_size()), AltsMinFrameSize, MaxFrameSize);
+    return std::clamp(static_cast<std::size_t>(result.max_frame_size()), AltsMinFrameSize,
+                      MaxFrameSize);
   }
   return AltsMinFrameSize;
 }

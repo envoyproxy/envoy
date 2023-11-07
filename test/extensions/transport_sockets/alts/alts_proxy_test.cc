@@ -198,9 +198,10 @@ TEST_F(AltsProxyTest, ClientFullHandshakeSuccess) {
   grpc::gcp::HandshakerResp& handshaker_resp = resp.value();
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedClientStartResponse()));
 
-  resp = (*alts_proxy)->sendNextHandshakeReq(absl::MakeSpan(
-              reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
-              ServerStartResponse.size()));
+  resp = (*alts_proxy)
+             ->sendNextHandshakeReq(
+                 absl::MakeSpan(reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
+                                ServerStartResponse.size()));
   EXPECT_OK(resp);
   handshaker_resp = resp.value();
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedNextResponse()));
@@ -229,9 +230,10 @@ TEST_F(AltsProxyTest, ServerStartSuccess) {
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
 
-  auto resp = (*alts_proxy)->sendStartServerHandshakeReq(absl::MakeSpan(
-              reinterpret_cast<const uint8_t*>(ClientStartResponse.data()),
-              ClientStartResponse.size()));
+  auto resp = (*alts_proxy)
+                  ->sendStartServerHandshakeReq(
+                      absl::MakeSpan(reinterpret_cast<const uint8_t*>(ClientStartResponse.data()),
+                                     ClientStartResponse.size()));
   EXPECT_OK(resp);
   grpc::gcp::HandshakerResp& handshaker_resp = resp.value();
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedServerStartResponse()));
@@ -261,15 +263,20 @@ TEST_F(AltsProxyTest, ServerFullHandshakeSuccess) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_TRUE(TestUtility::protoEqual(
-      (*alts_proxy)->sendStartServerHandshakeReq(absl::MakeSpan(
-              reinterpret_cast<const uint8_t*>(ClientStartResponse.data()),
-              ClientStartResponse.size())).value(),
-      expectedServerStartResponse()));
-  EXPECT_TRUE(TestUtility::protoEqual(
-      (*alts_proxy)->sendNextHandshakeReq(absl::MakeSpan(
-              reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
-              ServerStartResponse.size())).value(), expectedNextResponse()));
+  EXPECT_TRUE(
+      TestUtility::protoEqual((*alts_proxy)
+                                  ->sendStartServerHandshakeReq(absl::MakeSpan(
+                                      reinterpret_cast<const uint8_t*>(ClientStartResponse.data()),
+                                      ClientStartResponse.size()))
+                                  .value(),
+                              expectedServerStartResponse()));
+  EXPECT_TRUE(
+      TestUtility::protoEqual((*alts_proxy)
+                                  ->sendNextHandshakeReq(absl::MakeSpan(
+                                      reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
+                                      ServerStartResponse.size()))
+                                  .value(),
+                              expectedNextResponse()));
 }
 
 TEST_F(AltsProxyTest, CreateFailsDueToNullChannel) {
@@ -294,9 +301,10 @@ TEST_F(AltsProxyTest, ServerStartRpcLevelFailure) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_THAT((*alts_proxy)->sendStartServerHandshakeReq(absl::MakeSpan(
-              reinterpret_cast<const uint8_t*>(ClientStartResponse.data()),
-              ClientStartResponse.size())),
+  EXPECT_THAT((*alts_proxy)
+                  ->sendStartServerHandshakeReq(
+                      absl::MakeSpan(reinterpret_cast<const uint8_t*>(ClientStartResponse.data()),
+                                     ClientStartResponse.size())),
               StatusIs(absl::StatusCode::kInternal));
 }
 
@@ -307,9 +315,10 @@ TEST_F(AltsProxyTest, NextRpcLevelFailure) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_THAT((*alts_proxy)->sendNextHandshakeReq(absl::MakeSpan(
-              reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
-              ServerStartResponse.size())),
+  EXPECT_THAT((*alts_proxy)
+                  ->sendNextHandshakeReq(
+                      absl::MakeSpan(reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
+                                     ServerStartResponse.size())),
               StatusIs(absl::StatusCode::kInternal));
 }
 
@@ -330,9 +339,10 @@ TEST_F(AltsProxyTest, ServerStartRequestLevelFailure) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_THAT((*alts_proxy)->sendStartServerHandshakeReq(absl::MakeSpan(
-              reinterpret_cast<const uint8_t*>(ClientStartResponse.data()),
-              ClientStartResponse.size())),
+  EXPECT_THAT((*alts_proxy)
+                  ->sendStartServerHandshakeReq(
+                      absl::MakeSpan(reinterpret_cast<const uint8_t*>(ClientStartResponse.data()),
+                                     ClientStartResponse.size())),
               StatusIs(absl::StatusCode::kInternal));
 }
 
@@ -343,9 +353,10 @@ TEST_F(AltsProxyTest, NextRequestLevelFailure) {
 
   auto alts_proxy = AltsProxy::create(getChannel());
   EXPECT_OK(alts_proxy.status());
-  EXPECT_THAT((*alts_proxy)->sendNextHandshakeReq(absl::MakeSpan(
-              reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
-              ServerStartResponse.size())),
+  EXPECT_THAT((*alts_proxy)
+                  ->sendNextHandshakeReq(
+                      absl::MakeSpan(reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
+                                     ServerStartResponse.size())),
               StatusIs(absl::StatusCode::kInternal));
 }
 
