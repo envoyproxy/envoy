@@ -59,16 +59,16 @@ public:
     };
   }
 
-  void validateFilterStateData(const std::string& expectedName) {
+  void validateFilterStateData(const std::string& expected_name) {
     ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
         LocalReplyFilterStateKey));
     auto fs_value =
         filter_manager_->streamInfo().filterState()->getDataReadOnly<LocalReplyOwnerObject>(
             LocalReplyFilterStateKey);
-    EXPECT_EQ(fs_value->serializeAsString(), expectedName);
+    EXPECT_EQ(fs_value->serializeAsString(), expected_name);
 
     auto expected = std::make_unique<ProtobufWkt::StringValue>();
-    expected->set_value(expectedName);
+    expected->set_value(expected_name);
     EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
   }
 
