@@ -737,16 +737,16 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateValidResponseHeaders) {
                                                             access_log_filename);
 
   const TestConfig config{"host.com",
-                    "target.com",
-                    1,
-                    30,
-                    false,
-                    "",
-                    BufferOptions{1, 30},
-                    absl::nullopt,
-                    session_access_log_config,
-                    true,
-                    false};
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          true,
+                          false};
   setup(config);
 
   const std::string datagram = "hello";
@@ -779,16 +779,16 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeaders) {
                                                             access_log_filename);
 
   const TestConfig config{"host.com",
-                    "target.com",
-                    1,
-                    30,
-                    false,
-                    "",
-                    BufferOptions{1, 30},
-                    absl::nullopt,
-                    session_access_log_config,
-                    true,
-                    false};
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          true,
+                          false};
   setup(config);
 
   client_->write("hello", *listener_address_);
@@ -826,16 +826,16 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailers) {
                                                             access_log_filename);
 
   const TestConfig config{"host.com",
-                    "target.com",
-                    1,
-                    30,
-                    false,
-                    "",
-                    BufferOptions{1, 30},
-                    absl::nullopt,
-                    session_access_log_config,
-                    false,
-                    true};
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          false,
+                          true};
   setup(config);
 
   const std::string datagram = "hello";
