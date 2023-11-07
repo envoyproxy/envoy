@@ -140,13 +140,10 @@ void HttpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!request_encoder_) {
     return;
   }
+  auto codec = type_;
   request_encoder_->encodeData(data, end_stream);
 
-  if (type_ == Http::CodecType::HTTP1) {
-    return;
-  }
-
-  if (end_stream) {
+  if ((codec != Http::CodecType::HTTP1) && (end_stream)) {
     doneWriting();
   }
 }
