@@ -31,11 +31,12 @@ namespace {
 std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
     datadog::tracing::TracerConfig config, Upstream::ClusterManager& cluster_manager,
     const std::string& collector_cluster, const std::string& collector_reference_host,
-    TracerStats& tracer_stats, Event::Dispatcher& dispatcher, spdlog::logger& logger) {
+    TracerStats& tracer_stats, Event::Dispatcher& dispatcher, spdlog::logger& logger,
+    TimeSource& time_source) {
   config.logger = std::make_shared<Logger>(logger);
   config.agent.event_scheduler = std::make_shared<EventScheduler>(dispatcher);
   config.agent.http_client = std::make_shared<AgentHTTPClient>(
-      cluster_manager, collector_cluster, collector_reference_host, tracer_stats);
+      cluster_manager, collector_cluster, collector_reference_host, tracer_stats, time_source);
 
   datadog::tracing::Expected<datadog::tracing::FinalizedTracerConfig> maybe_config =
       datadog::tracing::finalize_config(config);
@@ -57,7 +58,7 @@ Tracer::ThreadLocalTracer::ThreadLocalTracer(const datadog::tracing::FinalizedTr
 Tracer::Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                const datadog::tracing::TracerConfig& config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-               ThreadLocal::SlotAllocator& thread_local_slot_allocator)
+               ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source)
     : tracer_stats_(makeTracerStats(scope)),
       thread_local_slot_(
           ThreadLocal::TypedSlot<ThreadLocalTracer>::makeUnique(thread_local_slot_allocator)) {
@@ -66,10 +67,11 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
                                 allow_added_via_api);
 
   thread_local_slot_->set([&logger = ENVOY_LOGGER(), collector_cluster, collector_reference_host,
-                           config, &tracer_stats = tracer_stats_,
-                           &cluster_manager](Event::Dispatcher& dispatcher) {
+                           config, &tracer_stats = tracer_stats_, &cluster_manager,
+                           &time_source](Event::Dispatcher& dispatcher) {
     return makeThreadLocalTracer(config, cluster_manager, collector_cluster,
-                                 collector_reference_host, tracer_stats, dispatcher, logger);
+                                 collector_reference_host, tracer_stats, dispatcher, logger,
+                                 time_source);
   });
 }
 

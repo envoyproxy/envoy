@@ -52,11 +52,12 @@ public:
    * @param scope statistics scope from which \c TracerStats can be created
    * @param thread_local_slot_allocator slot allocator for installing a
    * thread-local instance of the tracer.
+   * @param time_source supplies the time source.
    */
   explicit Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                   const datadog::tracing::TracerConfig& config,
                   Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                  ThreadLocal::SlotAllocator& thread_local_slot_allocator);
+                  ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source);
 
   struct ThreadLocalTracer : public ThreadLocal::ThreadLocalObject {
     /**
