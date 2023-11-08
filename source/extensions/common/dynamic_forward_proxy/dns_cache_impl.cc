@@ -58,7 +58,10 @@ DnsCacheImpl::DnsCacheImpl(
     // cache to load an entry. Further if this particular resolution fails all the is lost is the
     // potential optimization of having the entry be preresolved the first time a true consumer of
     // this DNS cache asks for it.
-    startCacheLoad(hostname.address(), hostname.port_value(), false);
+    const std::string host =
+        DnsHostInfo::normalizeHostForDfp(hostname.address(), hostname.port_value());
+    ENVOY_LOG(debug, "DNS pre-resolve starting for host {}", host);
+    startCacheLoad(host, hostname.port_value(), false);
   }
 }
 
