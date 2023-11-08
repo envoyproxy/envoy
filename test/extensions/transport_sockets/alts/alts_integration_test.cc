@@ -131,7 +131,7 @@ public:
       if (!status.ok())
         return WriteErrorResponse(stream, status);
       stream->Write(response);
-      if (context.state == COMPLETED)
+      if (context.state == HandshakeState::COMPLETED)
         return grpc::Status::OK;
       request.Clear();
     }
@@ -145,11 +145,11 @@ private:
   // least STARTED. When the handshaker server produces the first fame, the
   // state becomes SENT. After the handshaker server processes the final frame
   // from the peer, the state becomes COMPLETED.
-  enum HandshakeState { INITIAL, STARTED, SENT, COMPLETED };
+  enum class HandshakeState { INITIAL, STARTED, SENT, COMPLETED };
 
   struct HandshakerContext {
     bool is_client = true;
-    HandshakeState state = INITIAL;
+    HandshakeState state = HandshakeState::INITIAL;
   };
 
   grpc::Status ProcessRequest(HandshakerContext* context, const grpc::gcp::HandshakerReq& request,
@@ -169,7 +169,7 @@ private:
                                   const grpc::gcp::StartClientHandshakeReq& request,
                                   grpc::gcp::HandshakerResp* response) {
     // Checks request.
-    if (context->state != INITIAL) {
+    if (context->state != HandshakeState::INITIAL) {
       return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
     }
     if (request.application_protocols_size() == 0) {
@@ -186,7 +186,7 @@ private:
     response->mutable_status()->set_code(grpc::StatusCode::OK);
     // Updates handshaker context.
     context->is_client = true;
-    context->state = SENT;
+    context->state = HandshakeState::SENT;
     return grpc::Status::OK;
   }
 
@@ -194,7 +194,7 @@ private:
                                   const grpc::gcp::StartServerHandshakeReq& request,
                                   grpc::gcp::HandshakerResp* response) {
     // Checks request.
-    if (context->state != INITIAL) {
+    if (context->state != HandshakeState::INITIAL) {
       return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
     }
     if (request.application_protocols_size() == 0) {
@@ -209,13 +209,13 @@ private:
     if (request.in_bytes().empty()) {
       // start_server request does not have in_bytes.
       response->set_bytes_consumed(0);
-      context->state = STARTED;
+      context->state = HandshakeState::STARTED;
     } else {
       // start_server request has in_bytes.
       if (request.in_bytes() == kClientInitFrame) {
         response->set_out_frames(kServerFrame);
         response->set_bytes_consumed(strlen(kClientInitFrame));
-        context->state = SENT;
+        context->state = HandshakeState::SENT;
       } else {
         return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
       }
@@ -230,7 +230,7 @@ private:
                            grpc::gcp::HandshakerResp* response) {
     if (context->is_client) {
       // Processes next request on client side.
-      if (context->state != SENT) {
+      if (context->state != HandshakeState::SENT) {
         return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
       }
       if (request.in_bytes() != kServerFrame) {
@@ -238,32 +238,32 @@ private:
       }
       response->set_out_frames(kClientFinishFrame);
       response->set_bytes_consumed(strlen(kServerFrame));
-      context->state = COMPLETED;
+      context->state = HandshakeState::COMPLETED;
     } else {
       // Processes next request on server side.
       HandshakeState current_state = context->state;
-      if (current_state == STARTED) {
+      if (current_state == HandshakeState::STARTED) {
         if (request.in_bytes() != kClientInitFrame) {
           return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
         }
         response->set_out_frames(kServerFrame);
         response->set_bytes_consumed(strlen(kClientInitFrame));
-        context->state = SENT;
-      } else if (current_state == SENT) {
+        context->state = HandshakeState::SENT;
+      } else if (current_state == HandshakeState::SENT) {
         // Client finish frame may be sent along with the first payload from the
         // client, handshaker only consumes the client finish frame.
         if (request.in_bytes().substr(0, strlen(kClientFinishFrame)) != kClientFinishFrame) {
           return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
         }
         response->set_bytes_consumed(strlen(kClientFinishFrame));
-        context->state = COMPLETED;
+        context->state = HandshakeState::COMPLETED;
       } else {
         return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
       }
     }
     // At this point, processing next request succeeded.
     response->mutable_status()->set_code(grpc::StatusCode::OK);
-    if (context->state == COMPLETED) {
+    if (context->state == HandshakeState::COMPLETED) {
       *response->mutable_result() = GetHandshakerResult();
     }
     return grpc::Status::OK;

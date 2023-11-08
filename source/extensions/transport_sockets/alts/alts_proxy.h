@@ -34,16 +34,16 @@ public:
   ~AltsProxy();
 
   // Sends a StartClientHandshakeReq message to the ALTS handshaker service and
-  // returns the response. This API is blocking.
+  // returns the response.
   absl::StatusOr<grpc::gcp::HandshakerResp> sendStartClientHandshakeReq();
 
   // Sends a StartServerHandshakeReq message to the ALTS handshaker service and
-  // returns the response. This API is blocking.
+  // returns the response.
   absl::StatusOr<grpc::gcp::HandshakerResp>
   sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes);
 
   // Sends a NextHandshakeMessageReq message to the ALTS handshaker service and
-  // returns the response. This API is blocking.
+  // returns the response.
   absl::StatusOr<grpc::gcp::HandshakerResp>
   sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes);
 
