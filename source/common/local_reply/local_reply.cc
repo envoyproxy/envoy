@@ -78,8 +78,8 @@ public:
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
     if (filter_ == nullptr ||
-        !filter_->evaluate(stream_info, request_headers, response_headers, response_trailers,
-                           AccessLog::AccessLogType::NotSet)) {
+        !filter_->evaluate({&request_headers, &response_headers, &response_trailers},
+                           stream_info)) {
       return false;
     }
 

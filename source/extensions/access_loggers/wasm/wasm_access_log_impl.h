@@ -25,9 +25,11 @@ public:
            const Http::ResponseTrailerMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info,
            AccessLog::AccessLogType access_log_type) override {
-    if (filter_ && request_headers && response_headers && response_trailers) {
-      if (!filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers,
-                             access_log_type)) {
+    if (filter_) {
+      const Formatter::HttpFormatterContext log_context{
+          request_headers, response_headers, response_trailers, {}, access_log_type};
+
+      if (!filter_->evaluate(log_context, stream_info)) {
         return;
       }
     }

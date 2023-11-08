@@ -723,35 +723,30 @@ duration_filter:
   TestUtility::loadFromYaml(filter_yaml, config);
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   NiceMock<MockTimeSystem> time_source;
   TestStreamInfo stream_info(time_source);
 
+  const Formatter::HttpFormatterContext log_context{&request_headers};
+
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(100000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
-  EXPECT_TRUE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers,
-                              AccessLog::AccessLogType::NotSet));
+  EXPECT_TRUE(filter.evaluate(log_context, stream_info));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
-  EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers,
-                               AccessLog::AccessLogType::NotSet));
+  EXPECT_FALSE(filter.evaluate(log_context, stream_info));
 
   stream_info.end_time_ =
       stream_info.startTimeMonotonic() + std::chrono::microseconds(100000001000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
-  EXPECT_TRUE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers,
-                              AccessLog::AccessLogType::NotSet));
+  EXPECT_TRUE(filter.evaluate(log_context, stream_info));
 
   stream_info.end_time_ = stream_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
-  EXPECT_FALSE(filter.evaluate(stream_info, request_headers, response_headers, response_trailers,
-                               AccessLog::AccessLogType::NotSet));
+  EXPECT_FALSE(filter.evaluate(log_context, stream_info));
 
   StreamInfo::MockStreamInfo mock_stream_info;
   EXPECT_CALL(mock_stream_info, currentDuration()).WillOnce(testing::Return(std::nullopt));
-  EXPECT_FALSE(filter.evaluate(mock_stream_info, request_headers, response_headers,
-                               response_trailers, AccessLog::AccessLogType::NotSet));
+  EXPECT_FALSE(filter.evaluate(log_context, mock_stream_info));
 }
 
 TEST(AccessLogFilterTest, MidStreamDuration) {
@@ -769,19 +764,16 @@ duration_filter:
   TestUtility::loadFromYaml(filter_yaml, config);
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
+
+  const Formatter::HttpFormatterContext log_context{&request_headers};
 
   StreamInfo::MockStreamInfo mock_stream_info;
   EXPECT_CALL(mock_stream_info, currentDuration())
       .WillOnce(testing::Return(std::chrono::microseconds(1000)))     // 1ms
       .WillOnce(testing::Return(std::chrono::microseconds(1000000))); // 1000ms
 
-  EXPECT_FALSE(filter.evaluate(mock_stream_info, request_headers, response_headers,
-                               response_trailers, AccessLog::AccessLogType::NotSet));
-
-  EXPECT_TRUE(filter.evaluate(mock_stream_info, request_headers, response_headers,
-                              response_trailers, AccessLog::AccessLogType::NotSet));
+  EXPECT_FALSE(filter.evaluate(log_context, mock_stream_info));
+  EXPECT_TRUE(filter.evaluate(log_context, mock_stream_info));
 }
 
 TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
@@ -802,18 +794,16 @@ status_code_filter:
 
   NiceMock<MockTimeSystem> time_source;
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   TestStreamInfo info(time_source);
+
+  const Formatter::HttpFormatterContext log_context{&request_headers};
 
   info.setResponseCode(400);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
-  EXPECT_TRUE(filter.evaluate(info, request_headers, response_headers, response_trailers,
-                              AccessLog::AccessLogType::NotSet));
+  EXPECT_TRUE(filter.evaluate(log_context, info));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(500));
-  EXPECT_FALSE(filter.evaluate(info, request_headers, response_headers, response_trailers,
-                               AccessLog::AccessLogType::NotSet));
+  EXPECT_FALSE(filter.evaluate(log_context, info));
 }
 
 TEST_F(AccessLogImplTest, StatusCodeLessThan) {
@@ -1720,9 +1710,8 @@ public:
   SampleExtensionFilter(uint32_t sample_rate) : sample_rate_(sample_rate) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
-                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-                AccessLogType) const override {
+  bool evaluate(const Formatter::HttpFormatterContext&,
+                const StreamInfo::StreamInfo&) const override {
     if (current_++ == 0) {
       return true;
     }
