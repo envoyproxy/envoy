@@ -1,10 +1,10 @@
+load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
     "envoy_cc_library",
     "envoy_contrib_package",
 )
-load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 
 licenses(["notice"])  # Apache 2
 
