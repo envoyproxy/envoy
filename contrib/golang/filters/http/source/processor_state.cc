@@ -56,6 +56,10 @@ bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
 
   if (do_end_stream_ &&
       (status == GolangStatus::StopAndBuffer || status == GolangStatus::StopAndBufferWatermark)) {
+    ENVOY_LOG(
+        warn,
+        "golang filter handle wait data status {} when there is no data, convert it to continue",
+        int(status));
     status = GolangStatus::Continue;
   }
 
