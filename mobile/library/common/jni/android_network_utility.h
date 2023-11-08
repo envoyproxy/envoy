@@ -13,9 +13,10 @@
 
 /* Calls up through JNI to validate given certificates.
  */
-jobject call_jvm_verify_x509_cert_chain(Envoy::JNI::JniHelper& jni_helper,
-                                        const std::vector<std::string>& cert_chain,
-                                        std::string auth_type, absl::string_view hostname);
+Envoy::JNI::LocalRefUniquePtr<jobject>
+call_jvm_verify_x509_cert_chain(Envoy::JNI::JniHelper& jni_helper,
+                                const std::vector<std::string>& cert_chain, std::string auth_type,
+                                absl::string_view hostname);
 
 envoy_cert_validation_result verify_x509_cert_chain(const std::vector<std::string>& certs,
                                                     absl::string_view hostname);

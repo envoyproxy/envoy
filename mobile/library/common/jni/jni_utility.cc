@@ -27,11 +27,11 @@ jclass find_class(const char* class_name) {
   LocalRefUniquePtr<jclass> class_loader = jni_helper.findClass("java/lang/ClassLoader");
   jmethodID find_class_method = jni_helper.getMethodId(class_loader.get(), "loadClass",
                                                        "(Ljava/lang/String;)Ljava/lang/Class;");
-  Envoy::JNI::Exception::checkAndClear("find_class:GetMethodID");
   LocalRefUniquePtr<jstring> str_class_name = jni_helper.newStringUtf(class_name);
-  jclass clazz = (jclass)(jni_helper.getEnv()->CallObjectMethod(
-      get_class_loader(), find_class_method, str_class_name.get()));
-  Envoy::JNI::Exception::checkAndClear("find_class:CallObjectMethod");
+  jclass clazz =
+      jni_helper
+          .callObjectMethod<jclass>(get_class_loader(), find_class_method, str_class_name.get())
+          .release();
   return clazz;
 }
 
@@ -139,7 +139,8 @@ jobject native_map_to_map(JniHelper& jni_helper, envoy_map map) {
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     LocalRefUniquePtr<jstring> key = native_data_to_string(jni_helper, map.entries[i].key);
     LocalRefUniquePtr<jstring> value = native_data_to_string(jni_helper, map.entries[i].value);
-    callObjectMethod(jni_helper, j_hashMap, jmid_hashMapPut, key.get(), value.get());
+    LocalRefUniquePtr<jobject> ignored =
+        jni_helper.callObjectMethod(j_hashMap, jmid_hashMapPut, key.get(), value.get());
   }
   return j_hashMap;
 }
@@ -154,10 +155,9 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data) {
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
     jmethodID jmid_array = jni_helper.getMethodId(jcls_ByteBuffer.get(), "array", "()[B");
-    jbyteArray array = static_cast<jbyteArray>(callObjectMethod(jni_helper, j_data, jmid_array));
-
-    envoy_data native_data = array_to_native_data(jni_helper, array);
-    jni_helper.getEnv()->DeleteLocalRef(array);
+    LocalRefUniquePtr<jbyteArray> array =
+        jni_helper.callObjectMethod<jbyteArray>(j_data, jmid_array);
+    envoy_data native_data = array_to_native_data(jni_helper, array.get());
     return native_data;
   }
 
@@ -175,10 +175,9 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data, size_t d
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
     jmethodID jmid_array = jni_helper.getMethodId(jcls_ByteBuffer.get(), "array", "()[B");
-    jbyteArray array = static_cast<jbyteArray>(callObjectMethod(jni_helper, j_data, jmid_array));
-
-    envoy_data native_data = array_to_native_data(jni_helper, array, data_length);
-    jni_helper.getEnv()->DeleteLocalRef(array);
+    LocalRefUniquePtr<jbyteArray> array =
+        jni_helper.callObjectMethod<jbyteArray>(j_data, jmid_array);
+    envoy_data native_data = array_to_native_data(jni_helper, array.get(), data_length);
     return native_data;
   }
 
@@ -392,34 +391,6 @@ void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
   bool success = dest->ParseFromArray(bytes.get(), size);
   RELEASE_ASSERT(success, "Failed to parse protobuf message.");
 }
-
-#define JNI_UTILITY_DEFINE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                        \
-  JNI_TYPE call##JAVA_TYPE##Method(JniHelper& jni_helper, jobject object, jmethodID method_id,     \
-                                   ...) {                                                          \
-    va_list args;                                                                                  \
-    va_start(args, method_id);                                                                     \
-    JNI_TYPE result = jni_helper.getEnv()->Call##JAVA_TYPE##MethodV(object, method_id, args);      \
-    va_end(args);                                                                                  \
-    Envoy::JNI::Exception::checkAndClear();                                                        \
-    return result;                                                                                 \
-  }
-
-// TODO(fredyw): Delete these functions are replaced them with the ones from JniHelper
-
-JNI_UTILITY_DEFINE_CALL_METHOD(Object, jobject)
-
-#define JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                 \
-  JNI_TYPE callStatic##JAVA_TYPE##Method(JniHelper& jni_helper, jclass clazz, jmethodID method_id, \
-                                         ...) {                                                    \
-    va_list args;                                                                                  \
-    va_start(args, method_id);                                                                     \
-    JNI_TYPE result = jni_helper.getEnv()->CallStatic##JAVA_TYPE##MethodV(clazz, method_id, args); \
-    va_end(args);                                                                                  \
-    Envoy::JNI::Exception::checkAndClear();                                                        \
-    return result;                                                                                 \
-  }
-
-JNI_UTILITY_DEFINE_CALL_STATIC_METHOD(Object, jobject)
 
 } // namespace JNI
 } // namespace Envoy

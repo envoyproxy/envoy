@@ -120,26 +120,5 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, job
 void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
                           Envoy::Protobuf::MessageLite* dest);
 
-// TODO(fredyw): Delete these functions are replaced them with the ones from JniHelper
-
-// Helper functions for JNI's `Call<Type>Method` with proper exception handling in order to satisfy
-// -Xcheck:jni.
-// See
-// https://docs.oracle.com/en/java/javase/11/docs/specs/jni/functions.html#calling-instance-methods
-#define JNI_UTILITY_DECLARE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                       \
-  JNI_TYPE call##JAVA_TYPE##Method(JniHelper& jni_helper, jobject object, jmethodID method_id, ...);
-
-JNI_UTILITY_DECLARE_CALL_METHOD(Object, jobject)
-
-// Helper functions for JNI's `CallStatic<Type>Method` with proper exception handling in order to
-// satisfy -Xcheck:jni.
-// See
-// https://docs.oracle.com/en/java/javase/11/docs/specs/jni/functions.html#calling-static-methods
-#define JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                \
-  JNI_TYPE callStatic##JAVA_TYPE##Method(JniHelper& jni_helper, jclass clazz, jmethodID method_id, \
-                                         ...);
-
-JNI_UTILITY_DECLARE_CALL_STATIC_METHOD(Object, jobject)
-
 } // namespace JNI
 } // namespace Envoy
