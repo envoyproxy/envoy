@@ -54,6 +54,10 @@ bug_fixes:
 - area: grpc
   change: |
     Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+- area: tracing
+  change: |
+    Fixed a bug that caused the Datadog tracing extension to drop traces that
+    should be kept on account of an extracted sampling decision.
 - area: quic
   change: |
     Fixed a bug in QUIC and HCM interaction which could cause use-after-free during asynchronous certificates retrieval.
