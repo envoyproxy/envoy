@@ -85,10 +85,7 @@ HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClos
 
 bool HttpUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   if (type_ == Http::CodecType::HTTP2) {
-    if (Http::Utility::getResponseStatus(headers) != 200) {
-      return false;
-    }
-    return true;
+    return Http::Utility::getResponseStatus(headers) == 200;
   }
   // Http::CodecType::HTTP1
   //  According to RFC7231 any 2xx response indicates that the connection is
@@ -140,10 +137,15 @@ void HttpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!request_encoder_) {
     return;
   }
-  auto codec = type_;
+  // auto codec = type_;
   request_encoder_->encodeData(data, end_stream);
 
-  if ((codec != Http::CodecType::HTTP1) && (end_stream)) {
+  // doneWriting() is being skipped for H1 codec to avoid resetEncoder() call.
+  // This is because H1 codec does not support half-closed stream. Calling resetEncoder()
+  // will fully close the upstream connection without flushing any pending data, rather than a http
+  // stream reset.
+  // More details can be found on https://github.com/envoyproxy/envoy/pull/13293
+  if ((type_ != Http::CodecType::HTTP1) && (end_stream)) {
     doneWriting();
   }
 }
