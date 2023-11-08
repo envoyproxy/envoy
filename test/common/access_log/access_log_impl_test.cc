@@ -1051,7 +1051,7 @@ typed_config:
     TestStreamInfo stream_info(time_source_);
     stream_info.setResponseFlag(response_flag);
     EXPECT_CALL(*file_, write(_));
-    log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+    log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info);
   }
 }
 
