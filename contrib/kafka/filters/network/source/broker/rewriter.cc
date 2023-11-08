@@ -18,6 +18,7 @@ void ResponseRewriterImpl::onFailedParse(ResponseMetadataSharedPtr) {}
 
 constexpr int16_t METADATA_API_KEY = 3;
 constexpr int16_t FIND_COORDINATOR_API_KEY = 10;
+constexpr int16_t DESCRIBE_CLUSTER_API_KEY = 60;
 
 template <typename T> static T& extractResponseData(AbstractResponseSharedPtr& arg) {
   using TSharedPtr = std::shared_ptr<Response<T>>;
@@ -45,6 +46,11 @@ void ResponseRewriterImpl::process(Buffer::Instance& buffer) {
       updateFindCoordinatorBrokerAddresses(fcr);
       break;
     }
+    case DESCRIBE_CLUSTER_API_KEY: {
+      auto& dcr = extractResponseData<DescribeClusterResponse>(response);
+      updateDescribeClusterBrokerAddresses(dcr);
+      break;
+    }
     }
     encoder.encode(*response);
   }
@@ -53,15 +59,22 @@ void ResponseRewriterImpl::process(Buffer::Instance& buffer) {
 
 void ResponseRewriterImpl::updateMetadataBrokerAddresses(MetadataResponse& response) const {
   for (MetadataResponseBroker& broker : response.brokers_) {
-    maybeUpdateHostAndPort(broker);
+    maybeUpdateHostAndPort(broker, &MetadataResponseBroker::node_id_);
   }
 }
 
 void ResponseRewriterImpl::updateFindCoordinatorBrokerAddresses(
     FindCoordinatorResponse& response) const {
-  maybeUpdateHostAndPort(response);
+  maybeUpdateHostAndPort(response, &FindCoordinatorResponse::node_id_);
   for (Coordinator& coordinator : response.coordinators_) {
-    maybeUpdateHostAndPort(coordinator);
+    maybeUpdateHostAndPort(coordinator, &Coordinator::node_id_);
+  }
+}
+
+void ResponseRewriterImpl::updateDescribeClusterBrokerAddresses(
+    DescribeClusterResponse& response) const {
+  for (DescribeClusterBroker& broker : response.brokers_) {
+    maybeUpdateHostAndPort(broker, &DescribeClusterBroker::broker_id_);
   }
 }
 
