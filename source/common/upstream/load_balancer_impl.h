@@ -20,6 +20,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
 #include "source/common/upstream/subset_lb_config.h"
@@ -691,7 +692,9 @@ public:
             least_request_config.has_value() && least_request_config->has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
                       {least_request_config->active_request_bias(), runtime})
-                : absl::nullopt) {
+                : absl::nullopt),
+        full_scan_if_host_num_less_than_choice_num_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.full_scan_if_host_num_less_than_choice_num")) {
     initialize();
   }
 
@@ -712,7 +715,9 @@ public:
                       {least_request_config.active_request_bias(), runtime})
                 : absl::nullopt),
         enable_full_scan_(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, enable_full_scan, false)) {
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, enable_full_scan, false)),
+        full_scan_if_host_num_less_than_choice_num_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.full_scan_if_host_num_less_than_choice_num")) {
     initialize();
   }
 
@@ -749,6 +754,7 @@ private:
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
   const bool enable_full_scan_{};
+  const bool full_scan_if_host_num_less_than_choice_num_{};
 };
 
 /**

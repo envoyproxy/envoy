@@ -2894,6 +2894,27 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   // random() since we do a full table scan.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_6.chooseHost(nullptr));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.full_scan_if_host_num_less_than_choice_num", "false"}});
+  lr_lb_config.mutable_choice_count()->set_value(7);
+  LeastRequestLoadBalancer lb_7{priority_set_, nullptr,        stats_,       runtime_,
+                                random_,       common_config_, lr_lb_config, simTime()};
+
+  // Host number is smaller than choice number but full scan is disabled, we should still call
+  // random().
+  EXPECT_CALL(random_, random())
+      .Times(8) // One more time than the number of choices.
+      .WillOnce(Return(0))
+      .WillOnce(Return(1))
+      .WillOnce(Return(2))
+      .WillOnce(Return(0))
+      .WillOnce(Return(1))
+      .WillOnce(Return(2))
+      .WillOnce(Return(0))
+      .WillOnce(Return(1));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_7.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, FullScan) {
