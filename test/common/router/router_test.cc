@@ -4375,6 +4375,34 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   router_->onDestroy();
 }
 
+TEST_F(RouterTest, ResponseHeadersToPreserveCopiesHeadersOrClears) {
+  enableRedirects();
+  default_request_headers_.setCopy(Http::LowerCaseString("x-to-clear"), "value");
+
+  sendRequest();
+
+  redirect_headers_->setCopy(Http::LowerCaseString("x-to-copy"), "bar");
+
+  std::vector<std::string> toPreserve = {"x-to-clear", "x-to-copy"};
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
+              responseHeadersToPreserve())
+      .WillOnce(Return(toPreserve));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_->onDestroy();
+  EXPECT_TRUE(default_request_headers_.get(Http::LowerCaseString("x-to-clear")).empty());
+  auto copyResult = default_request_headers_.get(Http::LowerCaseString("x-to-copy"));
+  EXPECT_FALSE(copyResult.empty());
+  EXPECT_EQ(1, copyResult.size());
+  EXPECT_EQ("bar", copyResult[0]->value().getStringView());
+}
+
 namespace {
 
 std::shared_ptr<ShadowPolicyImpl>

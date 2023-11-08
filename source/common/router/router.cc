@@ -1761,7 +1761,8 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   // Redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ && (!request_buffer_overflowed_ || !callbacks_->decodingBuffer()) &&
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code) &&
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, headers, *location,
+                                               status_code) &&
       callbacks_->recreateStream(&headers)) {
     ENVOY_STREAM_LOG(debug, "Internal redirect succeeded", *callbacks_);
     cluster_->trafficStats()->upstream_internal_redirect_succeeded_total_.inc();
@@ -1781,9 +1782,9 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   return false;
 }
 
-bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                                      const Http::HeaderEntry& internal_redirect,
-                                                      uint64_t status_code) {
+bool Filter::convertRequestHeadersForInternalRedirect(
+    Http::RequestHeaderMap& downstream_headers, const Http::ResponseHeaderMap& upstream_headers,
+    const Http::HeaderEntry& internal_redirect, uint64_t status_code) {
   if (!downstream_headers.Path()) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: no path in downstream_headers", *callbacks_);
     return false;
@@ -1840,15 +1841,61 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   const std::string original_host(downstream_headers.getHostValue());
   const std::string original_path(downstream_headers.getPathValue());
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
-  Cleanup restore_original_headers(
-      [&downstream_headers, original_host, original_path, scheme_is_set, scheme_is_http]() {
-        downstream_headers.setHost(original_host);
-        downstream_headers.setPath(original_path);
-        if (scheme_is_set) {
-          downstream_headers.setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
-                                                      : Http::Headers::get().SchemeValues.Https);
+
+  auto saved_headers = Http::RequestHeaderMapImpl::create();
+  std::vector<std::string> headers_to_clear;
+
+  for (const auto to_preserve :
+       route_entry_->internalRedirectPolicy().responseHeadersToPreserve()) {
+    auto header = Http::LowerCaseString(to_preserve);
+    auto result = upstream_headers.get(header);
+    auto dresult = downstream_headers.get(header);
+    if (result.empty()) {
+      // Clear headers if present, else do nothing:
+      if (dresult.empty()) {
+        continue;
+      }
+      for (size_t idx = 0; idx < dresult.size(); idx++) {
+        saved_headers->addCopy(header, dresult[idx]->value().getStringView());
+      }
+      downstream_headers.remove(header);
+    } else {
+      // The header exists in the response, copy into the downstream headers
+      if (dresult.empty()) {
+        headers_to_clear.emplace_back(header);
+      } else {
+        for (size_t idx = 0; idx < dresult.size(); idx++) {
+          saved_headers->addCopy(header, dresult[idx]->value().getStringView());
         }
-      });
+        downstream_headers.remove(header);
+      }
+      for (size_t idx = 0; idx < result.size(); idx++) {
+        downstream_headers.addCopy(header, result[idx]->value().getStringView());
+      }
+    }
+  }
+
+  Cleanup restore_original_headers([&downstream_headers, original_host, original_path,
+                                    scheme_is_set, scheme_is_http, &saved_headers,
+                                    headers_to_clear]() {
+    downstream_headers.setHost(original_host);
+    downstream_headers.setPath(original_path);
+    if (scheme_is_set) {
+      downstream_headers.setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
+                                                  : Http::Headers::get().SchemeValues.Https);
+    }
+
+    saved_headers->iterate(
+        [&downstream_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          downstream_headers.setCopy(Http::LowerCaseString(header.key().getStringView()),
+                                     Http::LowerCaseString(header.value().getStringView()));
+          return Http::HeaderMap::Iterate::Continue;
+        });
+
+    for (const auto h : headers_to_clear) {
+      downstream_headers.remove(Http::LowerCaseString(h));
+    }
+  });
 
   // Replace the original host, scheme and path.
   downstream_headers.setScheme(absolute_url.scheme());

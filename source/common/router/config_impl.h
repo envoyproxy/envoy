@@ -578,6 +578,7 @@ public:
   }
 
   std::vector<InternalRedirectPredicateSharedPtr> predicates() const override;
+  std::vector<std::string> responseHeadersToPreserve() const override;
 
   uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 
@@ -591,6 +592,7 @@ private:
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
   std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
       predicate_factories_;
+  std::vector<std::string> response_headers_to_preserve_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_internal_redirects_{1};
   const bool enabled_{false};
