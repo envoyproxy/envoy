@@ -72,22 +72,23 @@ LocalRefUniquePtr<jstring> native_data_to_string(JniHelper& jni_helper, envoy_da
   return jni_helper.newStringUtf(str.c_str());
 }
 
-jbyteArray native_data_to_array(JniHelper& jni_helper, envoy_data data) {
-  jbyteArray j_data = jni_helper.getEnv()->NewByteArray(data.length);
-  void* critical_data = jni_helper.getEnv()->GetPrimitiveArrayCritical(j_data, nullptr);
+LocalRefUniquePtr<jbyteArray> native_data_to_array(JniHelper& jni_helper, envoy_data data) {
+  LocalRefUniquePtr<jbyteArray> j_data = jni_helper.newByteArray(data.length);
+  void* critical_data = jni_helper.getEnv()->GetPrimitiveArrayCritical(j_data.get(), nullptr);
   RELEASE_ASSERT(critical_data != nullptr, "unable to allocate memory in jni_utility");
   memcpy(critical_data, data.bytes, data.length); // NOLINT(safe-memcpy)
   // Here '0' (for which there is no named constant) indicates we want to commit the changes back
   // to the JVM and free the c array, where applicable.
   // TODO: potential perf improvement. Check if copied via isCopy, and optimize memory handling.
-  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_data, critical_data, 0);
+  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_data.get(), critical_data, 0);
   return j_data;
 }
 
-jlongArray native_stream_intel_to_array(JniHelper& jni_helper, envoy_stream_intel stream_intel) {
-  jlongArray j_array = jni_helper.getEnv()->NewLongArray(4);
+LocalRefUniquePtr<jlongArray> native_stream_intel_to_array(JniHelper& jni_helper,
+                                                           envoy_stream_intel stream_intel) {
+  LocalRefUniquePtr<jlongArray> j_array = jni_helper.newLongArray(4);
   jlong* critical_array =
-      static_cast<jlong*>(jni_helper.getEnv()->GetPrimitiveArrayCritical(j_array, nullptr));
+      static_cast<jlong*>(jni_helper.getEnv()->GetPrimitiveArrayCritical(j_array.get(), nullptr));
   RELEASE_ASSERT(critical_array != nullptr, "unable to allocate memory in jni_utility");
   critical_array[0] = static_cast<jlong>(stream_intel.stream_id);
   critical_array[1] = static_cast<jlong>(stream_intel.connection_id);
@@ -95,15 +96,16 @@ jlongArray native_stream_intel_to_array(JniHelper& jni_helper, envoy_stream_inte
   critical_array[3] = static_cast<jlong>(stream_intel.consumed_bytes_from_response);
   // Here '0' (for which there is no named constant) indicates we want to commit the changes back
   // to the JVM and free the c array, where applicable.
-  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_array, critical_array, 0);
+  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_array.get(), critical_array, 0);
   return j_array;
 }
 
-jlongArray native_final_stream_intel_to_array(JniHelper& jni_helper,
-                                              envoy_final_stream_intel final_stream_intel) {
-  jlongArray j_array = jni_helper.getEnv()->NewLongArray(16);
+LocalRefUniquePtr<jlongArray>
+native_final_stream_intel_to_array(JniHelper& jni_helper,
+                                   envoy_final_stream_intel final_stream_intel) {
+  LocalRefUniquePtr<jlongArray> j_array = jni_helper.newLongArray(16);
   jlong* critical_array =
-      static_cast<jlong*>(jni_helper.getEnv()->GetPrimitiveArrayCritical(j_array, nullptr));
+      static_cast<jlong*>(jni_helper.getEnv()->GetPrimitiveArrayCritical(j_array.get(), nullptr));
   RELEASE_ASSERT(critical_array != nullptr, "unable to allocate memory in jni_utility");
 
   critical_array[0] = static_cast<jlong>(final_stream_intel.stream_start_ms);
@@ -125,22 +127,22 @@ jlongArray native_final_stream_intel_to_array(JniHelper& jni_helper,
 
   // Here '0' (for which there is no named constant) indicates we want to commit the changes back
   // to the JVM and free the c array, where applicable.
-  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_array, critical_array, 0);
+  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_array.get(), critical_array, 0);
   return j_array;
 }
 
-jobject native_map_to_map(JniHelper& jni_helper, envoy_map map) {
+LocalRefUniquePtr<jobject> native_map_to_map(JniHelper& jni_helper, envoy_map map) {
   LocalRefUniquePtr<jclass> jcls_hashMap = jni_helper.findClass("java/util/HashMap");
   jmethodID jmid_hashMapInit = jni_helper.getMethodId(jcls_hashMap.get(), "<init>", "(I)V");
-  jobject j_hashMap =
-      jni_helper.getEnv()->NewObject(jcls_hashMap.get(), jmid_hashMapInit, map.length);
+  LocalRefUniquePtr<jobject> j_hashMap =
+      jni_helper.newObject(jcls_hashMap.get(), jmid_hashMapInit, map.length);
   jmethodID jmid_hashMapPut = jni_helper.getMethodId(
       jcls_hashMap.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     LocalRefUniquePtr<jstring> key = native_data_to_string(jni_helper, map.entries[i].key);
     LocalRefUniquePtr<jstring> value = native_data_to_string(jni_helper, map.entries[i].value);
     LocalRefUniquePtr<jobject> ignored =
-        jni_helper.callObjectMethod(j_hashMap, jmid_hashMapPut, key.get(), value.get());
+        jni_helper.callObjectMethod(j_hashMap.get(), jmid_hashMapPut, key.get(), value.get());
   }
   return j_hashMap;
 }
@@ -256,43 +258,47 @@ envoy_map to_native_map(JniHelper& jni_helper, jobjectArray entries) {
   return native_map;
 }
 
-jobjectArray ToJavaArrayOfObjectArray(JniHelper& jni_helper,
-                                      const Envoy::Types::ManagedEnvoyHeaders& map) {
+LocalRefUniquePtr<jobjectArray>
+ToJavaArrayOfObjectArray(JniHelper& jni_helper, const Envoy::Types::ManagedEnvoyHeaders& map) {
   LocalRefUniquePtr<jclass> jcls_byte_array = jni_helper.findClass("java/lang/Object");
-  jobjectArray javaArray =
-      jni_helper.getEnv()->NewObjectArray(2 * map.get().length, jcls_byte_array.get(), nullptr);
+  LocalRefUniquePtr<jobjectArray> javaArray =
+      jni_helper.newObjectArray(2 * map.get().length, jcls_byte_array.get(), nullptr);
 
   for (envoy_map_size_t i = 0; i < map.get().length; i++) {
-    jbyteArray key = native_data_to_array(jni_helper, map.get().entries[i].key);
-    jbyteArray value = native_data_to_array(jni_helper, map.get().entries[i].value);
+    LocalRefUniquePtr<jbyteArray> key = native_data_to_array(jni_helper, map.get().entries[i].key);
+    LocalRefUniquePtr<jbyteArray> value =
+        native_data_to_array(jni_helper, map.get().entries[i].value);
 
-    jni_helper.setObjectArrayElement(javaArray, 2 * i, key);
-    jni_helper.setObjectArrayElement(javaArray, 2 * i + 1, value);
+    jni_helper.setObjectArrayElement(javaArray.get(), 2 * i, key.get());
+    jni_helper.setObjectArrayElement(javaArray.get(), 2 * i + 1, value.get());
   }
 
   return javaArray;
 }
 
-jobjectArray ToJavaArrayOfByteArray(JniHelper& jni_helper, const std::vector<std::string>& v) {
+LocalRefUniquePtr<jobjectArray> ToJavaArrayOfByteArray(JniHelper& jni_helper,
+                                                       const std::vector<std::string>& v) {
   LocalRefUniquePtr<jclass> jcls_byte_array = jni_helper.findClass("[B");
-  jobjectArray joa = jni_helper.getEnv()->NewObjectArray(v.size(), jcls_byte_array.get(), nullptr);
+  LocalRefUniquePtr<jobjectArray> joa =
+      jni_helper.newObjectArray(v.size(), jcls_byte_array.get(), nullptr);
 
   for (size_t i = 0; i < v.size(); ++i) {
-    jbyteArray byte_array =
+    LocalRefUniquePtr<jbyteArray> byte_array =
         ToJavaByteArray(jni_helper, reinterpret_cast<const uint8_t*>(v[i].data()), v[i].length());
-    jni_helper.setObjectArrayElement(joa, i, byte_array);
+    jni_helper.setObjectArrayElement(joa.get(), i, byte_array.get());
   }
   return joa;
 }
 
-jbyteArray ToJavaByteArray(JniHelper& jni_helper, const uint8_t* bytes, size_t len) {
-  jbyteArray byte_array = jni_helper.getEnv()->NewByteArray(len);
+LocalRefUniquePtr<jbyteArray> ToJavaByteArray(JniHelper& jni_helper, const uint8_t* bytes,
+                                              size_t len) {
+  LocalRefUniquePtr<jbyteArray> byte_array = jni_helper.newByteArray(len);
   const jbyte* jbytes = reinterpret_cast<const jbyte*>(bytes);
-  jni_helper.setByteArrayRegion(byte_array, /*start=*/0, len, jbytes);
+  jni_helper.setByteArrayRegion(byte_array.get(), /*start=*/0, len, jbytes);
   return byte_array;
 }
 
-jbyteArray ToJavaByteArray(JniHelper& jni_helper, const std::string& str) {
+LocalRefUniquePtr<jbyteArray> ToJavaByteArray(JniHelper& jni_helper, const std::string& str) {
   const uint8_t* str_bytes = reinterpret_cast<const uint8_t*>(str.data());
   return ToJavaByteArray(jni_helper, str_bytes, str.size());
 }

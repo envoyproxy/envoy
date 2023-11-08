@@ -57,14 +57,16 @@ envoy_data array_to_native_data(JniHelper& jni_helper, jbyteArray j_data, size_t
  * @param env, the JNI env pointer.
  * @param envoy_data, the source to copy from.
  *
- * @return jbyteArray, copied data. It is up to the function caller to clean up memory.
+ * @return jbyteArray, copied data.
  */
-jbyteArray native_data_to_array(JniHelper& jni_helper, envoy_data data);
+LocalRefUniquePtr<jbyteArray> native_data_to_array(JniHelper& jni_helper, envoy_data data);
 
-jlongArray native_stream_intel_to_array(JniHelper& jni_helper, envoy_stream_intel stream_intel);
+LocalRefUniquePtr<jlongArray> native_stream_intel_to_array(JniHelper& jni_helper,
+                                                           envoy_stream_intel stream_intel);
 
-jlongArray native_final_stream_intel_to_array(JniHelper& jni_helper,
-                                              envoy_final_stream_intel final_stream_intel);
+LocalRefUniquePtr<jlongArray>
+native_final_stream_intel_to_array(JniHelper& jni_helper,
+                                   envoy_final_stream_intel final_stream_intel);
 
 /**
  * Utility function that copies envoy_map to a java HashMap jobject.
@@ -72,9 +74,9 @@ jlongArray native_final_stream_intel_to_array(JniHelper& jni_helper,
  * @param env, the JNI env pointer.
  * @param envoy_map, the source to copy from.
  *
- * @return jobject, copied data. It is up to the function caller to clean up memory.
+ * @return jobject, copied data.
  */
-jobject native_map_to_map(JniHelper& jni_helper, envoy_map map);
+LocalRefUniquePtr<jobject> native_map_to_map(JniHelper& jni_helper, envoy_map map);
 
 LocalRefUniquePtr<jstring> native_data_to_string(JniHelper& jni_helper, envoy_data data);
 
@@ -96,14 +98,16 @@ envoy_map to_native_map(JniHelper& jni_helper, jobjectArray entries);
  * Utilities to translate C++ std library constructs to their Java counterpart.
  * The underlying data is always copied to disentangle C++ and Java objects lifetime.
  */
-jobjectArray ToJavaArrayOfByteArray(JniHelper& jni_helper, const std::vector<std::string>& v);
+LocalRefUniquePtr<jobjectArray> ToJavaArrayOfByteArray(JniHelper& jni_helper,
+                                                       const std::vector<std::string>& v);
 
-jbyteArray ToJavaByteArray(JniHelper& jni_helper, const uint8_t* bytes, size_t len);
+LocalRefUniquePtr<jbyteArray> ToJavaByteArray(JniHelper& jni_helper, const uint8_t* bytes,
+                                              size_t len);
 
-jbyteArray ToJavaByteArray(JniHelper& jni_helper, const std::string& str);
+LocalRefUniquePtr<jbyteArray> ToJavaByteArray(JniHelper& jni_helper, const std::string& str);
 
-jobjectArray ToJavaArrayOfObjectArray(JniHelper& jni_helper,
-                                      const Envoy::Types::ManagedEnvoyHeaders& map);
+LocalRefUniquePtr<jobjectArray>
+ToJavaArrayOfObjectArray(JniHelper& jni_helper, const Envoy::Types::ManagedEnvoyHeaders& map);
 
 void JavaArrayOfByteArrayToStringVector(JniHelper& jni_helper, jobjectArray array,
                                         std::vector<std::string>* out);
