@@ -171,16 +171,6 @@ void JniHelper::callVoidMethod(jobject object, jmethodID method_id, ...) {
   rethrowException();
 }
 
-LocalRefUniquePtr<jobject> JniHelper::callObjectMethod(jobject object, jmethodID method_id, ...) {
-  va_list args;
-  va_start(args, method_id);
-  LocalRefUniquePtr<jobject> result(env_->CallObjectMethodV(object, method_id, args),
-                                    LocalRefDeleter(env_));
-  va_end(args);
-  rethrowException();
-  return result;
-}
-
 #define DEFINE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                             \
   JNI_TYPE JniHelper::callStatic##JAVA_TYPE##Method(jclass clazz, jmethodID method_id, ...) {      \
     va_list args;                                                                                  \
@@ -206,17 +196,6 @@ void JniHelper::callStaticVoidMethod(jclass clazz, jmethodID method_id, ...) {
   env_->CallStaticVoidMethodV(clazz, method_id, args);
   va_end(args);
   rethrowException();
-}
-
-LocalRefUniquePtr<jobject> JniHelper::callStaticObjectMethod(jclass clazz, jmethodID method_id,
-                                                             ...) {
-  va_list args;
-  va_start(args, method_id);
-  LocalRefUniquePtr<jobject> result(env_->CallStaticObjectMethodV(clazz, method_id, args),
-                                    LocalRefDeleter(env_));
-  va_end(args);
-  rethrowException();
-  return result;
 }
 
 jlong JniHelper::getDirectBufferCapacity(jobject buffer) {
