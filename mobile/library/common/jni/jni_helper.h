@@ -251,7 +251,13 @@ public:
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getobjectarrayelement
    */
-  LocalRefUniquePtr<jobject> getObjectArrayElement(jobjectArray array, jsize index);
+  template <typename T = jobject>
+  LocalRefUniquePtr<T> getObjectArrayElement(jobjectArray array, jsize index) {
+    LocalRefUniquePtr<T> result(static_cast<T>(env_->GetObjectArrayElement(array, index)),
+                                LocalRefDeleter(env_));
+    rethrowException();
+    return result;
+  }
 
   /**
    * Sets an element of a given `array` with the specified `index.

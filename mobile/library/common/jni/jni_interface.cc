@@ -1448,8 +1448,8 @@ static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
   jclass jcls_AndroidNetworkLibrary =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_addTestRootCertificate = jni_helper.getEnv()->GetStaticMethodID(
-      jcls_AndroidNetworkLibrary, "addTestRootCertificate", "([B)V");
+  jmethodID jmid_addTestRootCertificate =
+      jni_helper.getStaticMethodId(jcls_AndroidNetworkLibrary, "addTestRootCertificate", "([B)V");
 
   jbyteArray cert_array = Envoy::JNI::ToJavaByteArray(jni_helper, cert, len);
   jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_addTestRootCertificate,
@@ -1463,8 +1463,8 @@ static void jvm_clear_test_root_certificate() {
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
   jclass jcls_AndroidNetworkLibrary =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_clearTestRootCertificates = jni_helper.getEnv()->GetStaticMethodID(
-      jcls_AndroidNetworkLibrary, "clearTestRootCertificates", "()V");
+  jmethodID jmid_clearTestRootCertificates =
+      jni_helper.getStaticMethodId(jcls_AndroidNetworkLibrary, "clearTestRootCertificates", "()V");
 
   jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_clearTestRootCertificates);
   jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidNetworkLibrary);
