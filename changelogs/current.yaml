@@ -42,7 +42,6 @@ minor_behavior_changes:
     This feature improves flow control within the proxy by deferring work on the receiving end if the other
     end is backed up.
 
-
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: xds

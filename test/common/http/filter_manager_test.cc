@@ -26,10 +26,9 @@ using testing::InSequence;
 using testing::Return;
 
 namespace Envoy {
-
-using Protobuf::util::MessageDifferencer;
 namespace Http {
 namespace {
+using Protobuf::util::MessageDifferencer;
 class FilterManagerTest : public testing::Test {
 public:
   void initialize() {
