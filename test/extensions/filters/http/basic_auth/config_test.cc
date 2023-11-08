@@ -66,7 +66,7 @@ TEST(Factory, InvalidConfigDuplicateUsers) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
-                            EnvoyException, "basic auth: duplicate user 'user1'");
+                            EnvoyException, "basic auth: duplicate users");
 }
 
 TEST(Factory, InvalidConfigNoUser) {
@@ -120,7 +120,8 @@ TEST(Factory, InvalidConfigNoHash) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
-                            EnvoyException, "basic auth: invalid SHA hash length for 'user1'");
+                            EnvoyException,
+                            "basic auth: invalid htpasswd format, invalid SHA hash length");
 }
 
 TEST(Factory, InvalidConfigNotSHA) {
@@ -137,9 +138,9 @@ TEST(Factory, InvalidConfigNotSHA) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context), EnvoyException,
-      "basic auth: unsupported htpasswd format: please use {SHA} for 'user2'");
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+                            EnvoyException,
+                            "basic auth: unsupported htpasswd format: please use {SHA}");
 }
 
 } // namespace BasicAuth

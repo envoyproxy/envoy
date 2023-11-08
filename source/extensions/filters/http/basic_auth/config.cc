@@ -38,21 +38,18 @@ UserMap readHtpasswd(const std::string& htpasswd) {
       throw EnvoyException("basic auth: empty user name or password");
     }
 
-    // TODO(wbpcode): user name in exception message would simplify the debugging. But if we think
-    // it also sensitive information, we can remove it.
     if (users.contains(name)) {
-      throw EnvoyException(fmt::format("basic auth: duplicate user '{}'", name));
+      throw EnvoyException("basic auth: duplicate users");
     }
 
     if (!absl::StartsWith(hash, "{SHA}")) {
-      throw EnvoyException(fmt::format(
-          "basic auth: unsupported htpasswd format: please use {{SHA}} for '{}'", name));
+      throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
     }
 
     hash = hash.substr(5);
     // The base64 encoded SHA1 hash is 28 bytes long
     if (hash.length() != 28) {
-      throw EnvoyException(fmt::format("basic auth: invalid SHA hash length for '{}'", name));
+      throw EnvoyException("basic auth: invalid htpasswd format, invalid SHA hash length");
     }
 
     users.insert({name, {name, hash}});
