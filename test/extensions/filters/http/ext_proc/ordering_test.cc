@@ -70,6 +70,10 @@ protected:
     if (cb) {
       (*cb)(proto_config);
     }
+    config_.reset(new FilterConfig(
+        proto_config, kMessageTimeout, kMaxMessageTimeoutMs, *stats_store_.rootScope(), "",
+        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr))));
     config_ = std::make_shared<FilterConfig>(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
                                              *stats_store_.rootScope(), "");
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
