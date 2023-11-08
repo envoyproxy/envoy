@@ -13,6 +13,11 @@ envoy.filters.http.golang:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.compression.qatzip.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.filters.http.squash:
   categories:
   - envoy.filters.http

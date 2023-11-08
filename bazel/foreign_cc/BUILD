@@ -1,5 +1,6 @@
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
+load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
 
 licenses(["notice"])  # Apache 2
 
@@ -57,6 +58,24 @@ cc_library(
     deps = [
         "gperftools_build",
     ],
+)
+
+make(
+    name = "lz4",
+    args = [
+        "MOREFLAGS='-fPIC'",
+        "BUILD_SHARED=no",
+    ],
+    lib_source = "@com_github_lz4_lz4//:all",
+    out_static_libs = [
+        "liblz4.a",
+    ],
+    targets = [
+        "lib",
+        "install",
+    ],
+    visibility = ["//visibility:public"],
+    alwayslink = False,
 )
 
 # Kafka client dependency used by Kafka-mesh filter.
