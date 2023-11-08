@@ -22,7 +22,7 @@ bool is_cleartext_permitted(absl::string_view hostname) {
       Envoy::JNI::native_data_to_string(jni_helper, host);
   jclass jcls_AndroidNetworkLibrary =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_isCleartextTrafficPermitted = jni_helper.getEnv()->GetStaticMethodID(
+  jmethodID jmid_isCleartextTrafficPermitted = jni_helper.getStaticMethodId(
       jcls_AndroidNetworkLibrary, "isCleartextTrafficPermitted", "(Ljava/lang/String;)Z");
   jboolean result = jni_helper.callStaticBooleanMethod(
       jcls_AndroidNetworkLibrary, jmid_isCleartextTrafficPermitted, java_host.get());
@@ -40,7 +40,7 @@ void tag_socket(int ifd, int uid, int tag) {
   jclass jcls_AndroidNetworkLibrary =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_tagSocket =
-      jni_helper.getEnv()->GetStaticMethodID(jcls_AndroidNetworkLibrary, "tagSocket", "(III)V");
+      jni_helper.getStaticMethodId(jcls_AndroidNetworkLibrary, "tagSocket", "(III)V");
   jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_tagSocket, ifd, uid, tag);
 #else
   UNREFERENCED_PARAMETER(ifd);

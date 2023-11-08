@@ -13,6 +13,11 @@ behavior_changes:
   change: |
     undeprecated runtime key ``overload.global_downstream_max_connections`` until :ref:`downstream connections monitor
     <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
+- area: stats dns_filter
+  change: |
+    Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
+    is properly extracted. This changes the Prometheus name from
+    dns_filter_myprefix_local_a_record_answers{} to dns_filter_local_a_record_answers{envoy.dns_filter_prefix="myprefix"}.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -151,5 +156,10 @@ new_features:
     added :ref:`with_request_body
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>` to optionally override
     the default behavior of sending the request body to the authorization server from the per-route filter.
+- area: ratelimit
+  change: |
+    Ratelimit supports optional additional prefix to use when emitting statistics with :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stat_prefix>`
+    configuration flag.
 
 deprecated:
