@@ -113,9 +113,6 @@ void JavaArrayOfByteToBytesVector(JniHelper& jni_helper, jbyteArray array,
 
 void JavaArrayOfByteToString(JniHelper& jni_helper, jbyteArray jbytes, std::string* out);
 
-std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, jobjectArray array,
-                                                      std::string& cluster_out);
-
 /** Parses the proto from Java's byte array and stores the output into `dest` proto. */
 void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
                           Envoy::Protobuf::MessageLite* dest);

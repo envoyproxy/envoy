@@ -351,38 +351,6 @@ MatcherData::Type StringToType(std::string type_as_string) {
   return MatcherData::EXACT;
 }
 
-std::vector<MatcherData> javaObjectArrayToMatcherData(JniHelper& jni_helper, jobjectArray array,
-                                                      std::string& cluster_name_out) {
-  const size_t len = jni_helper.getArrayLength(array);
-  std::vector<MatcherData> ret;
-  if (len == 0) {
-    return ret;
-  }
-  ASSERT((len - 1) % 3 == 0);
-  if ((len - 1) % 3 != 0) {
-    return ret;
-  }
-
-  JavaArrayOfByteToString(
-      jni_helper, static_cast<jbyteArray>(jni_helper.getEnv()->GetObjectArrayElement(array, 0)),
-      &cluster_name_out);
-  for (size_t i = 1; i < len; i += 3) {
-    std::string name;
-    std::string type_as_string;
-    std::string value;
-    LocalRefUniquePtr<jbyteArray> element1 = jni_helper.getObjectArrayElement<jbyteArray>(array, i);
-    JavaArrayOfByteToString(jni_helper, element1.get(), &name);
-    LocalRefUniquePtr<jbyteArray> element2 =
-        jni_helper.getObjectArrayElement<jbyteArray>(array, i + 1);
-    JavaArrayOfByteToString(jni_helper, element2.get(), &type_as_string);
-    LocalRefUniquePtr<jbyteArray> element3 =
-        jni_helper.getObjectArrayElement<jbyteArray>(array, i + 2);
-    JavaArrayOfByteToString(jni_helper, element3.get(), &value);
-    ret.emplace_back(MatcherData(name, StringToType(type_as_string), value));
-  }
-  return ret;
-}
-
 void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
                           Envoy::Protobuf::MessageLite* dest) {
   ArrayElementsUniquePtr<jbyteArray, jbyte> bytes =
