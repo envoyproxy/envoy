@@ -61,6 +61,9 @@ bug_fixes:
 - area: redis
   change: |
     Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.
+- area: access log
+  change: |
+    Fixed a bug where the `omit_empty_values` field was not honored for access logs specifying formats via `text_format_source`.
 - area: ext_proc
   change: |
     Fixed content_length related issues when body mutation by external processor is enabled. ext_proc filter removes the content
