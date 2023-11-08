@@ -286,7 +286,6 @@ envoy_cc_library(
         "//envoy/network:listener_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:linked_object",
-        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:listener_filter_buffer_lib",
         "//source/server:active_listener_base",
