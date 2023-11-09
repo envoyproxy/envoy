@@ -350,6 +350,7 @@ public:
     std::string post_path_;
     absl::optional<BufferOptions> buffer_options_;
     absl::optional<std::string> idle_timeout_;
+    std::string session_access_log_config_ = "";
   };
 
   void setup(const TestConfig& config) {
@@ -406,6 +407,8 @@ typed_config:
 )EOF",
                                    config.idle_timeout_.value());
     }
+
+    filter_config += config.session_access_log_config_;
 
     config_helper_.renameListener("udp_proxy");
     config_helper_.addConfigModifier(
