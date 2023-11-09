@@ -198,7 +198,10 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
 }
 } // namespace
 
-uint64_t hash(const Protobuf::Message& message) { return reflectionHashMessage(message, 0); }
+uint64_t hash(const Protobuf::Message& message) {
+  // Must use a nonzero initial seed, because the empty message must hash to nonzero.
+  return reflectionHashMessage(message, 1);
+}
 
 } // namespace DeterministicProtoHash
 } // namespace Envoy
