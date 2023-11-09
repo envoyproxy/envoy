@@ -137,8 +137,10 @@ message Bootstrap {
   }
 
   message GrpcAsyncClientManagerConfig {
-    // Optional field to set the expiration time for the cached gRPC client object. The default is 50s.
-    google.protobuf.Duration max_cached_entry_idle_duration = 1 [(validate.rules).duration = {gt {}}];
+    // Optional field to set the expiration time for the cached gRPC client object.
+    // The minimal value is 5s and the default is 50s.
+    google.protobuf.Duration max_cached_entry_idle_duration = 1 
+        [(validate.rules).duration = {gte {seconds: 5}}];
   }
 
   reserved 10, 11;

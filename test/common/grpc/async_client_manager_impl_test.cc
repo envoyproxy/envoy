@@ -31,9 +31,7 @@ class RawAsyncClientCacheTest : public testing::Test {
 public:
   RawAsyncClientCacheTest()
       : api_(Api::createApiForTest(time_system_)),
-        dispatcher_(api_->allocateDispatcher("test_thread")) {
-    setClientCache(std::chrono::seconds(50));
-  }
+        dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   // advanceTimeAndRun moves the current time as requested, and then executes
   // all executable timers in a non-deterministic order. This mimics real-time behavior in
@@ -47,7 +45,7 @@ public:
     }
   }
 
-  void setClientCache(std::chrono::seconds entry_timeout_interval) {
+  void initialize(std::chrono::milliseconds entry_timeout_interval) {
     client_cache_ = std::make_unique<AsyncClientManagerImpl::RawAsyncClientCache>(
         *dispatcher_, entry_timeout_interval);
   }
@@ -59,8 +57,9 @@ protected:
   std::unique_ptr<AsyncClientManagerImpl::RawAsyncClientCache> client_cache_;
 };
 
-// envoy::config::bootstrap::v3::Bootstrap::Bootstrap::GrpcAsyncClientManagerConfig
-TEST_F(RawAsyncClientCacheTest, CacheEvictionDefault) {
+// Test cache eviction time with 50000ms.
+TEST_F(RawAsyncClientCacheTest, CacheEvictionMilliseconds) {
+  initialize(std::chrono::milliseconds(50000));
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   GrpcServiceConfigWithHashKey config_with_hash_key(foo_service);
@@ -76,8 +75,9 @@ TEST_F(RawAsyncClientCacheTest, CacheEvictionDefault) {
   EXPECT_EQ(client_cache_->getCache(config_with_hash_key).get(), nullptr);
 }
 
-TEST_F(RawAsyncClientCacheTest, CacheEvictionWithConfig) {
-  setClientCache(std::chrono::seconds(20));
+// Test cache eviction time with 20s.
+TEST_F(RawAsyncClientCacheTest, CacheEvictionWithSeconds) {
+  initialize(std::chrono::seconds(20));
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   GrpcServiceConfigWithHashKey config_with_hash_key(foo_service);
@@ -93,7 +93,9 @@ TEST_F(RawAsyncClientCacheTest, CacheEvictionWithConfig) {
   EXPECT_EQ(client_cache_->getCache(config_with_hash_key).get(), nullptr);
 }
 
+// Test multiple cache entries eviction behaviour.
 TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
+  initialize(std::chrono::milliseconds(50000));
   envoy::config::core::v3::GrpcService grpc_service;
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   for (int i = 1; i <= 50; i++) {
@@ -125,6 +127,7 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
 // Test the case when the eviction timer doesn't fire on time, getting the oldest entry that has
 // already expired but hasn't been evicted should succeed.
 TEST_F(RawAsyncClientCacheTest, GetExpiredButNotEvictedCacheEntry) {
+  initialize(std::chrono::milliseconds(50000));
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
@@ -147,7 +150,7 @@ public:
       return timer_;
     }));
     client_cache_ = std::make_unique<AsyncClientManagerImpl::RawAsyncClientCache>(
-        dispatcher_, std::chrono::seconds(50));
+        dispatcher_, std::chrono::milliseconds(50000));
     EXPECT_CALL(*timer_, enableTimer(testing::Not(std::chrono::milliseconds(0)), _))
         .Times(testing::AtLeast(1));
   }

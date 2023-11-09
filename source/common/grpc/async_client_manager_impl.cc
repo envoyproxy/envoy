@@ -15,11 +15,11 @@
 #include "source/common/grpc/google_async_client_impl.h"
 #endif
 
-static constexpr uint64_t DefaultEntryIdleDuration{50000};
-
 namespace Envoy {
 namespace Grpc {
 namespace {
+
+constexpr uint64_t DefaultEntryIdleDuration{50000};
 
 // Validates a string for gRPC header key compliance. This is a subset of legal HTTP characters.
 // See https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
