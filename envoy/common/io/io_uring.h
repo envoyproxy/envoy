@@ -191,13 +191,22 @@ enum IoUringSocketStatus {
   Closed,
 };
 
+/**
+ * A callback will be invoked when a close requested done on the socket.
+ */
 using IoUringSocketOnClosedCb = std::function<void()>;
 
+/**
+ * The data returned from the read request.
+ */
 struct ReadParam {
   Buffer::Instance& buf_;
   int32_t result_;
 };
 
+/**
+ * The data returned from the write request.
+ */
 struct WriteParam {
   int32_t result_;
 };
@@ -221,24 +230,31 @@ public:
 
   /**
    * Close the socket.
-   * param keep_fd_open is indicated the file descriptor of the socket will be closed or not in the
+   * @param keep_fd_open is indicated the file descriptor of the socket will be closed or not in the
    * end. The value of `true` is used for destroy the IoUringSocket but keep the file descriptor
-   * open.
+   * open. This is used for migrating the IoUringSocket between worker threads.
+   * @param cb will be invoked when the close request is done. This is also used for migrating the
+   * IoUringSocket between worker threads.
    */
   virtual void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) PURE;
 
   /**
-   * Enable the socket.
+   * Enable the read on the socket. The socket will be begin to submit the read request and deliever
+   * read event when the request is done. This is used when the socket is listening on the file read
+   * event.
    */
   virtual void enable() PURE;
 
   /**
-   * Disable the socket.
+   * Disable the read on the socket. The socket stop to submit the read request, although the
+   * existing read request won't be canceled but no read event will be delivered. This is used when
+   * the socket isn't listening on the file read event.
    */
   virtual void disable() PURE;
 
   /**
-   * Enable close event.
+   * Enable close event. This is used for the case the socket is listening on the file close event.
+   * Then a remote close is found by a read request will delievered as file close event.
    */
   virtual void enableCloseEvent(bool enable) PURE;
 
@@ -250,11 +266,14 @@ public:
 
   /**
    * Write data to the socket.
+   * @param data is going to write.
    */
   virtual void write(Buffer::Instance& data) PURE;
 
   /**
    * Write data to the socket.
+   * @param slices includes the data to write.
+   * @param num_slice the number of slices.
    */
   virtual uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
@@ -339,9 +358,23 @@ public:
    */
   virtual IoUringSocketStatus getStatus() const PURE;
 
+  /**
+   * Return the data get from the read request.
+   * @return Only return valid ReadParam when the callback being invoked with
+   * `Event::FileReadyType::Read`, otherwise `absl::nullopt` returned.
+   */
   virtual const OptRef<ReadParam>& getReadParam() const PURE;
+  /**
+   * Return the data get from the write request.
+   * @return Only return valid WriteParam when the callback being invoked with
+   * `Event::FileReadyType::Write`, otherwise `absl::nullopt` returned.
+   */
   virtual const OptRef<WriteParam>& getWriteParam() const PURE;
 
+  /**
+   * Set the callback when file ready event triggered.
+   * @param cb the callback function.
+   */
   virtual void setFileReadyCb(Event::FileReadyCb cb) PURE;
 };
 

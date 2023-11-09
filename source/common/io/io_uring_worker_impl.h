@@ -167,11 +167,15 @@ protected:
   // This records already injected completion request type to
   // avoid duplicated injections.
   uint8_t injected_completions_{0};
+  // The current status of socket.
   IoUringSocketStatus status_{Initialized};
+  // Deliver the remote close as file read event or file close event.
   bool enable_close_event_{false};
+  // The callback will be invoked when close request is done.
   IoUringSocketOnClosedCb on_closed_cb_{nullptr};
-
+  // This object store the data get from read request.
   OptRef<ReadParam> read_param_;
+  // This object store the data get from write request.
   OptRef<WriteParam> write_param_;
 
   Event::FileReadyCb cb_;
@@ -201,6 +205,8 @@ public:
   Buffer::OwnedImpl& getReadBuffer() { return read_buf_; }
 
 protected:
+  // Since the write of IoUringSocket is async, there may have write request is on the fly when
+  // close the socket. This timeout is setting for a time to wait the write request done.
   const uint32_t write_timeout_ms_;
   // For read. io_uring socket will read sequentially in the order of buf_ and read_error_. Unless
   // the buf_ is empty, the read_error_ will not be past to the handler. There is an exception that
@@ -229,11 +235,13 @@ protected:
   // closed successfully.
   Request* write_or_shutdown_req_{nullptr};
   Event::TimerPtr write_timeout_timer_{nullptr};
-
+  // Whether keep the fd open when close the IoUringSocket.
   bool keep_fd_open_{false};
-
+  // This is used for tracking the read's cancel request.
   Request* cancel_req_{nullptr};
+  // This is used for tracking the write or shutdown's cancel request.
   Request* write_or_shutdown_cancel_req_{nullptr};
+  // This is used for tracking the close request.
   Request* close_req_{nullptr};
 
   void closeInternal();
