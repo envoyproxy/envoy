@@ -13,40 +13,35 @@
 // because AndroidNetworkLibray can be called in non-Android platform with mock interfaces.
 
 bool jvm_cert_is_issued_by_known_root(Envoy::JNI::JniHelper& jni_helper, jobject result) {
-  jclass jcls_AndroidCertVerifyResult =
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidCertVerifyResult =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_isIssuedByKnownRoot =
-      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
+      jni_helper.getMethodId(jcls_AndroidCertVerifyResult.get(), "isIssuedByKnownRoot", "()Z");
   ASSERT(jmid_isIssuedByKnownRoot);
   bool is_issued_by_known_root = jni_helper.callBooleanMethod(result, jmid_isIssuedByKnownRoot);
-  jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidCertVerifyResult);
   return is_issued_by_known_root;
 }
 
 envoy_cert_verify_status_t jvm_cert_get_status(Envoy::JNI::JniHelper& jni_helper,
                                                jobject j_result) {
-  jclass jcls_AndroidCertVerifyResult =
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidCertVerifyResult =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
   jmethodID jmid_getStatus =
-      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "getStatus", "()I");
+      jni_helper.getMethodId(jcls_AndroidCertVerifyResult.get(), "getStatus", "()I");
   ASSERT(jmid_getStatus);
-  envoy_cert_verify_status_t result = CERT_VERIFY_STATUS_FAILED;
-  result =
+  envoy_cert_verify_status_t result =
       static_cast<envoy_cert_verify_status_t>(jni_helper.callIntMethod(j_result, jmid_getStatus));
-
-  jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidCertVerifyResult);
   return result;
 }
 
 Envoy::JNI::LocalRefUniquePtr<jobjectArray>
 jvm_cert_get_certificate_chain_encoded(Envoy::JNI::JniHelper& jni_helper, jobject result) {
-  jclass jcls_AndroidCertVerifyResult =
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidCertVerifyResult =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult");
-  jmethodID jmid_getCertificateChainEncoded =
-      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
+  jmethodID jmid_getCertificateChainEncoded = jni_helper.getMethodId(
+      jcls_AndroidCertVerifyResult.get(), "getCertificateChainEncoded", "()[[B");
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> certificate_chain =
       jni_helper.callObjectMethod<jobjectArray>(result, jmid_getCertificateChainEncoded);
-  jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidCertVerifyResult);
   return certificate_chain;
 }
 
@@ -72,10 +67,10 @@ call_jvm_verify_x509_cert_chain(Envoy::JNI::JniHelper& jni_helper,
                                 const std::vector<std::string>& cert_chain, std::string auth_type,
                                 absl::string_view hostname) {
   jni_log("[Envoy]", "jvm_verify_x509_cert_chain");
-  jclass jcls_AndroidNetworkLibrary =
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_verifyServerCertificates = jni_helper.getStaticMethodId(
-      jcls_AndroidNetworkLibrary, "verifyServerCertificates",
+      jcls_AndroidNetworkLibrary.get(), "verifyServerCertificates",
       "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;");
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> chain_byte_array =
       Envoy::JNI::ToJavaArrayOfByteArray(jni_helper, cert_chain);
@@ -84,9 +79,8 @@ call_jvm_verify_x509_cert_chain(Envoy::JNI::JniHelper& jni_helper,
   Envoy::JNI::LocalRefUniquePtr<jbyteArray> host_string = Envoy::JNI::ToJavaByteArray(
       jni_helper, reinterpret_cast<const uint8_t*>(hostname.data()), hostname.length());
   Envoy::JNI::LocalRefUniquePtr<jobject> result = jni_helper.callStaticObjectMethod(
-      jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates, chain_byte_array.get(),
+      jcls_AndroidNetworkLibrary.get(), jmid_verifyServerCertificates, chain_byte_array.get(),
       auth_string.get(), host_string.get());
-  jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidNetworkLibrary);
   return result;
 }
 

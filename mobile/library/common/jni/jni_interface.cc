@@ -170,10 +170,9 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     jclass, // class
     jlong engine, jstring elements, jobjectArray tags, jint count) {
   Envoy::JNI::JniHelper jni_helper(env);
-  const char* native_elements = jni_helper.getEnv()->GetStringUTFChars(elements, nullptr);
-  jint result = record_counter_inc(engine, native_elements,
+  Envoy::JNI::StringUtfUniquePtr native_elements = jni_helper.getStringUtfChars(elements, nullptr);
+  jint result = record_counter_inc(engine, native_elements.get(),
                                    Envoy::JNI::to_native_tags(jni_helper, tags), count);
-  jni_helper.getEnv()->ReleaseStringUTFChars(elements, native_elements);
   return result;
 }
 
@@ -257,15 +256,15 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
       Envoy::JNI::native_stream_intel_to_array(jni_helper, stream_intel);
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
-  jobject result = jni_helper.getEnv()->CallObjectMethod(
-      j_context, jmid_onHeaders, (jlong)headers.get().length, end_stream ? JNI_TRUE : JNI_FALSE,
-      j_stream_intel.get());
+  Envoy::JNI::LocalRefUniquePtr<jobject> result =
+      jni_helper.callObjectMethod(j_context, jmid_onHeaders, (jlong)headers.get().length,
+                                  end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel.get());
   // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of
   // the JNI exception better.
   bool exception_cleared = Envoy::JNI::Exception::checkAndClear(method);
 
   if (!exception_cleared) {
-    return result;
+    return result.release();
   }
 
   // Create a "no operation" result:
@@ -1129,11 +1128,11 @@ void setString(Envoy::JNI::JniHelper& jni_helper, jstring java_string, EngineBui
   if (!java_string) {
     return;
   }
-  const char* native_java_string = jni_helper.getEnv()->GetStringUTFChars(java_string, nullptr);
-  std::string java_string_str(native_java_string);
+  Envoy::JNI::StringUtfUniquePtr native_java_string =
+      jni_helper.getStringUtfChars(java_string, nullptr);
+  std::string java_string_str(native_java_string.get());
   if (!java_string_str.empty()) {
     (builder->*setter)(java_string_str);
-    jni_helper.getEnv()->ReleaseStringUTFChars(java_string, native_java_string);
   }
 }
 
@@ -1142,9 +1141,9 @@ std::string getCppString(Envoy::JNI::JniHelper& jni_helper, jstring java_string)
   if (!java_string) {
     return "";
   }
-  const char* native_java_string = jni_helper.getEnv()->GetStringUTFChars(java_string, nullptr);
-  std::string cpp_string(native_java_string);
-  jni_helper.getEnv()->ReleaseStringUTFChars(java_string, native_java_string);
+  Envoy::JNI::StringUtfUniquePtr native_java_string =
+      jni_helper.getStringUtfChars(java_string, nullptr);
+  std::string cpp_string(native_java_string.get());
   return cpp_string;
 }
 
@@ -1414,28 +1413,26 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
   jni_log("[Envoy]", "jvm_add_test_root_certificate");
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
-  jclass jcls_AndroidNetworkLibrary =
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_addTestRootCertificate =
-      jni_helper.getStaticMethodId(jcls_AndroidNetworkLibrary, "addTestRootCertificate", "([B)V");
+  jmethodID jmid_addTestRootCertificate = jni_helper.getStaticMethodId(
+      jcls_AndroidNetworkLibrary.get(), "addTestRootCertificate", "([B)V");
 
   Envoy::JNI::LocalRefUniquePtr<jbyteArray> cert_array =
       Envoy::JNI::ToJavaByteArray(jni_helper, cert, len);
-  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_addTestRootCertificate,
+  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary.get(), jmid_addTestRootCertificate,
                                   cert_array.get());
-  jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidNetworkLibrary);
 }
 
 static void jvm_clear_test_root_certificate() {
   jni_log("[Envoy]", "jvm_clear_test_root_certificate");
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
-  jclass jcls_AndroidNetworkLibrary =
+  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
       Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
-  jmethodID jmid_clearTestRootCertificates =
-      jni_helper.getStaticMethodId(jcls_AndroidNetworkLibrary, "clearTestRootCertificates", "()V");
+  jmethodID jmid_clearTestRootCertificates = jni_helper.getStaticMethodId(
+      jcls_AndroidNetworkLibrary.get(), "clearTestRootCertificates", "()V");
 
-  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_clearTestRootCertificates);
-  jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidNetworkLibrary);
+  jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary.get(), jmid_clearTestRootCertificates);
 }
 
 extern "C" JNIEXPORT jobject JNICALL

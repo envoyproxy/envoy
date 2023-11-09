@@ -199,9 +199,7 @@ void JniHelper::callStaticVoidMethod(jclass clazz, jmethodID method_id, ...) {
 }
 
 jlong JniHelper::getDirectBufferCapacity(jobject buffer) {
-  jlong result = env_->GetDirectBufferCapacity(buffer);
-  RELEASE_ASSERT(result != -1, "Failed calling GetDirectBufferCapacity.");
-  return result;
+  return env_->GetDirectBufferCapacity(buffer);
 }
 
 void JniHelper::rethrowException() {

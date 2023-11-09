@@ -22,16 +22,14 @@ jobject get_class_loader() {
   return static_class_loader;
 }
 
-jclass find_class(const char* class_name) {
+LocalRefUniquePtr<jclass> find_class(const char* class_name) {
   JniHelper jni_helper(get_env());
   LocalRefUniquePtr<jclass> class_loader = jni_helper.findClass("java/lang/ClassLoader");
   jmethodID find_class_method = jni_helper.getMethodId(class_loader.get(), "loadClass",
                                                        "(Ljava/lang/String;)Ljava/lang/Class;");
   LocalRefUniquePtr<jstring> str_class_name = jni_helper.newStringUtf(class_name);
-  jclass clazz =
-      jni_helper
-          .callObjectMethod<jclass>(get_class_loader(), find_class_method, str_class_name.get())
-          .release();
+  LocalRefUniquePtr<jclass> clazz = jni_helper.callObjectMethod<jclass>(
+      get_class_loader(), find_class_method, str_class_name.get());
   return clazz;
 }
 
@@ -149,7 +147,7 @@ LocalRefUniquePtr<jobject> native_map_to_map(JniHelper& jni_helper, envoy_map ma
 
 envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data) {
   // Returns -1 if the buffer is not a direct buffer.
-  jlong data_length = jni_helper.getEnv()->GetDirectBufferCapacity(j_data);
+  jlong data_length = jni_helper.getDirectBufferCapacity(j_data);
 
   if (data_length < 0) {
     LocalRefUniquePtr<jclass> jcls_ByteBuffer = jni_helper.findClass("java/nio/ByteBuffer");
@@ -168,8 +166,7 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data) {
 
 envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data, size_t data_length) {
   // Returns nullptr if the buffer is not a direct buffer.
-  uint8_t* direct_address =
-      static_cast<uint8_t*>(jni_helper.getEnv()->GetDirectBufferAddress(j_data));
+  uint8_t* direct_address = jni_helper.getDirectBufferAddress<uint8_t*>(j_data);
 
   if (direct_address == nullptr) {
     LocalRefUniquePtr<jclass> jcls_ByteBuffer = jni_helper.findClass("java/nio/ByteBuffer");
