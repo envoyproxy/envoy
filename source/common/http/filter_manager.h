@@ -36,6 +36,25 @@ class DownstreamFilterManager;
 
 struct ActiveStreamFilterBase;
 
+constexpr absl::string_view LocalReplyFilterStateKey =
+    "envoy.filters.network.http_connection_manager.local_reply_owner";
+class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
+public:
+  LocalReplyOwnerObject(const std::string& filter_config_name)
+      : filter_config_name_(filter_config_name) {}
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    message->set_value(filter_config_name_);
+    return message;
+  }
+
+  absl::optional<std::string> serializeAsString() const override { return filter_config_name_; }
+
+private:
+  const std::string filter_config_name_;
+};
+
 /**
  * Base class wrapper for both stream encoder and decoder filters.
  *
@@ -136,6 +155,11 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   }
 
   Router::RouteConstSharedPtr getRoute() const;
+
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
