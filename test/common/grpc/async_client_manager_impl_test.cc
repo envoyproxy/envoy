@@ -254,8 +254,8 @@ TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
             config_with_hash_key_c.getPreComputedHash());
 }
 
-// Test the client cache time is correctly configured from the async client manager.
-TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithConfig) {
+// Test the client cache time is correctly configured with seconds from the bootstrap proto.
+TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithSecondsConfig) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
@@ -281,6 +281,42 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithConfig) {
   // Here we want to test behavior with a specific sequence of events, where each timer
   // fires within a simulated second of what was programmed.
   for (int i = 0; i < 21; i++) {
+    time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
+  }
+
+  RawAsyncClientSharedPtr foo_client_3 =
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  EXPECT_NE(foo_client_2.get(), foo_client_3.get());
+}
+
+// Test the client cache time is correctly configured with millisconds from the bootstrap proto.
+TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithMilliConfig) {
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+
+  Bootstrap::GrpcAsyncClientManagerConfig aync_manager_config;
+  aync_manager_config.mutable_max_cached_entry_idle_duration()->MergeFrom(
+      ProtobufUtil::TimeUtil::MillisecondsToDuration(30000));
+
+  initialize(aync_manager_config);
+
+  RawAsyncClientSharedPtr foo_client_0 =
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  RawAsyncClientSharedPtr foo_client_1 =
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  EXPECT_EQ(foo_client_0.get(), foo_client_1.get());
+
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(29999), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+
+  RawAsyncClientSharedPtr foo_client_2 =
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  EXPECT_EQ(foo_client_1.get(), foo_client_2.get());
+
+  // Here we want to test behavior with a specific sequence of events, where each timer
+  // fires within a simulated second of what was programmed.
+  for (int i = 0; i < 31; i++) {
     time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                    Event::Dispatcher::RunType::NonBlock);
   }
