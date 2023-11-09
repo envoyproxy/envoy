@@ -60,6 +60,7 @@ message LeastRequest {
   // Configuration for local zone aware load balancing or locality weighted load balancing.
   common.v3.LocalityLbConfig locality_lb_config = 4;
 
+  // [#not-implemented-hide:]
   // Configuration for performing full scan on the list of hosts.
   // If this configuration is set, when selecting the host a full scan on the list hosts will be
   // used to select the one with least requests instead of using random choices.
