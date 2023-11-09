@@ -415,6 +415,30 @@ TEST(IoUringWorkerImplTest, CloseDetected) {
   delete read_req2;
 }
 
+TEST(IoUringWorkerImplTest, AvoidDuplicatedCloseRequest) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, 0, true);
+
+  Request* close_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareClose(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+
+  socket.close(false);
+  socket.close(false);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete close_req;
+}
+
 TEST(IoUringWorkerImplTest, NoOnWriteCallingBackInShutdownWriteSocketInjection) {
   Event::MockDispatcher dispatcher;
   IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
