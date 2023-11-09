@@ -238,7 +238,7 @@ protected:
   // Whether keep the fd open when close the IoUringSocket.
   bool keep_fd_open_{false};
   // This is used for tracking the read's cancel request.
-  Request* cancel_req_{nullptr};
+  Request* read_cancel_req_{nullptr};
   // This is used for tracking the write or shutdown's cancel request.
   Request* write_or_shutdown_cancel_req_{nullptr};
   // This is used for tracking the close request.
