@@ -26,7 +26,7 @@ def api_dependencies():
     )
 
     external_http_archive(
-        name = "com_github_cncf_udpa",
+        name = "com_github_cncf_xds",
     )
 
     external_http_archive(
