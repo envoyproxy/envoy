@@ -455,6 +455,8 @@ void ConnPoolImplBase::checkForIdleAndNotify() {
     for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb();
     }
+    // Clear callbacks, so they are not executed if checkForIdleAndNotify is called again.
+    idle_callbacks_.clear();
   }
 }
 
