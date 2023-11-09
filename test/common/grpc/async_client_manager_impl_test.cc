@@ -290,7 +290,7 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithSecondsConfig) {
   EXPECT_NE(foo_client_2.get(), foo_client_3.get());
 }
 
-// Test the client cache time is correctly configured with millisconds from the bootstrap proto.
+// Test the client cache time is correctly configured with milliseconds from the bootstrap proto.
 TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithMilliConfig) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
