@@ -842,6 +842,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
     ),
+    com_github_protocolbuffers_protobuf = dict(
+        project_name = "Protocol Buffers",
+        project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
+        project_url = "https://developers.google.com/protocol-buffers",
+        version = PROTOBUF_VERSION,
+        # When upgrading the protobuf library, please re-run
+        # test/common/json:gen_excluded_unicodes to recompute the ranges
+        # excluded from differential fuzzing that are populated in
+        # test/common/json/json_sanitizer_test_util.cc.
+        sha256 = "a700a49470d301f1190a487a923b5095bf60f08f4ae4cac9f5f7c36883d17971",
+        strip_prefix = "protobuf-{version}",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2023-07-06",
+        cpe = "cpe:2.3:a:google:protobuf:*",
+        license = "Protocol Buffers",
+        license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
+    ),
     grpc_httpjson_transcoding = dict(
         project_name = "grpc-httpjson-transcoding",
         project_desc = "Library that supports transcoding so that HTTP/JSON can be converted to gRPC",

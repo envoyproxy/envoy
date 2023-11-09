@@ -3,6 +3,8 @@ load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load("@rules_python//python:repositories.bzl", "py_repositories")
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -364,13 +366,18 @@ def envoy_dependencies(skip_targets = []):
     _com_github_wasmtime()
     _com_github_wasm_c_api()
 
+    py_repositories()
+    rules_proto_dependencies()
+    rules_proto_toolchains()
+
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
         cc = True,
         go = True,
         grpc = True,
         rules_override = {
-            "py_proto_library": ["@envoy_api//bazel:api_build_system.bzl", ""],
+            # "py_proto_library": ["@envoy_api//bazel:api_build_system.bzl", ""],
+            "cc_proto_library": ["@envoy_api//bazel:api_build_system.bzl", "",],
         },
     )
     native.bind(
@@ -933,6 +940,12 @@ def _com_google_protobuf():
     external_http_archive(
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
+        patch_args = ["-p1"],
+    )
+
+    external_http_archive(
+        "com_github_protocolbuffers_protobuf",
+        patches = ["@envoy//bazel:protobuf2.patch"],
         patch_args = ["-p1"],
     )
 

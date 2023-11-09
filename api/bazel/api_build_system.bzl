@@ -1,6 +1,6 @@
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
-load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
+load("@rules_python//python:proto.bzl", _py_proto_library = "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@rules_proto//proto:defs.bzl", "proto_library")
@@ -59,53 +59,68 @@ def _py_proto_mapping(dep):
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
 def _api_py_proto_library(name, srcs = [], deps = []):
-    mapped_deps = [_py_proto_mapping(dep) for dep in deps]
-    mapped_unique_deps = {k: True for k in mapped_deps}.keys()
     _py_proto_library(
         name = name + _PY_PROTO_SUFFIX,
-        srcs = srcs,
-        default_runtime = "@com_google_protobuf//:protobuf_python",
-        protoc = "@com_google_protobuf//:protoc",
-        deps = mapped_unique_deps + [
-            "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
-            "@com_google_googleapis//google/rpc:status_py_proto",
-            "@com_google_googleapis//google/api:annotations_py_proto",
-            "@com_google_googleapis//google/api:http_py_proto",
-            "@com_google_googleapis//google/api:httpbody_py_proto",
+        deps = deps + [
+            "@com_google_googleapis//google/api:http_proto",
         ],
         visibility = ["//visibility:public"],
     )
+#    mapped_deps = [_py_proto_mapping(dep) for dep in deps]
+#    mapped_unique_deps = {k: True for k in mapped_deps}.keys()
+#    _py_proto_library(
+#        name = name + _PY_PROTO_SUFFIX,
+#        srcs = srcs,
+#        default_runtime = "@com_google_protobuf//:protobuf_python",
+#        protoc = "@com_google_protobuf//:protoc",
+#        deps = mapped_unique_deps + [
+#            "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
+#            "@com_google_googleapis//google/rpc:status_py_proto",
+#            "@com_google_googleapis//google/api:annotations_py_proto",
+#            "@com_google_googleapis//google/api:http_py_proto",
+#            "@com_google_googleapis//google/api:httpbody_py_proto",
+#        ],
+#        visibility = ["//visibility:public"],
+#    )
 
-# This defines googleapis py_proto_library. The repository does not provide its definition and requires
-# overriding it in the consuming project (see https://github.com/grpc/grpc/issues/19255 for more details).
-def py_proto_library(name, deps = [], plugin = None):
-    srcs = [dep[:-6] + ".proto" if dep.endswith("_proto") else dep for dep in deps]
-    proto_deps = []
+## This defines googleapis py_proto_library. The repository does not provide its definition and requires
+## overriding it in the consuming project (see https://github.com/grpc/grpc/issues/19255 for more details).
+#def py_proto_library(name, deps = [], plugin = None):
+#    srcs = [dep[:-6] + ".proto" if dep.endswith("_proto") else dep for dep in deps]
+#    proto_deps = []
+#
+#    # py_proto_library in googleapis specifies *_proto rules in dependencies.
+#    # By rewriting *_proto to *.proto above, the dependencies in *_proto rules are not preserved.
+#    # As a workaround, manually specify the proto dependencies for the imported python rules.
+#    if name == "annotations_py_proto":
+#        proto_deps = proto_deps + [":http_py_proto"]
+#
+#    # checked.proto depends on syntax.proto, we have to add this dependency manually as well.
+#    if name == "checked_py_proto":
+#        proto_deps = proto_deps + [":syntax_py_proto"]
+#
+#    # Special handling for expr_proto target
+#    if srcs[0] == ":expr_moved.proto":
+#        srcs = ["checked.proto", "eval.proto", "explain.proto", "syntax.proto", "value.proto"]
+#        proto_deps = proto_deps + ["@com_google_googleapis//google/rpc:status_py_proto"]
+#
+#    # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
+#    # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.
+#    # plugin should also be passed in here when gRPC version is greater than v1.25.x.
+#    _py_proto_library(
+#        name = name,
+#        srcs = srcs,
+#        default_runtime = "@com_google_protobuf//:protobuf_python",
+#        protoc = "@com_google_protobuf//:protoc",
+#        deps = proto_deps + ["@com_google_protobuf//:protobuf_python"],
+#        visibility = ["//visibility:public"],
+#    )
 
-    # py_proto_library in googleapis specifies *_proto rules in dependencies.
-    # By rewriting *_proto to *.proto above, the dependencies in *_proto rules are not preserved.
-    # As a workaround, manually specify the proto dependencies for the imported python rules.
-    if name == "annotations_py_proto":
-        proto_deps = proto_deps + [":http_py_proto"]
-
-    # checked.proto depends on syntax.proto, we have to add this dependency manually as well.
-    if name == "checked_py_proto":
-        proto_deps = proto_deps + [":syntax_py_proto"]
-
-    # Special handling for expr_proto target
-    if srcs[0] == ":expr_moved.proto":
-        srcs = ["checked.proto", "eval.proto", "explain.proto", "syntax.proto", "value.proto"]
-        proto_deps = proto_deps + ["@com_google_googleapis//google/rpc:status_py_proto"]
-
-    # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
-    # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.
-    # plugin should also be passed in here when gRPC version is greater than v1.25.x.
+def cc_proto_library(name, deps = [], **kwargs):
+    native.cc_proto_library(name=name, deps=deps, **kwargs)
     _py_proto_library(
-        name = name,
-        srcs = srcs,
-        default_runtime = "@com_google_protobuf//:protobuf_python",
-        protoc = "@com_google_protobuf//:protoc",
-        deps = proto_deps + ["@com_google_protobuf//:protobuf_python"],
+        name = name.replace('_cc_proto', '') + "_py_pb2",
+        deps = deps,
         visibility = ["//visibility:public"],
     )
 
@@ -157,7 +172,6 @@ def api_cc_py_proto_library(
         deps = [relative_name],
         visibility = ["//visibility:public"],
     )
-    _api_py_proto_library(name, srcs, deps)
 
     # Optionally define gRPC services
     if has_services:
@@ -195,6 +209,8 @@ def api_proto_package(
         deps = deps,
         has_services = has_services,
     )
+
+    _api_py_proto_library(name = name, srcs = srcs, deps = deps)
 
     compilers = ["@io_bazel_rules_go//proto:go_proto", "@envoy_api//bazel:pgv_plugin_go"]
     if has_services:

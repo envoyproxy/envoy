@@ -37,6 +37,9 @@ def api_dependencies():
         name = "opencensus_proto",
     )
     external_http_archive(
+        name = "rules_python",
+    )
+    external_http_archive(
         name = "rules_proto",
     )
     external_http_archive(
