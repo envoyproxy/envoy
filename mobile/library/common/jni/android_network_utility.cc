@@ -77,16 +77,15 @@ call_jvm_verify_x509_cert_chain(Envoy::JNI::JniHelper& jni_helper,
   jmethodID jmid_verifyServerCertificates = jni_helper.getStaticMethodId(
       jcls_AndroidNetworkLibrary, "verifyServerCertificates",
       "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;");
-  jobjectArray chain_byte_array = Envoy::JNI::ToJavaArrayOfByteArray(jni_helper, cert_chain);
-  jbyteArray auth_string = Envoy::JNI::ToJavaByteArray(jni_helper, auth_type);
-  jbyteArray host_string = Envoy::JNI::ToJavaByteArray(
+  Envoy::JNI::LocalRefUniquePtr<jobjectArray> chain_byte_array =
+      Envoy::JNI::ToJavaArrayOfByteArray(jni_helper, cert_chain);
+  Envoy::JNI::LocalRefUniquePtr<jbyteArray> auth_string =
+      Envoy::JNI::ToJavaByteArray(jni_helper, auth_type);
+  Envoy::JNI::LocalRefUniquePtr<jbyteArray> host_string = Envoy::JNI::ToJavaByteArray(
       jni_helper, reinterpret_cast<const uint8_t*>(hostname.data()), hostname.length());
-  Envoy::JNI::LocalRefUniquePtr<jobject> result =
-      jni_helper.callStaticObjectMethod(jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates,
-                                        chain_byte_array, auth_string, host_string);
-  jni_helper.getEnv()->DeleteLocalRef(chain_byte_array);
-  jni_helper.getEnv()->DeleteLocalRef(auth_string);
-  jni_helper.getEnv()->DeleteLocalRef(host_string);
+  Envoy::JNI::LocalRefUniquePtr<jobject> result = jni_helper.callStaticObjectMethod(
+      jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates, chain_byte_array.get(),
+      auth_string.get(), host_string.get());
   jni_helper.getEnv()->DeleteLocalRef(jcls_AndroidNetworkLibrary);
   return result;
 }

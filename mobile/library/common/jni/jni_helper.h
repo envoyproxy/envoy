@@ -31,6 +31,9 @@ class LocalRefDeleter {
 public:
   explicit LocalRefDeleter(JNIEnv* env) : env_(env) {}
 
+  // This is to allow move semantics in `LocalRefUniquePtr`.
+  LocalRefDeleter& operator=(const LocalRefDeleter&) { return *this; }
+
   void operator()(jobject object) const {
     if (object != nullptr) {
       env_->DeleteLocalRef(object);
