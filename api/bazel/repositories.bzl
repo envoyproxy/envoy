@@ -57,6 +57,10 @@ def api_dependencies():
     )
 
     external_http_archive(
+        name = "dev_cel",
+    )
+
+    external_http_archive(
         name = "envoy_toolshed",
     )
 
