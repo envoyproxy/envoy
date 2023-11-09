@@ -670,6 +670,59 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
   cleanup();
 }
 
+// This test ensures that a write after the client reset the connection
+// will trigger a closed event.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteWithClientRST) {
+  initialize();
+  createServerListenerAndClientSocket();
+  bool expected_read = false;
+  bool expected_closed = false;
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&expected_read, &expected_closed](uint32_t events) {
+        if (expected_read) {
+          EXPECT_TRUE(events | Event::FileReadyType::Read);
+          expected_read = false;
+          return;
+        }
+        if (expected_closed) {
+          EXPECT_TRUE(events | Event::FileReadyType::Closed);
+          expected_closed = false;
+          return;
+        }
+        // It shouldn't reach here.
+        EXPECT_TRUE(false);
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  Api::OsSysCallsSingleton::get().shutdown(client_socket_, SHUT_WR);
+  expected_read = true;
+  // Running the event loop, to let the iouring worker process the read request.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(expected_read);
+
+  struct linger sl;
+  sl.l_onoff = 1;  /* non-zero value enables linger option in kernel */
+  sl.l_linger = 0; /* timeout interval in seconds */
+  setsockopt(client_socket_, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  expected_closed = true;
+  std::string write_data = "hello";
+  Buffer::OwnedImpl buffer;
+  buffer.add(write_data);
+  socket.write(buffer);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(expected_closed);
+
+  // Close the socket now, it expected the socket will be close directly without cancel.
+  socket.close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
