@@ -28,15 +28,12 @@ public:
       }
     }
 
-    if (!tls_slot_) {
-      return;
-    }
-    auto handle = tls_slot_->get()->handle();
-    if (!handle) {
-      return;
-    }
-    if (handle->wasmHandle()) {
-      handle->wasmHandle()->wasm()->log(plugin_, log_context, stream_info);
+    if (tls_slot_ != nullptr) {
+      if (auto handle = tls_slot_->get()->handle(); handle != nullptr) {
+        if (handle->wasmHandle()) {
+          handle->wasmHandle()->wasm()->log(plugin_, log_context, stream_info);
+        }
+      }
     }
   }
 
