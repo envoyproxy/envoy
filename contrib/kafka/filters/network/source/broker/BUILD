@@ -27,11 +27,14 @@ envoy_cc_contrib_extension(
 
 envoy_cc_library(
     name = "filter_config_lib",
-    srcs = [],
+    srcs = [
+        "filter_config.cc",
+    ],
     hdrs = [
         "filter_config.h",
     ],
     deps = [
+        "//source/common/common:assert_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg_cc_proto",
     ],
 )
@@ -51,7 +54,6 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
-        "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],
 )

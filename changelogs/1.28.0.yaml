@@ -60,8 +60,8 @@ minor_behavior_changes:
 - area: alternate_protocols_cache_filter
   change: |
     Changed the alternate protocols cache filter to get the cache from cluster config rather than filter config.
-    This allows one downstream filter to be used with multiple clusters with different caches. This change can be reverted by
-    setting runtime guard ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` to ``false``.
+    This allows one downstream HTTP filter to be used with multiple clusters with different caches. This change can be
+    reverted by setting runtime guard ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` to ``false``.
 - area: ext_authz
   change: |
     Don't append the local address to ``x-forwarded-for`` header when sending an http (not gRPC) auth request.
@@ -130,8 +130,8 @@ minor_behavior_changes:
     Enable environment_variable in router direct response.
 - area: access_log
   change: |
-    When emitting grpc logs, only downstream filter state was used. Now, both downstream and upstream filter states will be tried
-    to find the keys configured in filter_state_objects_to_log.
+    When emitting grpc logs, only downstream HTTP filter state was used. Now, both downstream and upstream HTTP filter states
+    will be tried to find the keys configured in filter_state_objects_to_log.
 
 bug_fixes:
 - area: connection limit

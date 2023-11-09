@@ -7,6 +7,7 @@
 #include "source/common/common/logger.h"
 
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
+#include "contrib/kafka/filters/network/source/external/responses.h"
 #include "contrib/kafka/filters/network/source/response_codec.h"
 
 namespace Envoy {
@@ -37,6 +38,8 @@ using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
  */
 class ResponseRewriterImpl : public ResponseRewriter, private Logger::Loggable<Logger::Id::kafka> {
 public:
+  ResponseRewriterImpl(const BrokerFilterConfig& config);
+
   // ResponseCallback
   void onMessage(AbstractResponseSharedPtr response) override;
   void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
@@ -44,9 +47,31 @@ public:
   // ResponseRewriter
   void process(Buffer::Instance& buffer) override;
 
+  /**
+   * Mutates response according to config.
+   */
+  void updateMetadataBrokerAddresses(MetadataResponse& response) const;
+
+  /**
+   * Mutates response according to config.
+   */
+  void updateFindCoordinatorBrokerAddresses(FindCoordinatorResponse& response) const;
+
   size_t getStoredResponseCountForTest() const;
 
 private:
+  // Helper function to update various response structures.
+  template <typename T> void maybeUpdateHostAndPort(T& arg) const {
+    const absl::optional<HostAndPort> hostAndPort = config_.findBrokerAddressOverride(arg.node_id_);
+    if (hostAndPort) {
+      ENVOY_LOG(trace, "Changing broker [{}] from {}:{} to {}:{}", arg.node_id_, arg.host_,
+                arg.port_, hostAndPort->first, hostAndPort->second);
+      arg.host_ = hostAndPort->first;
+      arg.port_ = hostAndPort->second;
+    }
+  }
+
+  const BrokerFilterConfig& config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
 };
 

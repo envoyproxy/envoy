@@ -231,10 +231,9 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   EXPECT_CALL(*encode_filter, onDestroy());
   filter_.onDestroy();
 
-  EXPECT_CALL(*access_log_1, log(_, _, _, _, _));
-  EXPECT_CALL(*access_log_2, log(_, _, _, _, _));
-  filter_.log(nullptr, nullptr, nullptr, StreamInfo::MockStreamInfo(),
-              AccessLog::AccessLogType::NotSet);
+  EXPECT_CALL(*access_log_1, log(_, _));
+  EXPECT_CALL(*access_log_2, log(_, _));
+  filter_.log({}, StreamInfo::MockStreamInfo());
 }
 
 // Validate that when dynamic_config and typed_config are both set, an exception is thrown.

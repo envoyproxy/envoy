@@ -1005,9 +1005,11 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
   // The timer will be enabled cyclically.
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(10);
-  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpPeriodic))
-      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  EXPECT_CALL(*mock_access_logger_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
+
         EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
         EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
                     testing::IsNull());
@@ -1018,9 +1020,11 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
   EXPECT_EQ(access_log_data_.value(), AccessLogType_Name(AccessLog::AccessLogType::TcpPeriodic));
 
   filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(9);
-  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpPeriodic))
-      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  EXPECT_CALL(*mock_access_logger_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
+
         EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 19);
         EXPECT_EQ(stream_info.getDownstreamBytesMeter()
                       ->bytesAtLastDownstreamPeriodicLog()
@@ -1030,7 +1034,11 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
   flush_timer->invokeCallback();
 
-  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpConnectionEnd));
+  EXPECT_CALL(*mock_access_logger_, log(_, _))
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext& log_context, const StreamInfo::StreamInfo&) {
+            EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpConnectionEnd);
+          }));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();

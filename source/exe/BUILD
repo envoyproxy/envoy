@@ -42,7 +42,7 @@ envoy_cc_library(
         "//source/server:drain_manager_lib",
         "//source/server:listener_hooks_lib",
         "//source/server:options_lib",
-        "//source/server:server_lib",
+        "//source/server:server_base_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
@@ -144,7 +144,7 @@ envoy_cc_library(
                "//source/server:drain_manager_lib",
                "//source/server:listener_hooks_lib",
                "//source/server:options_lib",
-               "//source/server:server_lib",
+               "//source/server:server_base_lib",
            ] + envoy_all_core_extensions() +
            # TODO(rojkov): drop io_uring dependency when it's fully integrated.
            select({
@@ -175,6 +175,7 @@ envoy_cc_library(
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:server_lib",
         "//source/server/config_validation:server_lib",
     ] + envoy_select_signal_trace([
         "//source/common/signal:sigaction_lib",

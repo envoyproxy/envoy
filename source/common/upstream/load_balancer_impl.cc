@@ -1299,9 +1299,8 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
                                                                 const HostsSource&) {
   HostSharedPtr candidate_host = nullptr;
 
-  // Do full scan if it's required explicitly or the number of choices is equal to or larger than
-  // the hosts size.
-  if ((hosts_to_use.size() <= choice_count_) || enable_full_scan_) {
+  // Do full scan if it's required explicitly.
+  if (enable_full_scan_) {
     for (const auto& sampled_host : hosts_to_use) {
       if (candidate_host == nullptr) {
         // Make a first choice to start the comparisons.

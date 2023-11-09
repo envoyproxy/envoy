@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Router {
 
-// This is the last filter in the upstream filter chain.
+// This is the last filter in the upstream HTTP filter chain.
 // It takes request headers/body/data from the filter manager and encodes them to the upstream
 // codec. It also registers the CodecBridge with the upstream stream, and takes response
 // headers/body/data from the upstream stream and sends them to the filter manager.
