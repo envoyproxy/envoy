@@ -84,15 +84,14 @@ HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
 bool HttpUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
-  if (type_ == Http::CodecType::HTTP2) {
-    return Http::Utility::getResponseStatus(headers) == 200;
+  if (type_ == Http::CodecType::HTTP1) {
+    //  According to RFC7231 any 2xx response indicates that the connection is
+    //  established.
+    //  Any 'Content-Length' or 'Transfer-Encoding' header fields MUST be ignored.
+    //  https://tools.ietf.org/html/rfc7231#section-4.3.6
+    return Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers));
   }
-  // Http::CodecType::HTTP1
-  //  According to RFC7231 any 2xx response indicates that the connection is
-  //  established.
-  //  Any 'Content-Length' or 'Transfer-Encoding' header fields MUST be ignored.
-  //  https://tools.ietf.org/html/rfc7231#section-4.3.6
-  return Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers));
+  return Http::Utility::getResponseStatus(headers) == 200;
 }
 
 void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
