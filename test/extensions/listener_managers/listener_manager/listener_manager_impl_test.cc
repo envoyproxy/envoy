@@ -5793,7 +5793,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_EQ(&parent_context.messageValidationContext(), &server_.messageValidationContext());
   EXPECT_EQ(&parent_context.lifecycleNotifier(), &server_.lifecycleNotifier());
   envoy::config::core::v3::ExtensionConfigSource config_source;
-  EXPECT_EQ(parent_context.createDynamicFilterConfigProvider(config_source, "", true), nullptr);
+  EXPECT_EQ(parent_context.createHttpDynamicFilterConfigProvider(config_source, "", true), nullptr);
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
