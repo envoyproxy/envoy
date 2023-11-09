@@ -20,6 +20,8 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
@@ -133,7 +135,7 @@ TEST_F(DnsCacheImplTest, PreresolveSuccess) {
   Network::DnsResolver::ResolveCb resolve_cb;
   std::string host = "bar.baz.com";
   uint32_t port = 443;
-  std::string authority = host + ":" + std::to_string(port);
+  std::string authority = absl::StrCat(host, ":", port);
   EXPECT_CALL(*resolver_, resolve(host, _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   EXPECT_CALL(
