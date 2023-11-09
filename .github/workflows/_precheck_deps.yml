@@ -52,4 +52,4 @@ jobs:
         ref: ${{ inputs.repo-ref }}
         persist-credentials: false
     - name: Dependency Review
-      uses: actions/dependency-review-action@6c5ccdad469c9f8a2996bfecaec55a631a347034
+      uses: actions/dependency-review-action@fde92acd0840415674c16b39c7d703fc28bc511e
