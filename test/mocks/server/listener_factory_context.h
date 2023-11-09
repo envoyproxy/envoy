@@ -57,7 +57,7 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
 
   HttpExtensionConfigProvider
-  createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
+  createHttpDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
                                     const std::string&, bool) override {
     return nullptr;
   }
