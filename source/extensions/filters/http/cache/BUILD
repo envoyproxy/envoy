@@ -102,7 +102,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
-        "//source/common/protobuf:utility_lib",
+        "//source/common/protobuf:deterministic_hash_lib",
         "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )

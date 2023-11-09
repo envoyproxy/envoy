@@ -296,7 +296,7 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
 TEST(HttpCacheTest, StableHashKey) {
   Key key;
   key.set_host("example.com");
-  ASSERT_EQ(stableHashKey(key), 9582653837550152292u);
+  ASSERT_EQ(stableHashKey(key), 14708617532262531931u);
 }
 
 TEST_P(LookupRequestTest, ResultWithBodyAndTrailersMatchesExpectation) {
