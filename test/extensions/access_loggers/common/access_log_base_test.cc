@@ -34,7 +34,7 @@ TEST(AccessLogBaseTest, NoFilter) {
   StreamInfo::MockStreamInfo stream_info;
   TestImpl logger(nullptr);
   EXPECT_EQ(logger.count(), 0);
-  logger.log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+  logger.log({}, stream_info);
   EXPECT_EQ(logger.count(), 1);
 }
 
@@ -45,7 +45,7 @@ TEST(AccessLogBaseTest, FilterReject) {
   EXPECT_CALL(*filter, evaluate(_, _)).WillOnce(Return(false));
   TestImpl logger(std::move(filter));
   EXPECT_EQ(logger.count(), 0);
-  logger.log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+  logger.log({}, stream_info);
   EXPECT_EQ(logger.count(), 0);
 }
 
