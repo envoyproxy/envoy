@@ -129,7 +129,7 @@ public:
   ListenerFactoryContextBaseImpl(
       Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
       const envoy::config::listener::v3::Listener& config, Server::DrainManagerPtr drain_manager,
-      Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager);
+      Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& mainThreadDispatcher() override;
@@ -161,12 +161,10 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
-  Configuration::HttpExtensionConfigProvider createDynamicFilterConfigProvider(
+  Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override;
-  Configuration::DownstreamFilterConfigProviderManagerPtr
+      const std::string& filter_config_name, bool last_filter_in_filter_chain) override;
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override;
 
   // DrainDecision
@@ -190,7 +188,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
   bool is_quic_;
-  Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager_{};
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{};
 };
 
 class ListenerImpl;
@@ -205,7 +203,7 @@ public:
       const envoy::config::listener::v3::Listener& config_message,
       const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl,
       DrainManagerPtr drain_manager,
-      Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager)
+      Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager)
       : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
             server, validation_visitor, config_message, std::move(drain_manager),
             filter_config_provider_manager)),
@@ -249,12 +247,10 @@ public:
 
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
-  Configuration::HttpExtensionConfigProvider createDynamicFilterConfigProvider(
+  Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override;
-  Configuration::DownstreamFilterConfigProviderManagerPtr
+      const std::string& filter_config_name, bool last_filter_in_filter_chain) override;
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override;
 
   // ListenerFactoryContext

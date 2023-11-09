@@ -218,7 +218,7 @@ class FactoryContext;
 using DownstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
-using DownstreamFilterConfigProviderManagerPtr =
+using DownstreamFilterConfigProviderManagerSharedPtr =
     std::shared_ptr<DownstreamFilterConfigProviderManager>;
 /**
  * Context passed to network and HTTP filters to access server resources.
@@ -294,24 +294,20 @@ public:
    * @param filter_config_name the filter config resource name.
    * @param last_filter_in_filter_chain indicates whether this filter is the last filter in the
    * configured chain
-   * @param filter_chain_type is the filter chain type
-   * @param listener_filter_matcher is the filter matcher for TCP listener filter. nullptr for other
-   * filter types.
    *
    * @return HttpExtensionConfigProvider
    */
-  virtual Configuration::HttpExtensionConfigProvider createDynamicFilterConfigProvider(
+  virtual Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) PURE;
+      const std::string& filter_config_name, bool last_filter_in_filter_chain) PURE;
 
   /**
    * Returns the downstream filter config provider manager.
    *
-   * @return DownstreamFilterConfigProviderManagerPtr
+   * @return DownstreamFilterConfigProviderManagerSharedPtr
    */
-  virtual DownstreamFilterConfigProviderManagerPtr downstreamFilterConfigProviderManager() PURE;
+  virtual DownstreamFilterConfigProviderManagerSharedPtr
+  downstreamFilterConfigProviderManager() PURE;
 };
 
 /**

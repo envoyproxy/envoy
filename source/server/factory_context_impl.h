@@ -49,12 +49,10 @@ public:
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
-  Configuration::HttpExtensionConfigProvider createDynamicFilterConfigProvider(
+  Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override;
-  Configuration::DownstreamFilterConfigProviderManagerPtr
+      const std::string& filter_config_name, bool last_filter_in_filter_chain) override;
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override;
 
 private:
@@ -64,7 +62,7 @@ private:
   Stats::Scope& global_scope_;
   Stats::Scope& listener_scope_;
   bool is_quic_;
-  Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager_{};
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{};
 };
 
 } // namespace Server

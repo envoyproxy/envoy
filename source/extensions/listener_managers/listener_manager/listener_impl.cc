@@ -230,7 +230,7 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager,
-    Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager)
+    Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager)
     : server_(server), metadata_(config.metadata()), typed_metadata_(config.metadata()),
       direction_(config.traffic_direction()), global_scope_(server.stats().createScope("")),
       listener_scope_(
@@ -302,12 +302,11 @@ ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
 bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
 Configuration::HttpExtensionConfigProvider
-ListenerFactoryContextBaseImpl::createDynamicFilterConfigProvider(
-    const envoy::config::core::v3::ExtensionConfigSource&, const std::string&, bool,
-    const std::string&, const Network::ListenerFilterMatcherSharedPtr&) {
+ListenerFactoryContextBaseImpl::createHttpDynamicFilterConfigProvider(
+    const envoy::config::core::v3::ExtensionConfigSource&, const std::string&, bool) {
   return nullptr;
 }
-Configuration::DownstreamFilterConfigProviderManagerPtr
+Configuration::DownstreamFilterConfigProviderManagerSharedPtr
 ListenerFactoryContextBaseImpl::downstreamFilterConfigProviderManager() {
   return filter_config_provider_manager_;
 }
@@ -967,16 +966,13 @@ bool PerListenerFactoryContextImpl::isQuicListener() const {
   return listener_factory_context_base_->isQuicListener();
 }
 Configuration::HttpExtensionConfigProvider
-PerListenerFactoryContextImpl::createDynamicFilterConfigProvider(
+PerListenerFactoryContextImpl::createHttpDynamicFilterConfigProvider(
     const envoy::config::core::v3::ExtensionConfigSource& config_source,
-    const std::string& filter_config_name, bool last_filter_in_filter_chain,
-    const std::string& filter_chain_type,
-    const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
-  return listener_factory_context_base_->createDynamicFilterConfigProvider(
-      config_source, filter_config_name, last_filter_in_filter_chain, filter_chain_type,
-      listener_filter_matcher);
+    const std::string& filter_config_name, bool last_filter_in_filter_chain) {
+  return listener_factory_context_base_->createHttpDynamicFilterConfigProvider(
+      config_source, filter_config_name, last_filter_in_filter_chain);
 }
-Configuration::DownstreamFilterConfigProviderManagerPtr
+Configuration::DownstreamFilterConfigProviderManagerSharedPtr
 PerListenerFactoryContextImpl::downstreamFilterConfigProviderManager() {
   return listener_factory_context_base_->downstreamFilterConfigProviderManager();
 }

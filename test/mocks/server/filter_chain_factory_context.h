@@ -14,11 +14,10 @@ public:
 
   HttpExtensionConfigProvider
   createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
-                                    const std::string&, bool, const std::string&,
-                                    const Network::ListenerFilterMatcherSharedPtr&) override {
+                                    const std::string&, bool) override {
     return nullptr;
   }
-  Configuration::DownstreamFilterConfigProviderManagerPtr
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override {
     return nullptr;
   }

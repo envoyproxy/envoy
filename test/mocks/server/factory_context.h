@@ -59,11 +59,10 @@ public:
 
   HttpExtensionConfigProvider
   createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
-                                    const std::string&, bool, const std::string&,
-                                    const Network::ListenerFilterMatcherSharedPtr&) override {
+                                    const std::string&, bool) override {
     return nullptr;
   }
-  Configuration::DownstreamFilterConfigProviderManagerPtr
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
@@ -93,7 +92,7 @@ public:
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
-  Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager_{
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
       std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()};
 };
 
