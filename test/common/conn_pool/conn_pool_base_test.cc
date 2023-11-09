@@ -519,7 +519,7 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
   pool_.onStreamClosed(*clients_.back(), false);
 
   // Now that the last connection is closed, while there are no requests, the pool becomes idle.
-  // idle_ppol_callback should be called once.
+  // idle_pool_callback should be called once.
   testing::MockFunction<void()> idle_pool_callback;
   EXPECT_CALL(idle_pool_callback, Call());
   pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction());
