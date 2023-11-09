@@ -17,7 +17,7 @@ TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GrpcWebFilterConfig factory;
   envoy::extensions::filters::http::grpc_web::v3::GrpcWeb config;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

@@ -279,9 +279,10 @@ public:
    * configuration.
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
-   * @return Http::FilterFactoryCb the factory creation function.
+   * @return  absl::StatusOr<Http::FilterFactoryCb> the factory creation function or an error if
+   * creation fails.
    */
-  virtual Http::FilterFactoryCb
+  virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
@@ -316,7 +317,7 @@ public:
    * @param context supplies the filter's context.
    * @return Http::FilterFactoryCb the factory creation function.
    */
-  virtual Http::FilterFactoryCb
+  virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::UpstreamFactoryContext& context) PURE;
 };

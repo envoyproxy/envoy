@@ -49,13 +49,13 @@ class TestHttpFilterFactory : public TestFilterFactory,
                               public Server::Configuration::NamedHttpFilterConfigFactory,
                               public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
     created_ = true;
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::UpstreamFactoryContext&) override {
     created_ = true;

@@ -18,7 +18,8 @@ TEST(DynamoFilterConfigTest, DynamoFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DynamoFilterConfig factory;
   envoy::extensions::filters::http::dynamo::v3::Dynamo proto_config;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

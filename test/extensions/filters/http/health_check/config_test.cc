@@ -34,7 +34,8 @@ TEST(HealthCheckFilterConfig, HealthCheckFilter) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   HealthCheckFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -70,8 +71,11 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context),
-               EnvoyException);
+  EXPECT_THROW(
+      EXPECT_FALSE(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
+                       .status()
+                       .ok()),
+      EnvoyException);
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) {
@@ -90,8 +94,9 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_NO_THROW(
-      factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context));
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
+                  .status()
+                  .ok());
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
@@ -105,9 +110,11 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
 
-  EXPECT_THROW(
-      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context),
-      EnvoyException);
+  EXPECT_THROW(EXPECT_FALSE(healthCheckFilterConfig
+                                .createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
+                                .status()
+                                .ok()),
+               EnvoyException);
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {
@@ -119,7 +126,10 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto)
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
-  healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
+  EXPECT_TRUE(
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
+          .status()
+          .ok());
 }
 
 TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
@@ -133,7 +143,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
-  healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
+  EXPECT_TRUE(
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
+          .status()
+          .ok());
 }
 
 void testHealthCheckHeaderMatch(
@@ -149,7 +162,8 @@ void testHealthCheckHeaderMatch(
   *config = input_config;
 
   Http::FilterFactoryCb cb =
-      healthCheckFilterConfig.createFilterFactoryFromProto(*config, "dummy_stats_prefix", context);
+      healthCheckFilterConfig.createFilterFactoryFromProto(*config, "dummy_stats_prefix", context)
+          .value();
 
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   Http::StreamFilterSharedPtr health_check_filter;

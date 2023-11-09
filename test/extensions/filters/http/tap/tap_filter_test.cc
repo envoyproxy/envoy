@@ -148,7 +148,7 @@ TEST(TapFilterConfigTest, InvalidProto) {
   TestUtility::loadFromYaml(filter_config, config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   TapFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context).value(),
                             EnvoyException,
                             "Error: Specifying admin streaming output without configuring admin.");
 }
@@ -170,7 +170,7 @@ TEST(TapFilterConfigTest, NeitherMatchNorMatchConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   TapFilterFactory factory;
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context).value(),
                             EnvoyException,
                             fmt::format("Neither match nor match_config is set in TapConfig: {}",
                                         config.common_config().static_config().DebugString()));

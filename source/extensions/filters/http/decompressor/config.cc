@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Decompressor {
 
-Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> DecompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const std::string decompressor_library_type{TypeUtil::typeUrlToDescriptorFullName(
@@ -20,8 +20,8 @@ Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyp
           Compression::Decompressor::NamedDecompressorLibraryConfigFactory>::
           getFactoryByType(decompressor_library_type);
   if (decompressor_library_factory == nullptr) {
-    throwEnvoyExceptionOrPanic(fmt::format("Didn't find a registered implementation for type: '{}'",
-                                           decompressor_library_type));
+    return absl::InvalidArgumentError(fmt::format(
+        "Didn't find a registered implementation for type: '{}'", decompressor_library_type));
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.decompressor_library().typed_config(), context.messageValidationVisitor(),

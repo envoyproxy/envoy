@@ -549,7 +549,8 @@ match_config:
 
   TestUtility::loadFromYamlAndValidate(config_str, proto_config);
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "test", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "test", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

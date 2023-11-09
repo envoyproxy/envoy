@@ -25,8 +25,10 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
 
   // First, try to create the filter factory creation function from factory context (if exists).
   if (context.factory_context_.has_value()) {
-    callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
-                                                    context.factory_context_.value());
+    auto callback_or_status = factory.createFilterFactoryFromProto(
+        *message, context.stat_prefix_, context.factory_context_.value());
+    THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
+    callback = callback_or_status.value();
   }
 
   // If above failed, try to create the filter factory creation function from server factory

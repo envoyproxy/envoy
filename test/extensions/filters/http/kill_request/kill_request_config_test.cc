@@ -23,7 +23,8 @@ TEST(KillRequestConfigTest, KillRequestFilterWithCorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   KillRequestFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(kill_request, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(kill_request, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -33,7 +34,8 @@ TEST(KillRequestConfigTest, KillRequestFilterWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   KillRequestFilterFactory factory;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context)
+          .value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

@@ -124,7 +124,7 @@ public:
   AddBodyFilterFactory() : DualFactoryBase("add-body-filter") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::AddBodyFilterConfig& proto_config, const std::string&,
       DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<AddBodyFilterConfig>(

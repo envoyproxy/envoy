@@ -20,7 +20,7 @@ public:
   BufferFilterFactory() : DualFactoryBase("envoy.filters.http.buffer") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
       const std::string& stats_prefix, DualInfo,
       Server::Configuration::ServerFactoryContext& context) override;

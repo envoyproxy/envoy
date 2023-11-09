@@ -21,8 +21,12 @@ namespace {
 
 TEST(LuaFilterConfigTest, ValidateEmptyConfigNotFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_NO_THROW(LuaFilterConfig().createFilterFactoryFromProto(
-      envoy::extensions::filters::http::lua::v3::Lua(), "stats", context));
+  EXPECT_NO_THROW(
+      EXPECT_TRUE(LuaFilterConfig()
+                      .createFilterFactoryFromProto(
+                          envoy::extensions::filters::http::lua::v3::Lua(), "stats", context)
+                      .status()
+                      .ok()));
 }
 
 TEST(LuaFilterConfigTest, LuaFilterWithDefaultSourceCode) {
@@ -38,7 +42,8 @@ TEST(LuaFilterConfigTest, LuaFilterWithDefaultSourceCode) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -54,7 +59,8 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -72,7 +78,8 @@ TEST(LuaFilterConfigTest, LuaFilterWithDeprecatedInlineCode) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -96,7 +103,9 @@ TEST(LuaFilterConfigTest, LuaFilterWithBothDeprecatedInlineCodeAndDefaultSourceC
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context), EnvoyException,
+      EXPECT_TRUE(
+          factory.createFilterFactoryFromProto(proto_config, "stats", context).status().ok()),
+      EnvoyException,
       "Error: Only one of `inline_code` or `default_source_code` can be set for the Lua filter.");
 }
 #endif

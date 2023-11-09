@@ -4294,7 +4294,7 @@ public:
   TestHttpFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
     PANIC("not implemented");

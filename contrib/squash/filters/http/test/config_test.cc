@@ -30,7 +30,8 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectYaml) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   SquashFilterConfigFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);

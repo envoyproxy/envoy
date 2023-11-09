@@ -75,8 +75,10 @@ success_criteria:
   TestUtility::loadFromYamlAndValidate(yaml, proto);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
-      admission_control_filter_factory.createFilterFactoryFromProtoTyped(
-          proto, "whatever", dual_info_, factory_context.getServerFactoryContext()),
+      EXPECT_TRUE(admission_control_filter_factory
+                      .createFilterFactoryFromProtoTyped(proto, "whatever", dual_info_,
+                                                         factory_context.getServerFactoryContext())
+                      .ok()),
       EnvoyException, "Success rate threshold cannot be less than 1.0%.");
 }
 
@@ -103,8 +105,10 @@ success_criteria:
   TestUtility::loadFromYamlAndValidate(yaml, proto);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
-      admission_control_filter_factory.createFilterFactoryFromProtoTyped(
-          proto, "whatever", dual_info_, factory_context.getServerFactoryContext()),
+      EXPECT_TRUE(admission_control_filter_factory
+                      .createFilterFactoryFromProtoTyped(proto, "whatever", dual_info_,
+                                                         factory_context.getServerFactoryContext())
+                      .ok()),
       EnvoyException, "Success rate threshold cannot be less than 1.0%.");
 }
 

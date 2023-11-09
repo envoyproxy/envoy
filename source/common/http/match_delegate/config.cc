@@ -280,7 +280,11 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
 
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(), context.messageValidationVisitor(), factory);
-  auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
+  auto filter_factory_or_error = factory.createFilterFactoryFromProto(*message, prefix, context);
+  if (!filter_factory_or_error.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(filter_factory_or_error.status().message()));
+  }
+  auto filter_factory = filter_factory_or_error.value();
 
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 

@@ -113,7 +113,7 @@ public:
   UpstreamCodecFilterFactory() : CommonFactoryBase("envoy.filters.http.upstream_codec") {}
 
   std::string category() const override { return "envoy.filters.http.upstream"; }
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::UpstreamFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {

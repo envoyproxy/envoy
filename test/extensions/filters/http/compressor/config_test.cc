@@ -27,10 +27,10 @@ TEST(CompressorFilterFactoryTests, UnregisteredCompressorLibraryConfig) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   CompressorFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-                            EnvoyException,
-                            "Didn't find a registered implementation for type: "
-                            "'test.mock_compressor_library.Unregistered'");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().message(),
+      testing::HasSubstr("Didn't find a registered implementation for type: "
+                         "'test.mock_compressor_library.Unregistered'"));
 }
 
 TEST(CompressorFilterFactoryTests, EmptyPerRouteConfig) {
