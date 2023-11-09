@@ -41,6 +41,8 @@ public:
   IoUringResult prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
                               off_t offset, Request* user_data) override;
   IoUringResult prepareClose(os_fd_t fd, Request* user_data) override;
+  IoUringResult prepareCancel(Request* cancelling_user_data, Request* user_data) override;
+  IoUringResult prepareShutdown(os_fd_t fd, int how, Request* user_data) override;
   IoUringResult submit() override;
   void injectCompletion(os_fd_t fd, Request* user_data, int32_t result) override;
   void removeInjectedCompletion(os_fd_t fd) override;
