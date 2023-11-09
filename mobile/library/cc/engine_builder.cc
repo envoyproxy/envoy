@@ -80,8 +80,8 @@ XdsBuilder& XdsBuilder::addClusterDiscoveryService(std::string cds_resources_loc
   return *this;
 }
 
-void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const {
-  auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
+void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const {
+  auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
   ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
   ads_config->set_set_node_on_first_message_only(true);
   ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -109,7 +109,7 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
   }
 
   if (!rtds_resource_name_.empty()) {
-    auto* layered_runtime = bootstrap->mutable_layered_runtime();
+    auto* layered_runtime = bootstrap.mutable_layered_runtime();
     auto* layer = layered_runtime->add_layers();
     layer->set_name("rtds_layer");
     auto* rtds_layer = layer->mutable_rtds_layer();
@@ -121,11 +121,11 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
   }
 
   if (enable_cds_) {
-    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
+    auto* cds_config = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
     if (cds_resources_locator_.empty()) {
       cds_config->mutable_ads();
     } else {
-      bootstrap->mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
+      bootstrap.mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
       cds_config->mutable_api_config_source()->set_api_type(
           envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
       cds_config->mutable_api_config_source()->set_transport_api_version(
@@ -133,10 +133,10 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
     }
     cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_in_seconds_);
     cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    bootstrap->add_node_context_params("cluster");
+    bootstrap.add_node_context_params("cluster");
     // Stat prefixes that we use in tests.
     auto* list =
-        bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
+        bootstrap.mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
     list->add_patterns()->set_exact("cluster_manager.active_clusters");
     list->add_patterns()->set_exact("cluster_manager.cluster_added");
     list->add_patterns()->set_exact("cluster_manager.cluster_updated");
@@ -932,7 +932,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   bootstrap->mutable_dynamic_resources();
 #ifdef ENVOY_GOOGLE_GRPC
   if (xds_builder_) {
-    xds_builder_->build(bootstrap.get());
+    xds_builder_->build(*bootstrap);
   }
 #endif
 
