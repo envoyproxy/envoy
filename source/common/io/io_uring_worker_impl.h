@@ -208,7 +208,7 @@ protected:
   // Since the write of IoUringSocket is async, there may have write request is on the fly when
   // close the socket. This timeout is setting for a time to wait the write request done.
   const uint32_t write_timeout_ms_;
-  // For read. io_uring socket will read sequentially in the order of buf_ and read_error_. Unless
+  // For read. iouring socket will read sequentially in the order of buf_ and read_error_. Unless
   // the buf_ is empty, the read_error_ will not be past to the handler. There is an exception that
   // when enable_close_event_ is set, the remote close read_error_(0) will always be past to the
   // handler.
@@ -222,7 +222,7 @@ protected:
   // This leads to the `IntegrationTest.TestFloodUpstreamErrors` timeout, since the http layer
   // always think the response is write successful, so flood protection is never kicked.
   //
-  // For write. io_uring socket will write sequentially in the order of write_buf_ and shutdown_
+  // For write. iouring socket will write sequentially in the order of write_buf_ and shutdown_
   // Unless the write_buf_ is empty, the shutdown operation will not be performed.
   Buffer::OwnedImpl write_buf_;
   // shutdown_ has 3 states. A absl::nullopt indicates the socket has not been shutdown, a false
@@ -231,7 +231,7 @@ protected:
   absl::optional<bool> shutdown_{};
   // If there is in progress write_or_shutdown_req_ during closing, a write timeout timer may be
   // setup to cancel the write_or_shutdown_req_, either a write request or a shutdown request. So
-  // we can make sure all SQEs bounding to the io_uring socket is completed and the socket can be
+  // we can make sure all SQEs bounding to the iouring socket is completed and the socket can be
   // closed successfully.
   Request* write_or_shutdown_req_{nullptr};
   Event::TimerPtr write_timeout_timer_{nullptr};

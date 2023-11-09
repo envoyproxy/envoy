@@ -466,7 +466,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteTimeout) {
   // The following line may partially complete since write buffer is full.
   socket.write(&slice, 1);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // The following will block in io_uring.
+  // The following will block in iouring.
   socket.write(&slice, 1);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -660,7 +660,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
   std::string write_data = "hello world";
   Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
 
-  // Running the event loop, to let the io_uring worker process the read request.
+  // Running the event loop, to let the iouring worker process the read request.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Close the socket now, it expected the socket will be close directly without cancel.
