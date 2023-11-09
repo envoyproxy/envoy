@@ -338,7 +338,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
       fd, [](uint32_t) {}, false);
 
   // Disable the socket, then there will be no new read request.
-  io_uring_socket.disable();
+  io_uring_socket.disableRead();
   // Fake the read request finish.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&read_req](const CompletionCb& cb) { cb(read_req, -EAGAIN, false); }));
@@ -399,8 +399,8 @@ TEST(IoUringWorkerImplTest, CloseDetected) {
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   IoUringServerSocket socket(
       0, worker, [](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, 0, true);
-  socket.enable();
-  socket.disable();
+  socket.enableRead();
+  socket.disableRead();
 
   // Consumes the first read request.
   Request* read_req2 = nullptr;

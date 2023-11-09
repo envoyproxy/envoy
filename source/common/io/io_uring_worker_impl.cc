@@ -107,7 +107,7 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Event::FileReadyCb
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
       fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
-  socket->enable();
+  socket->enableRead();
   return addSocket(std::move(socket));
 }
 
@@ -116,7 +116,7 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Buffer::Instance& 
   ENVOY_LOG(trace, "add server socket through existing socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
       fd, read_buf, *this, std::move(cb), write_timeout_ms_, enable_close_event);
-  socket->enable();
+  socket->enableRead();
   return addSocket(std::move(socket));
 }
 
@@ -333,9 +333,9 @@ void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
   }
 }
 
-void IoUringServerSocket::enable() {
-  IoUringSocketEntry::enable();
-  ENVOY_LOG(trace, "enable, fd = {}", fd_);
+void IoUringServerSocket::enableRead() {
+  IoUringSocketEntry::enableRead();
+  ENVOY_LOG(trace, "enable read, fd = {}", fd_);
 
   // Continue processing read buffer remained by the previous read.
   if (read_buf_.length() > 0 || read_error_.has_value()) {
@@ -347,7 +347,7 @@ void IoUringServerSocket::enable() {
   submitReadRequest();
 }
 
-void IoUringServerSocket::disable() { IoUringSocketEntry::disable(); }
+void IoUringServerSocket::disableRead() { IoUringSocketEntry::disableRead(); }
 
 void IoUringServerSocket::write(Buffer::Instance& data) {
   ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);

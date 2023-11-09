@@ -98,8 +98,8 @@ public:
     status_ = Closed;
     on_closed_cb_ = cb;
   }
-  void enable() override { status_ = Enabled; }
-  void disable() override { status_ = Disabled; }
+  void enableRead() override { status_ = Enabled; }
+  void disableRead() override { status_ = Disabled; }
   void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
   void write(Buffer::Instance&) override { PANIC("not implement"); }
@@ -191,8 +191,8 @@ public:
 
   // IoUringSocket
   void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) override;
-  void enable() override;
-  void disable() override;
+  void enableRead() override;
+  void disableRead() override;
   void write(Buffer::Instance& data) override;
   uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   void shutdown(int how) override;

@@ -38,8 +38,8 @@ public:
   MOCK_METHOD(os_fd_t, fd, (), (const));
   MOCK_METHOD(void, close, (bool, IoUringSocketOnClosedCb));
   MOCK_METHOD(void, shutdown, (int32_t how));
-  MOCK_METHOD(void, enable, ());
-  MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, enableRead, ());
+  MOCK_METHOD(void, disableRead, ());
   MOCK_METHOD(void, enableCloseEvent, (bool enable));
   MOCK_METHOD(void, connect, (const Network::Address::InstanceConstSharedPtr& address));
   MOCK_METHOD(void, write, (Buffer::Instance & data));

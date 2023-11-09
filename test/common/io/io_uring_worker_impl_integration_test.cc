@@ -397,8 +397,8 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
 
   // Emulate enable behavior.
   result.reset();
-  socket->disable();
-  socket->enable();
+  socket->disableRead();
+  socket->enableRead();
   while (!result.has_value()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -574,7 +574,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableClo
       true);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
   // Waiting for the server socket sending the data.
-  socket.disable();
+  socket.disableRead();
 
   Api::OsSysCallsSingleton::get().close(client_socket_);
 
@@ -602,7 +602,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadAndCloseAfterDisabledWithEn
       true);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
   // Waiting for the server socket sending the data.
-  socket.disable();
+  socket.disableRead();
 
   // Write data through client socket.
   std::string write_data = "hello world";
@@ -655,7 +655,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   // Disable the socket, then it won't submit any new request.
-  socket.disable();
+  socket.disableRead();
   // Write data through client socket, then it will consume the existing request.
   std::string write_data = "hello world";
   Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());

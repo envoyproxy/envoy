@@ -243,14 +243,14 @@ public:
    * read event when the request is done. This is used when the socket is listening on the file read
    * event.
    */
-  virtual void enable() PURE;
+  virtual void enableRead() PURE;
 
   /**
    * Disable the read on the socket. The socket stop to submit the read request, although the
    * existing read request won't be canceled but no read event will be delivered. This is used when
    * the socket isn't listening on the file read event.
    */
-  virtual void disable() PURE;
+  virtual void disableRead() PURE;
 
   /**
    * Enable close event. This is used for the case the socket is listening on the file close event.
