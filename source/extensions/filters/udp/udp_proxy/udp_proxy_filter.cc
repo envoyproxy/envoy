@@ -309,9 +309,6 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
       .connections()
       .dec();
 
-  write_filters_.clear();
-  read_filters_.clear();
-
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
