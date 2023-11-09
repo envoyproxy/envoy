@@ -631,8 +631,7 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
   Envoy::JNI::LocalRefUniquePtr<jbyteArray> j_in_data = Envoy::JNI::LocalRefUniquePtr<jbyteArray>(
       nullptr, Envoy::JNI::LocalRefDeleter(jni_helper.getEnv()));
   if (data) {
-    auto x = Envoy::JNI::native_data_to_array(jni_helper, *data);
-    j_in_data = std::move(x);
+    j_in_data = Envoy::JNI::native_data_to_array(jni_helper, *data);
   }
   jlong trailers_length = -1;
   if (trailers) {
