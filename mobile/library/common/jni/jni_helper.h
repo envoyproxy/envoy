@@ -361,6 +361,15 @@ public:
    */
   jlong getDirectBufferCapacity(jobject buffer);
 
+  /**
+   * Gets the address of memory associated with the given NIO direct buffer.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getdirectbufferaddress
+   */
+  template <typename T = void*> T getDirectBufferAddress(jobject buffer) {
+    return static_cast<T>(env_->GetDirectBufferAddress(buffer));
+  }
+
 private:
   /** Rethrows the Java exception occurred. */
   void rethrowException();
