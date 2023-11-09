@@ -158,7 +158,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "cel-spec-{version}",
         sha256 = "3de60ea3a29b6246faf04d206b7ee4633c155042e040086205c83edf713aee29",
         version = "2657e88023e5e7dfbb62e74de7a7cfd6e8284d7b",
-        urls = ["https://github.com/google/cel-spec/archive/archive/{version}.zip"],
+        urls = ["https://github.com/google/cel-spec/archive/{version}.zip"],
         use_category = ["api"],
         release_date = "2023-11-09",
     ),
