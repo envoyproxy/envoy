@@ -185,8 +185,8 @@ class IoUringWorker;
  */
 enum IoUringSocketStatus {
   Initialized,
-  Enabled,
-  Disabled,
+  ReadEnabled,
+  ReadDisabled,
   RemoteClosed,
   Closed,
 };

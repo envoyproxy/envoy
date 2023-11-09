@@ -463,7 +463,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   }
 
   // If the socket is enabled and there is bytes to read, notify the handler.
-  if (status_ == Enabled) {
+  if (status_ == ReadEnabled) {
     if (read_buf_.length() > 0) {
       ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, read_buf_.length());
       ReadParam param{read_buf_, static_cast<int32_t>(read_buf_.length())};
@@ -530,13 +530,13 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   }
 
   // The socket may be not readable during handler onRead callback, check it again here.
-  if (status_ == Enabled) {
+  if (status_ == ReadEnabled) {
     // If the read error is zero, it means remote close, then needn't new request.
     if (!read_error_.has_value() || read_error_.value() != 0) {
       // Submit a read accept request for the next read.
       submitReadRequest();
     }
-  } else if (status_ == Disabled) {
+  } else if (status_ == ReadDisabled) {
     // Since error in a disabled socket will not be handled by the handler, stop submit read
     // request if there is any error.
     if (!read_error_.has_value()) {

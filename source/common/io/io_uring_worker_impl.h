@@ -98,8 +98,8 @@ public:
     status_ = Closed;
     on_closed_cb_ = cb;
   }
-  void enableRead() override { status_ = Enabled; }
-  void disableRead() override { status_ = Disabled; }
+  void enableRead() override { status_ = ReadEnabled; }
+  void disableRead() override { status_ = ReadDisabled; }
   void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
   void write(Buffer::Instance&) override { PANIC("not implement"); }
