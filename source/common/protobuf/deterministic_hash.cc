@@ -99,6 +99,7 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor* field, uint64_t seed) {
   using Protobuf::FieldDescriptor;
   const auto reflection = message.GetReflection();
+  HASH_FIXED(field->number());
   switch (field->cpp_type()) {
   case FieldDescriptor::CPPTYPE_INT32:
     REFLECTION_FOR_EACH(Int32, HASH_FIXED);
@@ -178,6 +179,7 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
   std::string scratch;
   const auto reflection = message.GetReflection();
   const auto descriptor = message.GetDescriptor();
+  HASH_STRING(descriptor->full_name());
   if (descriptor->well_known_type() == Protobuf::Descriptor::WELLKNOWNTYPE_ANY) {
     const ProtobufWkt::Any* any = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
     auto submsg = unpackAnyForReflection(*any);
@@ -185,7 +187,6 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
       // If we wanted to handle unknown types in Any, this is where we'd have to do it.
       return seed;
     }
-    HASH_STRING(any->type_url());
     return reflectionHashMessage(*submsg, seed);
   }
   std::vector<const FieldDescriptor*> fields;
@@ -198,10 +199,7 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
 }
 } // namespace
 
-uint64_t hash(const Protobuf::Message& message) {
-  // Must use a nonzero initial seed, because the empty message must hash to nonzero.
-  return reflectionHashMessage(message, 1);
-}
+uint64_t hash(const Protobuf::Message& message) { return reflectionHashMessage(message, 0); }
 
 } // namespace DeterministicProtoHash
 } // namespace Envoy
