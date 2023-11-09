@@ -206,7 +206,7 @@ message ExternalProcessor {
   // more external processing for this stream from now on.
   bool disable_immediate_response = 15;
 
-  // Options related to the sending and receiving of dynamic metadata
+  // Options related to the sending and receiving of dynamic metadata.
   MetadataOptions metadata_options = 16;
 }
 
@@ -298,6 +298,6 @@ message ExtProcOverrides {
   // Set a different gRPC service for this route than the default.
   config.core.v3.GrpcService grpc_service = 5;
 
-  // Options related to the sending and receiving of dynamic metadata
+  // Options related to the sending and receiving of dynamic metadata.
   MetadataOptions metadata_options = 6;
 }
