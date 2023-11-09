@@ -681,7 +681,7 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
-    const std::string access_log_filename =
+  const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
   const std::string session_access_log_config = fmt::format(R"EOF(
@@ -696,8 +696,15 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
 )EOF",
                                                             access_log_filename);
 
-  TestConfig config{"host.com",           "target.com", 2, 30, false, "",
-                    BufferOptions{1, 30}, absl::nullopt, session_access_log_config};
+  const TestConfig config{"host.com",
+                          "target.com",
+                          2,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config};
   setup(config);
 
   // Initial datagram will create a session and a tunnel request.

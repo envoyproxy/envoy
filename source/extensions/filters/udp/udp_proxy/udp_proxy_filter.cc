@@ -385,8 +385,8 @@ void UdpProxyFilter::UdpActiveSession::onReadReady() {
 
 bool UdpProxyFilter::ActiveSession::onNewSession() {
   // Set UUID for the session. This is used for logging and tracing.
-  udp_session_info_.setStreamIdProvider(
-      std::make_shared<StreamInfo::StreamIdProviderImpl>(cluster_.filter_.config_->randomGenerator().uuid()));
+  udp_session_info_.setStreamIdProvider(std::make_shared<StreamInfo::StreamIdProviderImpl>(
+      cluster_.filter_.config_->randomGenerator().uuid()));
 
   for (auto& active_read_filter : read_filters_) {
     if (active_read_filter->initialized_) {
