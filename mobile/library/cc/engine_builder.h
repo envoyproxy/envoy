@@ -104,7 +104,7 @@ protected:
   // This method takes in a modifiable Bootstrap proto pointer because returning a new Bootstrap
   // proto would rely on proto's MergeFrom behavior, which can lead to unexpected results in the
   // Bootstrap config.
-  void build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const;
+  void build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const;
 
 private:
   // Required so that EngineBuilder can call the XdsBuilder's protected build() method.
