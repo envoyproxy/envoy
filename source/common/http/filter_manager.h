@@ -664,10 +664,12 @@ public:
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
   void log(AccessLog::AccessLogType access_log_type) {
-    Formatter::HttpFormatterContext log_context{filter_manager_callbacks_.requestHeaders().ptr(),
-                                                filter_manager_callbacks_.responseHeaders().ptr(),
-                                                filter_manager_callbacks_.responseTrailers().ptr()};
-    log_context.setAccessLogType(access_log_type);
+    const Formatter::HttpFormatterContext log_context{
+        filter_manager_callbacks_.requestHeaders().ptr(),
+        filter_manager_callbacks_.responseHeaders().ptr(),
+        filter_manager_callbacks_.responseTrailers().ptr(),
+        {},
+        access_log_type};
 
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
