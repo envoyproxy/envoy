@@ -9,6 +9,7 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -59,7 +60,10 @@ DnsCacheImpl::DnsCacheImpl(
     // potential optimization of having the entry be preresolved the first time a true consumer of
     // this DNS cache asks for it.
     const std::string host =
-        DnsHostInfo::normalizeHostForDfp(hostname.address(), hostname.port_value());
+        (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns"))
+            ? DnsHostInfo::normalizeHostForDfp(hostname.address(), hostname.port_value())
+            : hostname.address();
     ENVOY_LOG(debug, "DNS pre-resolve starting for host {}", host);
     startCacheLoad(host, hostname.port_value(), false);
   }

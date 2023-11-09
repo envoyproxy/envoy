@@ -60,6 +60,13 @@ bug_fixes:
     in BUFFERED BodySendMode + SEND HeaderSendMode. It is now external processor's responsibility to set the content length
     correctly matched to the mutated body. if those two doesn't match, the mutation will be rejected and local reply with error
     status will be returned.
+- area: dynamic_forward_proxy
+  change: |
+    Fixed a bug where the preresolved hostnames specified in the Dynamic Forward Proxy cluster
+    config would not use the normalized hostname as the DNS cache key, which is the same key
+    used for retrieval. This caused cache misses on initial use, even though the host DNS entry
+    was pre-resolved. The fix is guarded by runtime guard ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns``,
+    which defaults to true.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
