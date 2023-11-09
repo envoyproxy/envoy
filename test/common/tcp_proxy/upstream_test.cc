@@ -57,8 +57,9 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
-INSTANTIATE_TEST_SUITE_P(H1H2Codecs, HttpUpstreamTest,
-                         ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2));
+INSTANTIATE_TEST_SUITE_P(H1H2H3Codecs, HttpUpstreamTest,
+                         ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                                           Http::CodecType::HTTP3));
 
 TEST_P(HttpUpstreamTest, WriteUpstream) {
   this->setupUpstream();
@@ -241,8 +242,9 @@ public:
   bool is_http2_ = true;
 };
 
-INSTANTIATE_TEST_SUITE_P(H1H2Codecs, HttpUpstreamRequestEncoderTest,
-                         ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2));
+INSTANTIATE_TEST_SUITE_P(H1H2H3Codecs, HttpUpstreamRequestEncoderTest,
+                         ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                                           Http::CodecType::HTTP3));
 
 TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoder) {
   this->setupUpstream();

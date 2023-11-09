@@ -208,7 +208,7 @@ private:
   };
   DecoderShim response_decoder_;
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
-  Http::CodecType type_;
+  const Http::CodecType type_;
   bool read_half_closed_{};
   bool write_half_closed_{};
 
