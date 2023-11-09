@@ -58,7 +58,7 @@ public:
 
   HttpExtensionConfigProvider
   createHttpDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
-                                    const std::string&, bool) override {
+                                        const std::string&, bool) override {
     return nullptr;
   }
 
