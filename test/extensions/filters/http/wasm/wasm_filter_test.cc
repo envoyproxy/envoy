@@ -678,8 +678,7 @@ TEST_P(WasmHttpFilterTest, AccessLog) {
   StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete())
       .WillRepeatedly(testing::Return(std::chrono::milliseconds(30)));
-  filter().log(&request_headers, &response_headers, &response_trailers, log_stream_info,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers, &response_headers, &response_trailers}, log_stream_info);
   filter().onDestroy();
 }
 
@@ -698,8 +697,7 @@ TEST_P(WasmHttpFilterTest, AccessLogClientDisconnected) {
   StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete())
       .WillRepeatedly(testing::Return(std::chrono::milliseconds(30)));
-  filter().log(&request_headers, nullptr, nullptr, log_stream_info,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, log_stream_info);
   filter().onDestroy();
 }
 
@@ -716,8 +714,7 @@ TEST_P(WasmHttpFilterTest, AccessLogDisabledForIncompleteStream) {
 
   StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete()).WillRepeatedly(testing::Return(absl::nullopt));
-  filter().log(&request_headers, nullptr, nullptr, log_stream_info,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, log_stream_info);
   filter().onDestroy();
 }
 
@@ -733,8 +730,7 @@ TEST_P(WasmHttpFilterTest, AccessLogCreate) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers{};
-  filter().log(&request_headers, &response_headers, &response_trailers, log_stream_info,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers, &response_headers, &response_trailers}, log_stream_info);
   filter().onDestroy();
 }
 
@@ -1763,8 +1759,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
 
-  filter().log(&request_headers, nullptr, nullptr, request_stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, request_stream_info_);
 
   const auto* result =
       request_stream_info_.filterState()->getDataReadOnly<Filters::Common::Expr::CelState>(
@@ -1831,8 +1826,7 @@ TEST_P(WasmHttpFilterTest, Property) {
   request_stream_info_.upstreamInfo()->setUpstreamHost(host_description);
   EXPECT_CALL(request_stream_info_, requestComplete())
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  filter().log(&request_headers, nullptr, nullptr, request_stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, request_stream_info_);
 }
 
 TEST_P(WasmHttpFilterTest, ClusterMetadata) {
@@ -1863,16 +1857,14 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   request_stream_info_.upstreamInfo()->setUpstreamHost(host_description);
   EXPECT_CALL(request_stream_info_, requestComplete)
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  filter().log(&request_headers, nullptr, nullptr, request_stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, request_stream_info_);
 
   // If upstream host is empty, fallback to upstream cluster info for cluster metadata.
   request_stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
   EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
-  filter().log(&request_headers, nullptr, nullptr, request_stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, request_stream_info_);
 }
 
 TEST_P(WasmHttpFilterTest, SharedData) {

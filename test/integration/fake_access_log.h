@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/access_log_config.h"
+#include "envoy/access_log/access_log_config.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -8,21 +8,17 @@
 
 namespace Envoy {
 
-using LogSignature = std::function<void(
-    const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*, const Http::ResponseTrailerMap*,
-    const StreamInfo::StreamInfo&, AccessLog::AccessLogType)>;
+using LogSignature =
+    std::function<void(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&)>;
 
 class FakeAccessLog : public AccessLog::Instance {
 public:
   FakeAccessLog(LogSignature cb) : log_cb_(cb) {}
 
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type) override {
+  void log(const Formatter::HttpFormatterContext& context,
+           const StreamInfo::StreamInfo& info) override {
     if (log_cb_) {
-      log_cb_(request_headers, response_headers, response_trailers, stream_info, access_log_type);
+      log_cb_(context, info);
     }
   }
 
@@ -30,7 +26,7 @@ private:
   LogSignature log_cb_;
 };
 
-class FakeAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class FakeAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,

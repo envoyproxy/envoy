@@ -148,11 +148,8 @@ public:
                                      const std::shared_ptr<PluginBase>& plugin); // deprecated
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type) override;
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& info) override;
 
   uint32_t getLogLevel() override;
 

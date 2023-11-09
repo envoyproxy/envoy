@@ -319,11 +319,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
     headers->addReference(Http::Headers::get().Scheme, scheme);
   }
 
-  config_.headerEvaluator().evaluateHeaders(*headers,
-                                            downstream_info_.getRequestHeaders() == nullptr
-                                                ? *Http::StaticEmptyHeaders::get().request_headers
-                                                : *downstream_info_.getRequestHeaders(),
-                                            *Http::StaticEmptyHeaders::get().response_headers,
+  config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
                                             downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
@@ -351,11 +347,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
     headers->addReference(Http::Headers::get().Path, config_.postPath());
   }
 
-  config_.headerEvaluator().evaluateHeaders(*headers,
-                                            downstream_info_.getRequestHeaders() == nullptr
-                                                ? *Http::StaticEmptyHeaders::get().request_headers
-                                                : *downstream_info_.getRequestHeaders(),
-                                            *Http::StaticEmptyHeaders::get().response_headers,
+  config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
                                             downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/access_log_config.h"
+#include "envoy/access_log/access_log_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,7 +10,7 @@ namespace File {
 /**
  * Config registration for the file access log. @see AccessLogInstanceFactory.
  */
-class FileAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class FileAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,

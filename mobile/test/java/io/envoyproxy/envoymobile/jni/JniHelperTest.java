@@ -33,6 +33,18 @@ public class JniHelperTest {
                                                Object initialElement);
   public static native Object getObjectArrayElement(Object[] array, int index);
   public static native void setObjectArrayElement(Object[] array, int index, Object value);
+  public static native void setByteArrayRegion(byte[] array, int start, int index, byte[] buffer);
+  public static native void setCharArrayRegion(char[] array, int start, int index, char[] buffer);
+  public static native void setShortArrayRegion(short[] array, int start, int index,
+                                                short[] buffer);
+  public static native void setIntArrayRegion(int[] array, int start, int index, int[] buffer);
+  public static native void setLongArrayRegion(long[] array, int start, int index, long[] buffer);
+  public static native void setFloatArrayRegion(float[] array, int start, int index,
+                                                float[] buffer);
+  public static native void setDoubleArrayRegion(double[] array, int start, int index,
+                                                 double[] buffer);
+  public static native void setBooleanArrayRegion(boolean[] array, int start, int index,
+                                                  boolean[] buffer);
   public static native byte callByteMethod(Class<?> clazz, Object instance, String name,
                                            String signature);
   public static native char callCharMethod(Class<?> clazz, Object instance, String name,
@@ -185,6 +197,70 @@ public class JniHelperTest {
     Object[] array = new Object[] {1, 2, 3};
     setObjectArrayElement(array, 1, 200);
     assertThat(array).isEqualTo(new Object[] {1, 200, 3});
+  }
+
+  @Test
+  public void testSetByteArrayRegion() {
+    byte[] array = new byte[] {1, 0, 0, 0, 5};
+    byte[] buffer = new byte[] {2, 3, 4};
+    setByteArrayRegion(array, 1, 3, buffer);
+    assertThat(array).isEqualTo(new byte[] {1, 2, 3, 4, 5});
+  }
+
+  @Test
+  public void testSetCharArrayRegion() {
+    char[] array = new char[] {'a', ' ', ' ', ' ', 'e'};
+    char[] buffer = new char[] {'b', 'c', 'd'};
+    setCharArrayRegion(array, 1, 3, buffer);
+    assertThat(array).isEqualTo(new char[] {'a', 'b', 'c', 'd', 'e'});
+  }
+
+  @Test
+  public void testSetShortArrayRegion() {
+    short[] array = new short[] {1, 0, 0, 0, 5};
+    short[] buffer = new short[] {2, 3, 4};
+    setShortArrayRegion(array, 1, 3, buffer);
+    assertThat(array).isEqualTo(new short[] {1, 2, 3, 4, 5});
+  }
+
+  @Test
+  public void testSetIntArrayRegion() {
+    int[] array = new int[] {1, 0, 0, 0, 5};
+    int[] buffer = new int[] {2, 3, 4};
+    setIntArrayRegion(array, 1, 3, buffer);
+    assertThat(array).isEqualTo(new int[] {1, 2, 3, 4, 5});
+  }
+
+  @Test
+  public void testSetLongArrayRegion() {
+    long[] array = new long[] {1, 0, 0, 0, 5};
+    long[] buffer = new long[] {2, 3, 4};
+    setLongArrayRegion(array, 1, 3, buffer);
+    assertThat(array).isEqualTo(new long[] {1, 2, 3, 4, 5});
+  }
+
+  @Test
+  public void testSetFloatArrayRegion() {
+    float[] array = new float[] {1, 0, 0, 0, 5};
+    float[] buffer = new float[] {2, 3, 4};
+    setFloatArrayRegion(array, 1, 3, buffer);
+    assertThat(array).isEqualTo(new float[] {1, 2, 3, 4, 5});
+  }
+
+  @Test
+  public void testSetDoubleArrayRegion() {
+    double[] array = new double[] {1, 0, 0, 0, 5};
+    double[] buffer = new double[] {2, 3, 4};
+    setDoubleArrayRegion(array, 1, 3, buffer);
+    assertThat(array).isEqualTo(new double[] {1, 2, 3, 4, 5});
+  }
+
+  @Test
+  public void testSetBooleanArrayRegion() {
+    boolean[] array = new boolean[] {true, false, false, false, true};
+    boolean[] buffer = new boolean[] {true, true, true};
+    setBooleanArrayRegion(array, 1, 3, buffer);
+    assertThat(array).isEqualTo(new boolean[] {true, true, true, true, true});
   }
 
   @Test

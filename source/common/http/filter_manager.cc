@@ -368,6 +368,21 @@ ResponseTrailerMapOptRef ActiveStreamFilterBase::responseTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
+void ActiveStreamFilterBase::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  if (!streamInfo().filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey)) {
+    streamInfo().filterState()->setData(
+        LocalReplyFilterStateKey,
+        std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+}
+
 bool ActiveStreamDecoderFilter::canContinue() {
   // It is possible for the connection manager to respond directly to a request even while
   // a filter is trying to continue. If a response has already happened, we should not
@@ -480,7 +495,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+  ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
@@ -843,7 +858,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
     if (state_.decoder_filter_chain_aborted_) {
       // If the decoder filter chain has been aborted, then either:
       // 1. This filter has sent a local reply from decode metadata.
-      // 2. This filter is the terminal http filter, and an upstream filter has sent a local reply.
+      // 2. This filter is the terminal http filter, and an upstream HTTP filter has sent a local
+      // reply.
       ASSERT((status == FilterMetadataStatus::StopIterationForLocalReply) ||
              (std::next(entry) == decoder_filters_.end()));
       executeLocalReplyIfPrepared();
@@ -1535,8 +1551,8 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  // This filter chain options is only used for the downstream filter chains for now. So, try to
-  // set valid initial route only when the downstream callbacks is available.
+  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
+  // to set valid initial route only when the downstream callbacks is available.
   FilterChainOptionsImpl options(
       filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
   filter_chain_factory_.createFilterChain(*this, false, options);
@@ -1722,7 +1738,8 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+
+  ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {

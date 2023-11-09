@@ -13,20 +13,34 @@ behavior_changes:
   change: |
     undeprecated runtime key ``overload.global_downstream_max_connections`` until :ref:`downstream connections monitor
     <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
+- area: stats dns_filter
+  change: |
+    Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
+    is properly extracted. This changes the Prometheus name from
+    dns_filter_myprefix_local_a_record_answers{} to dns_filter_local_a_record_answers{envoy.dns_filter_prefix="myprefix"}.
 
 minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
+- area: aws
+  change: |
+    uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
+    which is deprecated. To revert this behavior set ``envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials`` to true.
 - area: upstream
   change: |
     Fixed a reported issue (https://github.com/envoyproxy/envoy/issues/11004) that causes the Least
     Request load balancer policy to be unfair when the number of hosts are very small, when the number
     of hosts is smaller than the choice_count, instead of randomly selection hosts from the list, we
     perform a full scan on it to choose the host with least requests.
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: local_rate_limit
   change: |
     Added new configuration field :ref:`rate_limited_as_resource_exhausted
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limited_as_resource_exhausted>`
     to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
+- area: filter state
+  change: |
+    Added config name of filter sending a local reply in filter state with key
+    ``envoy.filters.network.http_connection_manager.local_reply_owner``.
+    See :ref:`the well-known filter state keys <well_known_filter_state>` for more detail.
 - area: http2
   change: |
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
@@ -45,6 +59,10 @@ bug_fixes:
 - area: grpc
   change: |
     Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+- area: tracing
+  change: |
+    Fixed a bug that caused the Datadog tracing extension to drop traces that
+    should be kept on account of an extracted sampling decision.
 - area: quic
   change: |
     Fixed a bug in QUIC and HCM interaction which could cause use-after-free during asynchronous certificates retrieval.
@@ -149,7 +167,13 @@ new_features:
     the default behavior of sending the request body to the authorization server from the per-route filter.
 - area: grpc async client
   change: |
-    added :ref:`grpc_async_client_manager_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.grpc_async_client_manager_config>`
+    added :ref:`max_cached_entry_idle_duration
+    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig.max_cached_entry_idle_duration>`
     to control the cached grpc client eviction time in the cache.
+- area: ratelimit
+  change: |
+    Ratelimit supports optional additional prefix to use when emitting statistics with :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stat_prefix>`
+    configuration flag.
 
 deprecated:

@@ -12,36 +12,47 @@ using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
 
 namespace {
 
-UserMapConstPtr readHtpasswd(const std::string& htpasswd) {
-  std::unique_ptr<absl::flat_hash_map<std::string, User>> users =
-      std::make_unique<absl::flat_hash_map<std::string, User>>();
+UserMap readHtpasswd(const std::string& htpasswd) {
+  UserMap users;
+
   std::istringstream htpsswd_ss(htpasswd);
   std::string line;
 
   while (std::getline(htpsswd_ss, line)) {
-    const size_t colon_pos = line.find(':');
+    // TODO(wbpcode): should we trim the spaces or empty chars?
 
-    if (colon_pos != std::string::npos) {
-      std::string name = line.substr(0, colon_pos);
-      std::string hash = line.substr(colon_pos + 1);
-
-      if (name.empty()) {
-        throw EnvoyException("basic auth: invalid user name");
-      }
-
-      if (absl::StartsWith(hash, "{SHA}")) {
-        hash = hash.substr(5);
-        // The base64 encoded SHA1 hash is 28 bytes long
-        if (hash.length() != 28) {
-          throw EnvoyException("basic auth: invalid SHA hash length");
-        }
-
-        users->insert({name, {name, hash}});
-        continue;
-      }
+    // Skip empty lines and comments.
+    if (line.empty() || line[0] == '#') {
+      continue;
     }
 
-    throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
+    const size_t colon_pos = line.find(':');
+    if (colon_pos == std::string::npos) {
+      throw EnvoyException("basic auth: invalid htpasswd format, username:password is expected");
+    }
+
+    std::string name = line.substr(0, colon_pos);
+    std::string hash = line.substr(colon_pos + 1);
+
+    if (name.empty() || hash.empty()) {
+      throw EnvoyException("basic auth: empty user name or password");
+    }
+
+    if (users.contains(name)) {
+      throw EnvoyException("basic auth: duplicate users");
+    }
+
+    if (!absl::StartsWith(hash, "{SHA}")) {
+      throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
+    }
+
+    hash = hash.substr(5);
+    // The base64 encoded SHA1 hash is 28 bytes long
+    if (hash.length() != 28) {
+      throw EnvoyException("basic auth: invalid htpasswd format, invalid SHA hash length");
+    }
+
+    users.insert({name, {name, hash}});
   }
 
   return users;
@@ -52,8 +63,8 @@ UserMapConstPtr readHtpasswd(const std::string& htpasswd) {
 Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
     const BasicAuth& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-  const std::string htpasswd = Config::DataSource::read(proto_config.users(), false, context.api());
-  UserMapConstPtr users = readHtpasswd(htpasswd);
+  UserMap users =
+      readHtpasswd(Config::DataSource::read(proto_config.users(), false, context.api()));
   FilterConfigConstSharedPtr config =
       std::make_unique<FilterConfig>(std::move(users), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
