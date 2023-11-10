@@ -62,6 +62,9 @@ public:
     stream_info_.stream_id_provider_ = nullptr;
   }
 
+protected:
+  void routeNameTest(std::string yaml, bool omit_empty);
+
   NiceMock<MockTimeSystem> time_source_;
   Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers_;
@@ -122,17 +125,7 @@ typed_config:
             output_);
 }
 
-TEST_F(AccessLogImplTest, RouteName) {
-  const std::string yaml = R"EOF(
-name: accesslog
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-  path: /dev/null
-  log_format:
-    text_format_source:
-      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% %UPSTREAM_WIRE_BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
-  )EOF";
-
+void AccessLogImplTest::routeNameTest(std::string yaml, bool omit_empty) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
@@ -149,10 +142,46 @@ typed_config:
 
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 0 0 3 - "
-            "\"x.x.x.x\" "
-            "\"user-agent-set\" \"id\"  \"host\"\n",
-            output_);
+  if (omit_empty) {
+    EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 0 0 3  "
+              "\"x.x.x.x\" "
+              "\"user-agent-set\" \"id\"  \"host\"\n",
+              output_);
+  } else {
+    EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 0 0 3 - "
+              "\"x.x.x.x\" "
+              "\"user-agent-set\" \"id\"  \"host\"\n",
+              output_);
+  }
+}
+
+TEST_F(AccessLogImplTest, RouteName) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  log_format:
+    text_format_source:
+      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% %UPSTREAM_WIRE_BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+  )EOF";
+
+  routeNameTest(yaml, false /* omit_empty */);
+}
+
+TEST_F(AccessLogImplTest, RouteNameWithOmitEmptyString) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  log_format:
+    text_format_source:
+      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% %UPSTREAM_WIRE_BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+    omit_empty_values: true
+  )EOF";
+
+  routeNameTest(yaml, true /* omit_empty */);
 }
 
 TEST_F(AccessLogImplTest, HeadersBytes) {
