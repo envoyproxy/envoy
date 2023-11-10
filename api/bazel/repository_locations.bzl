@@ -34,7 +34,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE",
     ),
-    com_github_cncf_udpa = dict(
+    com_github_cncf_xds = dict(
         project_name = "xDS API",
         project_desc = "xDS API Working Group (xDS-WG)",
         project_url = "https://github.com/cncf/xds",

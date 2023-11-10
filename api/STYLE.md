@@ -126,7 +126,7 @@ To add an extension config to the API, the steps below should be followed:
    licenses(["notice"])  # Apache 2
 
    api_proto_package(
-       deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
+       deps = ["@com_github_cncf_xds//udpa/annotations:pkg"],
    )
    ```
 1. If this is still WiP and subject to breaking changes, please tag it
