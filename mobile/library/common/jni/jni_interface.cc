@@ -888,9 +888,9 @@ static const void* jvm_http_filter_init(const void* context) {
   Envoy::JNI::LocalRefUniquePtr<jobject> j_filter =
       jni_helper.callObjectMethod(j_context, jmid_create);
   jni_log_fmt("[Envoy]", "j_filter: %p", j_filter.get());
-  jobject retained_filter = jni_helper.getEnv()->NewGlobalRef(j_filter.get());
+  Envoy::JNI::GlobalRefUniquePtr<jobject> retained_filter = jni_helper.newGlobalRef(j_filter.get());
 
-  return retained_filter;
+  return retained_filter.release();
 }
 
 // EnvoyStringAccessor
@@ -1150,10 +1150,9 @@ std::string getCppString(Envoy::JNI::JniHelper& jni_helper, jstring java_string)
 // Converts a java byte array to a C++ string.
 std::string javaByteArrayToString(Envoy::JNI::JniHelper& jni_helper, jbyteArray j_data) {
   size_t data_length = static_cast<size_t>(jni_helper.getArrayLength(j_data));
-  char* critical_data =
-      static_cast<char*>(jni_helper.getEnv()->GetPrimitiveArrayCritical(j_data, 0));
-  std::string ret(critical_data, data_length);
-  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_data, critical_data, 0);
+  Envoy::JNI::PrimitiveArrayCriticalUniquePtr<char> critical_data =
+      jni_helper.getPrimitiveArrayCritical<char*>(j_data, nullptr);
+  std::string ret(critical_data.get(), data_length);
   return ret;
 }
 
