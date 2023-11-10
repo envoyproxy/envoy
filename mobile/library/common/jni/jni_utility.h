@@ -39,7 +39,7 @@ void set_class_loader(jobject class_loader);
  * @return jclass, the class with a provided `class_name` or NULL if
  *         it couldn't be found.
  */
-jclass find_class(const char* class_name);
+LocalRefUniquePtr<jclass> find_class(const char* class_name);
 
 void jni_delete_global_ref(void* context);
 

@@ -112,8 +112,8 @@ envoy_pytool_binary(
         ":jinja",
         "//tools/api_proto_plugin",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
-        "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
+        "@com_github_cncf_xds//udpa/annotations:pkg_py_proto",
+        "@com_github_cncf_xds//xds/annotations/v3:pkg_py_proto",
         requirement("envoy.code.check"),
     ],
 )
