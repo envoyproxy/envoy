@@ -258,7 +258,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
-// Check that several client-side AltsTsiHandshakers can successfully complete concurrent, full
+// Check that several client-side handshaker can successfully complete concurrent, full
 // client-side ALTS handshakes over the same channel to the handshaker service.
 TEST_F(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {
   // Setup.
@@ -389,7 +389,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
-// Check that several server-side AltsTsiHandshakers can successfully complete concurrent, full
+// Check that several server-side handshaker can successfully complete concurrent, full
 // server-side ALTS handshakes over the same channel to the handshaker service.
 TEST_F(AltsTsiHandshakerTest, ConcurrentServerSideFullHandshakes) {
   // Setup.

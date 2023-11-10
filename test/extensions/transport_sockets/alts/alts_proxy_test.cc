@@ -382,7 +382,7 @@ TEST_F(AltsProxyTest, NextRequestLevelFailure) {
               StatusIs(absl::StatusCode::kInternal));
 }
 
-// Check that the AltsProxy correctly handles an unreacheable handshaker service
+// Check that the AltsProxy correctly handles an unreachable handshaker service
 // when sending a StartClientHandshakeReq.
 TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnClientStart) {
   std::string unreacheable_address = absl::StrCat("[::1]:", "1001");
@@ -394,7 +394,7 @@ TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnClientStart) {
               StatusIs(absl::StatusCode::kUnavailable));
 }
 
-// Check that the AltsProxy correctly handles an unreacheable handshaker service
+// Check that the AltsProxy correctly handles an unreachable handshaker service
 // when sending a StartServerHandshakeReq.
 TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnServerStart) {
   std::string unreacheable_address = absl::StrCat("[::1]:", "1001");
@@ -407,7 +407,7 @@ TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnServerStart) {
               StatusIs(absl::StatusCode::kUnavailable));
 }
 
-// Check that the AltsProxy correctly handles an unreacheable handshaker service
+// Check that the AltsProxy correctly handles an unreachable handshaker service
 // when sending a NextHandshakeReq.
 TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnNextRequest) {
   std::string unreacheable_address = absl::StrCat("[::1]:", "1001");
