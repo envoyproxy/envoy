@@ -217,6 +217,8 @@ private:
   std::unique_ptr<std::thread> server_thread_;
 };
 
+// Check that a client-side AltsTsiHandshaker can successfully complete a full
+// client-side ALTS handshake.
 TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
@@ -256,6 +258,8 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
+// Check that several client-side AltsTsiHandshakers can successfully complete concurrent, full
+// client-side ALTS handshakes over the same channel to the handshaker service.
 TEST_F(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {
   // Setup.
   startFakeHandshakerService();
@@ -300,6 +304,8 @@ TEST_F(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {
   }
 }
 
+// Check that a client-side AltsTsiHandshaker can successfully complete a full
+// client-side ALTS handshake when there are unused bytes after the handshake.
 TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
   // Setup.
   startFakeHandshakerService();
@@ -342,6 +348,8 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
+// Check that a server-side AltsTsiHandshaker can successfully complete a full
+// server-side ALTS handshake.
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
@@ -381,6 +389,8 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
+// Check that several server-side AltsTsiHandshakers can successfully complete concurrent, full
+// server-side ALTS handshakes over the same channel to the handshaker service.
 TEST_F(AltsTsiHandshakerTest, ConcurrentServerSideFullHandshakes) {
   // Setup.
   startFakeHandshakerService();
@@ -424,6 +434,9 @@ TEST_F(AltsTsiHandshakerTest, ConcurrentServerSideFullHandshakes) {
   }
 }
 
+// Check that a server-side AltsTsiHandshaker can successfully complete a full
+// server-side ALTS handshake when there are unused bytes sent after the
+// handshake.
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
   // Setup.
   startFakeHandshakerService();
@@ -467,6 +480,8 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
+// Check that a server-side AltsTsiHandshaker can successfully complete a full
+// server-side ALTS handshake when the initial bytes from the client are missing.
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) {
   // Setup.
   startFakeHandshakerService();
@@ -518,6 +533,9 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) 
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
+// Check that a server-side AltsTsiHandshaker can successfully complete a full
+// server-side ALTS handshake when the ClientInit is split across 2 packets on
+// the wire.
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
   // Setup.
   startFakeHandshakerService();
@@ -574,6 +592,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
               StatusCodeIs(absl::StatusCode::kInternal));
 }
 
+// Check that AltsTsiHandshaker correctly handles invalid arguments.
 TEST_F(AltsTsiHandshakerTest, InvalidArgumentToNext) {
   // Setup.
   startFakeHandshakerService();
@@ -595,6 +614,7 @@ TEST_F(AltsTsiHandshakerTest, InvalidArgumentToNext) {
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
+// Check that the handshake result is correctly validated.
 TEST_F(AltsTsiHandshakerTest, InvalidHandshakeResult) {
   // Setup.
   startFakeHandshakerService();
@@ -646,6 +666,7 @@ TEST_F(AltsTsiHandshakerTest, InvalidHandshakeResult) {
               StatusIs(absl::StatusCode::kFailedPrecondition));
 }
 
+// Check that the max frame size is correctly computed.
 TEST_F(AltsTsiHandshakerTest, ComputeMaxFrameSize) {
   // Max frame size is not set.
   HandshakerResult result;

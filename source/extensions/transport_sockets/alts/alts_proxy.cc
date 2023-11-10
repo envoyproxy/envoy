@@ -6,6 +6,7 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "src/proto/grpc/gcp/handshaker.pb.h"
 #include "src/proto/grpc/gcp/transport_security_common.pb.h"
@@ -24,6 +25,8 @@ using ::grpc::gcp::ServerHandshakeParameters;
 using ::grpc::gcp::StartClientHandshakeReq;
 using ::grpc::gcp::StartServerHandshakeReq;
 
+constexpr absl::Duration AltsClientContextDeadline = absl::Seconds(30);
+
 void AltsProxy::setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions) {
   rpc_protocol_versions->mutable_max_rpc_version()->set_major(MaxMajorRpcVersion);
   rpc_protocol_versions->mutable_max_rpc_version()->set_minor(MaxMinorRpcVersion);
@@ -37,6 +40,7 @@ AltsProxy::create(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
     return absl::InvalidArgumentError("Handshaker service channel is null.");
   }
   auto client_context = std::make_unique<grpc::ClientContext>();
+  client_context->set_deadline(absl::ToChronoTime(absl::Now() + AltsClientContextDeadline));
   auto stub = HandshakerService::NewStub(handshaker_service_channel);
   if (stub == nullptr) {
     return absl::InvalidArgumentError("Handshaker service stub is null.");
