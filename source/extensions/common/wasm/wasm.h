@@ -66,10 +66,8 @@ public:
   void getFunctions() override;
 
   // AccessLog::Instance
-  void log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType access_log_type);
+  void log(const PluginSharedPtr& plugin, const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& info);
 
   void onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot);
 

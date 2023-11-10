@@ -205,7 +205,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
           config_->responseHeadersParser().evaluateHeaders(
-              headers, *request_headers_, dynamic_cast<const Http::ResponseHeaderMap&>(headers),
+              headers, {request_headers_, dynamic_cast<const Http::ResponseHeaderMap*>(&headers)},
               callbacks_->streamInfo());
         },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);

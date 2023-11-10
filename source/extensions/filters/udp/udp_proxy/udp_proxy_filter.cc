@@ -34,8 +34,7 @@ UdpProxyFilter::~UdpProxyFilter() {
   if (!config_->proxyAccessLogs().empty()) {
     fillProxyStreamInfo();
     for (const auto& access_log : config_->proxyAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value(),
-                      AccessLog::AccessLogType::NotSet);
+      access_log->log({}, udp_proxy_stats_.value());
     }
   }
 }
@@ -312,8 +311,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_session_info_,
-                      AccessLog::AccessLogType::NotSet);
+      access_log->log({}, udp_session_info_);
     }
   }
 }
@@ -681,12 +679,8 @@ void HttpUpstreamImpl::setRequestEncoder(Http::RequestEncoder& request_encoder, 
     headers->addReferenceKey(Http::Headers::get().Path, target_tunnel_path);
   }
 
-  tunnel_config_.headerEvaluator().evaluateHeaders(
-      *headers,
-      downstream_info_.getRequestHeaders() == nullptr
-          ? *Http::StaticEmptyHeaders::get().request_headers
-          : *downstream_info_.getRequestHeaders(),
-      *Http::StaticEmptyHeaders::get().response_headers, downstream_info_);
+  tunnel_config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
+                                                   downstream_info_);
 
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.

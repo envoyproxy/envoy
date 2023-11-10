@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
@@ -15,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using envoy::config::bootstrap::v3::Bootstrap;
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -30,8 +32,9 @@ class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
   TestAsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
                              TimeSource& time_source, Api::Api& api,
-                             const Grpc::StatNames& stat_names)
-      : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names) {}
+                             const Grpc::StatNames& stat_names,
+                             const Bootstrap::GrpcAsyncClientManagerConfig& config)
+      : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names, config) {}
   Grpc::AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService&,
                                                     Stats::Scope&, bool) override {
     return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
@@ -45,7 +48,8 @@ public:
   ExtAuthzFilterTest() : RealThreadsTestHelper(5), stat_names_(symbol_table_) {
     runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-          context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_);
+          context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_,
+          Bootstrap::GrpcAsyncClientManagerConfig());
     });
   }
 

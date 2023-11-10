@@ -9,8 +9,8 @@ HTTP level filter stack within the connection manager.
 Filters can be written that operate on HTTP level messages without knowledge of the underlying physical
 protocol (HTTP/1.1, HTTP/2, etc.) or multiplexing capabilities.
 
-HTTP filters can be downstream filters, associated with a given listener and doing stream processing on each
-downstream request before routing, or upstream filters, associated with a given cluster and doing stream processing once per upstream request, after the router filter.
+HTTP filters can be downstream HTTP filters, associated with a given listener and doing stream processing on each
+downstream request before routing, or upstream HTTP filters, associated with a given cluster and doing stream processing once per upstream request, after the router filter.
 
 There are three types of HTTP level filters:
 
@@ -83,7 +83,7 @@ During downstream HTTP filter chain processing, when ``decodeHeaders()`` is invo
 connection manager performs route resolution and sets a *cached route* pointing to an upstream
 cluster.
 
-Downstream filters have the capability to directly mutate this *cached route* after route resolution, via the
+Downstream HTTP filters have the capability to directly mutate this *cached route* after route resolution, via the
 ``setRoute`` callback and :repo:`DelegatingRoute <source/common/router/delegating_route_impl.h>`
 mechanism.
 

@@ -106,6 +106,11 @@ public:
     code: 200
   )EOF";
 
+  const std::string stat_prefix_config_ = R"EOF(
+  domain: foo
+  stat_prefix: with_stat_prefix
+  )EOF";
+
   Filters::Common::RateLimit::MockClient* client_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Stats::StatNamePool pool_{filter_callbacks_.clusterInfo()->statsScope().symbolTable()};
@@ -1613,6 +1618,58 @@ TEST_F(HttpRateLimitFilterTest, DefaultConfigValueTest) {
   EXPECT_EQ(0UL, config_->stage());
   EXPECT_EQ("foo", config_->domain());
   EXPECT_EQ(FilterRequestType::Both, config_->requestType());
+}
+
+// Test that defining stat_prefix appends an additional prefix to the emitted statistics names.
+TEST_F(HttpRateLimitFilterTest, StatsWithPrefix) {
+  const std::string stat_prefix = "with_stat_prefix";
+  const std::string over_limit_counter_name_with_prefix =
+      absl::StrCat("ratelimit.", stat_prefix, ".over_limit");
+  const std::string over_limit_counter_name_without_prefix = "ratelimit.over_limit";
+
+  setUpTest(stat_prefix_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
+
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl()};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"},
+      {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True}};
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               std::move(h), nullptr, "", nullptr);
+
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(over_limit_counter_name_with_prefix)
+                    .value());
+
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(over_limit_counter_name_without_prefix)
+                    .value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_4xx_).value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
 }
 
 } // namespace

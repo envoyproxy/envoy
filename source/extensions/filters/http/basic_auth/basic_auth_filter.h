@@ -36,15 +36,14 @@ struct User {
   std::string hash;
 };
 
-using UserMapConstPtr =
-    std::unique_ptr<const absl::flat_hash_map<std::string, User>>; // username, User
+using UserMap = absl::flat_hash_map<std::string, User>;
 
 /**
  * Configuration for the Basic Auth filter.
  */
 class FilterConfig {
 public:
-  FilterConfig(UserMapConstPtr users, const std::string& stats_prefix, Stats::Scope& scope);
+  FilterConfig(UserMap&& users, const std::string& stats_prefix, Stats::Scope& scope);
   const BasicAuthStats& stats() const { return stats_; }
   bool validateUser(absl::string_view username, absl::string_view password) const;
 
@@ -53,7 +52,7 @@ private:
     return BasicAuthStats{ALL_BASIC_AUTH_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  UserMapConstPtr users_;
+  const UserMap users_;
   BasicAuthStats stats_;
 };
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
@@ -66,11 +65,12 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
+  Http::FilterHeadersStatus onDenied(absl::string_view body,
+                                     absl::string_view response_code_details);
+
   // The callback function.
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   FilterConfigConstSharedPtr config_;
 };
 
