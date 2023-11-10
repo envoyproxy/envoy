@@ -9,7 +9,8 @@
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/jni/jni_helper.h"
 
-// NOLINT(namespace-envoy)
+namespace Envoy {
+namespace JNI {
 
 /* Calls up through JNI to validate given certificates.
  */
@@ -22,3 +23,6 @@ envoy_cert_validation_result verify_x509_cert_chain(const std::vector<std::strin
                                                     absl::string_view hostname);
 
 void jvm_detach_thread();
+
+} // namespace JNI
+} // namespace Envoy
