@@ -6,8 +6,8 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/instance_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/server.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
@@ -152,11 +152,11 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   std::unique_ptr<InstanceImpl> server;
   try {
     server = std::make_unique<InstanceImpl>(
-        init_manager, options, test_time.timeSystem(),
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart, stats_store,
-        fakelock, component_factory, std::make_unique<Random::RandomGeneratorImpl>(),
-        thread_local_instance, Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-        nullptr);
+        init_manager, options, test_time.timeSystem(), hooks, restart, stats_store, fakelock,
+        std::make_unique<Random::RandomGeneratorImpl>(), thread_local_instance,
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+    server->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                       component_factory);
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
     return;

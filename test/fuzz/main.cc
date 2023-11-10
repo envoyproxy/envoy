@@ -45,7 +45,7 @@ protected:
 
 TEST_P(FuzzerCorpusTest, RunOneCorpusFile) {
   ENVOY_LOG_MISC(info, "Corpus file: {}", GetParam());
-  const std::string buf = api_->fileSystem().fileReadToEnd(GetParam());
+  const std::string buf = api_->fileSystem().fileReadToEnd(GetParam()).value();
   // Everything from here on is the same as under the fuzzer lib.
   LLVMFuzzerTestOneInput(reinterpret_cast<const uint8_t*>(buf.c_str()), buf.size());
 }

@@ -192,6 +192,7 @@ void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::RequestHeaderMap& headers,
     Protobuf::Map<std::string, std::string>&& context_extensions,
     envoy::config::core::v3::Metadata&& metadata_context,
+    envoy::config::core::v3::Metadata&& route_metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
     bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
@@ -203,17 +204,15 @@ void CheckRequestUtils::createHttpCheck(
   // *cb->connection(), callbacks->streamInfo() and callbacks->decodingBuffer() are not qualified as
   // const.
   auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
-  if (cb->connection().has_value()) {
-    setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
-                       include_peer_certificate);
-    setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
-                       include_peer_certificate);
-  }
+  setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
+                     include_peer_certificate);
+  setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
+                     include_peer_certificate);
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
                         request_header_matchers);
 
-  if (include_tls_session && cb->connection().has_value()) {
+  if (include_tls_session) {
     if (cb->connection()->ssl() != nullptr) {
       attrs->mutable_tls_session();
       if (!cb->connection()->ssl()->sni().empty()) {
@@ -226,6 +225,7 @@ void CheckRequestUtils::createHttpCheck(
   // Fill in the context extensions and metadata context.
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);
   (*attrs->mutable_metadata_context()) = std::move(metadata_context);
+  (*attrs->mutable_route_metadata_context()) = std::move(route_metadata_context);
 }
 
 void CheckRequestUtils::createTcpCheck(
@@ -242,7 +242,6 @@ void CheckRequestUtils::createTcpCheck(
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
-
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }
 

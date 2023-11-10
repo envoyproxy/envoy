@@ -232,8 +232,10 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     // all hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which
     // results in 100%. If 80% of hosts are healthy, that priority's health is still 100%
     // (80%*1.4=112% and capped at 100%).
-    per_priority_health.get()[priority] = std::min<uint32_t>(
-        100, (host_set.overprovisioningFactor() * healthy_weight / total_weight));
+    per_priority_health.get()[priority] =
+        std::min<uint32_t>(100,
+                           // NOLINTNEXTLINE(clang-analyzer-core.DivideZero)
+                           (host_set.overprovisioningFactor() * healthy_weight / total_weight));
 
     // We perform the same computation for degraded hosts.
     per_priority_degraded.get()[priority] = std::min<uint32_t>(
@@ -1297,6 +1299,24 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
                                                                 const HostsSource&) {
   HostSharedPtr candidate_host = nullptr;
 
+  // Do full scan if it's required explicitly.
+  if (enable_full_scan_) {
+    for (const auto& sampled_host : hosts_to_use) {
+      if (candidate_host == nullptr) {
+        // Make a first choice to start the comparisons.
+        candidate_host = sampled_host;
+        continue;
+      }
+
+      const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
+      const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
+      if (sampled_active_rq < candidate_active_rq) {
+        candidate_host = sampled_host;
+      }
+    }
+    return candidate_host;
+  }
+
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
     const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];
@@ -1344,47 +1364,5 @@ HostConstSharedPtr RandomLoadBalancer::peekOrChoose(LoadBalancerContext* context
   return hosts_to_use[random_hash % hosts_to_use.size()];
 }
 
-SubsetSelectorImpl::SubsetSelectorImpl(
-    const Protobuf::RepeatedPtrField<std::string>& selector_keys,
-    envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
-        LbSubsetSelectorFallbackPolicy fallback_policy,
-    const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
-    bool single_host_per_subset)
-    : selector_keys_(selector_keys.begin(), selector_keys.end()),
-      fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()),
-      fallback_policy_(fallback_policy), single_host_per_subset_(single_host_per_subset) {
-
-  if (fallback_policy_ !=
-      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
-    // defining fallback_keys_subset_ for a fallback policy other than KEYS_SUBSET doesn't have
-    // any effect and it is probably a user mistake. We should let the user know about it.
-    if (!fallback_keys_subset_.empty()) {
-      throw EnvoyException("fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
-    }
-    return;
-  }
-
-  // if KEYS_SUBSET fallback policy is selected, fallback_keys_subset must not be empty, because
-  // it would be the same as not defining fallback policy at all (global fallback policy would be
-  // used)
-  if (fallback_keys_subset_.empty()) {
-    throw EnvoyException("fallback_keys_subset cannot be empty");
-  }
-
-  // We allow only for a fallback to a subset of the selector keys because this is probably the
-  // only use case that makes sense (fallback from more specific selector to less specific
-  // selector). Potentially we can relax this constraint in the future if there will be a use case
-  // for this.
-  if (!std::includes(selector_keys_.begin(), selector_keys_.end(), fallback_keys_subset_.begin(),
-                     fallback_keys_subset_.end())) {
-    throw EnvoyException("fallback_keys_subset must be a subset of selector keys");
-  }
-
-  // Enforce that the fallback_keys_subset_ set is smaller than the selector_keys_ set. Otherwise
-  // we could end up with a infinite recursion of SubsetLoadBalancer::chooseHost().
-  if (selector_keys_.size() == fallback_keys_subset_.size()) {
-    throw EnvoyException("fallback_keys_subset cannot be equal to keys");
-  }
-}
 } // namespace Upstream
 } // namespace Envoy

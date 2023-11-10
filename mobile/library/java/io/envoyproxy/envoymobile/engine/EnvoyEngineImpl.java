@@ -113,14 +113,10 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   @Override
   public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     performRegistration(envoyConfiguration);
-    try {
-      int status = JniLibrary.runEngine(this.engineHandle, "", envoyConfiguration.createBootstrap(),
-                                        logLevel);
-      if (status == 0) {
-        return EnvoyStatus.ENVOY_SUCCESS;
-      }
-    } catch (Throwable throwable) {
-      // TODO: Need to have a way to log the exception somewhere.
+    int status =
+        JniLibrary.runEngine(this.engineHandle, "", envoyConfiguration.createBootstrap(), logLevel);
+    if (status == 0) {
+      return EnvoyStatus.ENVOY_SUCCESS;
     }
     return EnvoyStatus.ENVOY_FAILURE;
   }

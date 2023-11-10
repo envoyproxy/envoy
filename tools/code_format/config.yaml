@@ -97,13 +97,14 @@ paths:
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/upstream/thread_aware_lb_impl.cc
+    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/load_balancer_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/outlier_detection_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
-    - source/common/network/io_socket_handle_impl.cc
+    - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
     - source/common/network/cidr_range.cc
     - source/common/network/utility.cc
@@ -150,10 +151,8 @@ paths:
     - source/common/router/header_parser.cc
     - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
-    - source/common/filesystem/posix/filesystem_impl.cc
     - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
-    - source/common/filesystem/win32/filesystem_impl.cc
     - source/common/filesystem/win32/watcher_impl.cc
     - source/common/common/utility.cc
     - source/common/common/regex.cc
@@ -197,7 +196,7 @@ paths:
   protobuf:
     include:
     - api/test
-    - bazel/cc_proto_descriptor_library
+    - api/bazel/cc_proto_descriptor_library
     - ci/prebuilt
     - source/common/protobuf
     - source/extensions/filters/http/grpc_field_extraction
@@ -248,7 +247,7 @@ paths:
   # Files in these paths can use MessageLite::SerializeAsString
   serialize_as_string:
     include:
-    - bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
+    - api/bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
     - contrib/config/source/kv_store_xds_delegate.cc
     - source/common/protobuf/utility.h
     - source/common/protobuf/utility.cc
@@ -274,6 +273,7 @@ paths:
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
+    - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/version/version.cc
@@ -406,3 +406,7 @@ visibility_excludes:
 - source/extensions/config_subscription/grpc/BUILD
 - source/extensions/load_balancing_policies/subset/BUILD
 - source/extensions/load_balancing_policies/ring_hash/BUILD
+- source/extensions/load_balancing_policies/round_robin/
+- source/extensions/load_balancing_policies/least_request/
+- source/extensions/load_balancing_policies/random/
+- source/extensions/load_balancing_policies/cluster_provided/

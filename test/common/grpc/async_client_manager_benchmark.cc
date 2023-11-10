@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 
@@ -28,7 +29,9 @@ class AsyncClientManagerImplTest {
 public:
   AsyncClientManagerImplTest()
       : api_(Api::createApiForTest()), stat_names_(scope_.symbolTable()),
-        async_client_manager_(cm_, tls_, test_time_.timeSystem(), *api_, stat_names_) {}
+        async_client_manager_(
+            cm_, tls_, test_time_.timeSystem(), *api_, stat_names_,
+            envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig()) {}
 
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -47,6 +50,7 @@ void testGetOrCreateAsyncClientWithConfig(::benchmark::State& state) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
           async_client_man_test.async_client_manager_.getOrCreateRawAsyncClient(
@@ -63,6 +67,7 @@ void testGetOrCreateAsyncClientWithHashConfig(::benchmark::State& state) {
   GrpcServiceConfigWithHashKey config_with_hash_key_a = GrpcServiceConfigWithHashKey(grpc_service);
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
           async_client_man_test.async_client_manager_.getOrCreateRawAsyncClientWithHashKey(

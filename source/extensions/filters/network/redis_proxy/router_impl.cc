@@ -53,6 +53,21 @@ Prefix::Prefix(
     mirror_policies_.emplace_back(std::make_shared<MirrorPolicyImpl>(
         mirror_policy, upstreams.at(mirror_policy.cluster()), runtime));
   }
+  if (route.has_read_command_policy()) {
+    read_upstream_ = upstreams.at(route.read_command_policy().cluster());
+  }
+}
+
+ConnPool::InstanceSharedPtr Prefix::upstream(const std::string& command) const {
+
+  if (read_upstream_) {
+    std::string to_lower_string = absl::AsciiStrToLower(command);
+    if (Common::Redis::SupportedCommands::isReadCommand(to_lower_string)) {
+      return read_upstream_;
+    }
+  }
+
+  return upstream_;
 }
 
 PrefixRoutes::PrefixRoutes(
@@ -91,6 +106,13 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key,
   if (value == nullptr) {
     // prefix route not found, default to catch all route.
     value = catch_all_route_;
+    // prefix route not found, check if catch_all_route is defined to fallback to.
+    if (catch_all_route_ != nullptr) {
+      value = catch_all_route_;
+    } else {
+      // no route found.
+      return value;
+    }
   }
 
   if (value->removePrefix()) {

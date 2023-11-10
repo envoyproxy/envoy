@@ -412,6 +412,26 @@ TEST_F(IoHandleImplTest, ShutDownOptionsNotSupported) {
   ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
 }
 
+// This test is ensure the memory created by BufferFragment won't be released
+// after the write.
+TEST_F(IoHandleImplTest, WriteBufferFragement) {
+  Buffer::OwnedImpl buf("a");
+  bool released = false;
+  auto buf_frag = Buffer::OwnedBufferFragmentImpl::create(
+      std::string(255, 'b'), [&released](const Buffer::OwnedBufferFragmentImpl* fragment) {
+        released = true;
+        delete fragment;
+      });
+  buf.addBufferFragment(*buf_frag.release());
+
+  auto result = io_handle_->write(buf);
+  EXPECT_FALSE(released);
+  EXPECT_EQ(0, buf.length());
+  io_handle_peer_->read(buf, absl::nullopt);
+  buf.drain(buf.length());
+  EXPECT_TRUE(released);
+}
+
 TEST_F(IoHandleImplTest, WriteByMove) {
   Buffer::OwnedImpl buf("0123456789");
   auto result = io_handle_peer_->write(buf);

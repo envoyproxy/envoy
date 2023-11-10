@@ -16,6 +16,8 @@ public:
   const std::string Buffer = "envoy.filters.http.buffer";
   // Bandwidth limit filter
   const std::string BandwidthLimit = "envoy.filters.http.bandwidth_limit";
+  // Basic Auth filter
+  const std::string BasicAuth = "envoy.filters.http.basic_auth";
   // Cache filter
   const std::string Cache = "envoy.filters.http.cache";
   // CDN Loop filter
@@ -44,6 +46,8 @@ public:
   const std::string GrpcJsonTranscoder = "envoy.filters.http.grpc_json_transcoder";
   // GRPC web filter
   const std::string GrpcWeb = "envoy.filters.http.grpc_web";
+  // GRPC Field Extraction filter
+  const std::string GrpcFieldExtraction = "envoy.filters.http.grpc_field_extraction";
   // GRPC http1 reverse bridge filter
   const std::string GrpcHttp1ReverseBridge = "envoy.filters.http.grpc_http1_reverse_bridge";
   // GRPC telemetry

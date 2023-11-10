@@ -6,8 +6,8 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/access_log_config.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -26,26 +26,18 @@ public:
   /**
    * Log a completed request if the underlying AccessLog `filter_` allows it.
    */
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type) override;
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& stream_info) override;
 
 private:
   /**
    * Log a completed request.
-   * @param request_headers supplies the incoming request headers after filtering.
-   * @param response_headers supplies response headers.
-   * @param response_trailers supplies response trailers.
+   * @param context supplies the necessary context to log.
    * @param stream_info supplies additional information about the request not
    * contained in the request headers.
    */
-  virtual void emitLog(const Http::RequestHeaderMap& request_headers,
-                       const Http::ResponseHeaderMap& response_headers,
-                       const Http::ResponseTrailerMap& response_trailers,
-                       const StreamInfo::StreamInfo& stream_info,
-                       AccessLog::AccessLogType access_log_type) PURE;
+  virtual void emitLog(const Formatter::HttpFormatterContext& context,
+                       const StreamInfo::StreamInfo& stream_info) PURE;
 
   AccessLog::FilterPtr filter_;
 };

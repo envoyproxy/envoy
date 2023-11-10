@@ -845,7 +845,7 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
   EXPECT_GT(quic_stream_->statsGatherer()->bytesOutstanding(), 0);
   // Close the stream; incoming acks will no longer invoke the stats gatherer but
   // the stats gatherer should log on stream close despite not receiving final downstream ack.
-  EXPECT_CALL(*mock_logger, log(_, _, _, _, _));
+  EXPECT_CALL(*mock_logger, log(_, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
 }
 

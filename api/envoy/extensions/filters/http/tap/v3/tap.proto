@@ -31,4 +31,7 @@ message Tap {
   // Request headers time stamp is stored after receiving request headers.
   // Response headers time stamp is stored after receiving response headers.
   bool record_headers_received_time = 2;
+
+  // Indicates whether report downstream connection info
+  bool record_downstream_connection = 3;
 }

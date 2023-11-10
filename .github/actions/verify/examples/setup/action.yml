@@ -16,15 +16,15 @@ runs:
     env:
       REF: ${{ inputs.ref }}
     shell: bash
-  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.0.10
+  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
     with:
       url: "${{ steps.url.outputs.base }}/envoy.tar"
       variant: dev
-  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.0.10
+  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
     with:
       url: "${{ steps.url.outputs.base }}/envoy-contrib.tar"
       variant: contrib-dev
-  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.0.10
+  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
     with:
       url: "${{ steps.url.outputs.base }}/envoy-google-vrp.tar"
       variant: google-vrp-dev

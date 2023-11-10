@@ -91,7 +91,14 @@ void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
   queueDiscoveryRequest(resource_type_url);
 }
 
-void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
+void GrpcMuxImpl::start() {
+  ASSERT(!started_);
+  if (started_) {
+    return;
+  }
+  started_ = true;
+  grpc_stream_.establishNewStream();
+}
 
 void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   if (shutdown_) {
@@ -127,6 +134,15 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   // clear error_detail after the request is sent if it exists.
   if (apiStateFor(type_url).request_.has_error_detail()) {
     apiStateFor(type_url).request_.clear_error_detail();
+  }
+}
+
+void GrpcMuxImpl::clearNonce() {
+  // Iterate over all api_states (for each type_url), and clear its nonce.
+  for (auto& [type_url, api_state] : api_state_) {
+    if (api_state) {
+      api_state->request_.clear_response_nonce();
+    }
   }
 }
 
@@ -451,6 +467,7 @@ void GrpcMuxImpl::onWriteable() { drainRequests(); }
 void GrpcMuxImpl::onStreamEstablished() {
   first_stream_request_ = true;
   grpc_stream_.maybeUpdateQueueSizeStat(0);
+  clearNonce();
   request_queue_ = std::make_unique<std::queue<std::string>>();
   for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);

@@ -48,7 +48,7 @@ std::string TcpGrpcAccessLogFactory::name() const { return "envoy.access_loggers
 /**
  * Static registration for the TCP gRPC access log. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(TcpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+LEGACY_REGISTER_FACTORY(TcpGrpcAccessLogFactory, AccessLog::AccessLogInstanceFactory,
                         "envoy.tcp_grpc_access_log");
 
 } // namespace TcpGrpc

@@ -235,13 +235,17 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     decoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (!decoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "decodeHeaders: Skipped");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (decoding_state_.sendHeaders()) {
+    status = onHeaders(decoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
   }
 
-  const auto status = onHeaders(decoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
+  if (!processing_complete_ && decoding_state_.shouldRemoveContentLength()) {
+    headers.removeContentLength();
+  }
   return status;
 }
 
@@ -509,13 +513,22 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     encoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (processing_complete_ || !encoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "encodeHeaders: Continue");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (!processing_complete_ && encoding_state_.sendHeaders()) {
+    status = onHeaders(encoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
   }
 
-  const auto status = onHeaders(encoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
+  // The content-length header will be kept when either one of the following conditions is met:
+  // (1) `shouldRemoveContentLength` returns false.
+  // (2) side stream processing has been completed. For example, it could be caused by stream error
+  // that triggers the local reply or due to spurious message that skips the side stream
+  // mutation.
+  if (!processing_complete_ && encoding_state_.shouldRemoveContentLength()) {
+    headers.removeContentLength();
+  }
   return status;
 }
 
@@ -663,14 +676,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // We won't be sending anything more to the stream after we
       // receive this message.
       ENVOY_LOG(debug, "Sending immediate response");
-      // TODO(tyxia) For immediate response case here and below, logging is needed because
-      // `onFinishProcessorCalls` is called after `closeStream` below.
-      // Investigate to see if we can switch the order of those two so that the logging here can be
-      // avoided.
-      logGrpcStreamInfo();
       processing_complete_ = true;
-      closeStream();
       onFinishProcessorCalls(Grpc::Status::Ok);
+      closeStream();
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
     }
@@ -703,9 +711,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
-    logGrpcStreamInfo();
-    closeStream();
     onFinishProcessorCalls(processing_status.raw_code());
+    closeStream();
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
@@ -728,10 +735,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
-    closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
     onFinishProcessorCalls(status);
+    closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));

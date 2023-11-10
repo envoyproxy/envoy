@@ -94,6 +94,11 @@ public:
   virtual uint32_t encode(Buffer::Instance& dst) const PURE;
 
   /**
+   * Convenience method for response's API key.
+   */
+  int16_t apiKey() const { return metadata_.api_key_; }
+
+  /**
    * Response's metadata.
    */
   const ResponseMetadata metadata_;
@@ -141,7 +146,7 @@ public:
     return metadata_ == rhs.metadata_ && data_ == rhs.data_;
   };
 
-  const Data data_;
+  Data data_;
 };
 
 } // namespace Kafka

@@ -150,6 +150,7 @@ envoy_cc_library(
     srcs = ["dependency_manager.cc"],
     hdrs = ["dependency_manager.h"],
     external_deps = [
+        "abseil_flat_hash_set",
         "abseil_status",
     ],
     deps = [

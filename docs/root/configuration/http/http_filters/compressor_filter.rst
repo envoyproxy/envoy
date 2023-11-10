@@ -26,32 +26,11 @@ compression only. Other compression libraries can be supported as extensions.
 
 An example configuration of the filter may look like the following:
 
-.. code-block:: yaml
-
-    http_filters:
-    - name: envoy.filters.http.compressor
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-        response_direction_config:
-          common_config:
-            min_content_length: 100
-            content_type:
-              - text/html
-              - application/json
-          disable_on_etag_header: true
-        request_direction_config:
-          common_config:
-            enabled:
-              default_value: false
-              runtime_key: request_compressor_enabled
-        compressor_library:
-          name: text_optimized
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
-            memory_level: 3
-            window_bits: 10
-            compression_level: BEST_COMPRESSION
-            compression_strategy: DEFAULT_STRATEGY
+.. literalinclude:: _include/compressor-filter.yaml
+    :language: yaml
+    :linenos:
+    :lines: 33-56
+    :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
 
 By *default* request compression is disabled, but when enabled it will be *skipped* if:
 
@@ -132,27 +111,11 @@ Per-Route Configuration
 Response compression can be enabled and disabled on individual virtual hosts and routes.
 For example, to disable response compression for a particular virtual host, but enable response compression for its ``/static`` route:
 
-.. code-block:: yaml
-
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      typed_per_filter_config:
-        envoy.filters.http.compression:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
-            disabled: true
-      routes:
-      - match: { prefix: "/static" }
-        route: { cluster: some_service }
-        typed_per_filter_config:
-          envoy.filters.http.compression:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
-          overrides:
-            response_direction_config:
-      - match: { prefix: "/" }
-        route: { cluster: some_service }
+.. literalinclude:: _include/compressor-filter.yaml
+    :language: yaml
+    :linenos:
+    :lines: 14-32
+    :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
 
 Using different compressors for requests and responses
 --------------------------------------------------------
@@ -160,48 +123,11 @@ Using different compressors for requests and responses
 If different compression libraries are desired for requests and responses, it is possible to install
 multiple compressor filters enabled only for requests or responses. For instance:
 
-.. code-block:: yaml
-
-    http_filters:
-    # This filter is only enabled for responses.
-    - name: envoy.filters.http.compressor
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-        request_direction_config:
-          common_config:
-            enabled:
-              default_value: false
-              runtime_key: request_compressor_enabled
-        compressor_library:
-          name: for_response
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
-            memory_level: 3
-            window_bits: 10
-            compression_level: BEST_COMPRESSION
-            compression_strategy: DEFAULT_STRATEGY
-    # This filter is only enabled for requests.
-    - name: envoy.filters.http.compressor
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-        response_direction_config:
-          common_config:
-            enabled:
-              default_value: false
-              runtime_key: response_compressor_enabled
-        request_direction_config:
-          common_config:
-            enabled:
-              default_value: true
-              runtime_key: request_compressor_enabled
-        compressor_library:
-          name: for_request
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
-            memory_level: 9
-            window_bits: 15
-            compression_level: BEST_SPEED
-            compression_strategy: DEFAULT_STRATEGY
+.. literalinclude:: _include/compressor-filter-request-response.yaml
+    :language: yaml
+    :linenos:
+    :lines: 25-64
+    :caption: :download:`compressor-filter-request-response.yaml <_include/compressor-filter-request-response.yaml>`
 
 .. _compressor-statistics:
 
