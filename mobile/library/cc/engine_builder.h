@@ -49,7 +49,7 @@ public:
   //                       (https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/operations/dynamic_configuration#aggregated-xds-ads).
   // `xds_server_port`: the port on which the xDS management server listens for ADS discovery
   //                    requests.
-  XdsBuilder(std::string xds_server_address, const int xds_server_port);
+  XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port);
 
   // Adds a header to the initial HTTP metadata headers sent on the gRPC stream.
   //
@@ -111,7 +111,7 @@ private:
   friend class EngineBuilder;
 
   std::string xds_server_address_;
-  int xds_server_port_;
+  uint32_t xds_server_port_;
   std::vector<envoy::config::core::v3::HeaderValue> xds_initial_grpc_metadata_;
   std::string ssl_root_certs_;
   std::string sni_;
