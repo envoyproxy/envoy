@@ -50,6 +50,14 @@ public:
 };
 
 /**
+ * A bundle struct for drop_overload stats.
+ */
+struct DropOverloadStats {
+  std::string category;
+  uint64_t dropped_count;
+};
+
+/**
  * Interface to select upstream local address based on the endpoint address.
  */
 class UpstreamLocalAddressSelector {
@@ -743,6 +751,7 @@ public:
   COUNTER(upstream_rq_cancelled)                                                                   \
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(upstream_rq_drop_overload)                                                               \
   COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
@@ -1176,6 +1185,16 @@ public:
    * @return true if this cluster should produce per-endpoint stats.
    */
   virtual bool perEndpointStatsEnabled() const PURE;
+
+  /**
+   * @return cluster drop_overload configuration.
+   */
+  virtual std::list<envoy::config::endpoint::v3::ClusterLoadAssignment::Policy::DropOverload> dropOverload() const PURE;
+
+  /**
+   * @return cluster drop_overload stats data.
+   */
+  virtual std::list<DropOverloadStats> dropOverloadStats() const PURE;
 
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.

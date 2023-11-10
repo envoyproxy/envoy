@@ -1,4 +1,5 @@
 #include "source/common/router/router.h"
+#include "source/common/common/interval_value.h"
 
 #include <algorithm>
 #include <chrono>
@@ -560,6 +561,37 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
     cluster_->trafficStats()->upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // Support DROP_OVERLOAD config from control plane to drop certain percentage of traffic.
+  if (cluster_->dropOverload().size() > 0) {
+    for (auto drop_overload : cluster_->dropOverload()) {
+      auto category = drop_overload.category();
+      auto drop_percentage = drop_overload.drop_percentage();
+      if (config_.random_.bernoulli(UnitFloat(drop_percentage.numerator()/drop_percentage.denominator()))) {
+        callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DropOverLoad);
+        chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
+        callbacks_->sendLocalReply(
+            Http::Code::ServiceUnavailable, "drop overload",
+            [modify_headers, this](Http::ResponseHeaderMap& headers) {
+              if (!config_.suppress_envoy_headers_) {
+                headers.addReference(Http::Headers::get().EnvoyDropOverload,
+                                     Http::Headers::get().EnvoyDropOverloadValues.True);
+              }
+              // Note: append_cluster_info does not respect suppress_envoy_headers.
+              modify_headers(headers);
+            },
+            absl::nullopt, StreamInfo::ResponseCodeDetails::get().DropOverload);
+        for (auto stats : cluster_->dropOverloadStats()) {
+          if (stats.category == category) {
+            stats.dropped_count ++;
+            break;
+          }
+        }
+        cluster_->trafficStats()->upstream_rq_drop_overload_.inc();
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+    }
   }
 
   // Fetch a connection pool for the upstream cluster.
