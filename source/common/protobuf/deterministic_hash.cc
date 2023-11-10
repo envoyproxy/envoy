@@ -7,26 +7,18 @@
 namespace Envoy {
 namespace DeterministicProtoHash {
 namespace {
-#define REFLECTION_FOR_EACH(get_type, hash_type)                                                   \
+
+#define REFLECTION_FOR_EACH(get_type, value_type)                                                  \
   if (field->is_repeated()) {                                                                      \
-    for (int i = 0; i < reflection->FieldSize(message, field); i++) {                              \
-      hash_type(reflection->GetRepeated##get_type(message, field, i));                             \
+    for (const auto q : reflection->GetRepeatedFieldRef<value_type>(message, field)) {             \
+      seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)},   \
+                                seed);                                                             \
     }                                                                                              \
   } else {                                                                                         \
-    hash_type(reflection->Get##get_type(message, field));                                          \
-  }
-
-#define HASH_FIXED(v)                                                                              \
-  do {                                                                                             \
-    auto q = v;                                                                                    \
+    const auto q = reflection->Get##get_type(message, field);                                      \
     seed =                                                                                         \
         HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed); \
-  } while (0)
-
-#define HASH_STRING(v)                                                                             \
-  do {                                                                                             \
-    seed = HashUtil::xxHash64(v, seed);                                                            \
-  } while (0)
+  }
 
 uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed = 0);
 uint64_t reflectionHashField(const Protobuf::Message& message,
@@ -53,7 +45,6 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
   auto entry_descriptor = map.begin()->get().GetDescriptor();
   const FieldDescriptor* key_field = entry_descriptor->map_key();
   const FieldDescriptor* value_field = entry_descriptor->map_value();
-  HASH_FIXED(key_field->number());
   std::function<bool(const Protobuf::Message& a, const Protobuf::Message& b)> compareFn;
   switch (key_field->cpp_type()) {
   case FieldDescriptor::CPPTYPE_INT32:
@@ -112,40 +103,44 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor* field, uint64_t seed) {
   using Protobuf::FieldDescriptor;
   const auto reflection = message.GetReflection();
-  HASH_FIXED(field->number());
+  {
+    const auto q = field->number();
+    seed =
+        HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed);
+  }
   switch (field->cpp_type()) {
   case FieldDescriptor::CPPTYPE_INT32:
-    REFLECTION_FOR_EACH(Int32, HASH_FIXED);
+    REFLECTION_FOR_EACH(Int32, int32_t);
     break;
   case FieldDescriptor::CPPTYPE_UINT32:
-    REFLECTION_FOR_EACH(UInt32, HASH_FIXED);
+    REFLECTION_FOR_EACH(UInt32, uint32_t);
     break;
   case FieldDescriptor::CPPTYPE_INT64:
-    REFLECTION_FOR_EACH(Int64, HASH_FIXED);
+    REFLECTION_FOR_EACH(Int64, int64_t);
     break;
   case FieldDescriptor::CPPTYPE_UINT64:
-    REFLECTION_FOR_EACH(UInt64, HASH_FIXED);
+    REFLECTION_FOR_EACH(UInt64, uint64_t);
     break;
   case FieldDescriptor::CPPTYPE_DOUBLE:
-    REFLECTION_FOR_EACH(Double, HASH_FIXED);
+    REFLECTION_FOR_EACH(Double, double);
     break;
   case FieldDescriptor::CPPTYPE_FLOAT:
-    REFLECTION_FOR_EACH(Float, HASH_FIXED);
+    REFLECTION_FOR_EACH(Float, float);
     break;
   case FieldDescriptor::CPPTYPE_BOOL:
-    REFLECTION_FOR_EACH(Bool, HASH_FIXED);
+    REFLECTION_FOR_EACH(Bool, bool);
     break;
   case FieldDescriptor::CPPTYPE_ENUM:
-    REFLECTION_FOR_EACH(EnumValue, HASH_FIXED);
+    REFLECTION_FOR_EACH(EnumValue, uint32_t);
     break;
   case FieldDescriptor::CPPTYPE_STRING: {
     if (field->is_repeated()) {
       for (const std::string& str : reflection->GetRepeatedFieldRef<std::string>(message, field)) {
-        HASH_STRING(str);
+        seed = HashUtil::xxHash64(str, seed);
       }
     } else {
       std::string scratch;
-      HASH_STRING(reflection->GetStringReference(message, field, &scratch));
+      seed = HashUtil::xxHash64(reflection->GetStringReference(message, field, &scratch), seed);
     }
   } break;
   case FieldDescriptor::CPPTYPE_MESSAGE:
@@ -192,7 +187,7 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
   std::string scratch;
   const auto reflection = message.GetReflection();
   const auto descriptor = message.GetDescriptor();
-  HASH_STRING(descriptor->full_name());
+  seed = HashUtil::xxHash64(descriptor->full_name(), seed);
   if (descriptor->well_known_type() == Protobuf::Descriptor::WELLKNOWNTYPE_ANY) {
     const ProtobufWkt::Any* any = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
     auto submsg = unpackAnyForReflection(*any);
