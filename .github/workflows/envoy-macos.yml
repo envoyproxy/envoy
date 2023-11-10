@@ -1,0 +1,61 @@
+name: Envoy/macos
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+    - release/v*
+  pull_request_target:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      pull-requests: read
+    with:
+      prime-build-image: false
+      check-mobile-run: false
+
+  macos:
+    needs:
+    - env
+    uses: ./.github/workflows/_ci.yml
+    name: CI ${{ matrix.name || matrix.target }}
+    secrets:
+      rbe-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+    with:
+      target: ${{ matrix.target }}
+      runs-on: macos-12-xl
+      command-ci:
+      command-prefix:
+      repo-ref: ${{ needs.env.outputs.repo_ref }}
+      steps-post:
+      steps-pre: ${{ matrix.steps-pre }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: ci/mac_ci_steps.sh
+          name: macOS
+          steps-pre: |
+            - run: ./ci/mac_ci_setup.sh
+              shell: bash
+              name: Setup macos
+          source: |
+            GCP_SERVICE_ACCOUNT_KEY_PATH=$(mktemp -t gcp_service_account.XXXXXX.json)
+            bash -c "echo \"${RBE_KEY}\" | base64 --decode > \"${GCP_SERVICE_ACCOUNT_KEY_PATH}\""
+            _BAZEL_BUILD_EXTRA_OPTIONS=(
+              --remote_download_toplevel
+              --flaky_test_attempts=2
+              --config=cache-google
+              --config=ci
+              --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_PATH})
+            export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}

@@ -15,8 +15,7 @@ HeaderMutation::HeaderMutation(const ProtoHeaderMutation& mutations)
 
 bool HeaderMutation::mutate(Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info) const {
-  mutations_.evaluateHeaders(headers, headers,
-                             *Envoy::Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  mutations_.evaluateHeaders(headers, {&headers}, stream_info);
   return true;
 }
 

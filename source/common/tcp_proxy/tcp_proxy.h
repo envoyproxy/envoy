@@ -538,6 +538,10 @@ protected:
   // This will be non-null from when an upstream connection is attempted until
   // it either succeeds or fails.
   std::unique_ptr<GenericConnPool> generic_conn_pool_;
+  // Time the filter first attempted to connect to the upstream after the
+  // cluster is discovered. Capture the first time as the filter may try multiple times to connect
+  // to the upstream.
+  absl::optional<MonotonicTime> initial_upstream_connection_start_time_;
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;

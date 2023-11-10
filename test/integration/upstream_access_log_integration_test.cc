@@ -116,8 +116,8 @@ INSTANTIATE_TEST_SUITE_P(Params, UpstreamAccessLogTest,
                          TestUtility::ipTestParamsToString);
 
 /*
- * Verifies that the Http Router's `upstream_log` correctly reflects the upstream filter state data
- * when the access log format has `UPSTREAM_FILTER_STATE` specifier.
+ * Verifies that the Http Router's `upstream_log` correctly reflects the upstream HTTP filter state
+ * data when the access log format has `UPSTREAM_FILTER_STATE` specifier.
  */
 TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
   auto log_file = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());

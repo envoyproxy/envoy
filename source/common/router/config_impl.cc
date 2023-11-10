@@ -863,11 +863,8 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers,
-                                   stream_info.getRequestHeaders() == nullptr
-                                       ? *Http::StaticEmptyHeaders::get().request_headers
-                                       : *stream_info.getRequestHeaders(),
-                                   headers, stream_info);
+    header_parser->evaluateHeaders(headers, {stream_info.getRequestHeaders(), &headers},
+                                   stream_info);
   }
 }
 
@@ -2246,7 +2243,7 @@ PerFilterConfigs::PerFilterConfigs(
             fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
       }
 
-      // If the field `config` is configured but is empty, we treat the filter as disabled
+      // If the field `config` is configured but is empty, we treat the filter is enabled
       // explicitly.
       if (filter_config.config().type_url().empty()) {
         configs_.emplace(name, FilterConfig{nullptr, false});

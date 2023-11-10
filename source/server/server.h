@@ -32,7 +32,6 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/init/manager_impl.h"
-#include "source/common/memory/heap_shrinker.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
@@ -133,7 +132,7 @@ public:
    * @param store provides the store being flushed.
    */
   static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                  TimeSource& time_source);
+                                  Upstream::ClusterManager& cm, TimeSource& time_source);
 
   /**
    * Load a bootstrap config and perform validation.
@@ -149,7 +148,7 @@ public:
 };
 
 /**
- * This is a helper used by InstanceImpl::run() on the stack. It's broken out to make testing
+ * This is a helper used by InstanceBase::run() on the stack. It's broken out to make testing
  * easier.
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
@@ -223,25 +222,30 @@ private:
 };
 
 /**
- * This is the actual full standalone server which stitches together various common components.
+ * This is the base class for the standalone server which stitches together various common
+ * components. Some components are optional (so PURE) and can be created or not by subclasses.
  */
-class InstanceImpl final : Logger::Loggable<Logger::Id::main>,
-                           public Instance,
-                           public ServerLifecycleNotifier {
+class InstanceBase : Logger::Loggable<Logger::Id::main>,
+                     public Instance,
+                     public ServerLifecycleNotifier {
 public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
-               Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-               HotRestart& restarter, Stats::StoreRoot& store,
-               Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
+  InstanceBase(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
+               ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+               Thread::BasicLockable& access_log_lock,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                std::unique_ptr<ProcessContext> process_context,
                Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
-  ~InstanceImpl() override;
+  // initialize the server. This must be called before run().
+  void initialize(Network::Address::InstanceConstSharedPtr local_address,
+                  ComponentFactory& component_factory);
+  ~InstanceBase() override;
+
+  virtual void maybeCreateHeapShrinker() PURE;
 
   void run() override;
 
@@ -313,8 +317,10 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  void initialize(Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory);
+  // This does most of the work of initialization, but can throw errors caught
+  // by initialize().
+  void initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                         ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
@@ -392,7 +398,6 @@ private:
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
-  std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
@@ -426,7 +431,8 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
-  explicit MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source);
+  explicit MetricSnapshotImpl(Stats::Store& store, Upstream::ClusterManager& cluster_manager,
+                              TimeSource& time_source);
 
   // Stats::MetricSnapshot
   const std::vector<CounterSnapshot>& counters() override { return counters_; }
@@ -439,6 +445,10 @@ public:
   const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
     return text_readouts_;
   }
+  const std::vector<Stats::PrimitiveCounterSnapshot>& hostCounters() override {
+    return host_counters_;
+  }
+  const std::vector<Stats::PrimitiveGaugeSnapshot>& hostGauges() override { return host_gauges_; }
   SystemTime snapshotTime() const override { return snapshot_time_; }
 
 private:
@@ -450,6 +460,8 @@ private:
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
   std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
   std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
+  std::vector<Stats::PrimitiveCounterSnapshot> host_counters_;
+  std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges_;
   SystemTime snapshot_time_;
 };
 

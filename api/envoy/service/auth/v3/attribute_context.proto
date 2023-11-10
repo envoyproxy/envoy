@@ -38,7 +38,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // - field mask to send
 // - which return values from request_context are copied back
 // - which return values are copied into request_headers]
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message AttributeContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.AttributeContext";
@@ -182,6 +182,9 @@ message AttributeContext {
 
   // Dynamic metadata associated with the request.
   config.core.v3.Metadata metadata_context = 11;
+
+  // Metadata associated with the selected route.
+  config.core.v3.Metadata route_metadata_context = 13;
 
   // TLS session details of the underlying connection.
   // This is not populated by default and will be populated if ext_authz filter's

@@ -456,7 +456,7 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
 
   EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
   EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   internal_listener_cb.value().get().onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 

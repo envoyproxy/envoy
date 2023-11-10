@@ -10,7 +10,6 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/router/header_formatter.h"
 
 namespace Envoy {
 namespace Router {
@@ -29,7 +28,7 @@ struct HeadersToAddEntry {
   std::string original_value_;
   bool add_if_empty_ = false;
 
-  HttpHeaderFormatterPtr formatter_;
+  Formatter::FormatterPtr formatter_;
   HeaderAppendAction append_action_;
 };
 
@@ -71,11 +70,10 @@ public:
     return *instance;
   }
 
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
-                       const Http::ResponseHeaderMap& response_headers,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo& stream_info) const override;
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
-                       const Http::ResponseHeaderMap& response_headers,
+
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo* stream_info) const;
 
   /**
@@ -84,20 +82,13 @@ public:
    * empty.
    */
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
-    evaluateHeaders(headers,
-                    stream_info.getRequestHeaders() != nullptr
-                        ? *stream_info.getRequestHeaders()
-                        : *Http::StaticEmptyHeaders::get().request_headers,
-                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+    evaluateHeaders(headers, {stream_info.getRequestHeaders()}, &stream_info);
   }
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const {
     evaluateHeaders(headers,
-                    stream_info == nullptr
-                        ? *Http::StaticEmptyHeaders::get().request_headers
-                        : (stream_info->getRequestHeaders() != nullptr
-                               ? *stream_info->getRequestHeaders()
-                               : *Http::StaticEmptyHeaders::get().request_headers),
-                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+                    Formatter::HttpFormatterContext{
+                        stream_info == nullptr ? nullptr : stream_info->getRequestHeaders()},
+                    stream_info);
   }
 
   /*

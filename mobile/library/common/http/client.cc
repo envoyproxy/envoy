@@ -1,6 +1,5 @@
 #include "library/common/http/client.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/http/codes.h"
@@ -14,8 +13,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
-#include "library/common/jni/android_jni_utility.h"
-#include "library/common/network/connectivity_manager.h"
 #include "library/common/stream_info/extra_stream_info.h"
 
 namespace Envoy {

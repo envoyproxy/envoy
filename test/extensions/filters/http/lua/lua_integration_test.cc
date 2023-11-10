@@ -872,7 +872,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         disabled: true
   - match:
@@ -880,7 +880,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: hello.lua
   - match:
@@ -888,7 +888,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: byebye.lua
   - match:
@@ -896,7 +896,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |
@@ -908,7 +908,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: nocode.lua
 )EOF";
@@ -925,7 +925,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |
@@ -937,7 +937,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |

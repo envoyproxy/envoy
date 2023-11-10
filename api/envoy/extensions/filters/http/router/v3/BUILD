@@ -9,6 +9,6 @@ api_proto_package(
         "//envoy/annotations:pkg",
         "//envoy/config/accesslog/v3:pkg",
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_xds//udpa/annotations:pkg",
     ],
 )

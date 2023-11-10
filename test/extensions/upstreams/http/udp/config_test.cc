@@ -22,7 +22,7 @@ public:
 
 protected:
   NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
-  NiceMock<Router::MockRouteEntry> route_entry_;
+  Upstream::ResourcePriority priority_ = Upstream::ResourcePriority::Default;
   Upstream::HostConstSharedPtr host_;
   UdpGenericConnPoolFactory factory_;
 };
@@ -32,14 +32,14 @@ TEST_F(UdpGenericConnPoolFactoryTest, CreateValidUdpConnPool) {
   EXPECT_CALL(thread_local_cluster_.lb_, chooseHost).WillOnce(Return(host));
   EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_,
                                              Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
-                                             route_entry_, Envoy::Http::Protocol::Http2, nullptr));
+                                             priority_, Envoy::Http::Protocol::Http2, nullptr));
 }
 
 TEST_F(UdpGenericConnPoolFactoryTest, CreateInvalidUdpConnPool) {
   EXPECT_CALL(thread_local_cluster_.lb_, chooseHost).WillOnce(Return(nullptr));
   EXPECT_FALSE(factory_.createGenericConnPool(thread_local_cluster_,
                                               Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
-                                              route_entry_, Envoy::Http::Protocol::Http2, nullptr));
+                                              priority_, Envoy::Http::Protocol::Http2, nullptr));
 }
 
 } // namespace Udp

@@ -411,6 +411,7 @@ envoy_cc_benchmark_binary(
         "//envoy/stats:stats_interface",
         "//source/common/stats:thread_local_store_lib",
         "//source/server:server_lib",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

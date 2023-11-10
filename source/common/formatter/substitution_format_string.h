@@ -57,8 +57,8 @@ public:
           commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
       return std::make_unique<FormatterBaseImpl<FormatterContext>>(
-          Config::DataSource::read(config.text_format_source(), true, context.api()), false,
-          commands);
+          Config::DataSource::read(config.text_format_source(), true, context.api()),
+          config.omit_empty_values(), commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::FORMAT_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;
     }

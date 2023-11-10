@@ -472,8 +472,6 @@ private:
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
 
-    const bool expand_agnostic_stream_lifetime_;
-
     // Snapshot of the route configuration at the time of request is started. This is used to ensure
     // that the same route configuration is used throughout the lifetime of the request. This
     // snapshot will be cleared when the cached route is blocked. Because after that we will not
@@ -522,6 +520,7 @@ private:
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
+    std::queue<MetadataMapPtr> deferred_metadata_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

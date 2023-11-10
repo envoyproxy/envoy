@@ -2,7 +2,8 @@
 
 #include "absl/strings/string_view.h"
 
-// NOLINT(namespace-envoy)
+namespace Envoy {
+namespace JNI {
 
 /* For android, calls up through JNI to see if cleartext is permitted for this
  * host.
@@ -15,3 +16,6 @@ bool is_cleartext_permitted(absl::string_view hostname);
  * For other platforms simply returns true.
  */
 void tag_socket(int ifd, int uid, int tag);
+
+} // namespace JNI
+} // namespace Envoy
