@@ -131,7 +131,16 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
     REFLECTION_FOR_EACH(Bool, bool);
     break;
   case FieldDescriptor::CPPTYPE_ENUM:
-    REFLECTION_FOR_EACH(EnumValue, uint32_t);
+    if (field->is_repeated()) {
+      int c = reflection->FieldSize(message, field);
+      for (int i = 0; i < c; i++) {
+        int v = reflection->GetRepeatedEnumValue(message, field, i);
+        seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<char*>(&v), sizeof(v)}, seed);
+      }
+    } else {
+      int v = reflection->GetEnumValue(message, field);
+      seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<char*>(&v), sizeof(v)}, seed);
+    }
     break;
   case FieldDescriptor::CPPTYPE_STRING: {
     if (field->is_repeated()) {

@@ -36,16 +36,16 @@ message RepeatedFields {
 };
 
 message SingleFields {
-  bool bool = 1;
-  string strings = 2;
+  bool b = 1;
+  string string = 2;
   int32 int32 = 3;
   uint32 uint32 = 4;
   int64 int64 = 5;
   uint64 uint64 = 6;
   bytes bytes = 7;
-  double double = 8;
-  float float = 9;
-  FooEnum enum = 10;
+  double db = 8;
+  float f = 9;
+  FooEnum e = 10;
 };
 
 //message WithAny {
