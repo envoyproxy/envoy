@@ -511,7 +511,7 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
   RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
 
-  // This is largely a check for the android platform: is_cleartext_permitted
+  // This is largely a check for the android platform: isCleartextPermitted
   // is a no-op for other platforms.
   if (internal_headers->getSchemeValue() != "https" &&
       !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
