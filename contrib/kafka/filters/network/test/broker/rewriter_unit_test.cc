@@ -130,6 +130,32 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteFindCoordinatorResponse) {
   assertAddress(fcr.coordinators_[2], cr3->first, cr3->second);
 }
 
+TEST(ResponseRewriterImplUnitTest, ShouldRewriteDescribeClusterResponse) {
+  // given
+  DescribeClusterBroker b1 = {13, "host1", 1111, absl::nullopt, {}};
+  DescribeClusterBroker b2 = {42, "host2", 2222, absl::nullopt, {}};
+  DescribeClusterBroker b3 = {77, "host3", 3333, absl::nullopt, {}};
+  std::vector<DescribeClusterBroker> brokers = {b1, b2, b3};
+  DescribeClusterResponse dcr = {0, 0, absl::nullopt, "", 0, brokers, 0, {}};
+
+  MockBrokerFilterConfig config;
+  absl::optional<HostAndPort> cr1 = {{"nh1", 4444}};
+  EXPECT_CALL(config, findBrokerAddressOverride(b1.broker_id_)).WillOnce(Return(cr1));
+  absl::optional<HostAndPort> cr2 = absl::nullopt;
+  EXPECT_CALL(config, findBrokerAddressOverride(b2.broker_id_)).WillOnce(Return(cr2));
+  absl::optional<HostAndPort> cr3 = {{"nh3", 6666}};
+  EXPECT_CALL(config, findBrokerAddressOverride(b3.broker_id_)).WillOnce(Return(cr3));
+  ResponseRewriterImpl testee{config};
+
+  // when
+  testee.updateDescribeClusterBrokerAddresses(dcr);
+
+  // then
+  assertAddress(dcr.brokers_[0], cr1->first, cr1->second);
+  assertAddress(dcr.brokers_[1], b2.host_, b2.port_);
+  assertAddress(dcr.brokers_[2], cr3->first, cr3->second);
+}
+
 TEST(ResponseRewriterUnitTest, ShouldCreateProperRewriter) {
   MockBrokerFilterConfig c1;
   EXPECT_CALL(c1, needsResponseRewrite()).WillOnce(Return(true));

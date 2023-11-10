@@ -171,6 +171,12 @@ in 2-node cluster:
 The address rewrite rules should cover all brokers present in the cluster - YAML blocks can be
 used to avoid repetition.
 
+The responses that can be mutated are:
+
+* metadata (all partition discovery operations),
+* find coordinator (used by consumer groups and transactions),
+* describe cluster.
+
 .. _config_network_filters_kafka_broker_debugging:
 
 Debugging

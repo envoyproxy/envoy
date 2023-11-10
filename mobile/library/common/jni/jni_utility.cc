@@ -22,16 +22,14 @@ jobject get_class_loader() {
   return static_class_loader;
 }
 
-jclass find_class(const char* class_name) {
+LocalRefUniquePtr<jclass> find_class(const char* class_name) {
   JniHelper jni_helper(get_env());
   LocalRefUniquePtr<jclass> class_loader = jni_helper.findClass("java/lang/ClassLoader");
   jmethodID find_class_method = jni_helper.getMethodId(class_loader.get(), "loadClass",
                                                        "(Ljava/lang/String;)Ljava/lang/Class;");
   LocalRefUniquePtr<jstring> str_class_name = jni_helper.newStringUtf(class_name);
-  jclass clazz =
-      jni_helper
-          .callObjectMethod<jclass>(get_class_loader(), find_class_method, str_class_name.get())
-          .release();
+  LocalRefUniquePtr<jclass> clazz = jni_helper.callObjectMethod<jclass>(
+      get_class_loader(), find_class_method, str_class_name.get());
   return clazz;
 }
 
@@ -60,9 +58,9 @@ envoy_data array_to_native_data(JniHelper& jni_helper, jbyteArray j_data) {
 
 envoy_data array_to_native_data(JniHelper& jni_helper, jbyteArray j_data, size_t data_length) {
   uint8_t* native_bytes = static_cast<uint8_t*>(safe_malloc(data_length));
-  void* critical_data = jni_helper.getEnv()->GetPrimitiveArrayCritical(j_data, 0);
-  memcpy(native_bytes, critical_data, data_length); // NOLINT(safe-memcpy)
-  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_data, critical_data, 0);
+  Envoy::JNI::PrimitiveArrayCriticalUniquePtr<void> critical_data =
+      jni_helper.getPrimitiveArrayCritical(j_data, nullptr);
+  memcpy(native_bytes, critical_data.get(), data_length); // NOLINT(safe-memcpy)
   return {data_length, native_bytes, free, native_bytes};
 }
 
@@ -74,29 +72,23 @@ LocalRefUniquePtr<jstring> native_data_to_string(JniHelper& jni_helper, envoy_da
 
 LocalRefUniquePtr<jbyteArray> native_data_to_array(JniHelper& jni_helper, envoy_data data) {
   LocalRefUniquePtr<jbyteArray> j_data = jni_helper.newByteArray(data.length);
-  void* critical_data = jni_helper.getEnv()->GetPrimitiveArrayCritical(j_data.get(), nullptr);
+  PrimitiveArrayCriticalUniquePtr<void> critical_data =
+      jni_helper.getPrimitiveArrayCritical(j_data.get(), nullptr);
   RELEASE_ASSERT(critical_data != nullptr, "unable to allocate memory in jni_utility");
-  memcpy(critical_data, data.bytes, data.length); // NOLINT(safe-memcpy)
-  // Here '0' (for which there is no named constant) indicates we want to commit the changes back
-  // to the JVM and free the c array, where applicable.
-  // TODO: potential perf improvement. Check if copied via isCopy, and optimize memory handling.
-  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_data.get(), critical_data, 0);
+  memcpy(critical_data.get(), data.bytes, data.length); // NOLINT(safe-memcpy)
   return j_data;
 }
 
 LocalRefUniquePtr<jlongArray> native_stream_intel_to_array(JniHelper& jni_helper,
                                                            envoy_stream_intel stream_intel) {
   LocalRefUniquePtr<jlongArray> j_array = jni_helper.newLongArray(4);
-  jlong* critical_array =
-      static_cast<jlong*>(jni_helper.getEnv()->GetPrimitiveArrayCritical(j_array.get(), nullptr));
+  PrimitiveArrayCriticalUniquePtr<jlong> critical_array =
+      jni_helper.getPrimitiveArrayCritical<jlong*>(j_array.get(), nullptr);
   RELEASE_ASSERT(critical_array != nullptr, "unable to allocate memory in jni_utility");
-  critical_array[0] = static_cast<jlong>(stream_intel.stream_id);
-  critical_array[1] = static_cast<jlong>(stream_intel.connection_id);
-  critical_array[2] = static_cast<jlong>(stream_intel.attempt_count);
-  critical_array[3] = static_cast<jlong>(stream_intel.consumed_bytes_from_response);
-  // Here '0' (for which there is no named constant) indicates we want to commit the changes back
-  // to the JVM and free the c array, where applicable.
-  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_array.get(), critical_array, 0);
+  critical_array.get()[0] = static_cast<jlong>(stream_intel.stream_id);
+  critical_array.get()[1] = static_cast<jlong>(stream_intel.connection_id);
+  critical_array.get()[2] = static_cast<jlong>(stream_intel.attempt_count);
+  critical_array.get()[3] = static_cast<jlong>(stream_intel.consumed_bytes_from_response);
   return j_array;
 }
 
@@ -104,30 +96,26 @@ LocalRefUniquePtr<jlongArray>
 native_final_stream_intel_to_array(JniHelper& jni_helper,
                                    envoy_final_stream_intel final_stream_intel) {
   LocalRefUniquePtr<jlongArray> j_array = jni_helper.newLongArray(16);
-  jlong* critical_array =
-      static_cast<jlong*>(jni_helper.getEnv()->GetPrimitiveArrayCritical(j_array.get(), nullptr));
+  PrimitiveArrayCriticalUniquePtr<jlong> critical_array =
+      jni_helper.getPrimitiveArrayCritical<jlong*>(j_array.get(), nullptr);
   RELEASE_ASSERT(critical_array != nullptr, "unable to allocate memory in jni_utility");
 
-  critical_array[0] = static_cast<jlong>(final_stream_intel.stream_start_ms);
-  critical_array[1] = static_cast<jlong>(final_stream_intel.dns_start_ms);
-  critical_array[2] = static_cast<jlong>(final_stream_intel.dns_end_ms);
-  critical_array[3] = static_cast<jlong>(final_stream_intel.connect_start_ms);
-  critical_array[4] = static_cast<jlong>(final_stream_intel.connect_end_ms);
-  critical_array[5] = static_cast<jlong>(final_stream_intel.ssl_start_ms);
-  critical_array[6] = static_cast<jlong>(final_stream_intel.ssl_end_ms);
-  critical_array[7] = static_cast<jlong>(final_stream_intel.sending_start_ms);
-  critical_array[8] = static_cast<jlong>(final_stream_intel.sending_end_ms);
-  critical_array[9] = static_cast<jlong>(final_stream_intel.response_start_ms);
-  critical_array[10] = static_cast<jlong>(final_stream_intel.stream_end_ms);
-  critical_array[11] = static_cast<jlong>(final_stream_intel.socket_reused);
-  critical_array[12] = static_cast<jlong>(final_stream_intel.sent_byte_count);
-  critical_array[13] = static_cast<jlong>(final_stream_intel.received_byte_count);
-  critical_array[14] = static_cast<jlong>(final_stream_intel.response_flags);
-  critical_array[15] = static_cast<jlong>(final_stream_intel.upstream_protocol);
-
-  // Here '0' (for which there is no named constant) indicates we want to commit the changes back
-  // to the JVM and free the c array, where applicable.
-  jni_helper.getEnv()->ReleasePrimitiveArrayCritical(j_array.get(), critical_array, 0);
+  critical_array.get()[0] = static_cast<jlong>(final_stream_intel.stream_start_ms);
+  critical_array.get()[1] = static_cast<jlong>(final_stream_intel.dns_start_ms);
+  critical_array.get()[2] = static_cast<jlong>(final_stream_intel.dns_end_ms);
+  critical_array.get()[3] = static_cast<jlong>(final_stream_intel.connect_start_ms);
+  critical_array.get()[4] = static_cast<jlong>(final_stream_intel.connect_end_ms);
+  critical_array.get()[5] = static_cast<jlong>(final_stream_intel.ssl_start_ms);
+  critical_array.get()[6] = static_cast<jlong>(final_stream_intel.ssl_end_ms);
+  critical_array.get()[7] = static_cast<jlong>(final_stream_intel.sending_start_ms);
+  critical_array.get()[8] = static_cast<jlong>(final_stream_intel.sending_end_ms);
+  critical_array.get()[9] = static_cast<jlong>(final_stream_intel.response_start_ms);
+  critical_array.get()[10] = static_cast<jlong>(final_stream_intel.stream_end_ms);
+  critical_array.get()[11] = static_cast<jlong>(final_stream_intel.socket_reused);
+  critical_array.get()[12] = static_cast<jlong>(final_stream_intel.sent_byte_count);
+  critical_array.get()[13] = static_cast<jlong>(final_stream_intel.received_byte_count);
+  critical_array.get()[14] = static_cast<jlong>(final_stream_intel.response_flags);
+  critical_array.get()[15] = static_cast<jlong>(final_stream_intel.upstream_protocol);
   return j_array;
 }
 
@@ -149,7 +137,7 @@ LocalRefUniquePtr<jobject> native_map_to_map(JniHelper& jni_helper, envoy_map ma
 
 envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data) {
   // Returns -1 if the buffer is not a direct buffer.
-  jlong data_length = jni_helper.getEnv()->GetDirectBufferCapacity(j_data);
+  jlong data_length = jni_helper.getDirectBufferCapacity(j_data);
 
   if (data_length < 0) {
     LocalRefUniquePtr<jclass> jcls_ByteBuffer = jni_helper.findClass("java/nio/ByteBuffer");
@@ -168,8 +156,7 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data) {
 
 envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data, size_t data_length) {
   // Returns nullptr if the buffer is not a direct buffer.
-  uint8_t* direct_address =
-      static_cast<uint8_t*>(jni_helper.getEnv()->GetDirectBufferAddress(j_data));
+  uint8_t* direct_address = jni_helper.getDirectBufferAddress<uint8_t*>(j_data);
 
   if (direct_address == nullptr) {
     LocalRefUniquePtr<jclass> jcls_ByteBuffer = jni_helper.findClass("java/nio/ByteBuffer");
@@ -187,7 +174,7 @@ envoy_data buffer_to_native_data(JniHelper& jni_helper, jobject j_data, size_t d
   native_data.bytes = direct_address;
   native_data.length = data_length;
   native_data.release = jni_delete_global_ref;
-  native_data.context = jni_helper.getEnv()->NewGlobalRef(j_data);
+  native_data.context = jni_helper.newGlobalRef(j_data).release();
 
   return native_data;
 }
