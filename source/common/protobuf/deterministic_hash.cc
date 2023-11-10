@@ -203,7 +203,11 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
   for (const auto field : fields) {
     seed = reflectionHashField(message, field, seed);
   }
-  return seed;
+  // Hash one extra character to signify end of message, so that
+  // msg{} field2=2
+  // hashes differently from
+  // msg{field2=2}
+  return HashUtil::xxHash64("\x17", seed);
 }
 } // namespace
 

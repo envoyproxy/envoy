@@ -22,6 +22,20 @@ envoy_cc_test(
 )
 
 envoy_proto_library(
+    name = "deterministic_hash_test_proto",
+    srcs = ["deterministic_hash_test.proto"],
+)
+
+envoy_cc_test(
+    name = "deterministic_hash_test",
+    srcs = ["deterministic_hash_test.cc"],
+    deps = [
+        ":deterministic_hash_test_proto_cc_proto",
+        "//source/common/protobuf:deterministic_hash_lib",
+    ],
+)
+
+envoy_proto_library(
     name = "utility_test_protos",
     srcs = [
         "utility_test_file_wip.proto",
