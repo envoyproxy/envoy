@@ -146,6 +146,7 @@ TEST_P(DnsCacheImplPreresolveTest, PreresolveSuccess) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns",
                                absl::StrCat(normalizeDfpHost())}});
+
   Network::DnsResolver::ResolveCb resolve_cb;
   std::string host = "bar.baz.com";
   uint32_t port = 443;
