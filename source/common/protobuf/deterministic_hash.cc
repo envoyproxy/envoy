@@ -68,7 +68,7 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
   case FieldDescriptor::CPPTYPE_UINT64:
     compareFn =
         makeCompareFn<uint64_t>([&entry_reflection, &key_field](const Protobuf::Message& msg) {
-          return entry_reflection->GetInt64(msg, key_field);
+          return entry_reflection->GetUInt64(msg, key_field);
         });
     break;
   case FieldDescriptor::CPPTYPE_BOOL:
