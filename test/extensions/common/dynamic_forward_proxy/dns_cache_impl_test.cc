@@ -47,10 +47,10 @@ public:
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
     config_.mutable_max_hosts()->set_value(max_hosts);
     if (!preresolve_hostnames.empty()) {
-      for (const auto& host_pair : preresolve_hostnames) {
+      for (const auto& [host, port] : preresolve_hostnames) {
         envoy::config::core::v3::SocketAddress* address = config_.add_preresolve_hostnames();
-        address->set_address(host_pair.first);
-        address->set_port_value(host_pair.second);
+        address->set_address(host);
+        address->set_port_value(port);
       }
     }
 
