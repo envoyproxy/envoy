@@ -16,7 +16,6 @@ type filter struct {
 	callbacks       api.FilterCallbackHandler
 	req_body_length uint64
 	query_params    url.Values
-	protocol        string
 	scheme          string
 	method          string
 	path            string
@@ -55,7 +54,6 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 	f.req_body_length = 0
 
-	f.protocol = header.Protocol()
 	f.scheme = header.Scheme()
 	f.method = header.Method()
 	f.path = header.Path()
