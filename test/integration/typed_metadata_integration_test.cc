@@ -45,13 +45,10 @@ TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
 
 class MockAccessLog : public AccessLog::Instance {
 public:
-  MOCK_METHOD(void, log,
-              (const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-               const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
-               AccessLog::AccessLogType));
+  MOCK_METHOD(void, log, (const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&));
 };
 
-class TestAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr createAccessLogInstance(
       const Protobuf::Message&, AccessLog::FilterPtr&&,
@@ -82,8 +79,7 @@ public:
 // Validate that access logger gets the right context with access to listener metadata
 TEST_P(ListenerTypedMetadataIntegrationTest, ListenerMetadataPlumbingToAccessLog) {
   TestAccessLogFactory factory;
-  Registry::InjectFactory<Server::Configuration::AccessLogInstanceFactory> factory_register(
-      factory);
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   // Add some typed metadata to the listener.
   ProtobufWkt::StringValue value;

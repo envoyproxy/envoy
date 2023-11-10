@@ -20,28 +20,20 @@ public:
                 AccessLog::FilterPtr filter)
       : plugin_(plugin), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
 
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type) override {
-    if (filter_ && request_headers && response_headers && response_trailers) {
-      if (!filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers,
-                             access_log_type)) {
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& stream_info) override {
+    if (filter_) {
+      if (!filter_->evaluate(log_context, stream_info)) {
         return;
       }
     }
 
-    if (!tls_slot_) {
-      return;
-    }
-    auto handle = tls_slot_->get()->handle();
-    if (!handle) {
-      return;
-    }
-    if (handle->wasmHandle()) {
-      handle->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
-                                        response_trailers, stream_info, access_log_type);
+    if (tls_slot_ != nullptr) {
+      if (auto handle = tls_slot_->get()->handle(); handle != nullptr) {
+        if (handle->wasmHandle()) {
+          handle->wasmHandle()->wasm()->log(plugin_, log_context, stream_info);
+        }
+      }
     }
   }
 

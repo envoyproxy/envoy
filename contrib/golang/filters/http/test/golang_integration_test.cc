@@ -186,7 +186,7 @@ typed_config:
           rt->mutable_route()->set_cluster("cluster_0");
 
           // virtualhost level per route config
-          const std::string key = "envoy.filters.http.golang";
+          const std::string key = "golang";
           const auto yaml_fmt =
               R"EOF(
               "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute

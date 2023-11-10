@@ -23,14 +23,15 @@ namespace Server {
 bool validateConfig(const Options& options,
                     const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
-                    Filesystem::Instance& file_system) {
+                    Filesystem::Instance& file_system,
+                    const ProcessContextOptRef& process_context) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
   TRY_ASSERT_MAIN_THREAD {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
-                              component_factory, thread_factory, file_system);
+                              component_factory, thread_factory, file_system, process_context);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
@@ -45,13 +46,14 @@ ValidationInstance::ValidationInstance(
     const Options& options, Event::TimeSystem& time_system,
     const Network::Address::InstanceConstSharedPtr& local_address, Stats::IsolatedStoreImpl& store,
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-    Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
+    Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+    const ProcessContextOptRef& process_context)
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
                                              !options.ignoreUnknownDynamicFields()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
-                                   random_generator_, bootstrap_)),
+                                   random_generator_, bootstrap_, process_context)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,

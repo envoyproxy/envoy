@@ -14,15 +14,11 @@ import Foundation
 /// This class is typically used as input to the EngineBuilder's setXds() method.
 @objcMembers
 open class XdsBuilder: NSObject {
-  public static let defaultJwtTokenLifetimeInSeconds: UInt32 = 60 * 60 * 24 * 90 // 90 days
   public static let defaultXdsTimeoutInSeconds: UInt32 = 5
 
   let xdsServerAddress: String
   let xdsServerPort: UInt32
-  var authHeader: String?
-  var authToken: String?
-  var jwtToken: String?
-  var jwtTokenLifetimeInSeconds: UInt32 = XdsBuilder.defaultJwtTokenLifetimeInSeconds
+  var xdsGrpcInitialMetadata: [String: String] = [:]
   var sslRootCerts: String?
   var sni: String?
   var rtdsResourceName: String?
@@ -40,38 +36,26 @@ open class XdsBuilder: NSObject {
     self.xdsServerPort = xdsServerPort
   }
 
-  /// Sets the authentication HTTP header and token value for authentication with the xDS
-  /// management server.
+  /// Adds a header to the initial HTTP metadata headers sent on the gRPC stream.
   ///
-  /// - parameter header: The HTTP authentication header.
-  /// - parameter token:  The authentication token to be sent in the header.
+  /// A common use for the initial metadata headers is for authentication to the xDS management
+  /// server.
+  ///
+  /// For example, if using API keys to authenticate to Traffic Director on GCP (see
+  /// https://cloud.google.com/docs/authentication/api-keys for details), invoke:
+  ///   builder.addInitialStreamHeader("x-goog-api-key", apiKeyToken)
+  ///          .addInitialStreamHeader("X-Android-Package", appPackageName)
+  ///          .addInitialStreamHeader("X-Android-Cert", sha1KeyFingerprint);
+  ///
+  /// - parameter header: The HTTP header to add on the gRPC stream's initial metadata.
+  /// - parameter value:  The HTTP header value to add on the gRPC stream's initial metadata.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setAuthenticationToken(
+  public func addInitialStreamHeader(
     header: String,
-    token: String) -> Self {
-    self.authHeader = header
-    self.authToken = token
-    return self
-  }
-
-  /// Sets JWT as the authentication method to the xDS management server, using the given token.
-  ///
-  /// - parameter token:                  The JWT token used to authenticate the client to the xDS
-  ///                                     management server.
-  /// - parameter tokenLifetimeInSeconds: <optional> the lifetime of the JWT token, in seconds. If
-  ///                                     none (or 0) is specified, then
-  ///                                     defaultJwtTokenLifetimeSeconds is used.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func setJwtAuthenticationToken(
-    token: String,
-    tokenLifetimeInSeconds: UInt32 = XdsBuilder.defaultJwtTokenLifetimeInSeconds) -> Self {
-    self.jwtToken = token
-    self.jwtTokenLifetimeInSeconds = (tokenLifetimeInSeconds > 0) ?
-        tokenLifetimeInSeconds : XdsBuilder.defaultJwtTokenLifetimeInSeconds
+    value: String) -> Self {
+    self.xdsGrpcInitialMetadata[header] = value
     return self
   }
 
@@ -183,6 +167,7 @@ open class EngineBuilder: NSObject {
   private var enableHttp3: Bool = false
 #endif
   private var quicHints: [String: Int] = [:]
+  private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -398,6 +383,17 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func addQuicHint(_ host: String, _ port: Int) -> Self {
     self.quicHints[host] = port
+    return self
+  }
+
+  /// Add a host suffix that's known to support QUIC.
+  ///
+  /// - parameter suffix: the string representation of the host suffix
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addQuicCanonicalSuffix(_ suffix: String) -> Self {
+    self.quicCanonicalSuffixes.append(suffix)
     return self
   }
 #endif
@@ -785,10 +781,7 @@ open class EngineBuilder: NSObject {
   func makeConfig() -> EnvoyConfiguration {
     var xdsServerAddress: String?
     var xdsServerPort: UInt32 = 0
-    var xdsAuthHeader: String?
-    var xdsAuthToken: String?
-    var xdsJwtToken: String?
-    var xdsJwtTokenLifetimeSeconds: UInt32 = 0
+    var xdsGrpcInitialMetadata: [String: String] = [:]
     var xdsSslRootCerts: String?
     var xdsSni: String?
     var rtdsResourceName: String?
@@ -800,10 +793,7 @@ open class EngineBuilder: NSObject {
 #if ENVOY_GOOGLE_GRPC
     xdsServerAddress = self.xdsBuilder?.xdsServerAddress
     xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
-    xdsAuthHeader = self.xdsBuilder?.authHeader
-    xdsAuthToken = self.xdsBuilder?.authToken
-    xdsJwtToken = self.xdsBuilder?.jwtToken
-    xdsJwtTokenLifetimeSeconds = self.xdsBuilder?.jwtTokenLifetimeInSeconds ?? 0
+    xdsGrpcInitialMetadata = self.xdsBuilder?.xdsGrpcInitialMetadata ?? [:]
     xdsSslRootCerts = self.xdsBuilder?.sslRootCerts
     xdsSni = self.xdsBuilder?.sni
     rtdsResourceName = self.xdsBuilder?.rtdsResourceName
@@ -826,6 +816,7 @@ open class EngineBuilder: NSObject {
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHttp3: self.enableHttp3,
       quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
+      quicCanonicalSuffixes: self.quicCanonicalSuffixes,
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
@@ -854,10 +845,7 @@ open class EngineBuilder: NSObject {
       nodeSubZone: self.nodeSubZone,
       xdsServerAddress: xdsServerAddress,
       xdsServerPort: xdsServerPort,
-      xdsAuthHeader: xdsAuthHeader,
-      xdsAuthToken: xdsAuthToken,
-      xdsJwtToken: xdsJwtToken,
-      xdsJwtTokenLifetimeSeconds: xdsJwtTokenLifetimeSeconds,
+      xdsGrpcInitialMetadata: xdsGrpcInitialMetadata,
       xdsSslRootCerts: xdsSslRootCerts,
       xdsSni: xdsSni,
       rtdsResourceName: rtdsResourceName,
@@ -901,6 +889,9 @@ private extension EngineBuilder {
     cxxBuilder.enableHttp3(self.enableHttp3)
     for (host, port) in self.quicHints {
       cxxBuilder.addQuicHint(host.toCXX(), Int32(port))
+    }
+    for (suffix) in self.quicCanonicalSuffixes {
+      cxxBuilder.addQuicCanonicalSuffix(suffix.toCXX())
     }
 #endif
     cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
@@ -960,13 +951,8 @@ private extension EngineBuilder {
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
                                                     Int32(xdsBuilder.xdsServerPort))
-      if let xdsAuthHeader = xdsBuilder.authHeader {
-        cxxXdsBuilder.setAuthenticationToken(xdsAuthHeader.toCXX(),
-                                             xdsBuilder.authToken?.toCXX() ?? "".toCXX())
-      }
-      if let xdsJwtToken = xdsBuilder.jwtToken {
-        cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(),
-                                                Int32(xdsBuilder.jwtTokenLifetimeInSeconds))
+      for (header, value) in xdsBuilder.xdsGrpcInitialMetadata {
+        cxxXdsBuilder.addInitialStreamHeader(header.toCXX(), value.toCXX())
       }
       if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
         cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())

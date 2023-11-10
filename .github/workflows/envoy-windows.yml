@@ -1,0 +1,106 @@
+name: Envoy/windows
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+    - release/v*
+  pull_request_target:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      pull-requests: read
+    with:
+      prime-build-image: false
+      check-mobile-run: false
+
+  windows:
+    needs:
+    - env
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: ci/windows_ci_steps.sh
+          name: Windows 2019
+    uses: ./.github/workflows/_ci.yml
+    name: CI ${{ matrix.name || matrix.target }}
+    secrets:
+      rbe-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+    with:
+      target: ${{ matrix.target }}
+      runs-on: envoy-win19-small
+      command-ci:
+      repo-ref: ${{ needs.env.outputs.repo-ref }}
+      steps-post:
+      temp-dir: 'C:\Users\runner\AppData\Local\Temp\bazel-shared'
+      upload-name: windows.release
+      upload-path: 'C:\Users\runner\AppData\Local\Temp\envoy'
+      source: |
+        export ENVOY_SHARED_TMP_DIR="C:\Users\runner\AppData\Local\Temp\bazel-shared"
+        export ENVOY_DOCKER_BUILD_DIR="C:\Users\runner\AppData\Local\Temp"
+        mkdir -p "$ENVOY_SHARED_TMP_DIR"
+        GCP_SERVICE_ACCOUNT_KEY_PATH=$(mktemp -p "${ENVOY_SHARED_TMP_DIR}" -t gcp_service_account.XXXXXX.json)
+        bash -c "echo \"${RBE_KEY}\" | base64 --decode > \"${GCP_SERVICE_ACCOUNT_KEY_PATH}\""
+        _BAZEL_BUILD_EXTRA_OPTIONS=(
+          --config=remote-ci
+          --config=rbe-google
+          --config=remote-msvc-cl
+          --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_PATH}
+          --jobs=75
+          --flaky_test_attempts=2)
+        export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
+
+  docker:
+    needs:
+    - env
+    - windows
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: windows2019
+          name: Windows 2019
+          runs-on: envoy-win19-small
+          build-type: windows
+          image-base: mcr.microsoft.com/windows/servercore
+          image-tag: ltsc2019
+        - target: windows2022
+          name: Windows 2022
+          runs-on: envoy-win22-small
+          build-type: windows-ltsc2022
+          image-base: mcr.microsoft.com/windows/nanoserver
+          image-tag: ltsc2022
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.env.outputs.repo_ref  }}
+    - uses: actions/download-artifact@v3
+      with:
+        name: windows.release
+    - run: |
+        # Convert to Unix-style path so tar doesn't think drive letter is a hostname
+        STAGING_DIR="$(echo $PWD | tr -d ':' | tr '\\' '/')"
+        mkdir -p windows/amd64 && tar zxf "${STAGING_DIR}/envoy_binary.tar.gz" -C ./windows/amd64
+        CI_SHA1=$(git rev-parse head)
+        export CI_SHA1
+        ci/docker_ci.sh
+      shell: bash
+      env:
+        CI_BRANCH: ${{ github.ref }}
+        DOCKERHUB_USERNAME: ${{ needs.env.outputs.trusted == 'true' && secrets.DOCKERHUB_USERNAME || '' }}
+        DOCKERHUB_PASSWORD: ${{ needs.env.outputs.trusted == 'true' && secrets.DOCKERHUB_PASSWORD || '' }}
+        WINDOWS_BUILD_TYPE: ${{ matrix.build-type }}
+        WINDOWS_IMAGE_BASE: ${{ matrix.image-base }}
+        WINDOWS_IMAGE_TAG: ${{ matrix.image-tag }}

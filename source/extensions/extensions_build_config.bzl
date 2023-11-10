@@ -124,6 +124,7 @@ EXTENSIONS = {
     "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.bandwidth_limit":               "//source/extensions/filters/http/bandwidth_limit:config",
+    "envoy.filters.http.basic_auth":                    "//source/extensions/filters/http/basic_auth:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
     "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
@@ -222,6 +223,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.udp.session.http_capsule":           "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
+    "envoy.filters.udp.session.dynamic_forward_proxy":  "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:config",
 
     #
     # Resource monitors
@@ -263,6 +265,18 @@ EXTENSIONS = {
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
     "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
+
+    #
+    # OpenTelemetry Resource Detectors
+    #
+
+    "envoy.tracers.opentelemetry.resource_detectors.environment":         "//source/extensions/tracers/opentelemetry/resource_detectors/environment:config",
+
+    #
+    # OpenTelemetry tracer samplers
+    #
+
+    "envoy.tracers.opentelemetry.samplers.always_on":         "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
 
     #
     # Transport sockets

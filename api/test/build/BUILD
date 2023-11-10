@@ -13,7 +13,7 @@ api_cc_test(
         "//envoy/service/discovery/v2:pkg_cc_proto",
         "//envoy/service/metrics/v2:pkg_cc_proto",
         "//envoy/service/ratelimit/v2:pkg_cc_proto",
-        "@com_github_cncf_udpa//udpa/service/orca/v1:pkg_cc_proto",
+        "@com_github_cncf_xds//udpa/service/orca/v1:pkg_cc_proto",
     ],
 )
 

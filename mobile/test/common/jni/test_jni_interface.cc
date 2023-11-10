@@ -73,6 +73,8 @@ Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeSendDiscoveryRespons
                                                                                   jstring yaml) {
   jni_log("[XTS]", "sending DiscoveryResponse from the xDS server");
   const char* yaml_chars = env->GetStringUTFChars(yaml, /* isCopy= */ nullptr);
+  // The yaml utilities have non-relevant thread asserts.
+  Envoy::Thread::SkipAsserts skip;
   envoy::service::discovery::v3::DiscoveryResponse response;
   Envoy::TestUtility::loadFromYaml(yaml_chars, response);
   sendDiscoveryResponse(response);

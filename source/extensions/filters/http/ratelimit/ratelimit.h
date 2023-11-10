@@ -56,10 +56,11 @@ public:
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
-        http_context_(http_context), stat_names_(scope.symbolTable()),
+        http_context_(http_context), stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         response_headers_parser_(
-            Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {}
+            Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
+        status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -76,6 +77,7 @@ public:
   Filters::Common::RateLimit::StatNames& statNames() { return stat_names_; }
   Http::Code rateLimitedStatus() { return rate_limited_status_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
+  Http::Code statusOnError() const { return status_on_error_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -97,6 +99,14 @@ private:
     return Http::Code::TooManyRequests;
   }
 
+  static Http::Code toRatelimitServerErrorCode(uint64_t status) {
+    const auto code = static_cast<Http::Code>(status);
+    if (code >= Http::Code::Continue && code <= Http::Code::NetworkAuthenticationRequired) {
+      return code;
+    }
+    return Http::Code::InternalServerError;
+  }
+
   const std::string domain_;
   const uint64_t stage_;
   const FilterRequestType request_type_;
@@ -111,6 +121,7 @@ private:
   Filters::Common::RateLimit::StatNames stat_names_;
   const Http::Code rate_limited_status_;
   Router::HeaderParserPtr response_headers_parser_;
+  const Http::Code status_on_error_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

@@ -34,8 +34,7 @@ UdpProxyFilter::~UdpProxyFilter() {
   if (!config_->proxyAccessLogs().empty()) {
     fillProxyStreamInfo();
     for (const auto& access_log : config_->proxyAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value(),
-                      AccessLog::AccessLogType::NotSet);
+      access_log->log({}, udp_proxy_stats_.value());
     }
   }
 }
@@ -151,7 +150,7 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
     return createSessionWithOptionalHost(std::move(addresses), optional_host);
   }
 
-  auto host = chooseHost(addresses.peer_);
+  auto host = chooseHost(addresses.peer_, nullptr);
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
     cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
@@ -173,16 +172,19 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOpt
   }
 
   new_session->createFilterChain();
-  new_session->onNewSession();
-  auto new_session_ptr = new_session.get();
-  sessions_.emplace(std::move(new_session));
+  if (new_session->onNewSession()) {
+    auto new_session_ptr = new_session.get();
+    sessions_.emplace(std::move(new_session));
+    return new_session_ptr;
+  }
 
-  return new_session_ptr;
+  return nullptr;
 }
 
 Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(
-    const Network::Address::InstanceConstSharedPtr& peer_address) const {
-  UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address);
+    const Network::Address::InstanceConstSharedPtr& peer_address,
+    const StreamInfo::StreamInfo* stream_info) const {
+  UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address, stream_info);
   Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
   return host;
 }
@@ -214,7 +216,7 @@ Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::
       // If a host becomes unhealthy, we optimally would like to replace it with a new session
       // to a healthy host. We may eventually want to make this behavior configurable, but for now
       // this will be the universal behavior.
-      auto host = chooseHost(data.addresses_.peer_);
+      auto host = chooseHost(data.addresses_.peer_, nullptr);
       if (host != nullptr && host->coarseHealth() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host().value().get()) {
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
@@ -240,7 +242,7 @@ UdpProxyFilter::PerPacketLoadBalancingClusterInfo::PerPacketLoadBalancingCluster
 
 Network::FilterStatus
 UdpProxyFilter::PerPacketLoadBalancingClusterInfo::onData(Network::UdpRecvData& data) {
-  auto host = chooseHost(data.addresses_.peer_);
+  auto host = chooseHost(data.addresses_.peer_, nullptr);
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
     cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
@@ -309,8 +311,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_session_info_,
-                      AccessLog::AccessLogType::NotSet);
+      access_log->log({}, udp_session_info_);
     }
   }
 }
@@ -381,7 +382,7 @@ void UdpProxyFilter::UdpActiveSession::onReadReady() {
   cluster_.filter_.read_callbacks_->udpListener().flush();
 }
 
-void UdpProxyFilter::ActiveSession::onNewSession() {
+bool UdpProxyFilter::ActiveSession::onNewSession() {
   for (auto& active_read_filter : read_filters_) {
     if (active_read_filter->initialized_) {
       // The filter may call continueFilterChain() in onNewSession(), causing next
@@ -392,11 +393,11 @@ void UdpProxyFilter::ActiveSession::onNewSession() {
     active_read_filter->initialized_ = true;
     auto status = active_read_filter->read_filter_->onNewSession();
     if (status == ReadFilterStatus::StopIteration) {
-      return;
+      return true;
     }
   }
 
-  createUpstream();
+  return createUpstream();
 }
 
 void UdpProxyFilter::ActiveSession::onData(Network::UdpRecvData& data) {
@@ -466,7 +467,7 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
   }
 }
 
-void UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filter) {
+bool UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filter) {
   ASSERT(filter != nullptr);
 
   std::list<ActiveReadFilterPtr>::iterator entry = std::next(filter->entry());
@@ -478,31 +479,37 @@ void UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filt
     (*entry)->initialized_ = true;
     auto status = (*entry)->read_filter_->onNewSession();
     if (status == ReadFilterStatus::StopIteration) {
-      break;
+      return true;
     }
   }
 
-  createUpstream();
+  if (!createUpstream()) {
+    cluster_.removeSession(this);
+    return false;
+  }
+
+  return true;
 }
 
-void UdpProxyFilter::UdpActiveSession::createUpstream() {
+bool UdpProxyFilter::UdpActiveSession::createUpstream() {
   if (udp_socket_) {
     // A session filter may call on continueFilterChain(), after already creating the socket,
     // so we first check that the socket was not created already.
-    return;
+    return true;
   }
 
   if (!host_) {
-    host_ = cluster_.chooseHost(addresses_.peer_);
+    host_ = cluster_.chooseHost(addresses_.peer_, &udp_session_info_);
     if (host_ == nullptr) {
       ENVOY_LOG(debug, "cannot find any valid host.");
       cluster_.cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
-      return;
+      return false;
     }
   }
 
   cluster_.addSession(host_.get(), this);
   createUdpSocket(host_);
+  return true;
 }
 
 void UdpProxyFilter::UdpActiveSession::createUdpSocket(const Upstream::HostConstSharedPtr& host) {
@@ -672,12 +679,8 @@ void HttpUpstreamImpl::setRequestEncoder(Http::RequestEncoder& request_encoder, 
     headers->addReferenceKey(Http::Headers::get().Path, target_tunnel_path);
   }
 
-  tunnel_config_.headerEvaluator().evaluateHeaders(
-      *headers,
-      downstream_info_.getRequestHeaders() == nullptr
-          ? *Http::StaticEmptyHeaders::get().request_headers
-          : *downstream_info_.getRequestHeaders(),
-      *Http::StaticEmptyHeaders::get().response_headers, downstream_info_);
+  tunnel_config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
+                                                   downstream_info_);
 
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
@@ -792,26 +795,28 @@ UdpProxyFilter::TunnelingActiveSession::TunnelingActiveSession(
     ClusterInfo& cluster, Network::UdpRecvData::LocalPeerAddresses&& addresses)
     : ActiveSession(cluster, std::move(addresses), nullptr) {}
 
-void UdpProxyFilter::TunnelingActiveSession::createUpstream() {
+bool UdpProxyFilter::TunnelingActiveSession::createUpstream() {
   if (conn_pool_factory_) {
     // A session filter may call on continueFilterChain(), after already creating the upstream,
     // so we first check that the factory was not created already.
-    return;
+    return true;
   }
 
   conn_pool_factory_ = std::make_unique<TunnelingConnectionPoolFactory>();
   load_balancer_context_ = std::make_unique<UdpLoadBalancerContext>(
-      cluster_.filter_.config_->hashPolicy(), addresses_.peer_);
+      cluster_.filter_.config_->hashPolicy(), addresses_.peer_, &udp_session_info_);
 
-  establishUpstreamConnection();
+  return establishUpstreamConnection();
 }
 
-void UdpProxyFilter::TunnelingActiveSession::establishUpstreamConnection() {
+bool UdpProxyFilter::TunnelingActiveSession::establishUpstreamConnection() {
   if (!createConnectionPool()) {
     ENVOY_LOG(debug, "failed to create upstream connection pool");
     cluster_.cluster_stats_.sess_tunnel_failure_.inc();
-    cluster_.removeSession(this);
+    return false;
   }
+
+  return true;
 }
 
 bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
@@ -899,9 +904,7 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamEvent(Network::Connection
       event == Network::ConnectionEvent::LocalClose) {
     upstream_.reset();
 
-    if (connecting) {
-      establishUpstreamConnection();
-    } else {
+    if (!connecting || !establishUpstreamConnection()) {
       cluster_.removeSession(this);
     }
   }

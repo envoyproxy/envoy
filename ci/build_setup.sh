@@ -56,6 +56,10 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
+  if [[ -n "$CLANG_TOOLCHAIN_SETUP" ]]; then
+    return
+  fi
+  export CLANG_TOOLCHAIN_SETUP=1
   ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
@@ -76,12 +80,15 @@ function setup_clang_toolchain() {
   echo "clang toolchain with ${ENVOY_STDLIB} configured"
 }
 
-export BUILD_DIR=${BUILD_DIR:-/build}
-if [[ ! -d "${BUILD_DIR}" ]]
-then
-  echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
-  mkdir -p "${BUILD_DIR}"
+if [[ -z "${BUILD_DIR}" ]]; then
+    echo "BUILD_DIR not set - defaulting to ~/.cache/envoy-bazel" >&2
+    BUILD_DIR="${HOME}/.cache/envoy-bazel"
 fi
+if [[ ! -d "${BUILD_DIR}" ]]; then
+    echo "${BUILD_DIR} missing - Creating." >&2
+    mkdir -p "${BUILD_DIR}"
+fi
+export BUILD_DIR
 
 # Environment setup.
 export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"

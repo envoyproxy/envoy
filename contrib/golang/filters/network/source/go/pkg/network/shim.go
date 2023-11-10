@@ -63,14 +63,25 @@ var (
 	libraryID string
 )
 
+// wrap the UpstreamFilter to ensure that the runtime.finalizer can be triggered
+// regardless of whether there is a circular reference in the UpstreamFilter.
+type upstreamConnWrapper struct {
+	api.UpstreamFilter
+	finalizer *int
+}
+
 func CreateUpstreamConn(addr string, filter api.UpstreamFilter) {
+	conn := &upstreamConnWrapper{
+		UpstreamFilter: filter,
+		finalizer:      new(int),
+	}
 	connID := atomic.AddUint64(&upstreamConnIDGenerator, 1)
-	_ = UpstreamFilters.StoreFilterByConnID(connID, filter)
+	_ = UpstreamFilters.StoreFilterByConnID(connID, conn)
 
 	h := cgoAPI.UpstreamConnect(libraryID, addr, connID)
 
 	// NP: make sure filter will be deleted.
-	runtime.SetFinalizer(filter, func(f api.UpstreamFilter) {
+	runtime.SetFinalizer(conn.finalizer, func(_ *int) {
 		cgoAPI.UpstreamFinalize(unsafe.Pointer(uintptr(h)), api.NormalFinalize)
 	})
 }

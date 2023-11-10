@@ -182,7 +182,7 @@ Dynamic Metadata
 The External Authorization filter supports emitting dynamic metadata as an opaque ``google.protobuf.Struct``.
 
 When using a gRPC authorization server, dynamic metadata will be emitted only when the :ref:`CheckResponse
-<envoy_v3_api_msg_service.auth.v3.CheckResponse>` contains a filled :ref:`dynamic_metadata
+<envoy_v3_api_msg_service.auth.v3.CheckResponse>` contains a non-empty :ref:`dynamic_metadata
 <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field.
 
 When using an HTTP authorization server, dynamic metadata will be emitted only when there are response headers
