@@ -51,9 +51,9 @@ void IoUringSocketEntry::onAcceptCompleted() {
 
 void IoUringSocketEntry::onReadCompleted() {
   ENVOY_LOG(trace,
-            "calling event callback since pending read buf has {} size data, data = {}, "
+            "calling event callback since pending read buf has {} size data, "
             "fd = {}",
-            getReadParam()->buf_.length(), getReadParam()->buf_.toString(), fd_);
+            getReadParam()->buf_.length(), fd_);
   cb_(Event::FileReadyType::Read);
 }
 
