@@ -173,8 +173,7 @@ TEST_P(AdminInstanceTest, ClustersJsonAndText) {
       }
      ],
      "health_status": {
-      "eds_health_status": "DEGRADED",
-      "excluded_via_eds_draining": true,
+      "eds_health_status": "DRAINING",
       "failed_active_health_check": true,
       "failed_outlier_check": true,
       "failed_active_degraded_check": true,

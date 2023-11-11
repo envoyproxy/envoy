@@ -146,7 +146,7 @@ message HostStatus {
 }
 
 // Health status for a host.
-// [#next-free-field: 10]
+// [#next-free-field: 9]
 message HostHealthStatus {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.HostHealthStatus";
@@ -173,10 +173,6 @@ message HostHealthStatus {
 
   // The host failed active HC due to timeout.
   bool active_hc_timeout = 8;
-
-  // The host should be excluded from panic, spillover, etc. calculations because it was explicitly
-  // taken out of rotation via EDS draining.
-  bool excluded_via_eds_draining = 9;
 
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
