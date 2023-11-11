@@ -42,8 +42,7 @@ def generate_compilation_database(args):
             db_entry['command'] = (
                 db_entry['command'].replace('-isysroot __BAZEL_XCODE_SDKROOT__', ''))
             db_entry['command'] = (
-                db_entry['command'].replace('DEBUG_PREFIX_MAP_PWD=.', '')
-            )
+                db_entry['command'].replace('DEBUG_PREFIX_MAP_PWD=.', ''))
         return db_entry
 
     return list(map(replace_execroot_marker, db_entries))
