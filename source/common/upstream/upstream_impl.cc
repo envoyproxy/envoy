@@ -440,7 +440,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   // Clear all old EDS health flags first.
   HostImpl::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   HostImpl::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  HostImpl::healthFlagClear(Host::HealthFlag::DRAINING_EDS_HEALTH);
+  HostImpl::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   // Set the appropriate EDS health flag.
   switch (health_status) {
@@ -450,7 +450,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
     HostImpl::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DRAINING:
-    HostImpl::healthFlagSet(Host::HealthFlag::DRAINING_EDS_HEALTH);
+    HostImpl::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
     break;
   case envoy::config::core::v3::DEGRADED:
     HostImpl::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
@@ -1530,7 +1530,7 @@ namespace {
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
          host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) ||
-         host.healthFlagGet(Host::HealthFlag::DRAINING_EDS_HEALTH);
+         host.healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING);
 }
 
 } // namespace

@@ -1563,7 +1563,7 @@ TEST_F(HostImplTest, HealthStatus) {
   EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
   EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
   // Old EDS flags should be cleared and new flag will be set.
-  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::DRAINING_EDS_HEALTH));
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING));
 
   // Setting an active unhealthy flag make the host unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -5551,7 +5551,7 @@ TEST(HostPartitionTest, PartitionHosts) {
   hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
   hosts[4]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts[5]->healthFlagSet(Host::HealthFlag::DRAINING_EDS_HEALTH);
+  hosts[5]->healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   auto hosts_per_locality =
       makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4], hosts[5]}});

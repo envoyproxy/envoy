@@ -151,7 +151,7 @@ public:
   /* The host failed active HC due to timeout. */                                \
   m(ACTIVE_HC_TIMEOUT, 0x100)                                                    \
   /* The host is currently marked as draining by EDS */                          \
-  m(DRAINING_EDS_HEALTH, 0x200)
+  m(EDS_STATUS_DRAINING, 0x200)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
