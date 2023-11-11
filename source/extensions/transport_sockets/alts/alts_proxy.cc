@@ -25,6 +25,7 @@ using ::grpc::gcp::ServerHandshakeParameters;
 using ::grpc::gcp::StartClientHandshakeReq;
 using ::grpc::gcp::StartServerHandshakeReq;
 
+// TODO(matthewstevenson88): Make this deadline configurable.
 constexpr absl::Duration AltsClientContextDeadline = absl::Seconds(30);
 
 void AltsProxy::setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions) {
