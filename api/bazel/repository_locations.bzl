@@ -39,8 +39,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "xDS API Working Group (xDS-WG)",
         project_url = "https://github.com/cncf/xds",
         # During the UDPA -> xDS migration, we aren't working with releases.
-        version = "3a472e524827f72d1ad621c4983dd5af54c46776",
-        sha256 = "dc305e20c9fa80822322271b50aa2ffa917bf4fd3973bcec52bfc28dc32c5927",
+        version = "0f5e0d9dbc1270b5eddd1be47fa8b2aea72f9a1f",
+        sha256 = "25cc9ba2c7f197d1cfacc69b6233e2ae1d24f62656d5254bb0b18ba08b8661aa",
         release_date = "2023-06-07",
         strip_prefix = "xds-{version}",
         urls = ["https://github.com/cncf/xds/archive/{version}.tar.gz"],
@@ -150,6 +150,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/norbjd/protoc-gen-jsonschema/archive/{version}.zip"],
         use_category = ["build"],
         release_date = "2023-05-30",
+    ),
+    dev_cel = dict(
+        project_name = "CEL",
+        project_desc = "Common Expression Language -- specification and binary representation",
+        project_url = "https://github.com/google/cel-spec",
+        strip_prefix = "cel-spec-{version}",
+        sha256 = "6d4bf5a0ac04b35c421cb8317cd35bbe78aacffee787bc7aa89daa1e211ff6be",
+        version = "0.13.0",
+        urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
+        use_category = ["api"],
+        release_date = "2023-11-09",
     ),
     envoy_toolshed = dict(
         project_name = "envoy_toolshed",
