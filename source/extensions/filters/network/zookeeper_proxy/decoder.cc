@@ -44,23 +44,23 @@ const char* createFlagsToString(CreateFlags flags) {
 
 absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instance& data,
                                                                   uint64_t& offset) {
-  ENVOY_LOG(trace, "[zookeeper_proxy] decoding request with {} bytes at offset {}", data.length(),
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with {} bytes at offset {}", data.length(),
             offset);
 
   // Check message length.
   const absl::StatusOr<int32_t> len = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       len, fmt::format("peekInt32 for len: {}", len.status().message()));
 
-  ENVOY_LOG(trace, "[zookeeper_proxy] decoding request with len {} at offset {}", len.value(),
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with len {} at offset {}", len.value(),
             offset);
 
   absl::Status status = ensureMinLength(len.value(), XID_LENGTH + INT_LENGTH); // xid + opcode
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       status, fmt::format("ensureMinLength: {}", status.message()));
 
   status = ensureMaxLength(len.value());
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       status, fmt::format("ensureMaxLength: {}", status.message()));
 
   auto start_time = time_source_.monotonicTime();
@@ -76,10 +76,10 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
   //       However, some client implementations might expose setWatches
   //       as a regular data request, so we support that as well.
   const absl::StatusOr<int32_t> xid = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       xid, fmt::format("peerInt32 for xid: {}", xid.status().message()));
 
-  ENVOY_LOG(trace, "[zookeeper_proxy] decoding request with xid {} at offset {}", xid.value(),
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with xid {} at offset {}", xid.value(),
             offset);
 
   switch (static_cast<XidCodes>(xid.value())) {
@@ -123,10 +123,10 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
   // must happen every 1/3 of the negotiated session timeout, to keep
   // the session alive.
   const absl::StatusOr<int32_t> oc = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       oc, fmt::format("peekInt32 for opcode: {}", oc.status().message()));
 
-  ENVOY_LOG(trace, "[zookeeper_proxy] decoding request with opcode {} at offset {}", oc.value(),
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with opcode {} at offset {}", oc.value(),
             offset);
 
   const auto opcode = static_cast<OpCodes>(oc.value());
@@ -232,7 +232,7 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
     callbacks_.onCloseRequest();
     break;
   default:
-    ENVOY_LOG(debug, "[zookeeper_proxy] decodeOnData exception: unknown opcode {}",
+    ENVOY_LOG(debug, "zookeeper_proxy: decodeOnData exception: unknown opcode {}",
               enumToSignedInt(opcode));
     callbacks_.onDecodeError();
     return absl::nullopt;
@@ -245,31 +245,31 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
 
 absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Instance& data,
                                                                    uint64_t& offset) {
-  ENVOY_LOG(trace, "[zookeeper_proxy] decoding response with {} bytes at offset {}", data.length(),
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with {} bytes at offset {}", data.length(),
             offset);
 
   // Check message length.
   const absl::StatusOr<int32_t> len = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       len, fmt::format("peekInt32 for len: {}", len.status().message()));
 
-  ENVOY_LOG(trace, "[zookeeper_proxy] decoding response with len.value() {} at offset {}",
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with len.value() {} at offset {}",
             len.value(), offset);
 
   absl::Status status =
       ensureMinLength(len.value(), XID_LENGTH + ZXID_LENGTH + INT_LENGTH); // xid + zxid + err
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       status, fmt::format("ensureMinLength: {}", status.message()));
 
   status = ensureMaxLength(len.value());
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       status, fmt::format("ensureMaxLength: {}", status.message()));
 
   const absl::StatusOr<int32_t> xid = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       xid, fmt::format("peekInt32 for xid: {}", xid.status().message()));
 
-  ENVOY_LOG(trace, "[zookeeper_proxy] decoding response with xid {} at offset {}", xid.value(),
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with xid {} at offset {}", xid.value(),
             offset);
   const auto xid_code = static_cast<XidCodes>(xid.value());
 
@@ -285,7 +285,7 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Insta
     ABSL_FALLTHROUGH_INTENDED;
   case XidCodes::SetWatchesXid:
     latency = fetchControlRequestData(xid.value(), opcode);
-    COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+    COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
         latency, fmt::format("fetchControlRequestData: {}", latency.status().message()));
     break;
   case XidCodes::WatchXid:
@@ -293,12 +293,12 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Insta
     break;
   default:
     latency = fetchDataRequestData(xid.value(), opcode);
-    COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+    COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
         latency, fmt::format("fetchDataRequestData: {}", latency.status().message()));
   }
 
   // Connect responses are special, they have no full reply header
-  // but just an xid with no zxid nor error fields like the ones
+  // but just an XID with no zxid nor error fields like the ones
   // available for all other server generated messages.
   if (xid_code == XidCodes::ConnectXid) {
     status = parseConnectResponse(data, offset, len.value(), latency.value());
@@ -309,15 +309,15 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnWrite(Buffer::Insta
 
   // Control responses that aren't connect, with XIDs <= 0.
   const absl::StatusOr<int64_t> zxid = helper_.peekInt64(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       zxid, fmt::format("peekInt64 for zxid: {}", zxid.status().message()));
 
   const absl::StatusOr<int32_t> error = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
       error, fmt::format("peekInt32 for error: {}", error.status().message()));
 
   ENVOY_LOG(trace,
-            "[zookeeper_proxy] decoding response with zxid.value() {} and error {} at offset {}",
+            "zookeeper_proxy: decoding response with zxid.value() {} and error {} at offset {}",
             zxid.value(), error.value(), offset);
 
   switch (xid_code) {
@@ -365,17 +365,17 @@ absl::Status DecoderImpl::ensureMaxLength(const int32_t len) const {
 absl::Status DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   absl::Status status =
       ensureMinLength(len, XID_LENGTH + ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Skip zxid, timeout, and session id.
   offset += ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH;
 
   // Skip password.
   status = skipString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<bool> readonly = maybeReadBool(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(readonly,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(readonly,
                                                                   readonly.status().message());
 
   callbacks_.onConnect(readonly.value());
@@ -386,17 +386,17 @@ absl::Status DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset,
 absl::Status DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   absl::Status status =
       ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH + INT_LENGTH + INT_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
   // Skip opcode + type.
   offset += OPCODE_LENGTH + INT_LENGTH;
 
   const absl::StatusOr<std::string> scheme = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(scheme,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(scheme,
                                                                   scheme.status().message());
 
   // Skip credential.
   status = skipString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   callbacks_.onAuthRequest(scheme.value());
 
@@ -406,13 +406,13 @@ absl::Status DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& off
 absl::Status DecoderImpl::parseGetDataRequest(Buffer::Instance& data, uint64_t& offset,
                                               uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH + BOOL_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   const absl::StatusOr<bool> watch = helper_.peekBool(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(watch, watch.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(watch, watch.status().message());
 
   callbacks_.onGetDataRequest(path.value(), watch.value());
 
@@ -443,43 +443,43 @@ absl::Status DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) {
 absl::Status DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                              OpCodes opcode) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (4 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   // Skip data.
   status = skipString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   status = skipAcls(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   absl::StatusOr<int32_t> flag_data = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(flag_data,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(flag_data,
                                                                   flag_data.status().message());
 
   const CreateFlags flags = static_cast<CreateFlags>(flag_data.value());
   status = callbacks_.onCreateRequest(path.value(), flags, opcode);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   return absl::OkStatus();
 }
 
 absl::Status DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   // Skip data.
   status = skipString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Ignore version.
   absl::StatusOr<int32_t> version = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(version,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(version,
                                                                   version.status().message());
 
   callbacks_.onSetRequest(path.value());
@@ -490,13 +490,13 @@ absl::Status DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offs
 absl::Status DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset,
                                                   uint32_t len, const bool two) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH + BOOL_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   const absl::StatusOr<bool> watch = helper_.peekBool(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(watch, watch.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(watch, watch.status().message());
 
   callbacks_.onGetChildrenRequest(path.value(), watch.value(), two);
 
@@ -506,13 +506,13 @@ absl::Status DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64
 absl::Status DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset,
                                              uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   const absl::StatusOr<int32_t> version = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(version,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(version,
                                                                   version.status().message());
 
   callbacks_.onDeleteRequest(path.value(), version.value());
@@ -523,13 +523,13 @@ absl::Status DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& o
 absl::Status DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& offset,
                                              uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH + BOOL_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   const absl::StatusOr<bool> watch = helper_.peekBool(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(watch, watch.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(watch, watch.status().message());
 
   callbacks_.onExistsRequest(path.value(), watch.value());
 
@@ -539,10 +539,10 @@ absl::Status DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& o
 absl::Status DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& offset,
                                              uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   callbacks_.onGetAclRequest(path.value());
 
@@ -552,16 +552,16 @@ absl::Status DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& o
 absl::Status DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset,
                                              uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   status = skipAcls(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<int32_t> version = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(version,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(version,
                                                                   version.status().message());
 
   callbacks_.onSetAclRequest(path.value(), version.value());
@@ -572,8 +572,8 @@ absl::Status DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& o
 absl::StatusOr<std::string> DecoderImpl::pathOnlyRequest(Buffer::Instance& data, uint64_t& offset,
                                                          uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH);
-  COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      status, status.message(), debug, "[zookeeper_proxy] path only request decoding exception {}",
+  COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+      status, status.message(), debug, "zookeeper_proxy: path only request decoding exception {}",
       status.message());
 
   return helper_.peekString(data, offset);
@@ -582,13 +582,13 @@ absl::StatusOr<std::string> DecoderImpl::pathOnlyRequest(Buffer::Instance& data,
 absl::Status DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset,
                                             uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   const absl::StatusOr<int32_t> version = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(version,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(version,
                                                                   version.status().message());
 
   callbacks_.onCheckRequest(path.value(), version.value());
@@ -600,19 +600,19 @@ absl::Status DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& of
                                             uint32_t len) {
   // Treat empty transactions as a decoding error, there should be at least 1 header.
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + MULTI_HEADER_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   while (true) {
     const absl::StatusOr<int32_t> opcode = helper_.peekInt32(data, offset);
-    COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(opcode,
+    COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(opcode,
                                                                     opcode.status().message());
 
     const absl::StatusOr<bool> done = helper_.peekBool(data, offset);
-    COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(done, done.status().message());
+    COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(done, done.status().message());
 
     // Ignore error field.
     const absl::StatusOr<int32_t> error = helper_.peekInt32(data, offset);
-    COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(error,
+    COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(error,
                                                                     error.status().message());
 
     if (done.value()) {
@@ -622,26 +622,26 @@ absl::Status DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& of
     switch (static_cast<OpCodes>(opcode.value())) {
     case OpCodes::Create:
       status = parseCreateRequest(data, offset, len, OpCodes::Create);
-      COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
-          status, debug, "[zookeeper_proxy] multi request (create) decoding exception {}",
+      COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
+          status, debug, "zookeeper_proxy: multi request (create) decoding exception {}",
           status.message());
       break;
     case OpCodes::SetData:
       status = parseSetRequest(data, offset, len);
-      COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
-          status, debug, "[zookeeper_proxy] multi request (set) decoding exception {}",
+      COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
+          status, debug, "zookeeper_proxy: multi request (set) decoding exception {}",
           status.message());
       break;
     case OpCodes::Check:
       status = parseCheckRequest(data, offset, len);
-      COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
-          status, debug, "[zookeeper_proxy] multi request (check) decoding exception {}",
+      COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
+          status, debug, "zookeeper_proxy: multi request (check) decoding exception {}",
           status.message());
       break;
     case OpCodes::Delete:
       status = parseDeleteRequest(data, offset, len);
-      COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
-          status, debug, "[zookeeper_proxy] multi request (delete) decoding exception {}",
+      COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
+          status, debug, "zookeeper_proxy: multi request (delete) decoding exception {}",
           status.message());
       break;
     default:
@@ -660,22 +660,22 @@ absl::Status DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t&
                                                uint32_t len) {
   absl::Status status =
       ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH) + LONG_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Skip joining.
   status = skipString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Skip leaving.
   status = skipString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
   // Skip new members.
   status = skipString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Read config id.
   absl::StatusOr<int64_t> config_id = helper_.peekInt64(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(config_id,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(config_id,
                                                                   config_id.status().message());
 
   callbacks_.onReconfigRequest();
@@ -687,23 +687,23 @@ absl::Status DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_
                                                  uint32_t len) {
   absl::Status status =
       ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + LONG_LENGTH + (3 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Ignore relative Zxid.
   absl::StatusOr<int64_t> zxid = helper_.peekInt64(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(zxid, zxid.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(zxid, zxid.status().message());
 
   // Data watches.
   status = skipStrings(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Exist watches.
   status = skipStrings(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Child watches.
   status = skipStrings(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   callbacks_.onSetWatchesRequest();
 
@@ -714,31 +714,31 @@ absl::Status DecoderImpl::parseSetWatches2Request(Buffer::Instance& data, uint64
                                                   uint32_t len) {
   absl::Status status =
       ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + LONG_LENGTH + (5 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Ignore relative Zxid.
   absl::StatusOr<int64_t> zxid = helper_.peekInt64(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(zxid, zxid.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(zxid, zxid.status().message());
 
   // Data watches.
   status = skipStrings(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Exist watches.
   status = skipStrings(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Child watches.
   status = skipStrings(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Persistent watches.
   status = skipStrings(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   // Persistent recursive watches.
   status = skipStrings(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   callbacks_.onSetWatches2Request();
 
@@ -748,13 +748,13 @@ absl::Status DecoderImpl::parseSetWatches2Request(Buffer::Instance& data, uint64
 absl::Status DecoderImpl::parseAddWatchRequest(Buffer::Instance& data, uint64_t& offset,
                                                uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   const absl::StatusOr<int32_t> mode = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(mode, mode.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(mode, mode.status().message());
 
   callbacks_.onAddWatchRequest(path.value(), mode.value());
 
@@ -764,13 +764,13 @@ absl::Status DecoderImpl::parseAddWatchRequest(Buffer::Instance& data, uint64_t&
 absl::Status DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset,
                                                uint32_t len, OpCodes opcode) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   const absl::StatusOr<int32_t> watch_type = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(watch_type,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(watch_type,
                                                                   watch_type.status().message());
 
   if (opcode == OpCodes::CheckWatches) {
@@ -789,7 +789,7 @@ absl::Status DecoderImpl::skipString(Buffer::Instance& data, uint64_t& offset) {
 
   if (slen.value() < 0) {
     ENVOY_LOG(trace,
-              "[zookeeper_proxy] decoding response with negative string length {} at offset {}",
+              "zookeeper_proxy: decoding response with negative string length {} at offset {}",
               slen.value(), offset);
     return absl::OkStatus();
   }
@@ -827,8 +827,8 @@ Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data, Decod
 
   if (zk_filter_buffer_len == 0) {
     status = decodeAndBufferHelper(data, dtype, zk_filter_buffer);
-    WRITE_ENVOY_LOG_IF_STATUS_NOT_OK(
-        status, debug, "[zookeeper_proxy] decodeAndBufferHelper exception: {}", status.message());
+    WRITE_LOG_IF_STATUS_NOT_OK(
+        status, debug, "zookeeper_proxy: decodeAndBufferHelper exception: {}", status.message());
 
     return Network::FilterStatus::Continue;
   }
@@ -839,8 +839,8 @@ Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data, Decod
   data.prepend(zk_filter_buffer);
 
   status = decodeAndBufferHelper(data, dtype, zk_filter_buffer);
-  WRITE_ENVOY_LOG_IF_STATUS_NOT_OK(
-      status, debug, "[zookeeper_proxy] decodeAndBufferHelper exception: {}", status.message());
+  WRITE_LOG_IF_STATUS_NOT_OK(
+      status, debug, "zookeeper_proxy: decodeAndBufferHelper exception: {}", status.message());
 
   // Drain the prepended ZooKeeper filter buffer.
   data.drain(zk_filter_buffer_len);
@@ -862,16 +862,16 @@ absl::Status DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeTy
   while (offset < data_len) {
     // Peek packet length.
     len = helper_.peekInt32(data, offset);
-    COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+    COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
         len, fmt::format("peekInt32 for len: {}", len.status().message()));
 
     status = ensureMinLength(len.value(), dtype == DecodeType::READ
                                               ? XID_LENGTH + INT_LENGTH
                                               : XID_LENGTH + ZXID_LENGTH + INT_LENGTH);
-    COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+    COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
     status = ensureMaxLength(len.value());
-    COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+    COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
     offset += len.value();
     if (offset <= data_len) {
@@ -931,7 +931,7 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
         callbacks_.onRequestBytes(opcode.value(), offset - current);
         break;
       } else {
-        ENVOY_LOG(debug, "[zookeeper_proxy] decodeOnData exception: {}", opcode.status().message());
+        ENVOY_LOG(debug, "zookeeper_proxy: decodeOnData exception: {}", opcode.status().message());
         goto exit_decode_loop;
       }
     case DecodeType::WRITE:
@@ -940,7 +940,7 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
         callbacks_.onResponseBytes(opcode.value(), offset - current);
         break;
       } else {
-        ENVOY_LOG(debug, "[zookeeper_proxy] decodeOnWrite exception: {}",
+        ENVOY_LOG(debug, "zookeeper_proxy: decodeOnWrite exception: {}",
                   opcode.status().message());
         goto exit_decode_loop;
       }
@@ -954,19 +954,19 @@ absl::Status DecoderImpl::parseConnectResponse(Buffer::Instance& data, uint64_t&
                                                const std::chrono::milliseconds latency) {
   absl::Status status =
       ensureMinLength(len, PROTOCOL_VERSION_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<int32_t> timeout = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(timeout,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(timeout,
                                                                   timeout.status().message());
 
   // Skip session id + password.
   offset += SESSION_LENGTH;
   status = skipString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<bool> readonly = maybeReadBool(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(readonly,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(readonly,
                                                                   readonly.status().message());
 
   callbacks_.onConnectResponse(0, timeout.value(), readonly.value(), latency);
@@ -978,18 +978,18 @@ absl::Status DecoderImpl::parseWatchEvent(Buffer::Instance& data, uint64_t& offs
                                           const uint32_t len, const int64_t zxid,
                                           const int32_t error) {
   absl::Status status = ensureMinLength(len, SERVER_HEADER_LENGTH + (3 * INT_LENGTH));
-  COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status);
+  COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<int32_t> event_type = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(event_type,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(event_type,
                                                                   event_type.status().message());
 
   const absl::StatusOr<int32_t> client_state = helper_.peekInt32(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(client_state,
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(client_state,
                                                                   client_state.status().message());
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
-  COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   callbacks_.onWatchEvent(event_type.value(), client_state.value(), path.value(), zxid, error);
 

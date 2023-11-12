@@ -48,18 +48,18 @@ private:
     return status;                                                                                 \
   }
 
-#define WRITE_ENVOY_LOG_IF_STATUS_NOT_OK(status, log_level, ...)                                   \
+#define WRITE_LOG_IF_STATUS_NOT_OK(status, log_level, ...)                                         \
   if (!status.ok()) {                                                                              \
     ENVOY_LOG(log_level, ##__VA_ARGS__);                                                           \
   }
 
-#define COUNT_DECODER_ERROR_AND_RETURN_IF_STATUS_NOT_OK(status)                                    \
+#define COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status)                                      \
   if (!status.ok()) {                                                                              \
     callbacks_.onDecodeError();                                                                    \
     return status;                                                                                 \
   }
 
-#define COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(status, log_level, ...)           \
+#define COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(status, log_level, ...)             \
   if (!status.ok()) {                                                                              \
     ENVOY_LOG(log_level, ##__VA_ARGS__);                                                           \
     callbacks_.onDecodeError();                                                                    \
@@ -71,13 +71,13 @@ private:
     return absl::InvalidArgumentError(message);                                                    \
   }
 
-#define COUNT_DECODER_ERROR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message)           \
+#define COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message)             \
   if (!status.ok()) {                                                                              \
     callbacks_.onDecodeError();                                                                    \
     return absl::InvalidArgumentError(message);                                                    \
   }
 
-#define COUNT_DECODER_ERROR_WITH_LOG_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message,  \
+#define COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message,    \
                                                                                  log_level, ...)   \
   if (!status.ok()) {                                                                              \
     ENVOY_LOG(log_level, ##__VA_ARGS__);                                                           \
