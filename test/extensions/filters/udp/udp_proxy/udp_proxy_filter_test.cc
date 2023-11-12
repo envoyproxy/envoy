@@ -31,7 +31,6 @@
 
 using testing::AtLeast;
 using testing::ByMove;
-using testing::ContainsRegex;
 using testing::DoAll;
 using testing::DoDefault;
 using testing::InSequence;
@@ -480,9 +479,9 @@ upstream_socket_config:
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
   EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
-  EXPECT_THAT(output_.back(),
-              testing::ContainsRegex("17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 "
-                                     "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"));
+  EXPECT_TRUE(std::regex_match(output_.back(),
+                               std::regex("17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 "
+                                          "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")));
 }
 
 // Route with source IP.
