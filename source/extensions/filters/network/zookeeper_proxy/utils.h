@@ -19,8 +19,8 @@ namespace ZooKeeperProxy {
 /**
  * Helper for extracting ZooKeeper data from a buffer.
  *
- * If at any point a peek is tried beyond max_len, an EnvoyException <---- reword this comment
- * will be thrown. This is important to protect Envoy against malformed
+ * If at any point a peek is tried beyond max_len, an invalid argument error
+ * will be returned. This is important to protect Envoy against malformed
  * requests (e.g.: when the declared and actual length don't match).
  *
  * Note: ZooKeeper's protocol uses network byte ordering (big-endian).
