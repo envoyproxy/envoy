@@ -1206,13 +1206,13 @@ TEST_F(ZooKeeperFilterTest, SetAclRequest) {
 TEST_F(ZooKeeperFilterTest, SetAclTooBigRequest) {
   initialize();
 
-  std::string schema = std::string(1048544, '*')
+  std::string schema = std::string(1048544, '*');
   Buffer::OwnedImpl data = encodeSetAclRequest("/foo", schema, "passwd", -1);
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(0UL, store_.counter("test.zookeeper.setacl_rq").value());
   EXPECT_EQ(0, config_->stats().request_bytes_.value());
-  EXPECT_EQ(0, store_.counter("test.zookeeper.setacl_rq_bytes")).value());
+  EXPECT_EQ(0, store_.counter("test.zookeeper.setacl_rq_bytes").value());
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 

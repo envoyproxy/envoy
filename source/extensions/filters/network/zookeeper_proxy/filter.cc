@@ -421,7 +421,8 @@ absl::Status ZooKeeperFilter::onGetEphemeralsRequest(const absl::StatusOr<std::s
   return absl::OkStatus();
 }
 
-absl::Status ZooKeeperFilter::onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) {
+absl::Status
+ZooKeeperFilter::onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) {
   RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   config_->stats_.getallchildrennumber_rq_.inc();

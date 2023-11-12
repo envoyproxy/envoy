@@ -181,8 +181,8 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
     break;
   case OpCodes::Sync:
     status = callbacks_.onSyncRequest(pathOnlyRequest(data, offset, len.value()));
-    RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-        status, fmt::format("onSyncRequest: {}", status.message()));
+    RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status,
+                                            fmt::format("onSyncRequest: {}", status.message()));
     break;
   case OpCodes::Check:
     status = parseCheckRequest(data, offset, len.value());
@@ -578,7 +578,8 @@ absl::StatusOr<std::string> DecoderImpl::pathOnlyRequest(Buffer::Instance& data,
                                                          uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH);
   COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      status, fmt::format("zookeeper_proxy: path only request decoding exception {}", status.message()));
+      status,
+      fmt::format("zookeeper_proxy: path only request decoding exception {}", status.message()));
 
   return helper_.peekString(data, offset);
 }
