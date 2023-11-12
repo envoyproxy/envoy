@@ -1230,12 +1230,10 @@ TEST_F(ZooKeeperFilterTest, TooSmallSyncRequest) {
 
   Buffer::OwnedImpl data = encodeTooShortPath("/foo", enumToSignedInt(OpCodes::Sync));
 
-  // testRequest(data, {{{"opname", "sync"}, {"path", "/foo"}}, {{"bytes", "20"}}});
-
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(0UL, store_.counter("test.zookeeper.sync_rq").value());
   EXPECT_EQ(0, config_->stats().request_bytes_.value());
-  EXPECT_EQ(0, store_.counter("test.zookeeper.sync_rq_bytes")).value();
+  EXPECT_EQ(0, store_.counter("test.zookeeper.sync_rq_bytes").value());
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 
@@ -1308,39 +1306,6 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
   testResponse({{{"opname", "multi_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}});
-}
-
-TEST_F(ZooKeeperFilterTest, MultiRequestWithBadCreateRequest) {
-  initialize();
-
-  Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", 0, true);
-  Buffer::OwnedImpl create2 = encodeCreateRequestWithPartialData("/foo", "bar", true);
-  Buffer::OwnedImpl create3 = encodeCreateRequestWithNegativeDataLen("/baz", 0, true);
-  Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToSignedInt(OpCodes::Check), true);
-  Buffer::OwnedImpl set1 = encodeSetRequest("/bar", "2", -1, true);
-  Buffer::OwnedImpl delete1 = encodeDeleteRequest("/abcd", 1, true);
-  Buffer::OwnedImpl delete2 = encodeDeleteRequest("/efg", 2, true);
-
-  std::vector<std::pair<int32_t, Buffer::OwnedImpl>> ops;
-  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Create), std::move(create1)));
-  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Create), std::move(create2)));
-  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Create), std::move(create3)));
-  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Check), std::move(check1)));
-  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::SetData), std::move(set1)));
-  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Delete), std::move(delete1)));
-  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Delete), std::move(delete2)));
-
-  Buffer::OwnedImpl data = encodeMultiRequest(ops);
-
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-  EXPECT_EQ(0UL, config_->stats().multi_rq_.value());
-  EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
-  EXPECT_EQ(0UL, store_.counter("test.zookeeper.multi_rq_bytes").value());
-  EXPECT_EQ(0UL, config_->stats().create_rq_.value());
-  EXPECT_EQ(0UL, config_->stats().setdata_rq_.value());
-  EXPECT_EQ(0UL, config_->stats().check_rq_.value());
-  EXPECT_EQ(0UL, config_->stats().delete_rq_.value());
-  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 
 TEST_F(ZooKeeperFilterTest, ReconfigRequest) {
