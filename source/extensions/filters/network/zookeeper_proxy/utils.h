@@ -76,14 +76,6 @@ private:
     callbacks_.onDecodeError();                                                                    \
     return absl::InvalidArgumentError(message);                                                    \
   }
-
-#define COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message,    \
-                                                                               log_level, ...)     \
-  if (!status.ok()) {                                                                              \
-    ENVOY_LOG(log_level, ##__VA_ARGS__);                                                           \
-    callbacks_.onDecodeError();                                                                    \
-    return absl::InvalidArgumentError(message);                                                    \
-  }
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions

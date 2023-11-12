@@ -349,7 +349,7 @@ public:
   void onExistsRequest(const std::string& path, bool watch) override;
   void onGetAclRequest(const std::string& path) override;
   void onSetAclRequest(const std::string& path, int32_t version) override;
-  void onSyncRequest(const absl::StatusOr<std::string>& path) override;
+  absl::Status onSyncRequest(const absl::StatusOr<std::string>& path) override;
   void onCheckRequest(const std::string& path, int32_t version) override;
   void onMultiRequest() override;
   void onReconfigRequest() override;
@@ -358,8 +358,8 @@ public:
   void onAddWatchRequest(const std::string& path, const int32_t mode) override;
   void onCheckWatchesRequest(const std::string& path, int32_t type) override;
   void onRemoveWatchesRequest(const std::string& path, int32_t type) override;
-  void onGetEphemeralsRequest(const absl::StatusOr<std::string>& path) override;
-  void onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) override;
+  absl::Status onGetEphemeralsRequest(const absl::StatusOr<std::string>& path) override;
+  absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) override;
   void onCloseRequest() override;
   void onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,

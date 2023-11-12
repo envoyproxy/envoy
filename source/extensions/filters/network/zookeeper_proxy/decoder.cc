@@ -180,7 +180,9 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
         status, fmt::format("parseSetAclRequest: {}", status.message()));
     break;
   case OpCodes::Sync:
-    callbacks_.onSyncRequest(pathOnlyRequest(data, offset, len.value()));
+    status = callbacks_.onSyncRequest(pathOnlyRequest(data, offset, len.value()));
+    RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+        status, fmt::format("onSyncRequest: {}", status.message()));
     break;
   case OpCodes::Check:
     status = parseCheckRequest(data, offset, len.value());
@@ -223,10 +225,14 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
         status, fmt::format("parseXWatchesRequest (remove watches): {}", status.message()));
     break;
   case OpCodes::GetEphemerals:
-    callbacks_.onGetEphemeralsRequest(pathOnlyRequest(data, offset, len.value()));
+    status = callbacks_.onGetEphemeralsRequest(pathOnlyRequest(data, offset, len.value()));
+    RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+        status, fmt::format("onGetEphemeralsRequest: {}", status.message()));
     break;
   case OpCodes::GetAllChildrenNumber:
-    callbacks_.onGetAllChildrenNumberRequest(pathOnlyRequest(data, offset, len.value()));
+    status = callbacks_.onGetAllChildrenNumberRequest(pathOnlyRequest(data, offset, len.value()));
+    RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+        status, fmt::format("onGetAllChildrenNumberRequest: {}", status.message()));
     break;
   case OpCodes::Close:
     callbacks_.onCloseRequest();
@@ -550,7 +556,7 @@ absl::Status DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& o
 
 absl::Status DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset,
                                              uint32_t len) {
-  absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
+  absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
   COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
   const absl::StatusOr<std::string> path = helper_.peekString(data, offset);
@@ -571,9 +577,8 @@ absl::Status DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& o
 absl::StatusOr<std::string> DecoderImpl::pathOnlyRequest(Buffer::Instance& data, uint64_t& offset,
                                                          uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH);
-  COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      status, status.message(), debug, "zookeeper_proxy: path only request decoding exception {}",
-      status.message());
+  COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+      status, fmt::format("zookeeper_proxy: path only request decoding exception {}", status.message()));
 
   return helper_.peekString(data, offset);
 }
