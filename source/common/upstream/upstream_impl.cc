@@ -1085,13 +1085,13 @@ ClusterInfoImpl::ClusterInfoImpl(
       added_via_api_(added_via_api), has_configured_http_filters_(false),
       per_endpoint_stats_(config.has_track_cluster_stats() &&
                           config.track_cluster_stats().per_endpoint_stats()) {
-  for (auto drop_overload : config.load_assignment().policy().drop_overloads()) {
-    drop_overload_.emplace_back(drop_overload);
-    DropOverloadStats stats;
-    stats.category = drop_overload.category();
-    drop_overload_stats_.emplace_back(stats);
+  auto drop_overload = config.load_assignment().policy().drop_overloads();
+  if (drop_overload.size() > 0) {
+    // Only support the first drop_overload category configuration.
+    // The rest will be ignored.
+    auto drop_percentage = drop_overload[0].drop_percentage();
+    drop_overload_ = UnitFloat(drop_percentage.numerator() / drop_percentage.denominator());
   }
-
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(

@@ -982,9 +982,7 @@ public:
 
   bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
 
-  std::list<envoy::config::endpoint::v3::ClusterLoadAssignment::Policy::DropOverload> dropOverload() const override { return drop_overload_; }
-
-  std::list<DropOverloadStats> dropOverloadStats() const override { return drop_overload_stats_; }
+  UnitFloat dropOverload() const override { return drop_overload_; }
 
   UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
@@ -1051,7 +1049,6 @@ public:
     // Upgrade filter chains not yet supported for upstream filters.
     return false;
   }
-
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -1160,8 +1157,7 @@ private:
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
-  std::list<envoy::config::endpoint::v3::ClusterLoadAssignment::Policy::DropOverload> drop_overload_;
-  std::list<DropOverloadStats> drop_overload_stats_;
+  UnitFloat drop_overload_{0};
 };
 
 /**
