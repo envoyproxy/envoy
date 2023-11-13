@@ -15,7 +15,7 @@ namespace OpenTelemetry {
 SamplingResult
 AlwaysOnSampler::shouldSample(const absl::optional<SpanContext> parent_context,
                               const std::string& /*trace_id*/, const std::string& /*name*/,
-                              ::opentelemetry::proto::trace::v1::Span::SpanKind /*kind*/,
+                              OTelSpanKind /*kind*/,
                               const std::map<std::string, std::string>& /*attributes*/,
                               const std::vector<SpanContext>& /*links*/) {
   SamplingResult result;
