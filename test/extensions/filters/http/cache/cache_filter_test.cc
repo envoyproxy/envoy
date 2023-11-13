@@ -1150,21 +1150,18 @@ TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
 }
 
 TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndInitialIsBug) {
-  GTEST_SKIP(); // TODO(issue #29217): Remove skip.
   EXPECT_ENVOY_BUG(
       CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation, FilterState::Initial),
       "Unexpected filter state in requestCacheStatus");
 }
 
 TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDecodeServingFromCacheIsBug) {
-  GTEST_SKIP(); // TODO(issue #29217): Remove skip.
   EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
                                                     FilterState::DecodeServingFromCache),
                    "Unexpected filter state in requestCacheStatus");
 }
 
 TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDestroyedIsBug) {
-  GTEST_SKIP(); // TODO(issue #29217): Remove skip.
   EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
                                                     FilterState::Destroyed),
                    "Unexpected filter state in requestCacheStatus");
