@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
 #include "absl/strings/str_join.h"
