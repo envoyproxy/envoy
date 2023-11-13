@@ -333,6 +333,11 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 
 /*/extensions/health_checkers/common @zuercher @botengyao
 
+# HTTP credential injector
+/*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
+/*/extensions/injected_credentials/common @zhaohuabing @kyessenov
+/*/extensions/injected_credentials/generic @zhaohuabing @kyessenov
+
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED

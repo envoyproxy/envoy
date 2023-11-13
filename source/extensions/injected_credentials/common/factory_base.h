@@ -1,0 +1,45 @@
+#pragma once
+
+#include "envoy/server/filter_config.h"
+
+#include "source/extensions/injected_credentials/common/credential.h"
+#include "source/extensions/injected_credentials/common/factory.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Credentials {
+namespace Common {
+
+template <class ConfigProto>
+class CredentialInjectorFactoryBase : public NamedCredentialInjectorConfigFactory {
+public:
+  CredentialInjectorSharedPtr
+  createCredentialInjectorFromProto(const Protobuf::Message& proto_config,
+                                    Server::Configuration::FactoryContext& context) override {
+    return createCredentialInjectorFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
+                                                             context.messageValidationVisitor()),
+        context);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ConfigProto>();
+  }
+
+  std::string name() const override { return name_; }
+
+protected:
+  CredentialInjectorFactoryBase(const std::string& name) : name_(name) {}
+
+private:
+  virtual CredentialInjectorSharedPtr
+  createCredentialInjectorFromProtoTyped(const ConfigProto&,
+                                         Server::Configuration::FactoryContext&) PURE;
+
+  const std::string name_;
+};
+
+} // namespace Common
+} // namespace Credentials
+} // namespace Extensions
+} // namespace Envoy

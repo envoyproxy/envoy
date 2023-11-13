@@ -293,6 +293,13 @@ envoy.filters.http.cors:
   type_urls:
   - envoy.extensions.filters.http.cors.v3.Cors
   - envoy.extensions.filters.http.cors.v3.CorsPolicy
+envoy.filters.http.credential_injector:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
 envoy.filters.http.csrf:
   categories:
   - envoy.filters.http
@@ -876,6 +883,13 @@ envoy.http.header_validators.envoy_default:
   status: wip
   type_urls:
   - envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
+envoy.injected_credentials.generic:
+  categories:
+  - envoy.injected_credentials
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.injected_credentials.generic.v3.Generic
 envoy.internal_redirect_predicates.allow_listed_routes:
   categories:
   - envoy.internal_redirect_predicates
