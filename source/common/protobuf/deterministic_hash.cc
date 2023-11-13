@@ -26,58 +26,77 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
 
 struct MapFieldSorter {
   MapFieldSorter(const Protobuf::RepeatedFieldRef<Protobuf::Message> entries)
-      : entries_(entries.begin(), entries.end()),
+      : entries_(entries.begin(), entries.end()), compare_(*entries_.begin()),
         reflection_(*entries_.begin()->get().GetReflection()),
         descriptor_(*entries_.begin()->get().GetDescriptor()), key_field_(*descriptor_.map_key()),
         value_field_(*descriptor_.map_value()) {}
   const std::vector<std::reference_wrapper<const Protobuf::Message>>& sorted() {
     using Protobuf::FieldDescriptor;
-    std::function<bool(const Protobuf::Message& a, const Protobuf::Message& b)> compareFn;
-    switch (key_field_.cpp_type()) {
-    case FieldDescriptor::CPPTYPE_INT32:
-      compareFn = [this](const Protobuf::Message& a, const Protobuf::Message& b) {
-        return reflection_.GetInt32(a, &key_field_) < reflection_.GetInt32(b, &key_field_);
-      };
-      break;
-    case FieldDescriptor::CPPTYPE_UINT32:
-      compareFn = [this](const Protobuf::Message& a, const Protobuf::Message& b) {
-        return reflection_.GetUInt32(a, &key_field_) < reflection_.GetUInt32(b, &key_field_);
-      };
-      break;
-    case FieldDescriptor::CPPTYPE_INT64:
-      compareFn = [this](const Protobuf::Message& a, const Protobuf::Message& b) {
-        return reflection_.GetInt64(a, &key_field_) < reflection_.GetInt64(b, &key_field_);
-      };
-      break;
-    case FieldDescriptor::CPPTYPE_UINT64:
-      compareFn = [this](const Protobuf::Message& a, const Protobuf::Message& b) {
-        return reflection_.GetUInt64(a, &key_field_) < reflection_.GetUInt64(b, &key_field_);
-      };
-      break;
-    case FieldDescriptor::CPPTYPE_BOOL:
-      compareFn = [this](const Protobuf::Message& a, const Protobuf::Message& b) {
-        return reflection_.GetBool(a, &key_field_) < reflection_.GetBool(b, &key_field_);
-      };
-      break;
-    case FieldDescriptor::CPPTYPE_STRING: {
-      compareFn = [this](const Protobuf::Message& a, const Protobuf::Message& b) {
-        std::string scratch_a, scratch_b;
-        return reflection_.GetStringReference(a, &key_field_, &scratch_a) <
-               reflection_.GetStringReference(b, &key_field_, &scratch_b);
-      };
-      break;
-    }
-    case FieldDescriptor::CPPTYPE_DOUBLE:
-    case FieldDescriptor::CPPTYPE_FLOAT:
-    case FieldDescriptor::CPPTYPE_ENUM:
-    case FieldDescriptor::CPPTYPE_MESSAGE:
-      IS_ENVOY_BUG("invalid map key type");
-    }
-    std::sort(entries_.begin(), entries_.end(), compareFn);
+    std::sort(entries_.begin(), entries_.end(), compare_);
     return entries_;
   }
 
   std::vector<std::reference_wrapper<const Protobuf::Message>> entries_;
+  struct Compare {
+    Compare(const Protobuf::Message& first_msg)
+        : reflection_(*first_msg.GetReflection()), descriptor_(*first_msg.GetDescriptor()),
+          key_field_(*descriptor_.map_key()), compare_fn_(selectCompareFn()) {}
+    bool operator()(const Protobuf::Message& a, const Protobuf::Message& b) {
+      return (this->*compare_fn_)(a, b);
+    }
+
+  private:
+    bool compareByInt32(const Protobuf::Message& a, const Protobuf::Message& b) {
+      return reflection_.GetInt32(a, &key_field_) < reflection_.GetInt32(b, &key_field_);
+    }
+    bool compareByUInt32(const Protobuf::Message& a, const Protobuf::Message& b) {
+      return reflection_.GetUInt32(a, &key_field_) < reflection_.GetUInt32(b, &key_field_);
+    }
+    bool compareByInt64(const Protobuf::Message& a, const Protobuf::Message& b) {
+      return reflection_.GetInt64(a, &key_field_) < reflection_.GetInt64(b, &key_field_);
+    }
+    bool compareByUInt64(const Protobuf::Message& a, const Protobuf::Message& b) {
+      return reflection_.GetUInt64(a, &key_field_) < reflection_.GetUInt64(b, &key_field_);
+    }
+    bool compareByBool(const Protobuf::Message& a, const Protobuf::Message& b) {
+      return reflection_.GetBool(a, &key_field_) < reflection_.GetBool(b, &key_field_);
+    }
+    bool compareByString(const Protobuf::Message& a, const Protobuf::Message& b) {
+      std::string scratch_a, scratch_b;
+      return reflection_.GetStringReference(a, &key_field_, &scratch_a) <
+             reflection_.GetStringReference(b, &key_field_, &scratch_b);
+    }
+    using CompareMemberFn = bool (Compare::*)(const Protobuf::Message& a,
+                                              const Protobuf::Message& b);
+    CompareMemberFn selectCompareFn() {
+      using Protobuf::FieldDescriptor;
+      switch (key_field_.cpp_type()) {
+      case FieldDescriptor::CPPTYPE_INT32:
+        return &Compare::compareByInt32;
+      case FieldDescriptor::CPPTYPE_UINT32:
+        return &Compare::compareByUInt32;
+      case FieldDescriptor::CPPTYPE_INT64:
+        return &Compare::compareByInt64;
+      case FieldDescriptor::CPPTYPE_UINT64:
+        return &Compare::compareByUInt64;
+      case FieldDescriptor::CPPTYPE_BOOL:
+        return &Compare::compareByBool;
+      case FieldDescriptor::CPPTYPE_STRING: {
+        return &Compare::compareByString;
+      }
+      case FieldDescriptor::CPPTYPE_DOUBLE:
+      case FieldDescriptor::CPPTYPE_FLOAT:
+      case FieldDescriptor::CPPTYPE_ENUM:
+      case FieldDescriptor::CPPTYPE_MESSAGE:
+        IS_ENVOY_BUG("invalid map key type");
+        return nullptr;
+      }
+    }
+    const Protobuf::Reflection& reflection_;
+    const Protobuf::Descriptor& descriptor_;
+    const Protobuf::FieldDescriptor& key_field_;
+    CompareMemberFn compare_fn_;
+  } compare_;
   const Protobuf::Reflection& reflection_;
   const Protobuf::Descriptor& descriptor_;
   const Protobuf::FieldDescriptor& key_field_;
