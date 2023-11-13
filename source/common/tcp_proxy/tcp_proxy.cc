@@ -799,7 +799,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    upstream_.reset();
+    read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
     disableIdleTimer();
 
     if (connecting) {
