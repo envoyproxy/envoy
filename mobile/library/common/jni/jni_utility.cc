@@ -1,7 +1,7 @@
 #include "library/common/jni/jni_utility.h"
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 
 #include "source/common/common/assert.h"
 
@@ -353,6 +353,15 @@ void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
   jsize size = jni_helper.getArrayLength(source);
   bool success = dest->ParseFromArray(bytes.get(), size);
   RELEASE_ASSERT(success, "Failed to parse protobuf message.");
+}
+
+LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
+                                                   const Envoy::Protobuf::MessageLite& source) {
+  size_t size = source.ByteSizeLong();
+  LocalRefUniquePtr<jbyteArray> byte_array = jni_helper.newByteArray(size);
+  auto bytes = jni_helper.getByteArrayElements(byte_array.get(), nullptr);
+  source.SerializeToArray(bytes.get(), size);
+  return byte_array;
 }
 
 std::string javaStringToString(JniHelper& jni_helper, jstring java_string) {

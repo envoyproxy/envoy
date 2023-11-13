@@ -124,6 +124,10 @@ void javaByteArrayToString(JniHelper& jni_helper, jbyteArray jbytes, std::string
 void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
                           Envoy::Protobuf::MessageLite* dest);
 
+/** Converts from Proto to Java byte array. */
+LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
+                                                   const Envoy::Protobuf::MessageLite& source);
+
 /** Converts from Java `String` to C++ string. */
 std::string javaStringToString(JniHelper& jni_helper, jstring java_string);
 
