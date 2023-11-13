@@ -37,6 +37,8 @@ def jvm_flags(lib_name):
         "-Djava.library.path=library/common/jni:test/common/jni",
         "-Denvoy_jni_library_name={}".format(lib_name),
         "-Xcheck:jni",
+        # Use the signal handlers defined in Envoy instead of using libjsig.so.
+        "-XX:+AllowUserSignalHandlers",
     ] + select({
         "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],
         "//conditions:default": [],

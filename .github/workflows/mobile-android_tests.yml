@@ -51,7 +51,6 @@ jobs:
           --build_tests_only \
           --config=test-android \
           --config=mobile-remote-ci \
-          --define=signal_trace=disabled \
           //test/java/...
 
   kotlintestslinux:
@@ -85,5 +84,4 @@ jobs:
           --build_tests_only \
           --config=test-android \
           --config=mobile-remote-ci \
-          --define=signal_trace=disabled \
           //test/kotlin/...
