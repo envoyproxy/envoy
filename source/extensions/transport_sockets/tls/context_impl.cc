@@ -1243,7 +1243,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   // selected_ctx represents the final selected certificate, it should meet all requirements or pick
   // a candidate
   const TlsContext* selected_ctx = nullptr;
-  const TlsContext* candicate_ctx = nullptr;
+  const TlsContext* candidate_ctx = nullptr;
   OcspStapleAction ocsp_staple_action;
 
   auto selected = [&](const TlsContext& ctx) -> bool {
@@ -1259,10 +1259,10 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
       return true;
     }
 
-    if (client_ecdsa_capable && !ctx.is_ecdsa_ && candicate_ctx == nullptr) {
+    if (client_ecdsa_capable && !ctx.is_ecdsa_ && candidate_ctx == nullptr) {
       // ECDSA cert is preferred if client is ECDSA capable, so RSA cert is marked as a candidate,
       // searching will continue until exhausting all certs or find a exact match.
-      candicate_ctx = &ctx;
+      candidate_ctx = &ctx;
       ocsp_staple_action = action;
       return false;
     }
@@ -1285,7 +1285,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
 
   auto tail_select = [&](bool go_to_next_phase) {
     if (selected_ctx == nullptr) {
-      selected_ctx = candicate_ctx;
+      selected_ctx = candidate_ctx;
     }
 
     if (selected_ctx == nullptr && !go_to_next_phase) {
@@ -1315,7 +1315,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   // Full scan certs if client provides SNI but no cert matches to it,
   // it requires full_scan_certs_on_sni_mismatch is enabled.
   if (selected_ctx == nullptr) {
-    candicate_ctx = nullptr;
+    candidate_ctx = nullptr;
     // Skip loop when there is no cert compatible to key type
     if (client_ecdsa_capable || (!client_ecdsa_capable && has_rsa_)) {
       for (const auto& ctx : tls_contexts_) {
