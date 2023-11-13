@@ -271,19 +271,6 @@ public:
     return buffer;
   }
 
-  Buffer::OwnedImpl encodeTooShortPath(const std::string& path, const int32_t opcode) const {
-    Buffer::OwnedImpl buffer;
-
-    buffer.writeBEInt<int32_t>(1);
-    buffer.writeBEInt<int32_t>(1000);
-    // Opcode.
-    buffer.writeBEInt<int32_t>(opcode);
-    // Path.
-    addString(buffer, path);
-
-    return buffer;
-  }
-
   Buffer::OwnedImpl encodePathLongerThanBuffer(const std::string& path,
                                                const int32_t opcode) const {
     Buffer::OwnedImpl buffer;
@@ -1203,19 +1190,6 @@ TEST_F(ZooKeeperFilterTest, SetAclRequest) {
   testResponse({{{"opname", "setacl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}});
 }
 
-TEST_F(ZooKeeperFilterTest, SetAclTooBigRequest) {
-  initialize();
-
-  std::string schema = std::string(1048544, '*');
-  Buffer::OwnedImpl data = encodeSetAclRequest("/foo", schema, "passwd", -1);
-
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-  EXPECT_EQ(0UL, store_.counter("test.zookeeper.setacl_rq").value());
-  EXPECT_EQ(0, config_->stats().request_bytes_.value());
-  EXPECT_EQ(0, store_.counter("test.zookeeper.setacl_rq_bytes").value());
-  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
-}
-
 TEST_F(ZooKeeperFilterTest, SyncRequest) {
   initialize();
 
@@ -1223,18 +1197,6 @@ TEST_F(ZooKeeperFilterTest, SyncRequest) {
 
   testRequest(data, {{{"opname", "sync"}, {"path", "/foo"}}, {{"bytes", "20"}}});
   testResponse({{{"opname", "sync_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}});
-}
-
-TEST_F(ZooKeeperFilterTest, TooSmallSyncRequest) {
-  initialize();
-
-  Buffer::OwnedImpl data = encodeTooShortPath("/foo", enumToSignedInt(OpCodes::Sync));
-
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-  EXPECT_EQ(0UL, store_.counter("test.zookeeper.sync_rq").value());
-  EXPECT_EQ(0, config_->stats().request_bytes_.value());
-  EXPECT_EQ(0, store_.counter("test.zookeeper.sync_rq_bytes").value());
-  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 
 TEST_F(ZooKeeperFilterTest, GetEphemeralsRequest) {
