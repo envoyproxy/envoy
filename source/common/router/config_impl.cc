@@ -383,7 +383,7 @@ std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::pred
   return predicates;
 }
 
-std::vector<std::string> InternalRedirectPolicyImpl::responseHeadersToPreserve() const {
+std::vector<Http::LowerCaseString> InternalRedirectPolicyImpl::responseHeadersToPreserve() const {
   return response_headers_to_preserve_;
 }
 

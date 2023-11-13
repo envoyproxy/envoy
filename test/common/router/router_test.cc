@@ -4383,7 +4383,9 @@ TEST_F(RouterTest, ResponseHeadersToPreserveCopiesHeadersOrClears) {
 
   redirect_headers_->setCopy(Http::LowerCaseString("x-to-copy"), "bar");
 
-  std::vector<std::string> toPreserve = {"x-to-clear", "x-to-copy"};
+  std::vector<Http::LowerCaseString> toPreserve;
+  toPreserve.emplace_back("x-to-clear");
+  toPreserve.emplace_back("x-to-copy");
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
               responseHeadersToPreserve())
       .WillOnce(Return(toPreserve));

@@ -1843,11 +1843,9 @@ bool Filter::convertRequestHeadersForInternalRedirect(
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
 
   auto saved_headers = Http::RequestHeaderMapImpl::create();
-  std::vector<std::string> headers_to_clear;
+  std::vector<Http::LowerCaseString> headers_to_clear;
 
-  for (const auto& to_preserve :
-       route_entry_->internalRedirectPolicy().responseHeadersToPreserve()) {
-    auto header = Http::LowerCaseString(to_preserve);
+  for (const auto& header : route_entry_->internalRedirectPolicy().responseHeadersToPreserve()) {
     auto result = upstream_headers.get(header);
     auto dresult = downstream_headers.get(header);
     if (result.empty()) {
@@ -1893,7 +1891,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
         });
 
     for (const auto& h : headers_to_clear) {
-      downstream_headers.remove(Http::LowerCaseString(h));
+      downstream_headers.remove(h);
     }
   });
 
