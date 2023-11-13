@@ -135,7 +135,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         platformFilterChain, stringAccessors, keyValueStores, statSinks, runtimeGuards,
         mEnablePlatformCertificatesValidation,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
-        /*xdsPort=*/0, /*xdsAuthenticationHeader=*/"", /*xdsAuthenticationToken=*/"",
+        /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
         /*xdsSslRootCerts=*/"",
         /*xdsSni=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, Struct.getDefaultInstance(),
         /*cdsResourcesLocator=*/"",

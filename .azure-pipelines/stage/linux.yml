@@ -26,6 +26,9 @@ parameters:
 - name: bazelBuildExtraOptions
   type: string
   default: ""
+- name: bazelConfigRBE
+  type: string
+  default: --config=remote-ci --config=rbe-google --jobs=$(RbeJobs)
 
 - name: managedAgent
   type: boolean
@@ -63,6 +66,7 @@ jobs:
       managedAgent: ${{ parameters.managedAgent }}
       ciTarget: $(target.value)
       cacheName: "release"
+      bazelConfigRBE: ${{ parameters.bazelConfigRBE }}
       bazelBuildExtraOptions: ${{ parameters.bazelBuildExtraOptions }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)

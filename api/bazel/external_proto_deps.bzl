@@ -22,7 +22,7 @@ EXTERNAL_PROTO_GO_BAZEL_DEP_MAP = {
     # Note @com_google_googleapis are point to @go_googleapis.
     #
     # It is aligned to xDS dependency to suppress the conflicting package heights error between
-    # @com_github_cncf_udpa//xds/type/matcher/v3:pkg_go_proto
+    # @com_github_cncf_xds//xds/type/matcher/v3:pkg_go_proto
     # @envoy_api//envoy/config/rbac/v3:pkg_go_proto
     #
     # TODO(https://github.com/bazelbuild/rules_go/issues/1986): update to

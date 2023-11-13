@@ -16,9 +16,9 @@
 #include "source/server/config_validation/server.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/hot_restart_nop_impl.h"
+#include "source/server/instance_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
-#include "source/server/server.h"
 
 #include "absl/debugging/symbolize.h"
 #include "absl/strings/str_split.h"
@@ -66,7 +66,8 @@ bool MainCommonBase::run() {
   case Server::Mode::Validate:
     return Server::validateConfig(
         options_, Network::Utility::getLocalAddress(options_.localAddressIpVersion()),
-        component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem());
+        component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem(),
+        process_context_ ? ProcessContextOptRef(std::ref(*process_context_)) : absl::nullopt);
   case Server::Mode::InitOnly:
     PERF_DUMP();
     return true;

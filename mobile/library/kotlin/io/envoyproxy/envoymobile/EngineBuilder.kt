@@ -36,8 +36,7 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
     private const val DEFAULT_XDS_TIMEOUT_IN_SECONDS: Int = 5
   }
 
-  internal var authHeader: String? = null
-  internal var authToken: String? = null
+  internal var grpcInitialMetadata = mutableMapOf<String, String>()
   internal var sslRootCerts: String? = null
   internal var sni: String? = null
   internal var rtdsResourceName: String? = null
@@ -47,16 +46,23 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
   internal var cdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
 
   /**
-   * Sets the authentication HTTP header and token value for authenticating with the xDS management
+   * Adds a header to the initial HTTP metadata headers sent on the gRPC stream.
+   *
+   * A common use for the initial metadata headers is for authentication to the xDS management
    * server.
    *
-   * @param header The HTTP authentication header.
-   * @param token The authentication token to be sent in the header.
+   * For example, if using API keys to authenticate to Traffic Director on GCP (see
+   * https://cloud.google.com/docs/authentication/api-keys for details), invoke:
+   * builder.addInitialStreamHeader("x-goog-api-key", apiKeyToken)
+   * .addInitialStreamHeader("X-Android-Package", appPackageName)
+   * .addInitialStreamHeader("X-Android-Cert", sha1KeyFingerprint)
+   *
+   * @param header The HTTP header name to add to the initial gRPC stream's metadata.
+   * @param value The HTTP header value to add to the initial gRPC stream's metadata.
    * @return this builder.
    */
-  fun setAuthenticationToken(header: String, token: String): XdsBuilder {
-    this.authHeader = header
-    this.authToken = token
+  fun addInitialStreamHeader(header: String, value: String): XdsBuilder {
+    this.grpcInitialMetadata.put(header, value)
     return this
   }
 
@@ -723,8 +729,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         xdsBuilder?.rtdsTimeoutInSeconds ?: 0,
         xdsBuilder?.xdsServerAddress,
         xdsBuilder?.xdsServerPort ?: 0,
-        xdsBuilder?.authHeader,
-        xdsBuilder?.authToken,
+        xdsBuilder?.grpcInitialMetadata ?: mapOf<String, String>(),
         xdsBuilder?.sslRootCerts,
         xdsBuilder?.sni,
         nodeId,

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -50,16 +51,17 @@ public:
   //                    requests.
   XdsBuilder(std::string xds_server_address, const int xds_server_port);
 
-  // Sets the authentication token in the gRPC headers used to authenticate to the xDS management
+  // Adds a header to the initial HTTP metadata headers sent on the gRPC stream.
+  //
+  // A common use for the initial metadata headers is for authentication to the xDS management
   // server.
   //
   // For example, if using API keys to authenticate to Traffic Director on GCP (see
   // https://cloud.google.com/docs/authentication/api-keys for details), invoke:
-  //   builder.setAuthenticationToken("x-goog-api-key", api_key_token)
-  //
-  // `token_header`: the header name for which the the `token` will be set as a value.
-  // `token`: the authentication token.
-  XdsBuilder& setAuthenticationToken(std::string token_header, std::string token);
+  //   builder.addInitialStreamHeader("x-goog-api-key", api_key_token)
+  //          .addInitialStreamHeader("X-Android-Package", app_package_name)
+  //          .addInitialStreamHeader("X-Android-Cert", sha1_key_fingerprint);
+  XdsBuilder& addInitialStreamHeader(std::string header, std::string value);
 
   // Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
   // connection. If no root certs are specified, the operating system defaults are used.
@@ -102,7 +104,7 @@ protected:
   // This method takes in a modifiable Bootstrap proto pointer because returning a new Bootstrap
   // proto would rely on proto's MergeFrom behavior, which can lead to unexpected results in the
   // Bootstrap config.
-  void build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const;
+  void build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const;
 
 private:
   // Required so that EngineBuilder can call the XdsBuilder's protected build() method.
@@ -110,8 +112,7 @@ private:
 
   std::string xds_server_address_;
   int xds_server_port_;
-  std::string authentication_token_header_;
-  std::string authentication_token_;
+  std::vector<envoy::config::core::v3::HeaderValue> xds_initial_grpc_metadata_;
   std::string ssl_root_certs_;
   std::string sni_;
   std::string rtds_resource_name_;
@@ -178,6 +179,11 @@ public:
 #endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
+  // Adds the hostnames that should be pre-resolved by DNS prior to the first request issued for
+  // that host. When invoked, any previous preresolve hostname entries get cleared and only the ones
+  // provided in the hostnames argument get set.
+  // TODO(abeyad): change this method and the other language APIs to take a {host,port} pair.
+  // E.g. addDnsPreresolveHost(std::string host, uint32_t port);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
 
@@ -252,7 +258,7 @@ private:
   std::vector<std::string> stats_sinks_;
 
   std::vector<NativeFilterConfig> native_filter_chain_;
-  std::vector<std::string> dns_preresolve_hostnames_;
+  std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;

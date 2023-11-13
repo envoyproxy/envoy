@@ -9,7 +9,7 @@ namespace Upstream {
 
 /*
  * Upstream Factory Context used by both Clusters and Routers to configure
- * upstream filters.
+ * upstream HTTP filters.
  */
 class UpstreamFactoryContextImpl : public Server::Configuration::UpstreamFactoryContext {
 public:

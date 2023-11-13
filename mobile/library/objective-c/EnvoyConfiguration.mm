@@ -115,8 +115,8 @@
                                       nodeSubZone:(nullable NSString *)nodeSubZone
                                  xdsServerAddress:(nullable NSString *)xdsServerAddress
                                     xdsServerPort:(UInt32)xdsServerPort
-                                    xdsAuthHeader:(nullable NSString *)xdsAuthHeader
-                                     xdsAuthToken:(nullable NSString *)xdsAuthToken
+                           xdsGrpcInitialMetadata:
+                               (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
                                            xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName
@@ -170,8 +170,7 @@
   self.nodeSubZone = nodeSubZone;
   self.xdsServerAddress = xdsServerAddress;
   self.xdsServerPort = xdsServerPort;
-  self.xdsAuthHeader = xdsAuthHeader;
-  self.xdsAuthToken = xdsAuthToken;
+  self.xdsGrpcInitialMetadata = xdsGrpcInitialMetadata;
   self.xdsSslRootCerts = xdsSslRootCerts;
   self.xdsSni = xdsSni;
   self.rtdsResourceName = rtdsResourceName;
@@ -272,9 +271,9 @@
 #ifdef ENVOY_GOOGLE_GRPC
   if (self.xdsServerAddress != nil) {
     Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
-    if (self.xdsAuthHeader != nil) {
-      xdsBuilder.setAuthenticationToken([self.xdsAuthHeader toCXXString],
-                                        [self.xdsAuthToken toCXXString]);
+    for (NSString *header in self.xdsGrpcInitialMetadata) {
+      xdsBuilder.addInitialStreamHeader(
+          [header toCXXString], [[self.xdsGrpcInitialMetadata objectForKey:header] toCXXString]);
     }
     if (self.xdsSslRootCerts != nil) {
       xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);

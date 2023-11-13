@@ -321,7 +321,7 @@ public:
 using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFactoryContext;
 
 /**
- * FactoryContext for upstream filters.
+ * FactoryContext for upstream HTTP filters.
  */
 class UpstreamFactoryContext {
 public:

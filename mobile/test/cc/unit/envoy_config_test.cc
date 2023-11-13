@@ -1,8 +1,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
@@ -15,16 +18,28 @@
 #include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 #endif
 
+namespace Envoy {
+namespace {
+
+using namespace Platform;
+
 using envoy::config::bootstrap::v3::Bootstrap;
+using DfpClusterConfig = ::envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig;
 using testing::HasSubstr;
 using testing::IsEmpty;
 using testing::Not;
 using testing::SizeIs;
 
-namespace Envoy {
-namespace {
-
-using namespace Platform;
+DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
+  DfpClusterConfig cluster_config;
+  const auto& clusters = bootstrap.static_resources().clusters();
+  for (const auto& cluster : clusters) {
+    if (cluster.name() == "base") {
+      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config);
+    }
+  }
+  return cluster_config;
+}
 
 TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
@@ -232,6 +247,35 @@ TEST(TestConfig, AddMaxConnectionsPerHost) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("max_connections { value: 16 }"));
 }
 
+TEST(TestConfig, AddDnsPreresolveHostnames) {
+  EngineBuilder engine_builder;
+  engine_builder.addDnsPreresolveHostnames({"google.com", "lyft.com"});
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>
+      expected_dns_preresolve_hostnames;
+  auto& host_addr1 = *expected_dns_preresolve_hostnames.Add();
+  host_addr1.set_address("google.com");
+  host_addr1.set_port_value(443);
+  auto& host_addr2 = *expected_dns_preresolve_hostnames.Add();
+  host_addr2.set_address("lyft.com");
+  host_addr2.set_port_value(443);
+  EXPECT_TRUE(TestUtility::repeatedPtrFieldEqual(
+      getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
+      expected_dns_preresolve_hostnames));
+
+  // Resetting the DNS preresolve hostnames with just "google.com" now.
+  engine_builder.addDnsPreresolveHostnames({"google.com"});
+  bootstrap = engine_builder.generateBootstrap();
+  expected_dns_preresolve_hostnames.Clear();
+  auto& host_addr3 = *expected_dns_preresolve_hostnames.Add();
+  host_addr3.set_address("google.com");
+  host_addr3.set_port_value(443);
+  EXPECT_TRUE(TestUtility::repeatedPtrFieldEqual(
+      getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
+      expected_dns_preresolve_hostnames));
+}
+
 #ifdef ENVOY_MOBILE_STATS_REPORTING
 std::string statsdSinkConfig(int port) {
   std::string config = R"({ name: envoy.stat_sinks.statsd,
@@ -280,13 +324,18 @@ TEST(TestConfig, DisableHttp3) {
 #ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, XdsConfig) {
   EngineBuilder engine_builder;
-  XdsBuilder xds_builder(/*xds_server_address=*/"fake-td.googleapis.com",
-                         /*xds_server_port=*/12345);
+  const std::string host = "fake-td.googleapis.com";
+  const uint32_t port = 12345;
+  const std::string authority = absl::StrCat(host, ":", port);
+
+  XdsBuilder xds_builder(/*xds_server_address=*/host,
+                         /*xds_server_port=*/port);
   engine_builder.setXds(std::move(xds_builder));
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+
   auto& ads_config = bootstrap->dynamic_resources().ads_config();
   EXPECT_EQ(ads_config.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
-  EXPECT_EQ(ads_config.grpc_services(0).google_grpc().target_uri(), "fake-td.googleapis.com:12345");
+  EXPECT_EQ(ads_config.grpc_services(0).google_grpc().target_uri(), authority);
   EXPECT_EQ(ads_config.grpc_services(0).google_grpc().stat_prefix(), "ads");
   EXPECT_THAT(ads_config.grpc_services(0)
                   .google_grpc()
@@ -297,29 +346,33 @@ TEST(TestConfig, XdsConfig) {
               IsEmpty());
   EXPECT_THAT(ads_config.grpc_services(0).google_grpc().call_credentials(), SizeIs(0));
 
-  // With authentication credentials.
-  xds_builder =
-      XdsBuilder(/*xds_server_address=*/"fake-td.googleapis.com", /*xds_server_port=*/12345);
-  xds_builder.setAuthenticationToken(/*header=*/"x-goog-api-key", /*token=*/"A1B2C3");
+  // With initial gRPC metadata.
+  xds_builder = XdsBuilder(/*xds_server_address=*/host, /*xds_server_port=*/port);
+  xds_builder.addInitialStreamHeader(/*header=*/"x-goog-api-key", /*value=*/"A1B2C3")
+      .addInitialStreamHeader(/*header=*/"x-android-package",
+                              /*value=*/"com.google.envoymobile.io.myapp");
   xds_builder.setSslRootCerts(/*root_certs=*/"my_root_cert");
-  xds_builder.setSni(/*sni=*/"fake-td.googleapis.com");
+  xds_builder.setSni(/*sni=*/host);
   engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
-  auto& ads_config_with_tokens = bootstrap->dynamic_resources().ads_config();
-  EXPECT_EQ(ads_config_with_tokens.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).google_grpc().target_uri(),
-            "fake-td.googleapis.com:12345");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).google_grpc().stat_prefix(), "ads");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+  auto& ads_config_with_metadata = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config_with_metadata.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).google_grpc().target_uri(), authority);
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).google_grpc().stat_prefix(), "ads");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0)
                 .google_grpc()
                 .channel_credentials()
                 .ssl_credentials()
                 .root_certs()
                 .inline_string(),
             "my_root_cert");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).initial_metadata(0).key(), "x-goog-api-key");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).initial_metadata(0).value(), "A1B2C3");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(0).key(), "x-goog-api-key");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(0).value(), "A1B2C3");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(1).key(),
+            "x-android-package");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(1).value(),
+            "com.google.envoymobile.io.myapp");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0)
                 .google_grpc()
                 .channel_args()
                 .args()

@@ -31,6 +31,9 @@ class LocalRefDeleter {
 public:
   explicit LocalRefDeleter(JNIEnv* env) : env_(env) {}
 
+  // This is to allow move semantics in `LocalRefUniquePtr`.
+  LocalRefDeleter& operator=(const LocalRefDeleter&) { return *this; }
+
   void operator()(jobject object) const {
     if (object != nullptr) {
       env_->DeleteLocalRef(object);
@@ -120,16 +123,21 @@ private:
 };
 
 /** A unique pointer for JNI primitive array critical. */
-using PrimitiveArrayCriticalUniquePtr = std::unique_ptr<void, PrimitiveArrayCriticalDeleter>;
+template <typename T>
+using PrimitiveArrayCriticalUniquePtr =
+    std::unique_ptr<typename std::remove_pointer<T>::type, PrimitiveArrayCriticalDeleter>;
 
 /**
- * A thin wrapper around JNI API with memory-safety.
+ * A thin wrapper around JNI API with automatic memory management.
  *
  * NOTE: Do not put any other helper functions that are not part of the JNI API here.
  */
 class JniHelper {
 public:
   explicit JniHelper(JNIEnv* env) : env_(env) {}
+
+  /** Gets the underlying `JNIEnv`. */
+  JNIEnv* getEnv();
 
   /**
    * Gets the object method with the given signature.
@@ -150,14 +158,14 @@ public:
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#findclass
    */
-  LocalRefUniquePtr<jclass> findClass(const char* class_name);
+  [[nodiscard]] LocalRefUniquePtr<jclass> findClass(const char* class_name);
 
   /**
    * Returns the class of a given `object`.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getobjectclass
    */
-  LocalRefUniquePtr<jclass> getObjectClass(jobject object);
+  [[nodiscard]] LocalRefUniquePtr<jclass> getObjectClass(jobject object);
 
   /**
    * Throws Java exception with the specified class name and error message.
@@ -171,31 +179,31 @@ public:
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#exceptionoccurred
    */
-  LocalRefUniquePtr<jthrowable> exceptionOccurred();
+  [[nodiscard]] LocalRefUniquePtr<jthrowable> exceptionOccurred();
 
   /**
    * Creates a new global reference to the object referred to by the `object` argument.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#newglobalref
    */
-  GlobalRefUniquePtr<jobject> newGlobalRef(jobject object);
+  [[nodiscard]] GlobalRefUniquePtr<jobject> newGlobalRef(jobject object);
 
   /**
    * Creates a new instance of a given `clazz` from the given `method_id`.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#newobject-newobjecta-newobjectv
    */
-  LocalRefUniquePtr<jobject> newObject(jclass clazz, jmethodID method_id, ...);
+  [[nodiscard]] LocalRefUniquePtr<jobject> newObject(jclass clazz, jmethodID method_id, ...);
 
   /**
    * Creates a new Java string from the given `str`.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#newstringutf
    */
-  LocalRefUniquePtr<jstring> newStringUtf(const char* str);
+  [[nodiscard]] LocalRefUniquePtr<jstring> newStringUtf(const char* str);
 
   /** Gets the pointer to an array of bytes representing `str`. */
-  StringUtfUniquePtr getStringUtfChars(jstring str, jboolean* is_copy);
+  [[nodiscard]] StringUtfUniquePtr getStringUtfChars(jstring str, jboolean* is_copy);
 
   /**
    * Gets the size of the array.
@@ -206,7 +214,7 @@ public:
 
 /** A macro to create `New<Type>Array`. helper function. */
 #define DECLARE_NEW_ARRAY(JAVA_TYPE, JNI_TYPE)                                                     \
-  LocalRefUniquePtr<JNI_TYPE> new##JAVA_TYPE##Array(jsize length);
+  [[nodiscard]] LocalRefUniquePtr<JNI_TYPE> new##JAVA_TYPE##Array(jsize length);
 
   /**
    * Helper functions for `New<Type>Array`.
@@ -221,13 +229,13 @@ public:
   DECLARE_NEW_ARRAY(Float, jfloatArray)
   DECLARE_NEW_ARRAY(Double, jdoubleArray)
   DECLARE_NEW_ARRAY(Boolean, jbooleanArray)
-  LocalRefUniquePtr<jobjectArray> newObjectArray(jsize length, jclass element_class,
-                                                 jobject initial_element = nullptr);
+  [[nodiscard]] LocalRefUniquePtr<jobjectArray> newObjectArray(jsize length, jclass element_class,
+                                                               jobject initial_element = nullptr);
 
 /** A macro to create `Get<JavaType>ArrayElement` function. */
 #define DECLARE_GET_ARRAY_ELEMENTS(JAVA_TYPE, JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE)                    \
-  ArrayElementsUniquePtr<JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE> get##JAVA_TYPE##ArrayElements(          \
-      JNI_ARRAY_TYPE array, jboolean* is_copy);
+  [[nodiscard]] ArrayElementsUniquePtr<JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE>                           \
+      get##JAVA_TYPE##ArrayElements(JNI_ARRAY_TYPE array, jboolean* is_copy);
 
   /**
    * Helper functions for `Get<JavaType>ArrayElements`.
@@ -248,7 +256,13 @@ public:
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getobjectarrayelement
    */
-  LocalRefUniquePtr<jobject> getObjectArrayElement(jobjectArray array, jsize index);
+  template <typename T = jobject>
+  [[nodiscard]] LocalRefUniquePtr<T> getObjectArrayElement(jobjectArray array, jsize index) {
+    LocalRefUniquePtr<T> result(static_cast<T>(env_->GetObjectArrayElement(array, index)),
+                                LocalRefDeleter(env_));
+    rethrowException();
+    return result;
+  }
 
   /**
    * Sets an element of a given `array` with the specified `index.
@@ -257,7 +271,37 @@ public:
    */
   void setObjectArrayElement(jobjectArray array, jsize index, jobject value);
 
-  PrimitiveArrayCriticalUniquePtr getPrimitiveArrayCritical(jarray array, jboolean* is_copy);
+  /**
+   * Returns the pointer into the primitive array.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getprimitivearraycritical-releaseprimitivearraycritical
+   */
+  template <typename T = void*>
+  [[nodiscard]] PrimitiveArrayCriticalUniquePtr<T> getPrimitiveArrayCritical(jarray array,
+                                                                             jboolean* is_copy) {
+    PrimitiveArrayCriticalUniquePtr<T> result(
+        static_cast<T>(env_->GetPrimitiveArrayCritical(array, is_copy)),
+        PrimitiveArrayCriticalDeleter(env_, array));
+    return result;
+  }
+
+  /**
+   * Sets a region of an `array` from a `buffer` with the specified `start` index and `length`.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#setprimitivetypearrayregion-routines
+   */
+#define DECLARE_SET_ARRAY_REGION(JAVA_TYPE, JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE)                      \
+  void set##JAVA_TYPE##ArrayRegion(JNI_ARRAY_TYPE array, jsize start, jsize length,                \
+                                   const JNI_ELEMENT_TYPE* buffer);
+
+  DECLARE_SET_ARRAY_REGION(Byte, jbyteArray, jbyte)
+  DECLARE_SET_ARRAY_REGION(Char, jcharArray, jchar)
+  DECLARE_SET_ARRAY_REGION(Short, jshortArray, jshort)
+  DECLARE_SET_ARRAY_REGION(Int, jintArray, jint)
+  DECLARE_SET_ARRAY_REGION(Long, jlongArray, jlong)
+  DECLARE_SET_ARRAY_REGION(Float, jfloatArray, jfloat)
+  DECLARE_SET_ARRAY_REGION(Double, jdoubleArray, jdouble)
+  DECLARE_SET_ARRAY_REGION(Boolean, jbooleanArray, jboolean)
 
 /** A macro to create `Call<Type>Method` helper function. */
 #define DECLARE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                   \
@@ -276,8 +320,19 @@ public:
   DECLARE_CALL_METHOD(Float, jfloat)
   DECLARE_CALL_METHOD(Double, jdouble)
   DECLARE_CALL_METHOD(Boolean, jboolean)
+
   void callVoidMethod(jobject object, jmethodID method_id, ...);
-  LocalRefUniquePtr<jobject> callObjectMethod(jobject object, jmethodID method_id, ...);
+
+  template <typename T = jobject>
+  [[nodiscard]] LocalRefUniquePtr<T> callObjectMethod(jobject object, jmethodID method_id, ...) {
+    va_list args;
+    va_start(args, method_id);
+    LocalRefUniquePtr<T> result(static_cast<T>(env_->CallObjectMethodV(object, method_id, args)),
+                                LocalRefDeleter(env_));
+    va_end(args);
+    rethrowException();
+    return result;
+  }
 
 /** A macro to create `CallStatic<Type>Method` helper function. */
 #define DECLARE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                            \
@@ -296,8 +351,21 @@ public:
   DECLARE_CALL_STATIC_METHOD(Float, jfloat)
   DECLARE_CALL_STATIC_METHOD(Double, jdouble)
   DECLARE_CALL_STATIC_METHOD(Boolean, jboolean)
+
   void callStaticVoidMethod(jclass clazz, jmethodID method_id, ...);
-  LocalRefUniquePtr<jobject> callStaticObjectMethod(jclass clazz, jmethodID method_id, ...);
+
+  template <typename T = jobject>
+  [[nodiscard]] LocalRefUniquePtr<T> callStaticObjectMethod(jclass clazz, jmethodID method_id,
+                                                            ...) {
+    va_list args;
+    va_start(args, method_id);
+    LocalRefUniquePtr<T> result(
+        static_cast<T>(env_->CallStaticObjectMethodV(clazz, method_id, args)),
+        LocalRefDeleter(env_));
+    va_end(args);
+    rethrowException();
+    return result;
+  }
 
   /**
    * Returns the capacity of the memory region referenced by the given `java.nio.Buffer` object.
@@ -305,6 +373,15 @@ public:
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getdirectbuffercapacity
    */
   jlong getDirectBufferCapacity(jobject buffer);
+
+  /**
+   * Gets the address of memory associated with the given NIO direct buffer.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getdirectbufferaddress
+   */
+  template <typename T = void*> T getDirectBufferAddress(jobject buffer) {
+    return static_cast<T>(env_->GetDirectBufferAddress(buffer));
+  }
 
 private:
   /** Rethrows the Java exception occurred. */

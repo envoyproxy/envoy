@@ -174,9 +174,9 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAccessLog) {
   access_logs_ = {handler};
   setup(false, "");
 
-  EXPECT_CALL(*handler, log(_, _, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext&,
+                          const StreamInfo::StreamInfo& stream_info) {
         EXPECT_FALSE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError));
@@ -207,9 +207,9 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
         return true;
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext&,
+                          const StreamInfo::StreamInfo& stream_info) {
         EXPECT_FALSE(stream_info.responseCode());
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError));
@@ -248,13 +248,13 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
-  EXPECT_CALL(*log_handler, log(_, _, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
-        ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
-        EXPECT_EQ("codec_error:too_many_outbound_frames",
-                  stream_info.responseCodeDetails().value());
-      }));
+  EXPECT_CALL(*log_handler, log(_, _))
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+            EXPECT_EQ("codec_error:too_many_outbound_frames",
+                      stream_info.responseCodeDetails().value());
+          }));
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   EXPECT_LOG_NOT_CONTAINS("warning", "downstream HTTP flood",
@@ -283,12 +283,12 @@ TEST_F(HttpConnectionManagerImplTest, EnvoyOverloadError) {
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
-  EXPECT_CALL(*log_handler, log(_, _, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
-        ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
-        EXPECT_EQ("overload_error:Envoy_Overloaded", stream_info.responseCodeDetails().value());
-      }));
+  EXPECT_CALL(*log_handler, log(_, _))
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+            EXPECT_EQ("overload_error:Envoy_Overloaded", stream_info.responseCodeDetails().value());
+          }));
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
@@ -1476,11 +1476,11 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
 
-  EXPECT_CALL(*log_handler_, log(_, _, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
-        EXPECT_FALSE(stream_info.hasAnyResponseFlag());
-      }));
+  EXPECT_CALL(*log_handler_, log(_, _))
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_FALSE(stream_info.hasAnyResponseFlag());
+          }));
 
   expectOnDestroy();
   EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_)).Times(2);

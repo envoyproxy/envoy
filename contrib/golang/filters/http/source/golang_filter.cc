@@ -211,11 +211,10 @@ void Filter::onDestroy() {
 }
 
 // access_log is executed before the log of the stream filter
-void Filter::log(const Http::RequestHeaderMap* headers, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
-                 Envoy::AccessLog::AccessLogType type) {
+void Filter::log(const Formatter::HttpFormatterContext& log_context,
+                 const StreamInfo::StreamInfo&) {
   // `log` may be called multiple times with different log type
-  switch (type) {
+  switch (log_context.accessLogType()) {
   case Envoy::AccessLog::AccessLogType::DownstreamStart:
   case Envoy::AccessLog::AccessLogType::DownstreamPeriodic:
   case Envoy::AccessLog::AccessLogType::DownstreamEnd: {
@@ -226,12 +225,12 @@ void Filter::log(const Http::RequestHeaderMap* headers, const Http::ResponseHead
       initRequest(state);
 
       request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
-          const_cast<Http::RequestHeaderMap*>(headers));
+          const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
     }
 
     state.enterLog();
     req_->phase = static_cast<int>(state.phase());
-    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(type));
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
     state.leaveLog();
   } break;
   default:

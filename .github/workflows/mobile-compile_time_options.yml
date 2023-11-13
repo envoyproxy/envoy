@@ -73,7 +73,8 @@ jobs:
              --define=envoy_yaml=disabled \
              --copt=-fno-unwind-tables \
              --copt=-fno-exceptions \
-             //test/performance:test_binary_size
+             --define=google_grpc=disabled \
+             //test/performance:test_binary_size //library/cc/...
 
   cc_test:
     needs: env

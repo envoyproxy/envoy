@@ -34,8 +34,7 @@ UdpProxyFilter::~UdpProxyFilter() {
   if (!config_->proxyAccessLogs().empty()) {
     fillProxyStreamInfo();
     for (const auto& access_log : config_->proxyAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value(),
-                      AccessLog::AccessLogType::NotSet);
+      access_log->log({}, udp_proxy_stats_.value());
     }
   }
 }
@@ -284,6 +283,7 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                      std::make_shared<Network::ConnectionInfoSetterImpl>(
                                          addresses_.local_, addresses_.peer_))),
       session_id_(next_global_session_id_++) {
+  udp_session_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
   cluster_.filter_.config_->stats().downstream_sess_active_.inc();
   cluster_.cluster_.info()
@@ -312,8 +312,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_session_info_,
-                      AccessLog::AccessLogType::NotSet);
+      access_log->log({}, udp_session_info_);
     }
   }
 }
@@ -385,6 +384,10 @@ void UdpProxyFilter::UdpActiveSession::onReadReady() {
 }
 
 bool UdpProxyFilter::ActiveSession::onNewSession() {
+  // Set UUID for the session. This is used for logging and tracing.
+  udp_session_info_.setStreamIdProvider(std::make_shared<StreamInfo::StreamIdProviderImpl>(
+      cluster_.filter_.config_->randomGenerator().uuid()));
+
   for (auto& active_read_filter : read_filters_) {
     if (active_read_filter->initialized_) {
       // The filter may call continueFilterChain() in onNewSession(), causing next
@@ -509,6 +512,7 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
     }
   }
 
+  udp_session_info_.upstreamInfo()->setUpstreamHost(host_);
   cluster_.addSession(host_.get(), this);
   createUdpSocket(host_);
   return true;
@@ -681,12 +685,8 @@ void HttpUpstreamImpl::setRequestEncoder(Http::RequestEncoder& request_encoder, 
     headers->addReferenceKey(Http::Headers::get().Path, target_tunnel_path);
   }
 
-  tunnel_config_.headerEvaluator().evaluateHeaders(
-      *headers,
-      downstream_info_.getRequestHeaders() == nullptr
-          ? *Http::StaticEmptyHeaders::get().request_headers
-          : *downstream_info_.getRequestHeaders(),
-      *Http::StaticEmptyHeaders::get().response_headers, downstream_info_);
+  tunnel_config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
+                                                   downstream_info_);
 
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
@@ -769,6 +769,8 @@ void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailur
                                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
   callbacks_->onStreamFailure(reason, failure_reason, host);
+  downstream_info_.upstreamInfo()->setUpstreamHost(host);
+  downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
 }
 
 void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -786,6 +788,7 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   bool is_ssl = upstream_host->transportSocketFactory().implementsSecureTransport();
   upstream_->setRequestEncoder(request_encoder, is_ssl);
   upstream_->setTunnelCreationCallbacks(*this);
+  downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
 }
 
 TunnelingConnectionPoolPtr TunnelingConnectionPoolFactory::createConnPool(
@@ -852,6 +855,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
   if (conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
+    udp_session_info_.setAttemptCount(connect_attempts_);
     conn_pool_->newStream(*this);
     return true;
   }

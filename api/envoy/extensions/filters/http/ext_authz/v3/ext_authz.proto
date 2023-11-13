@@ -401,6 +401,19 @@ message CheckSettings {
   map<string, string> context_extensions = 1 [(udpa.annotations.sensitive) = true];
 
   // When set to true, disable the configured :ref:`with_request_body
-  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a route.
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a specific route.
+  //
+  // Please note that only one of *disable_request_body_buffering* or
+  // :ref:`with_request_body <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>`
+  // may be specified.
   bool disable_request_body_buffering = 2;
+
+  // Enable or override request body buffering, which is configured using the
+  // :ref:`with_request_body <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
+  // option for a specific route.
+  //
+  // Please note that only only one of *with_request_body* or
+  // :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>`
+  // may be specified.
+  BufferSettings with_request_body = 3;
 }
