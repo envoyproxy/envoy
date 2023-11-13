@@ -21,7 +21,7 @@ cc_library(
     name = "server_envoy_jni_lib",
     testonly = True,
     srcs = [
-        "test_jni_interface.cc",
+        "test_jni_impl.cc",
     ],
     linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
