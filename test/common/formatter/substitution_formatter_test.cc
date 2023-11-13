@@ -3945,7 +3945,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "%START_TIME(%E4n)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
-    FormatterImpl formatter(format);
+    FormatterImpl formatter(format, false);
     EXPECT_EQ("%E4n", formatter.formatWithContext(formatter_context, stream_info));
   }
 #endif
