@@ -19,7 +19,7 @@ namespace LocalReply {
 class BodyFormatter {
 public:
   BodyFormatter()
-      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
+      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%", false)),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,

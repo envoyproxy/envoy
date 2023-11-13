@@ -99,28 +99,9 @@ using Filter = FilterBase<Formatter::HttpFormatterContext>;
 using FilterPtr = std::unique_ptr<Filter>;
 
 /**
- * Abstract access logger for requests and connections.
+ * Abstract access logger for HTTP requests and TCP connections.
  */
-class Instance {
-public:
-  virtual ~Instance() = default;
-
-  /**
-   * Log a completed request.
-   * @param request_headers supplies the incoming request headers after filtering.
-   * @param response_headers supplies response headers.
-   * @param response_trailers supplies response trailers.
-   * @param stream_info supplies additional information about the request not
-   * contained in the request headers.
-   * @param access_log_type supplies additional information about the type of the
-   * log record, i.e the location in the code which recorded the log.
-   */
-  virtual void log(const Http::RequestHeaderMap* request_headers,
-                   const Http::ResponseHeaderMap* response_headers,
-                   const Http::ResponseTrailerMap* response_trailers,
-                   const StreamInfo::StreamInfo& stream_info, AccessLogType access_log_type) PURE;
-};
-
+using Instance = InstanceBase<Formatter::HttpFormatterContext>;
 using InstanceSharedPtr = std::shared_ptr<Instance>;
 
 } // namespace AccessLog

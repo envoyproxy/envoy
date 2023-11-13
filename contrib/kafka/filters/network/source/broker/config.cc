@@ -16,10 +16,11 @@ namespace Broker {
 Network::FilterFactoryCb KafkaConfigFactory::createFilterFactoryFromProtoTyped(
     const KafkaBrokerProtoConfig& proto_config, Server::Configuration::FactoryContext& context) {
 
-  const BrokerFilterConfig filter_config{proto_config};
+  const BrokerFilterConfigSharedPtr filter_config =
+      std::make_shared<BrokerFilterConfig>(proto_config);
   return [&context, filter_config](Network::FilterManager& filter_manager) -> void {
     Network::FilterSharedPtr filter =
-        std::make_shared<KafkaBrokerFilter>(context.scope(), context.timeSource(), filter_config);
+        std::make_shared<KafkaBrokerFilter>(context.scope(), context.timeSource(), *filter_config);
     filter_manager.addFilter(filter);
   };
 }

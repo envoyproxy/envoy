@@ -50,11 +50,7 @@ public:
   ~MockInstance() override;
 
   // AccessLog::Instance
-  MOCK_METHOD(void, log,
-              (const Http::RequestHeaderMap* request_headers,
-               const Http::ResponseHeaderMap* response_headers,
-               const Http::ResponseTrailerMap* response_trailers,
-               const StreamInfo::StreamInfo& stream_info, AccessLogType access_log_type));
+  MOCK_METHOD(void, log, (const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&));
 };
 
 } // namespace AccessLog
