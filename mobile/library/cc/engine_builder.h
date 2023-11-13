@@ -179,6 +179,11 @@ public:
 #endif
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
+  // Adds the hostnames that should be pre-resolved by DNS prior to the first request issued for
+  // that host. When invoked, any previous preresolve hostname entries get cleared and only the ones
+  // provided in the hostnames argument get set.
+  // TODO(abeyad): change this method and the other language APIs to take a {host,port} pair.
+  // E.g. addDnsPreresolveHost(std::string host, uint32_t port);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
 
@@ -253,7 +258,7 @@ private:
   std::vector<std::string> stats_sinks_;
 
   std::vector<NativeFilterConfig> native_filter_chain_;
-  std::vector<std::string> dns_preresolve_hostnames_;
+  std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;

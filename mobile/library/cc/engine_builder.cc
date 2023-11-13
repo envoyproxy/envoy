@@ -208,7 +208,12 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
 }
 
 EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
-  dns_preresolve_hostnames_ = hostnames;
+  // Add a default port of 443 for all hosts. We'll eventually change this API so it takes a single
+  // {host, pair} and it can be called multiple times.
+  dns_preresolve_hostnames_.clear();
+  for (const std::string& hostname : hostnames) {
+    dns_preresolve_hostnames_.push_back({hostname /* host */, 443 /* port */});
+  }
   return *this;
 }
 
@@ -623,10 +628,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
 
-  for (auto& hostname : dns_preresolve_hostnames_) {
+  for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
-    address->set_address(hostname);
-    address->set_port_value(443);
+    address->set_address(host);
+    address->set_port_value(port);
   }
 
   auto* dfp_filter = hcm->add_http_filters();
