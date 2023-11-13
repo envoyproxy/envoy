@@ -62,9 +62,8 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 };
 
 /**
@@ -77,9 +76,8 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 };
 
 /**
@@ -104,9 +102,8 @@ public:
             Server::Configuration::CommonFactoryContext& context);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 };
 
 /**
@@ -118,9 +115,8 @@ public:
            Server::Configuration::CommonFactoryContext& context);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 };
 
 /**
@@ -131,9 +127,8 @@ public:
   NotHealthCheckFilter() = default;
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 };
 
 /**
@@ -142,9 +137,8 @@ public:
 class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 };
 
 /**
@@ -156,9 +150,8 @@ public:
                 Random::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   Runtime::Loader& runtime_;
@@ -176,9 +169,8 @@ public:
   HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   const Http::HeaderUtility::HeaderDataPtr header_data_;
@@ -192,9 +184,8 @@ public:
   ResponseFlagFilter(const envoy::config::accesslog::v3::ResponseFlagFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   uint64_t configured_flags_{};
@@ -213,9 +204,8 @@ public:
   GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatusFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   GrpcStatusHashSet statuses_;
@@ -238,9 +228,8 @@ public:
 
   LogTypeFilter(const envoy::config::accesslog::v3::LogTypeFilter& filter_config);
 
-  bool evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
-                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-                AccessLogType access_log_type) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   LogTypeHashSet types_;
@@ -254,9 +243,8 @@ class MetadataFilter : public Filter {
 public:
   MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config);
 
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers, AccessLogType) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   Matchers::ValueMatcherConstSharedPtr present_matcher_;
@@ -266,27 +254,6 @@ private:
 
   const bool default_match_;
   const std::string filter_;
-};
-
-/**
- * Extension filter factory that reads from ExtensionFilter proto.
- */
-class ExtensionFilterFactory : public Config::TypedFactory {
-public:
-  ~ExtensionFilterFactory() override = default;
-
-  /**
-   * Create a particular extension filter implementation from a config proto. If the
-   * implementation is unable to produce a filter with the provided parameters, it should throw an
-   * EnvoyException. The returned pointer should never be nullptr.
-   * @param config supplies the custom configuration for this filter type.
-   * @param context supplies the server factory context.
-   * @return an instance of extension filter implementation from a config proto.
-   */
-  virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                                 Server::Configuration::CommonFactoryContext& context) PURE;
-
-  std::string category() const override { return "envoy.access_loggers.extension_filters"; }
 };
 
 /**
@@ -324,10 +291,7 @@ public:
 
     auto& factory = Config::Utility::getAndCheckFactory<ExtensionFilterFactoryBase<Context>>(
         config.extension_filter());
-    auto typed_filter_config = Config::Utility::translateToFactoryConfig(
-        config.extension_filter(), context.messageValidationVisitor(), factory);
-
-    return factory.createFilter(*typed_filter_config, context);
+    return factory.createFilter(config.extension_filter(), context);
   }
 
   /**

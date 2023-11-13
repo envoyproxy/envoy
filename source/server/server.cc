@@ -801,7 +801,8 @@ void InstanceBase::onRuntimeReady() {
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
+        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames(),
+        bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(

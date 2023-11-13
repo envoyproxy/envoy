@@ -151,6 +151,7 @@ public:
   const FilterChainFactory& sessionFilterFactory() const override { return *this; };
   bool hasSessionFilters() const override { return !filter_factories_.empty(); }
   const UdpTunnelingConfigPtr& tunnelingConfig() const override { return tunneling_config_; };
+  Random::RandomGenerator& randomGenerator() const override { return random_generator_; }
 
   // FilterChainFactory
   void createFilterChain(FilterChainFactoryCallbacks& callbacks) const override {
@@ -180,6 +181,7 @@ private:
   std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
   UdpTunnelingConfigPtr tunneling_config_;
   std::list<SessionFilters::FilterFactoryCb> filter_factories_;
+  Random::RandomGenerator& random_generator_;
 };
 
 /**

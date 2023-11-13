@@ -689,8 +689,30 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
-  TestConfig config{"host.com",           "target.com", 2, 30, false, "",
-                    BufferOptions{1, 30}, absl::nullopt};
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%UPSTREAM_REQUEST_ATTEMPT_COUNT%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          2,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config};
   setup(config);
 
   // Initial datagram will create a session and a tunnel request.
@@ -718,6 +740,8 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
   sendCapsuleDownstream("response", true);
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("2"));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, PropagateValidResponseHeaders) {
