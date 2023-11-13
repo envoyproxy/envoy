@@ -51,8 +51,8 @@ bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: buffer
   change: |
-    Fixed a bug the memory will be released if it is coming from BufferFragment, when moving the slices between
-    the buffers and clear the drain tracker at the same time.
+    Fixed a bug where the memory will be released if it is coming from ``BufferFragment`` when moving the slices
+    between the buffers and clearing the drain tracker at the same time.
 - area: xds
   change: |
     Fixed a bug (https://github.com/envoyproxy/envoy/issues/27702) that caused ADS initialization
