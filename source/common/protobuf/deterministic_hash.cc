@@ -24,98 +24,90 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed =
 uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor* field, uint64_t seed);
 
-struct MapFieldSorter {
-  MapFieldSorter(const Protobuf::RepeatedFieldRef<Protobuf::Message> entries)
-      : entries_(entries.begin(), entries.end()), compare_(*entries_.begin()),
-        reflection_(*entries_.begin()->get().GetReflection()),
-        descriptor_(*entries_.begin()->get().GetDescriptor()), key_field_(*descriptor_.map_key()),
-        value_field_(*descriptor_.map_value()) {}
-  const std::vector<std::reference_wrapper<const Protobuf::Message>>& sorted() {
-    using Protobuf::FieldDescriptor;
-    std::sort(entries_.begin(), entries_.end(), compare_);
-    return entries_;
+struct MapFieldComparer {
+  MapFieldComparer(const Protobuf::Message& first_msg)
+      : reflection_(*first_msg.GetReflection()), descriptor_(*first_msg.GetDescriptor()),
+        key_field_(*descriptor_.map_key()), compare_fn_(selectCompareFn()) {}
+  bool operator()(const Protobuf::Message& a, const Protobuf::Message& b) {
+    return (this->*compare_fn_)(a, b);
   }
 
-  std::vector<std::reference_wrapper<const Protobuf::Message>> entries_;
-  struct Compare {
-    Compare(const Protobuf::Message& first_msg)
-        : reflection_(*first_msg.GetReflection()), descriptor_(*first_msg.GetDescriptor()),
-          key_field_(*descriptor_.map_key()), compare_fn_(selectCompareFn()) {}
-    bool operator()(const Protobuf::Message& a, const Protobuf::Message& b) {
-      return (this->*compare_fn_)(a, b);
+private:
+  bool compareByInt32(const Protobuf::Message& a, const Protobuf::Message& b) {
+    return reflection_.GetInt32(a, &key_field_) < reflection_.GetInt32(b, &key_field_);
+  }
+  bool compareByUInt32(const Protobuf::Message& a, const Protobuf::Message& b) {
+    return reflection_.GetUInt32(a, &key_field_) < reflection_.GetUInt32(b, &key_field_);
+  }
+  bool compareByInt64(const Protobuf::Message& a, const Protobuf::Message& b) {
+    return reflection_.GetInt64(a, &key_field_) < reflection_.GetInt64(b, &key_field_);
+  }
+  bool compareByUInt64(const Protobuf::Message& a, const Protobuf::Message& b) {
+    return reflection_.GetUInt64(a, &key_field_) < reflection_.GetUInt64(b, &key_field_);
+  }
+  bool compareByBool(const Protobuf::Message& a, const Protobuf::Message& b) {
+    return reflection_.GetBool(a, &key_field_) < reflection_.GetBool(b, &key_field_);
+  }
+  bool compareByString(const Protobuf::Message& a, const Protobuf::Message& b) {
+    std::string scratch_a, scratch_b;
+    return reflection_.GetStringReference(a, &key_field_, &scratch_a) <
+           reflection_.GetStringReference(b, &key_field_, &scratch_b);
+  }
+  using CompareMemberFn = bool (MapFieldComparer::*)(const Protobuf::Message& a,
+                                                     const Protobuf::Message& b);
+  CompareMemberFn selectCompareFn() {
+    using Protobuf::FieldDescriptor;
+    switch (key_field_.cpp_type()) {
+    case FieldDescriptor::CPPTYPE_INT32:
+      return &MapFieldComparer::compareByInt32;
+    case FieldDescriptor::CPPTYPE_UINT32:
+      return &MapFieldComparer::compareByUInt32;
+    case FieldDescriptor::CPPTYPE_INT64:
+      return &MapFieldComparer::compareByInt64;
+    case FieldDescriptor::CPPTYPE_UINT64:
+      return &MapFieldComparer::compareByUInt64;
+    case FieldDescriptor::CPPTYPE_BOOL:
+      return &MapFieldComparer::compareByBool;
+    case FieldDescriptor::CPPTYPE_STRING: {
+      return &MapFieldComparer::compareByString;
     }
-
-  private:
-    bool compareByInt32(const Protobuf::Message& a, const Protobuf::Message& b) {
-      return reflection_.GetInt32(a, &key_field_) < reflection_.GetInt32(b, &key_field_);
+    case FieldDescriptor::CPPTYPE_DOUBLE:
+    case FieldDescriptor::CPPTYPE_FLOAT:
+    case FieldDescriptor::CPPTYPE_ENUM:
+    case FieldDescriptor::CPPTYPE_MESSAGE:
+      IS_ENVOY_BUG("invalid map key type");
+      return nullptr;
     }
-    bool compareByUInt32(const Protobuf::Message& a, const Protobuf::Message& b) {
-      return reflection_.GetUInt32(a, &key_field_) < reflection_.GetUInt32(b, &key_field_);
-    }
-    bool compareByInt64(const Protobuf::Message& a, const Protobuf::Message& b) {
-      return reflection_.GetInt64(a, &key_field_) < reflection_.GetInt64(b, &key_field_);
-    }
-    bool compareByUInt64(const Protobuf::Message& a, const Protobuf::Message& b) {
-      return reflection_.GetUInt64(a, &key_field_) < reflection_.GetUInt64(b, &key_field_);
-    }
-    bool compareByBool(const Protobuf::Message& a, const Protobuf::Message& b) {
-      return reflection_.GetBool(a, &key_field_) < reflection_.GetBool(b, &key_field_);
-    }
-    bool compareByString(const Protobuf::Message& a, const Protobuf::Message& b) {
-      std::string scratch_a, scratch_b;
-      return reflection_.GetStringReference(a, &key_field_, &scratch_a) <
-             reflection_.GetStringReference(b, &key_field_, &scratch_b);
-    }
-    using CompareMemberFn = bool (Compare::*)(const Protobuf::Message& a,
-                                              const Protobuf::Message& b);
-    CompareMemberFn selectCompareFn() {
-      using Protobuf::FieldDescriptor;
-      switch (key_field_.cpp_type()) {
-      case FieldDescriptor::CPPTYPE_INT32:
-        return &Compare::compareByInt32;
-      case FieldDescriptor::CPPTYPE_UINT32:
-        return &Compare::compareByUInt32;
-      case FieldDescriptor::CPPTYPE_INT64:
-        return &Compare::compareByInt64;
-      case FieldDescriptor::CPPTYPE_UINT64:
-        return &Compare::compareByUInt64;
-      case FieldDescriptor::CPPTYPE_BOOL:
-        return &Compare::compareByBool;
-      case FieldDescriptor::CPPTYPE_STRING: {
-        return &Compare::compareByString;
-      }
-      case FieldDescriptor::CPPTYPE_DOUBLE:
-      case FieldDescriptor::CPPTYPE_FLOAT:
-      case FieldDescriptor::CPPTYPE_ENUM:
-      case FieldDescriptor::CPPTYPE_MESSAGE:
-        IS_ENVOY_BUG("invalid map key type");
-        return nullptr;
-      }
-    }
-    const Protobuf::Reflection& reflection_;
-    const Protobuf::Descriptor& descriptor_;
-    const Protobuf::FieldDescriptor& key_field_;
-    CompareMemberFn compare_fn_;
-  } compare_;
+  }
   const Protobuf::Reflection& reflection_;
   const Protobuf::Descriptor& descriptor_;
   const Protobuf::FieldDescriptor& key_field_;
-  const Protobuf::FieldDescriptor& value_field_;
+  CompareMemberFn compare_fn_;
 };
+
+std::vector<std::reference_wrapper<const Protobuf::Message>>
+sortedMapField(const Protobuf::RepeatedFieldRef<Protobuf::Message> map_entries) {
+  std::vector<std::reference_wrapper<const Protobuf::Message>> entries(map_entries.begin(),
+                                                                       map_entries.end());
+  auto compare = MapFieldComparer(*entries.begin());
+  std::sort(entries.begin(), entries.end(), compare);
+  return entries;
+}
 
 // To make a map serialize deterministically we need to force the order.
 // Here we're going to sort the keys into numerical order for number keys,
 // or lexicographical order for strings, and then hash them in that order.
 uint64_t reflectionHashMapField(const Protobuf::Message& message,
                                 const Protobuf::FieldDescriptor* field, uint64_t seed) {
-  using Protobuf::FieldDescriptor;
   const auto reflection = message.GetReflection();
-  auto entries = reflection->GetRepeatedFieldRef<Protobuf::Message>(message, field);
-  MapFieldSorter sorter(entries);
-  auto& sorted_entries = sorter.sorted();
+  auto sorted_entries =
+      sortedMapField(reflection->GetRepeatedFieldRef<Protobuf::Message>(message, field));
+  const auto map_descriptor = sorted_entries.begin()->get().GetDescriptor();
+  const auto key_field = map_descriptor->map_key();
+  const auto value_field = map_descriptor->map_value();
   for (const auto& entry : sorted_entries) {
-    seed = reflectionHashField(entry, &sorter.key_field_, seed);
-    seed = reflectionHashField(entry, &sorter.value_field_, seed);
+    seed = reflectionHashField(entry, key_field, seed);
+    seed = reflectionHashField(entry, value_field, seed);
   }
   return seed;
 }
