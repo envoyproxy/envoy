@@ -75,9 +75,10 @@ private:
     case FieldDescriptor::CPPTYPE_FLOAT:
     case FieldDescriptor::CPPTYPE_ENUM:
     case FieldDescriptor::CPPTYPE_MESSAGE:
-      IS_ENVOY_BUG("invalid map key type");
-      return nullptr;
+      break;
     }
+    IS_ENVOY_BUG("invalid map key type");
+    return nullptr;
   }
   const Protobuf::Reflection& reflection_;
   const Protobuf::Descriptor& descriptor_;
