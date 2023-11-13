@@ -257,7 +257,7 @@ and then shipped upstream with all of the normal Envoy request sanitization taki
   avoid duplicating undesired header values.
 
 .. warning::
-  Note that no filters will see the response that triggers the internal redirect. If there is a need
+  Note that no downstream filters will see the response that triggers the internal redirect. If there is a need
   to pass data between the redirect response and the followup request, see
   :ref:`response_headers_to_preserve<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_preserve>`
   
