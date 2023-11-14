@@ -659,23 +659,34 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     validation->set_trust_chain_verification(envoy::extensions::transport_sockets::tls::v3::
                                                  CertificateValidationContext::ACCEPT_UNTRUSTED);
   }
+
   if (platform_certificates_validation_on_) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator
         validator;
     validation->mutable_custom_validator_config()->set_name(
         "envoy_mobile.cert_validator.platform_bridge_cert_validator");
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
-
   } else {
-    const char* inline_certs = ""
+    std::string certs;
+#ifdef ENVOY_GOOGLE_GRPC
+    if (xds_builder_ && !xds_builder_->ssl_root_certs_.empty()) {
+      certs = xds_builder_->ssl_root_certs_;
+    }
+#endif
+
+    if (certs.empty()) {
+      // The xDS builder doesn't supply root certs, so we'll use the certs packed with Envoy Mobile,
+      // if the build config allows it.
+      const char* inline_certs = ""
 #ifndef EXCLUDE_CERTIFICATES
 #include "library/common/config/certificates.inc"
 #endif
-                               "";
-    // The certificates in certificates.inc are prefixed with 2 spaces per
-    // line to be ingressed into YAML.
-    std::string certs = inline_certs;
-    absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+                                 "";
+      certs = inline_certs;
+      // The certificates in certificates.inc are prefixed with 2 spaces per
+      // line to be ingressed into YAML.
+      absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+    }
     validation->mutable_trusted_ca()->set_inline_string(certs);
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport

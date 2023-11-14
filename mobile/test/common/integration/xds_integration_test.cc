@@ -8,6 +8,7 @@
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"
@@ -32,9 +33,10 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
   Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
   Config::forceRegisterGrpcMuxFactory();
   Config::forceRegisterNewGrpcMuxFactory();
+  Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
 
-  expect_dns_ = false; // doesn't use DFP.
   create_xds_upstream_ = true;
+  tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
