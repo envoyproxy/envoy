@@ -4,19 +4,11 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.2"
-<<<<<<< Updated upstream
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/config:95.4"
 "source/common/crypto:95.5"
-"source/common/event:95.1" # Emulated edge events guards don't report LCOV
-=======
-"source/common/api:84.5"
-"source/common/api/posix:81.8"
-"source/common/config:95.3"
-"source/common/crypto:88.1"
 "source/common/event:95.0" # Emulated edge events guards don't report LCOV
->>>>>>> Stashed changes
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.2"
 "source/common/json:94.6"
