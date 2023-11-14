@@ -7,8 +7,9 @@
 namespace Envoy {
 namespace Server {
 
-/** * Implementation of OverloadManager that is never overloaded. Using this instead of the real
- * * OverloadManager keeps the admin interface accessible even when the proxy is overloaded. */
+/** Implementation of OverloadManager that is never overloaded. Using this instead of the real
+ *  OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
+*/
 class NullOverloadManager : public OverloadManager {
 public:
   struct OverloadState : public ThreadLocalOverloadState {
