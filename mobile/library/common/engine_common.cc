@@ -60,7 +60,7 @@ public:
   using Server::InstanceBase::InstanceBase;
   void maybeCreateHeapShrinker() override {}
   std::unique_ptr<Envoy::Server::OverloadManager> createOverloadManager() override {
-    return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal());
+    return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
   }
 };
 

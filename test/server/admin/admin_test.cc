@@ -312,7 +312,7 @@ private:
   Server::Instance& server_;
   AdminImpl::NullRouteConfigProvider route_config_provider_{server_.timeSource()};
   AdminImpl::NullScopedRouteConfigProvider scoped_route_config_provider_{server_.timeSource()};
-  NullOverloadManager::OverloadState overload_state_{server_.dispatcher()};
+  NullOverloadManager::OverloadState overload_state_{server_.dispatcher(), false};
   AdminImpl::AdminListenSocketFactory socket_factory_{nullptr};
   Stats::ScopeSharedPtr listener_scope_;
   AdminImpl::AdminListener listener_{admin_, std::move(listener_scope_)};
