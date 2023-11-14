@@ -26,7 +26,10 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "dynatrace_resource_detector_test",
-    srcs = ["dynatrace_resource_detector_test.cc"],
+    srcs = [
+        "dynatrace_metadata_file_reader_test.cc",
+        "dynatrace_resource_detector_test.cc",
+    ],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.dynatrace"],
     deps = [
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:dynatrace_resource_detector_lib",
