@@ -4742,8 +4742,8 @@ TEST_P(RouterShadowingTest, LahDeeDah) {
 
   // Guarantee that callbacks are invoked in onDestroy instead of destructor.
   {
-    EXPECT_CALL(foo_request, removeWatermarkCallbacks()).Times(1);
-    EXPECT_CALL(foo_request, cancel()).Times(1);
+    EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+    EXPECT_CALL(foo_request, cancel());
     router_->onDestroy();
   }
   EXPECT_CALL(foo_request, removeWatermarkCallbacks()).Times(0);
