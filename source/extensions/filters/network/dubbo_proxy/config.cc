@@ -23,20 +23,24 @@ SINGLETON_MANAGER_REGISTRATION(dubbo_route_config_provider_manager);
 Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
+
+  auto& server_context = context.getServerFactoryContext();
+
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
-      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(dubbo_route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+      server_context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(dubbo_route_config_provider_manager),
+          [&server_context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(server_context.admin());
           });
 
   std::shared_ptr<Config> filter_config(
       std::make_shared<ConfigImpl>(proto_config, context, *route_config_provider_manager));
 
   return [route_config_provider_manager, filter_config,
-          &context](Network::FilterManager& filter_manager) -> void {
+          &server_context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
-                                            context.mainThreadDispatcher().timeSource()));
+        std::make_shared<ConnectionManager>(*filter_config, server_context.api().randomGenerator(),
+                                            server_context.mainThreadDispatcher().timeSource()));
   };
 }
 

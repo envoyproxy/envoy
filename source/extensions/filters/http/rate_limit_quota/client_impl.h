@@ -37,10 +37,12 @@ public:
                       RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets)
       : domain_name_(domain_name),
         aync_client_(
-            context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
-                config_with_hash_key, context.scope(), true)),
+            context.getServerFactoryContext()
+                .clusterManager()
+                .grpcAsyncClientManager()
+                .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true)),
         rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
-        time_source_(context.mainThreadDispatcher().timeSource()) {}
+        time_source_(context.getServerFactoryContext().mainThreadDispatcher().timeSource()) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 

@@ -24,9 +24,11 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit&
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.getServerFactoryContext();
+
   ASSERT(!proto_config.domain().empty());
-  ConfigSharedPtr config(new Config(proto_config, context.localInfo(), context.scope(),
-                                    context.runtime(), context.clusterManager()));
+  ConfigSharedPtr config(new Config(proto_config, server_context.localInfo(), context.scope(),
+                                    server_context.runtime(), server_context.clusterManager()));
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 

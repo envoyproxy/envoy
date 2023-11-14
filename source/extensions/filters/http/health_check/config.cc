@@ -33,7 +33,8 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   HealthCheckCacheManagerSharedPtr cache_manager;
   if (cache_time_ms > 0) {
     cache_manager = std::make_shared<HealthCheckCacheManager>(
-        context.mainThreadDispatcher(), std::chrono::milliseconds(cache_time_ms));
+        context.getServerFactoryContext().mainThreadDispatcher(),
+        std::chrono::milliseconds(cache_time_ms));
   }
 
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages;

@@ -62,7 +62,7 @@ void TracerManagerImpl::removeExpiredCacheEntries() {
 
 std::shared_ptr<TracerManager>
 TracerManagerImpl::singleton(Server::Configuration::FactoryContext& context) {
-  return context.singletonManager().getTyped<Tracing::TracerManagerImpl>(
+  return context.getServerFactoryContext().singletonManager().getTyped<Tracing::TracerManagerImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(tracer_manager), [&context] {
         return std::make_shared<Tracing::TracerManagerImpl>(
             std::make_unique<Tracing::TracerFactoryContextImpl>(

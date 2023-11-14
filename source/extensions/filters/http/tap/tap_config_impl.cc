@@ -33,7 +33,7 @@ HttpTapConfigImpl::HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& pr
                                      Common::Tap::Sink* admin_streamer,
                                      Server::Configuration::FactoryContext& context)
     : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer, context),
-      time_source_(context.mainThreadDispatcher().timeSource()) {}
+      time_source_(context.getServerFactoryContext().mainThreadDispatcher().timeSource()) {}
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(
     const envoy::extensions::filters::http::tap::v3::Tap& tap_config, uint64_t stream_id,

@@ -84,7 +84,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
     PathWithEscapedSlashesAction
     getPathWithEscapedSlashesActionRuntimeOverride(Server::Configuration::FactoryContext& context) {
   // The default behavior is to leave escaped slashes unchanged.
-  uint64_t runtime_override = context.runtime().snapshot().getInteger(
+  uint64_t runtime_override = context.getServerFactoryContext().runtime().snapshot().getInteger(
       "http_connection_manager.path_with_escaped_slashes_action", 0);
   switch (runtime_override) {
   default:
@@ -111,7 +111,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
   envoy::type::v3::FractionalPercent default_fraction;
   default_fraction.set_numerator(100);
   default_fraction.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-  if (context.runtime().snapshot().featureEnabled(
+  if (context.getServerFactoryContext().runtime().snapshot().featureEnabled(
           "http_connection_manager.path_with_escaped_slashes_action_enabled", default_fraction)) {
     return config.path_with_escaped_slashes_action() ==
                    envoy::extensions::filters::network::http_connection_manager::v3::
@@ -206,32 +206,34 @@ SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.getServerFactoryContext();
+
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
-      context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
+      server_context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
+          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&server_context] {
             return std::make_shared<Http::TlsCachingDateProviderImpl>(
-                context.mainThreadDispatcher(), context.threadLocal());
+                server_context.mainThreadDispatcher(), server_context.threadLocal());
           });
 
   Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
-      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+      server_context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&server_context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(server_context.admin());
           });
 
   Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager =
-      context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
+      server_context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
-          [&context, route_config_provider_manager] {
+          [&server_context, route_config_provider_manager] {
             return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
-                context.admin(), *route_config_provider_manager);
+                server_context.admin(), *route_config_provider_manager);
           });
 
   auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
   std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
       Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
-          context.getServerFactoryContext());
+          server_context);
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
           tracer_manager, filter_config_provider_manager};
@@ -276,10 +278,13 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
+    auto& server_context = context.getServerFactoryContext();
+
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), context.api().randomGenerator(),
-        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.mainThreadDispatcher().timeSource());
+        *filter_config, context.drainDecision(), server_context.api().randomGenerator(),
+        server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
+        server_context.clusterManager(), server_context.overloadManager(),
+        server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -339,12 +344,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb,
-          context.runtime().snapshot().getInteger(Http::MaxRequestHeadersSizeOverrideKey,
-                                                  Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
+          context.getServerFactoryContext().runtime().snapshot().getInteger(
+              Http::MaxRequestHeadersSizeOverrideKey, Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
-          context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
-                                                  Http::DEFAULT_MAX_HEADERS_COUNT))),
+          context.getServerFactoryContext().runtime().snapshot().getInteger(
+              Http::MaxRequestHeadersCountOverrideKey, Http::DEFAULT_MAX_HEADERS_COUNT))),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
@@ -370,14 +375,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
-          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
-                                                      100))),
+          context.getServerFactoryContext().runtime().snapshot().featureEnabled(
+              "http_connection_manager.normalize_path", 100))),
 #else
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
-          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
-                                                      0))),
+          context.getServerFactoryContext().runtime().snapshot().featureEnabled(
+              "http_connection_manager.normalize_path", 0))),
 #endif
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
@@ -549,7 +554,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {
-    user_agent_ = context_.localInfo().clusterName();
+    user_agent_ = context_.getServerFactoryContext().localInfo().clusterName();
   }
 
   if (config.has_tracing()) {
@@ -638,7 +643,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   Http::FilterChainHelper<Server::Configuration::FactoryContext,
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.getServerFactoryContext(),
-             context_.clusterManager(), context_, stats_prefix_);
+             context_.getServerFactoryContext().clusterManager(), context_, stats_prefix_);
   THROW_IF_NOT_OK(helper.processFilters(config.http_filters(), "http", "http", filter_factories_));
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -683,8 +688,9 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
-        context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
+        context_.getServerFactoryContext().api().randomGenerator(), http2_options_,
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+        overload_manager);
   case CodecType::HTTP3:
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
@@ -695,10 +701,10 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
             headersWithUnderscoresAction());
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
-        http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-        overload_manager);
+        connection, data, callbacks, context_.scope(),
+        context_.getServerFactoryContext().api().randomGenerator(), http1_codec_stats_,
+        http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
@@ -743,7 +749,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
 }
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
-  return *context_.localInfo().address();
+  return *context_.getServerFactoryContext().localInfo().address();
 }
 
 /**
@@ -760,8 +766,8 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   }
   // Otherwise, for the sake of backwards compatibility, fall back to using tracing provider
   // configuration defined in the bootstrap config.
-  if (context_.httpContext().defaultTracingConfig().has_http()) {
-    return &context_.httpContext().defaultTracingConfig().http();
+  if (context_.getServerFactoryContext().httpContext().defaultTracingConfig().has_http()) {
+    return &context_.getServerFactoryContext().httpContext().defaultTracingConfig().http();
   }
   return nullptr;
 }
@@ -800,10 +806,13 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context, clear_hop_by_hop_headers](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
+    auto& server_context = context.getServerFactoryContext();
+
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), context.api().randomGenerator(),
-        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.mainThreadDispatcher().timeSource());
+        *filter_config, context.drainDecision(), server_context.api().randomGenerator(),
+        server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
+        server_context.clusterManager(), server_context.overloadManager(),
+        server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

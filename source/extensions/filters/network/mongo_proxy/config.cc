@@ -24,8 +24,9 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   const std::string stat_prefix = fmt::format("mongo.{}", proto_config.stat_prefix());
   AccessLogSharedPtr access_log;
   if (!proto_config.access_log().empty()) {
-    access_log = std::make_shared<AccessLog>(proto_config.access_log(), context.accessLogManager(),
-                                             context.mainThreadDispatcher().timeSource());
+    access_log = std::make_shared<AccessLog>(
+        proto_config.access_log(), context.getServerFactoryContext().accessLogManager(),
+        context.getServerFactoryContext().mainThreadDispatcher().timeSource());
   }
 
   Filters::Common::Fault::FaultDelayConfigSharedPtr fault_config;
@@ -44,9 +45,10 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   return [stat_prefix, &context, access_log, fault_config, emit_dynamic_metadata,
           stats](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
-        stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
-        context.drainDecision(), context.mainThreadDispatcher().timeSource(), emit_dynamic_metadata,
-        stats));
+        stat_prefix, context.scope(), context.getServerFactoryContext().runtime(), access_log,
+        fault_config, context.drainDecision(),
+        context.getServerFactoryContext().mainThreadDispatcher().timeSource(),
+        emit_dynamic_metadata, stats));
   };
 }
 

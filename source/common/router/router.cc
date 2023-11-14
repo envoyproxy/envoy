@@ -68,17 +68,20 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            Server::Configuration::FactoryContext& context,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config)
-    : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                   context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-                   PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                   config.start_child_span(), config.suppress_envoy_headers(),
-                   config.respect_expected_rq_timeout(),
-                   config.suppress_grpc_request_failure_code_stats(),
-                   config.has_upstream_log_options()
-                       ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
-                       : false,
-                   config.strict_check_headers(), context.api().timeSource(), context.httpContext(),
-                   context.routerContext()) {
+    : FilterConfig(
+          stat_prefix, context.getServerFactoryContext().localInfo(), context.scope(),
+          context.getServerFactoryContext().clusterManager(),
+          context.getServerFactoryContext().runtime(),
+          context.getServerFactoryContext().api().randomGenerator(), std::move(shadow_writer),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
+          config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
+          config.suppress_grpc_request_failure_code_stats(),
+          config.has_upstream_log_options()
+              ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
+              : false,
+          config.strict_check_headers(), context.getServerFactoryContext().api().timeSource(),
+          context.getServerFactoryContext().httpContext(),
+          context.getServerFactoryContext().routerContext()) {
   for (const auto& upstream_log : config.upstream_log()) {
     upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
   }
@@ -101,8 +104,8 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, server_factory_ctx, context.clusterManager(),
-               *upstream_ctx_, prefix);
+        helper(*filter_config_provider_manager, server_factory_ctx,
+               context.getServerFactoryContext().clusterManager(), *upstream_ctx_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
                                           "router upstream http", upstream_http_filter_factories_));
   }

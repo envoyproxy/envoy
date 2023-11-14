@@ -15,9 +15,11 @@ Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::router::v3::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   Stats::StatNameManagedStorage prefix(stat_prefix, context.scope().symbolTable());
-  Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
-      prefix.statName(), context,
-      std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()), proto_config));
+  Router::FilterConfigSharedPtr filter_config(
+      new Router::FilterConfig(prefix.statName(), context,
+                               std::make_unique<Router::ShadowWriterImpl>(
+                                   context.getServerFactoryContext().clusterManager()),
+                               proto_config));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
