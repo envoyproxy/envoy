@@ -13,7 +13,7 @@ namespace {
 /**
  * Returns the appropriate error status code for a given gRPC status.
  *
- * https://connect.build/docs/protocol#error-codes
+ * https://connectrpc.com/docs/protocol#error-codes
  */
 std::string statusCodeToString(const Grpc::Status::GrpcStatus status) {
   using WellKnownGrpcStatus = Grpc::Status::WellKnownGrpcStatus;
@@ -122,7 +122,7 @@ bool serializeJson(const EndStreamResponse& response, std::string& out) {
 /**
  * Gets the appropriate HTTP status code for a given gRPC status.
  *
- * https://connect.build/docs/protocol#error-codes
+ * https://connectrpc.com/docs/protocol#error-codes
  */
 uint64_t statusCodeToConnectUnaryStatus(const Grpc::Status::GrpcStatus status) {
   using WellKnownGrpcStatus = Grpc::Status::WellKnownGrpcStatus;

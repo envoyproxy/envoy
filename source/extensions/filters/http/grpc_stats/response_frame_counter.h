@@ -11,7 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcStats {
 
-// An adaptation of the gRPC frame inspector that handles the Buf Connect end-of-stream frame.
+// An adaptation of the gRPC frame inspector that handles the Connect end-of-stream frame.
 class ResponseFrameCounter : protected Grpc::FrameInspector {
 public:
   uint64_t inspect(const Buffer::Instance& input);

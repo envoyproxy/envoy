@@ -7,7 +7,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# L7 HTTP filter that translates Buf Connect to gRPC.
+# L7 HTTP filter that translates Connect RPC to gRPC.
 
 envoy_extension_package()
 

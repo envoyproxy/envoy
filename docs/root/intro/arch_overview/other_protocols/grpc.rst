@@ -34,8 +34,8 @@ Envoy supports multiple gRPC bridges:
 * :ref:`grpc_http1_reverse_bridge filter <config_http_filters_grpc_http1_reverse_bridge>` which allows gRPC requests to be sent to Envoy
   and then translated to HTTP/1.1 when sent to the upstream. The response is then converted back into gRPC when sent to the downstream.
   This filter can also optionally manage the gRPC frame header, allowing the upstream to not have to be gRPC aware at all.
-* :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>` which allows Buf Connect requests to be sent to Envoy.
-  Envoy then translates the requests to gRPC to be sent to the upstream. The response is converted back into the Buf Connect protocol
+* :ref:`connect_grpc_bridge filter <config_http_filters_connect_grpc_bridge>` which allows Connect requests to be sent to Envoy.
+  Envoy then translates the requests to gRPC to be sent to the upstream. The response is converted back into the Connect protocol
   to be sent back to the downstream. HTTP/1.1 requests will be upgraded to HTTP/2 or HTTP/3 when needed.
 
 .. _arch_overview_grpc_services:

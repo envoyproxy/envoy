@@ -20,7 +20,7 @@ Http::FilterFactoryCb ConnectGrpcFilterConfigFactory::createFilterFactoryFromPro
 }
 
 /**
- * Static registration for the Buf Connect stats filter. @see RegisterFactory.
+ * Static registration for the Connect RPC stats filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(ConnectGrpcFilterConfigFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);

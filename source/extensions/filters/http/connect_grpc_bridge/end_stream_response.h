@@ -28,9 +28,9 @@ struct EndStreamResponse {
 };
 
 /**
- * Serializes a Buf Connect Error object to JSON.
+ * Serializes a Connect Error object to JSON.
  *
- * https://connect.build/docs/protocol#error-end-stream
+ * https://connectrpc.com/docs/protocol#error-end-stream
  *
  * @param error Error object to serialize.
  * @param out String to store result in.
@@ -39,9 +39,9 @@ struct EndStreamResponse {
 bool serializeJson(const Error& error, std::string& out);
 
 /**
- * Serializes a Buf Connect EndStreamResponse object to JSON.
+ * Serializes a Connect EndStreamResponse object to JSON.
  *
- * https://connect.build/docs/protocol#error-end-stream
+ * https://connectrpc.com/docs/protocol#error-end-stream
  *
  * @param response EndStreamResponse object to serialize.
  * @param out String to store result in.

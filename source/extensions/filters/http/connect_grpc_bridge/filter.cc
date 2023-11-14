@@ -18,10 +18,10 @@ namespace ConnectGrpcBridge {
 namespace {
 
 struct RcDetailsValues {
-  // The Buf Connect gRPC bridge tried to buffer a unary request that was too large for the
+  // The Connect RPC to gRPC bridge tried to buffer a unary request that was too large for the
   // configured decoder buffer limit.
   const std::string ConnectBridgeUnaryRequestTooLarge = "connect_bridge_unary_request_too_large";
-  // The Buf Connect gRPC bridge tried to buffer a unary response that was too large for the
+  // The Connect RPC to gRPC bridge tried to buffer a unary response that was too large for the
   // configured encoder buffer limit.
   const std::string ConnectBridgeUnaryResponseTooLarge = "connect_bridge_unary_response_too_large";
 };
