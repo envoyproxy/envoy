@@ -9,8 +9,10 @@
 
 import datetime
 import html
+import icalendar
 import json
 import os
+import requests
 import sys
 from datetime import datetime as dt
 from functools import cached_property
@@ -25,6 +27,9 @@ from aio.core.functional import async_property
 from aio.run import runner
 
 ENVOY_REPO = "envoyproxy/envoy"
+
+# Oncall calendar
+CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
 
 ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
@@ -133,6 +138,21 @@ class RepoNotifier(runner.Runner):
         return (await self.tracked_prs)["stalled_prs"]
 
     @async_property(cache=True)
+    async def oncall_string(self):
+        ical = requests.get(CALENDAR)
+        parsed_calendar = icalendar.Calendar.from_ical(ical.text)
+        ical.close()
+
+        now = datetime.datetime.now()
+        sunday = now - datetime.timedelta(days=now.weekday() + 1)
+
+        for component in parsed_calendar.walk():
+            if component.name == "VEVENT":
+                if (sunday.date() == component.decoded("dtstart").date()):
+                    return component.get("summary")
+        return "unable to find this week's oncall"
+
+    @async_property(cache=True)
     async def tracked_prs(self):
         # A dict of maintainer : outstanding_pr_string to be sent to slack
         # A placeholder for unassigned PRs, to be sent to #maintainers eventually
@@ -231,6 +251,11 @@ class RepoNotifier(runner.Runner):
         try:
             unassigned = "\n".join(await self.unassigned_prs)
             stalled = "\n".join(await self.stalled_prs)
+            # On Monday, post the new oncall.
+            if datetime.date.today().weekday() == 0:
+                oncall = await self.oncall_string
+                await self.send_message(channel='#envoy-maintainer-oncall', text=(f"{oncall}"))
+                await self.send_message(channel='#general', text=(f"{oncall}"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))
