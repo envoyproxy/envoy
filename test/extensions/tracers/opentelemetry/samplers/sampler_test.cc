@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -27,7 +28,8 @@ class TestSampler : public Sampler {
 public:
   MOCK_METHOD(SamplingResult, shouldSample,
               ((const absl::optional<SpanContext>), (const std::string&), (const std::string&),
-               (OTelSpanKind), (const OTelSpanAttributes&), (const std::vector<SpanContext>&)),
+               (OTelSpanKind), (OptRef<const Tracing::TraceContext>),
+               (const std::vector<SpanContext>&)),
               (override));
   MOCK_METHOD(std::string, getDescription, (), (const, override));
 };
@@ -133,7 +135,8 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   // shouldSample returns a result without additional attributes and Decision::RECORD_AND_SAMPLE
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _))
       .WillOnce([](const absl::optional<SpanContext>, const std::string&, const std::string&,
-                   OTelSpanKind, const OTelSpanAttributes&, const std::vector<SpanContext>&) {
+                   OTelSpanKind, OptRef<const Tracing::TraceContext>,
+                   const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::RECORD_AND_SAMPLE;
         res.tracestate = "this_is=tracesate";
@@ -152,13 +155,15 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   // shouldSamples return a result containing additional attributes and Decision::DROP
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _))
       .WillOnce([](const absl::optional<SpanContext>, const std::string&, const std::string&,
-                   OTelSpanKind, const OTelSpanAttributes&, const std::vector<SpanContext>&) {
+                   OTelSpanKind, OptRef<const Tracing::TraceContext>,
+                   const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::DROP;
-        OTelSpanAttributes attributes;
+        std::map<std::string, std::string> attributes;
         attributes["key"] = "value";
         attributes["another_key"] = "another_value";
-        res.attributes = std::make_unique<const OTelSpanAttributes>(std::move(attributes));
+        res.attributes =
+            std::make_unique<const std::map<std::string, std::string>>(std::move(attributes));
         res.tracestate = "this_is=another_tracesate";
         return res;
       });
@@ -169,7 +174,7 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   EXPECT_STREQ(unsampled_span->tracestate().c_str(), "this_is=another_tracesate");
 }
 
-// Test OTLP tracer with a sampler
+// Test that sampler receives trace_context
 TEST_F(SamplerFactoryTest, TestInitialAttributes) {
   auto test_sampler = std::make_shared<NiceMock<TestSampler>>();
   TestSamplerFactory sampler_factory;
@@ -194,53 +199,7 @@ TEST_F(SamplerFactoryTest, TestInitialAttributes) {
 
   auto driver = std::make_unique<Driver>(opentelemetry_config, context);
 
-  // set all expected values
-  trace_context.context_method_ = "GET";
-  trace_context.context_host_ = "localhost:1234";
-  trace_context.context_path_ = "/path?query";
-  trace_context.setByReference(":scheme", "http");
-  OTelSpanAttributes expected = {{"http.request.method", "GET"}, {"server.address", "localhost"},
-                                 {"server.port", "1234"},        {"url.path", "/path"},
-                                 {"url.query", "query"},         {"url.scheme", "http"}};
-
-  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, expected, _));
-  driver->startSpan(config, trace_context, stream_info, "operation_name",
-                    {Tracing::Reason::Sampling, true});
-
-  // no port, no path
-  trace_context.context_method_ = "POST";
-  trace_context.context_host_ = "localhost";
-  trace_context.context_path_ = "/path";
-  trace_context.setByReference(":scheme", "http");
-  expected = {{"http.request.method", "POST"},
-              {"server.address", "localhost"},
-              {"url.path", "/path"},
-              {"url.scheme", "http"}};
-
-  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, expected, _));
-  driver->startSpan(config, trace_context, stream_info, "operation_name",
-                    {Tracing::Reason::Sampling, true});
-
-  // no port, query without path
-  trace_context.context_method_ = "POST";
-  trace_context.context_host_ = "127.0.0.1";
-  trace_context.context_path_ = "?asdf";
-  trace_context.setByReference(":scheme", "http");
-  expected = {{"http.request.method", "POST"},
-              {"server.address", "127.0.0.1"},
-              {"url.path", "asdf"},
-              {"url.scheme", "http"}};
-
-  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, expected, _));
-  driver->startSpan(config, trace_context, stream_info, "operation_name",
-                    {Tracing::Reason::Sampling, true});
-
-  // all empty
-  trace_context.context_method_ = "";
-  trace_context.context_host_ = "";
-  trace_context.context_path_ = "";
-  trace_context.removeByKey(":scheme");
-  expected.clear();
+  auto expected = makeOptRef<const Tracing::TraceContext>(trace_context);
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, expected, _));
   driver->startSpan(config, trace_context, stream_info, "operation_name",
                     {Tracing::Reason::Sampling, true});

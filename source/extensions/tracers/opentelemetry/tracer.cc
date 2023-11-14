@@ -26,13 +26,13 @@ namespace {
 
 void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> span_context,
                  Span& new_span, const std::string& operation_name,
-                 const OTelSpanAttributes& initial_attributes) {
+                 OptRef<const Tracing::TraceContext> trace_context) {
   if (!sampler) {
     return;
   }
   const auto sampling_result =
       sampler->shouldSample(span_context, operation_name, new_span.getTraceIdAsHex(),
-                            new_span.spankind(), initial_attributes, {});
+                            new_span.spankind(), trace_context, {});
   new_span.setSampled(sampling_result.isSampled());
 
   if (sampling_result.attributes) {
@@ -62,7 +62,8 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
   SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled(), tracestate());
-  return parent_tracer_.startSpan(name, start_time, span_context, {},
+  return parent_tracer_.startSpan(name, start_time, span_context,
+                                  makeOptRefFromPtr<const Tracing::TraceContext>(nullptr),
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
 }
 
@@ -179,7 +180,7 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
 Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, SystemTime start_time,
 
                                    Tracing::Decision tracing_decision,
-                                   const OTelSpanAttributes& initial_attributes,
+                                   OptRef<const Tracing::TraceContext> trace_context,
                                    OTelSpanKind span_kind) {
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
   Span new_span(operation_name, start_time, time_source_, *this, span_kind);
@@ -189,7 +190,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, SystemTime
   uint64_t span_id = random_.random();
   new_span.setId(Hex::uint64ToHex(span_id));
   if (sampler_) {
-    callSampler(sampler_, absl::nullopt, new_span, operation_name, initial_attributes);
+    callSampler(sampler_, absl::nullopt, new_span, operation_name, trace_context);
   } else {
     new_span.setSampled(tracing_decision.traced);
   }
@@ -198,7 +199,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, SystemTime
 
 Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, SystemTime start_time,
                                    const SpanContext& previous_span_context,
-                                   const OTelSpanAttributes& initial_attributes,
+                                   OptRef<const Tracing::TraceContext> trace_context,
                                    OTelSpanKind span_kind) {
   // Create a new span and populate details from the span context.
   Span new_span(operation_name, start_time, time_source_, *this, span_kind);
@@ -211,7 +212,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, SystemTime
   new_span.setId(Hex::uint64ToHex(span_id));
   if (sampler_) {
     // Sampler should make a sampling decision and set tracestate
-    callSampler(sampler_, previous_span_context, new_span, operation_name, initial_attributes);
+    callSampler(sampler_, previous_span_context, new_span, operation_name, trace_context);
   } else {
     // Respect the previous span's sampled flag.
     new_span.setSampled(previous_span_context.sampled());

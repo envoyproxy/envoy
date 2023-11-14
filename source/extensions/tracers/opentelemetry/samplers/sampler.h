@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/tracing/trace_context.h"
@@ -30,13 +31,6 @@ enum class Decision {
 };
 
 /**
- * @brief A string key-value map that stores the span attributes.
- * see
- * https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/common/README.md#attribute
- */
-using OTelSpanAttributes = std::map<std::string, std::string>;
-
-/**
  * @brief The type of the span.
  * see
  * https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#spankind
@@ -47,7 +41,7 @@ struct SamplingResult {
   /// @see Decision
   Decision decision;
   // A set of span Attributes that will also be added to the Span. Can be nullptr.
-  std::unique_ptr<const OTelSpanAttributes> attributes;
+  std::unique_ptr<const std::map<std::string, std::string>> attributes;
   // A Tracestate that will be associated with the Span. If the sampler
   // returns an empty Tracestate here, the Tracestate will be cleared, so samplers SHOULD normally
   // return the passed-in Tracestate if they do not intend to change it
@@ -78,13 +72,14 @@ public:
    * TraceId, they MUST always match.
    * @param name Name of the Span to be created.
    * @param spankind Span kind of the Span to be created.
-   * @param attributes Initial set of Attributes of the Span to be created.
+   * @param trace_context TraceContext containing potential initial span attributes
    * @param links Collection of links that will be associated with the Span to be created.
    * @return SamplingResult @see SamplingResult
    */
   virtual SamplingResult shouldSample(const absl::optional<SpanContext> parent_context,
                                       const std::string& trace_id, const std::string& name,
-                                      OTelSpanKind spankind, const OTelSpanAttributes& attributes,
+                                      OTelSpanKind spankind,
+                                      OptRef<const Tracing::TraceContext> trace_context,
                                       const std::vector<SpanContext>& links) PURE;
 
   /**

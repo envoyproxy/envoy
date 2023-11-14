@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/api/api.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -45,11 +46,13 @@ public:
   Tracing::SpanPtr startSpan(const std::string& operation_name, SystemTime start_time,
 
                              Tracing::Decision tracing_decision,
-                             const OTelSpanAttributes& initial_attributes, OTelSpanKind span_kind);
+                             OptRef<const Tracing::TraceContext> trace_context,
+                             OTelSpanKind span_kind);
 
   Tracing::SpanPtr startSpan(const std::string& operation_name, SystemTime start_time,
                              const SpanContext& previous_span_context,
-                             const OTelSpanAttributes& initial_attributes, OTelSpanKind span_kind);
+                             OptRef<const Tracing::TraceContext> trace_context,
+                             OTelSpanKind span_kind);
 
 private:
   /**
