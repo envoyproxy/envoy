@@ -111,8 +111,8 @@ envoy_cc_library(
     hdrs = select({
         "@envoy//bazel:apple": [
             "apple_pac_proxy_resolver.h",
-            "apple_proxy_resolver.h",
             "apple_proxy_resolution.h",
+            "apple_proxy_resolver.h",
             "apple_system_proxy_settings_monitor.h",
             "system_proxy_settings.h",
         ],

@@ -65,9 +65,9 @@ void ApplePACProxyResolver::resolveProxies(
   auto callbackWrapper =
       static_cast<void*>(new class PACProxyResolutionCompletionCallback(didResolveProxy));
   CFStreamClientContext context = {0, callbackWrapper, nullptr, nullptr, nullptr};
-  // Even though neither the name of the method nor Apple's documentation mentions that, manual testing shows
-  // that `CFNetworkExecuteProxyAutoConfigurationURL` method does caching of fetched PAC file and does not
-  // fetch it on every proxy resolution request.
+  // Even though neither the name of the method nor Apple's documentation mentions that, manual
+  // testing shows that `CFNetworkExecuteProxyAutoConfigurationURL` method does caching of fetched
+  // PAC file and does not fetch it on every proxy resolution request.
   CFRunLoopSourceRef runLoopSource =
       CFNetworkExecuteProxyAutoConfigurationURL(cf_proxy_autoconfiguration_file_url, cf_target_url,
                                                 proxyAutoConfigurationResultCallback, &context);

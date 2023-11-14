@@ -1,3 +1,5 @@
+#pragma once
+
 #include "library/objective-c/proxy/EnvoyProxySettings.h"
 
 NS_ASSUME_NONNULL_BEGIN
