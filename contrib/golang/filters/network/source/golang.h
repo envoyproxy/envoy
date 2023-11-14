@@ -76,7 +76,9 @@ public:
   void close(Network::ConnectionCloseType close_type);
 
   Event::Dispatcher* dispatcher() { return dispatcher_; }
-  Upstream::ClusterManager& clusterManager() { return context_.clusterManager(); }
+  Upstream::ClusterManager& clusterManager() {
+    return context_.getServerFactoryContext().clusterManager();
+  }
 
   std::string getLocalAddrStr() const { return local_addr_; }
   std::string getRemoteAddrStr() const { return addr_; };
