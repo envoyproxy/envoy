@@ -87,6 +87,11 @@ public:
    * @return if the client connects to a peer host.
    */
   virtual bool connected() PURE;
+
+  /**
+   * @return the streamInfo of the current connection if there is any.
+   */
+  virtual OptRef<StreamInfo::StreamInfo> getStreamInfo() PURE;
 };
 
 using AsyncTcpClientPtr = std::unique_ptr<AsyncTcpClient>;
