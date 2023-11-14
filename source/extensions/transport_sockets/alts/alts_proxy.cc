@@ -42,6 +42,7 @@ AltsProxy::create(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
   }
   auto client_context = std::make_unique<grpc::ClientContext>();
   client_context->set_deadline(absl::ToChronoTime(absl::Now() + AltsClientContextDeadline));
+  // TODO(matthewstevenson88): Investigate using Envoy's async gRPC client.
   auto stub = HandshakerService::NewStub(handshaker_service_channel);
   if (stub == nullptr) {
     return absl::InvalidArgumentError("Handshaker service stub is null.");
