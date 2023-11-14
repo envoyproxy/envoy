@@ -303,8 +303,8 @@ public:
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
-  // By default, this prepends a downstream filter, but if downstream is set to
-  // false it will prepend an upstream filter.
+  // By default, this prepends a downstream HTTP filter, but if downstream is set to
+  // false it will prepend an upstream HTTP filter.
   void prependFilter(const std::string& filter_yaml, bool downstream = true);
 
   // Add an HTTP filter prior to existing filters.

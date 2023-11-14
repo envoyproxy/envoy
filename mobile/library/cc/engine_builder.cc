@@ -26,6 +26,7 @@
 #endif
 
 #include "source/common/http/matching/inputs.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "absl/strings/str_join.h"
@@ -46,17 +47,11 @@ namespace Platform {
 XdsBuilder::XdsBuilder(std::string xds_server_address, const int xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
-XdsBuilder& XdsBuilder::setAuthenticationToken(std::string token_header, std::string token) {
-  authentication_token_header_ = std::move(token_header);
-  authentication_token_ = std::move(token);
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
-                                                  const int token_lifetime_in_seconds) {
-  jwt_token_ = std::move(token);
-  jwt_token_lifetime_in_seconds_ =
-      token_lifetime_in_seconds > 0 ? token_lifetime_in_seconds : DefaultJwtTokenLifetimeSeconds;
+XdsBuilder& XdsBuilder::addInitialStreamHeader(std::string header, std::string value) {
+  envoy::config::core::v3::HeaderValue header_value;
+  header_value.set_key(std::move(header));
+  header_value.set_value(std::move(value));
+  xds_initial_grpc_metadata_.emplace_back(std::move(header_value));
   return *this;
 }
 
@@ -85,8 +80,8 @@ XdsBuilder& XdsBuilder::addClusterDiscoveryService(std::string cds_resources_loc
   return *this;
 }
 
-void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const {
-  auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
+void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const {
+  auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
   ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
   ads_config->set_set_node_on_first_message_only(true);
   ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -102,17 +97,11 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
         ->set_inline_string(ssl_root_certs_);
   }
 
-  if (!authentication_token_header_.empty() && !authentication_token_.empty()) {
-    auto* auth_token_metadata = grpc_service.add_initial_metadata();
-    auth_token_metadata->set_key(authentication_token_header_);
-    auth_token_metadata->set_value(authentication_token_);
-  } else if (!jwt_token_.empty()) {
-    auto& jwt = *grpc_service.mutable_google_grpc()
-                     ->add_call_credentials()
-                     ->mutable_service_account_jwt_access();
-    jwt.set_json_key(jwt_token_);
-    jwt.set_token_lifetime_seconds(jwt_token_lifetime_in_seconds_);
+  if (!xds_initial_grpc_metadata_.empty()) {
+    grpc_service.mutable_initial_metadata()->Assign(xds_initial_grpc_metadata_.begin(),
+                                                    xds_initial_grpc_metadata_.end());
   }
+
   if (!sni_.empty()) {
     auto& channel_args =
         *grpc_service.mutable_google_grpc()->mutable_channel_args()->mutable_args();
@@ -120,7 +109,7 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
   }
 
   if (!rtds_resource_name_.empty()) {
-    auto* layered_runtime = bootstrap->mutable_layered_runtime();
+    auto* layered_runtime = bootstrap.mutable_layered_runtime();
     auto* layer = layered_runtime->add_layers();
     layer->set_name("rtds_layer");
     auto* rtds_layer = layer->mutable_rtds_layer();
@@ -132,11 +121,11 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
   }
 
   if (enable_cds_) {
-    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
+    auto* cds_config = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
     if (cds_resources_locator_.empty()) {
       cds_config->mutable_ads();
     } else {
-      bootstrap->mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
+      bootstrap.mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
       cds_config->mutable_api_config_source()->set_api_type(
           envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
       cds_config->mutable_api_config_source()->set_transport_api_version(
@@ -144,10 +133,10 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
     }
     cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_in_seconds_);
     cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    bootstrap->add_node_context_params("cluster");
+    bootstrap.add_node_context_params("cluster");
     // Stat prefixes that we use in tests.
     auto* list =
-        bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
+        bootstrap.mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
     list->add_patterns()->set_exact("cluster_manager.active_clusters");
     list->add_patterns()->set_exact("cluster_manager.cluster_added");
     list->add_patterns()->set_exact("cluster_manager.cluster_updated");
@@ -219,7 +208,12 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
 }
 
 EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
-  dns_preresolve_hostnames_ = hostnames;
+  // Add a default port of 443 for all hosts. We'll eventually change this API so it takes a single
+  // {host, pair} and it can be called multiple times.
+  dns_preresolve_hostnames_.clear();
+  for (const std::string& hostname : hostnames) {
+    dns_preresolve_hostnames_.push_back({hostname /* host */, 443 /* port */});
+  }
   return *this;
 }
 
@@ -310,6 +304,11 @@ EngineBuilder& EngineBuilder::setHttp3ClientConnectionOptions(std::string option
 
 EngineBuilder& EngineBuilder::addQuicHint(std::string host, int port) {
   quic_hints_.emplace_back(std::move(host), port);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
+  quic_suffixes_.emplace_back(std::move(suffix));
   return *this;
 }
 
@@ -466,6 +465,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           cache_config.mutable_alternate_protocols_cache_options()->add_prepopulated_entries();
       entry->set_hostname(host);
       entry->set_port(port);
+    }
+    for (const auto& suffix : quic_suffixes_) {
+      cache_config.mutable_alternate_protocols_cache_options()->add_canonical_suffixes(suffix);
     }
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
@@ -626,10 +628,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
 
-  for (auto& hostname : dns_preresolve_hostnames_) {
+  for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
-    address->set_address(hostname);
-    address->set_port_value(443);
+    address->set_address(host);
+    address->set_port_value(port);
   }
 
   auto* dfp_filter = hcm->add_http_filters();
@@ -835,6 +837,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       entry->set_hostname(host);
       entry->set_port(port);
     }
+    for (const auto& suffix : quic_suffixes_) {
+      alpn_options.mutable_auto_config()
+          ->mutable_alternate_protocols_cache_options()
+          ->add_canonical_suffixes(suffix);
+    }
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
@@ -930,7 +937,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   bootstrap->mutable_dynamic_resources();
 #ifdef ENVOY_GOOGLE_GRPC
   if (xds_builder_) {
-    xds_builder_->build(bootstrap.get());
+    xds_builder_->build(*bootstrap);
   }
 #endif
 

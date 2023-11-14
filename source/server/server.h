@@ -32,7 +32,6 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/init/manager_impl.h"
-#include "source/common/memory/heap_shrinker.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
@@ -149,7 +148,7 @@ public:
 };
 
 /**
- * This is a helper used by InstanceImpl::run() on the stack. It's broken out to make testing
+ * This is a helper used by InstanceBase::run() on the stack. It's broken out to make testing
  * easier.
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
@@ -223,25 +222,30 @@ private:
 };
 
 /**
- * This is the actual full standalone server which stitches together various common components.
+ * This is the base class for the standalone server which stitches together various common
+ * components. Some components are optional (so PURE) and can be created or not by subclasses.
  */
-class InstanceImpl final : Logger::Loggable<Logger::Id::main>,
-                           public Instance,
-                           public ServerLifecycleNotifier {
+class InstanceBase : Logger::Loggable<Logger::Id::main>,
+                     public Instance,
+                     public ServerLifecycleNotifier {
 public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
-               Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-               HotRestart& restarter, Stats::StoreRoot& store,
-               Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
+  InstanceBase(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
+               ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+               Thread::BasicLockable& access_log_lock,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                std::unique_ptr<ProcessContext> process_context,
                Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
-  ~InstanceImpl() override;
+  // initialize the server. This must be called before run().
+  void initialize(Network::Address::InstanceConstSharedPtr local_address,
+                  ComponentFactory& component_factory);
+  ~InstanceBase() override;
+
+  virtual void maybeCreateHeapShrinker() PURE;
 
   void run() override;
 
@@ -313,8 +317,10 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  void initialize(Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory);
+  // This does most of the work of initialization, but can throw errors caught
+  // by initialize().
+  void initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                         ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
@@ -392,7 +398,6 @@ private:
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
-  std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;

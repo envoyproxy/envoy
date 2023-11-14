@@ -60,15 +60,3 @@
 -keep class io.envoyproxy.envoymobile.engine.types.EnvoyLogger {
    <methods>;
 }
-
--keep class com.google.protobuf.** {
-   *;
-}
-
--keep class com.google.protobuf.MessageLite {
-    *;
-}
-
--keep class com.google.protobuf.MessageLite$Builder {
-    *;
-}

@@ -995,15 +995,13 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
 
 TEST_P(TcpProxyIntegrationTest, RecordsUpstreamConnectionTimeLatency) {
   FakeAccessLogFactory factory;
-  factory.setLogCallback([](const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                            const Http::ResponseTrailerMap*,
-                            const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  factory.setLogCallback([](const Formatter::HttpFormatterContext&,
+                            const StreamInfo::StreamInfo& stream_info) {
     EXPECT_TRUE(
         stream_info.upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency().has_value());
   });
 
-  Registry::InjectFactory<Server::Configuration::AccessLogInstanceFactory> factory_register(
-      factory);
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* filter_chain =
@@ -1397,8 +1395,8 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
 
   expectEndpointToMatchRoute([](IntegrationTcpClient& tcp_client) -> std::string {
     // Break the write into two; validate that the first is received before sending the second. This
-    // validates that a downstream filter can use this functionality, even if it can't make a
-    // decision after the first `onData()`.
+    // validates that a downstream network filter can use this functionality, even if it can't make
+    // a decision after the first `onData()`.
     EXPECT_TRUE(tcp_client.write("p", false));
     tcp_client.waitForData("p");
     tcp_client.clearData();
