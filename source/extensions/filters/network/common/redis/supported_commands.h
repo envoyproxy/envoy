@@ -87,6 +87,11 @@ struct SupportedCommands {
   static const std::string& quit() { CONSTRUCT_ON_FIRST_USE(std::string, "quit"); }
 
   /**
+   * @return asking command
+   */
+  static const std::string& asking() { CONSTRUCT_ON_FIRST_USE(std::string, "asking"); }
+
+  /**
    * @return commands which alters the state of redis
    */
   static const absl::flat_hash_set<std::string>& writeCommands() {

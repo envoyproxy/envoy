@@ -659,6 +659,11 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  if (command_name == Common::Redis::SupportedCommands::asking()) {
+    localResponse(callbacks, "OK");
+    return nullptr;
+  }
+
   if (request->asArray().size() < 2 &&
       Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0) {
     // Commands other than PING, TIME and transaction commands all have at least two arguments.

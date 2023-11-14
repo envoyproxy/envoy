@@ -185,5 +185,8 @@ new_features:
     Ratelimit supports optional additional prefix to use when emitting statistics with :ref:`stat_prefix
     <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stat_prefix>`
     configuration flag.
+- area: redis
+  change: |
+    Add support for ASKING command in redis_proxy filter.
 
 deprecated:

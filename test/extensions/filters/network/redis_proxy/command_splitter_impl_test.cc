@@ -91,6 +91,13 @@ TEST_F(RedisCommandSplitterImplTest, QuitSuccess) {
   EXPECT_EQ(0UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
 
+TEST_F(RedisCommandSplitterImplTest, AskingSuccess) {
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"asking"});
+
+  EXPECT_EQ(0UL, store_.counter("redis.foo.splitter.invalid_request").value());
+}
+
 TEST_F(RedisCommandSplitterImplTest, AuthWithNoPassword) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
