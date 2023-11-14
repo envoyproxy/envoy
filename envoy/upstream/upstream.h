@@ -99,7 +99,7 @@ public:
    *   from cluster config. If the bind config from the cluster manager, the param
    *   is empty.
    */
-  virtual UpstreamLocalAddressSelectorConstSharedPtr
+  virtual absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
   createLocalAddressSelector(std::vector<UpstreamLocalAddress> upstream_local_addresses,
                              absl::optional<std::string> cluster_name) const PURE;
 
