@@ -31,6 +31,14 @@ public class JniHelperTest {
   public static native boolean[] newBooleanArray(int length);
   public static native Object[] newObjectArray(int length, Class<?> elementClass,
                                                Object initialElement);
+  public static native byte[] getByteArrayElements(byte[] array);
+  public static native char[] getCharArrayElements(char[] array);
+  public static native short[] getShortArrayElements(short[] array);
+  public static native int[] getIntArrayElements(int[] array);
+  public static native long[] getLongArrayElements(long[] array);
+  public static native float[] getFloatArrayElements(float[] array);
+  public static native double[] getDoubleArrayElements(double[] array);
+  public static native boolean[] getBooleanArrayElements(boolean[] array);
   public static native Object getObjectArrayElement(Object[] array, int index);
   public static native void setObjectArrayElement(Object[] array, int index, Object value);
   public static native void setByteArrayRegion(byte[] array, int start, int index, byte[] buffer);
@@ -184,6 +192,50 @@ public class JniHelperTest {
   public void testNewObjectArray() {
     assertThat(newObjectArray(3, String.class, "foo"))
         .isEqualTo(new String[] {"foo", "foo", "foo"});
+  }
+
+  @Test
+  public void testGetByteArrayElements() {
+    assertThat(getByteArrayElements(new byte[] {0, 0, 0})).isEqualTo(new byte[] {123, 123, 123});
+  }
+
+  @Test
+  public void testGetCharArrayElements() {
+    assertThat(getCharArrayElements(new char[] {' ', ' ', ' '}))
+        .isEqualTo(new char[] {'a', 'a', 'a'});
+  }
+
+  @Test
+  public void testGetShortArrayElements() {
+    assertThat(getShortArrayElements(new short[] {0, 0, 0})).isEqualTo(new short[] {123, 123, 123});
+  }
+
+  @Test
+  public void testGetIntArrayElements() {
+    assertThat(getIntArrayElements(new int[] {0, 0, 0})).isEqualTo(new int[] {123, 123, 123});
+  }
+
+  @Test
+  public void testGetLongArrayElements() {
+    assertThat(getLongArrayElements(new long[] {0, 0, 0})).isEqualTo(new long[] {123, 123, 123});
+  }
+
+  @Test
+  public void testGetFloatArrayElements() {
+    assertThat(getFloatArrayElements(new float[] {0, 0, 0}))
+        .isEqualTo(new float[] {3.14f, 3.14f, 3.14f});
+  }
+
+  @Test
+  public void testGetDoubleArrayElements() {
+    assertThat(getDoubleArrayElements(new double[] {0, 0, 0}))
+        .isEqualTo(new double[] {3.14, 3.14, 3.14});
+  }
+
+  @Test
+  public void testGetBooleanArrayElements() {
+    assertThat(getBooleanArrayElements(new boolean[] {false, false, false}))
+        .isEqualTo(new boolean[] {true, true, true});
   }
 
   @Test
