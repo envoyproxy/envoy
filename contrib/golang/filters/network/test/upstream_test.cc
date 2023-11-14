@@ -37,9 +37,10 @@ public:
   void initialize() {
     EXPECT_CALL(slot_allocator_, allocateSlot())
         .WillRepeatedly(Invoke(&slot_allocator_, &ThreadLocal::MockInstance::allocateSlotMock));
-    context_.cluster_manager_.initializeClusters({"plainText"}, {});
-    context_.cluster_manager_.initializeThreadLocalClusters({"plainText"});
-    ON_CALL(context_.api_, threadFactory()).WillByDefault(ReturnRef(thread_factory_));
+    context_.server_factory_context_.cluster_manager_.initializeClusters({"plainText"}, {});
+    context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"plainText"});
+    ON_CALL(context_.server_factory_context_.api_, threadFactory())
+        .WillByDefault(ReturnRef(thread_factory_));
     UpstreamConn::initThreadLocalStorage(context_, slot_allocator_);
     dso_ = std::make_shared<Dso::MockNetworkFilterDsoImpl>();
     upConn_ = std::make_shared<UpstreamConn>(addr_, dso_, 0, &dispatcher_);
@@ -64,23 +65,29 @@ TEST_F(UpstreamConnTest, ConnectUpstream) {
           "envoy.network.transport_socket.original_dst_address");
   EXPECT_EQ(dst_addr->address()->asString(), addr_);
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      newConnection(_))
       .WillOnce(
           Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
-                upstream_connection_);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .newConnectionImpl(cb);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .poolReady(upstream_connection_);
             return nullptr;
           }));
   EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamConnectionReady(_, _));
   upConn_->connect();
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      newConnection(_))
       .WillOnce(
           Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-                ConnectionPool::PoolFailureReason::RemoteConnectionFailure, true);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .newConnectionImpl(cb);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, true);
             return nullptr;
           }));
   EXPECT_CALL(*dso_.get(),
