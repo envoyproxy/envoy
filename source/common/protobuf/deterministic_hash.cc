@@ -68,9 +68,8 @@ private:
       return &MapFieldComparer::compareByUInt64;
     case FieldDescriptor::CPPTYPE_BOOL:
       return &MapFieldComparer::compareByBool;
-    case FieldDescriptor::CPPTYPE_STRING: {
+    case FieldDescriptor::CPPTYPE_STRING:
       return &MapFieldComparer::compareByString;
-    }
     case FieldDescriptor::CPPTYPE_DOUBLE:
     case FieldDescriptor::CPPTYPE_FLOAT:
     case FieldDescriptor::CPPTYPE_ENUM:
