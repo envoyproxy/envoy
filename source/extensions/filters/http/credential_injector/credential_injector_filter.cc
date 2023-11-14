@@ -8,8 +8,8 @@ namespace HttpFilters {
 namespace CredentialInjector {
 
 FilterConfig::FilterConfig(CredentialInjectorSharedPtr credential_injector, bool overwrite,
-                           const std::string& stats_prefix, Stats::Scope& scope)
-    : injector_(credential_injector), overwrite_(overwrite),
+                           bool fail_request, const std::string& stats_prefix, Stats::Scope& scope)
+    : injector_(credential_injector), overwrite_(overwrite), fail_request_(fail_request),
       stats_(generateStats(stats_prefix + "credential_injector.", scope)) {}
 
 CredentialInjectorFilter::CredentialInjectorFilter(FilterConfigSharedPtr config)
@@ -29,10 +29,18 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
 
 void CredentialInjectorFilter::onSuccess() {
   decoder_callbacks_->dispatcher().post([this]() {
-    if (config_->injectCredential(*request_headers_)) {
+    bool success = config_->injectCredential(*request_headers_);
+
+    if (success) {
       config_->stats().injected_.inc();
     } else {
       config_->stats().failed_.inc();
+    }
+
+    if (!success && config_.failRequest()) {
+      decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                         nullptr, absl::nullopt, "failed_to_inject_credential");
+      return;
     }
 
     decoder_callbacks_->continueDecoding();
@@ -41,9 +49,13 @@ void CredentialInjectorFilter::onSuccess() {
 
 void CredentialInjectorFilter::onFailure() {
   config_->stats().failed_.inc();
-  // todo: add a config option to allow the user to specify whether to continue or fail the request
-  // decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
-  //                                   absl::nullopt, EMPTY_STRING);
+
+  if (config_.failRequest()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                       nullptr, absl::nullopt, "failed_to_get_credential");
+    return;
+  }
+
   decoder_callbacks_->continueDecoding();
 }
 

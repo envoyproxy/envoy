@@ -7,6 +7,12 @@ namespace Generic {
 
 bool GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
   if (!overwrite && !headers.get(Http::LowerCaseString(header_)).empty()) {
+    ENVOY_LOG(warn, "Credential already exists in the header.");
+    return false;
+  }
+
+  if (secret_reader_->credential().empty()) {
+    ENVOY_LOG(warn, "Credential is empty.");
     return false;
   }
 

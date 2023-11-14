@@ -32,8 +32,9 @@ Http::FilterFactoryCb CredentialInjectorFilterFactory::createFilterFactoryFromPr
   CredentialInjectorSharedPtr credential_injector =
       config_factory->createCredentialInjectorFromProto(*message, context);
 
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      credential_injector, proto_config.overwrite(), stats_prefix, context.scope());
+  FilterConfigSharedPtr config =
+      std::make_shared<FilterConfig>(credential_injector, proto_config.overwrite(),
+                                     proto_config.fail_request(), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<CredentialInjectorFilter>(config));
   };
