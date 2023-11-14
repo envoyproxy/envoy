@@ -13,7 +13,6 @@ Draining occurs at the following times:
 * The server is being :ref:`hot restarted <arch_overview_hot_restart>`.
 * The server begins the graceful drain sequence via the :ref:`drain_listeners?graceful
   <operations_admin_interface_drain>` admin endpoint.
-* The server begins the graceful drain sequence via :ref:`EDS <arch_overview_dynamic_config_eds>`.
 * The server has been manually health check failed via the :ref:`healthcheck/fail
   <operations_admin_interface_healthcheck_fail>` admin endpoint. See the :ref:`health check filter
   <arch_overview_health_checking_filter>` architecture overview for more information.
