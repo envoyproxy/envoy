@@ -12,7 +12,6 @@ import html
 import icalendar
 import json
 import os
-import requests
 import sys
 from datetime import datetime as dt
 from functools import cached_property
@@ -139,9 +138,9 @@ class RepoNotifier(runner.Runner):
 
     @async_property(cache=True)
     async def oncall_string(self):
-        ical = requests.get(CALENDAR)
-        parsed_calendar = icalendar.Calendar.from_ical(ical.text)
-        ical.close()
+        response =  await self.session.get(CALENDAR)
+        content = await response.read()
+        parsed_calendar = icalendar.Calendar.from_ical(content)
 
         now = datetime.datetime.now()
         sunday = now - datetime.timedelta(days=now.weekday() + 1)

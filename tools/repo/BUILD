@@ -16,7 +16,6 @@ envoy_pytool_binary(
         requirement("aio.api.github"),
         requirement("aio.run.runner"),
         requirement("icalendar"),
-        requirement("requests"),
         requirement("slack_sdk"),
     ],
 )

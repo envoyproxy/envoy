@@ -35,7 +35,6 @@ protobuf<4.22.0
 pygithub
 pyreadline
 pyyaml
-requests
 setuptools
 slack_sdk
 sphinx>=7
