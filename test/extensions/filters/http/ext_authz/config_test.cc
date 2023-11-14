@@ -48,8 +48,8 @@ public:
   ExtAuthzFilterTest() : RealThreadsTestHelper(5), stat_names_(symbol_table_) {
     runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-          context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_,
-          Bootstrap::GrpcAsyncClientManagerConfig());
+          context_.server_factory_context_.cluster_manager_, tls(), api().timeSource(), api(),
+          stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
     });
   }
 
@@ -66,8 +66,7 @@ public:
   Http::FilterFactoryCb createFilterFactory(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config) {
     // Delegate call to mock async client manager to real async client manager.
-    ON_CALL(context_, getServerFactoryContext()).WillByDefault(testing::ReturnRef(server_context_));
-    ON_CALL(context_.cluster_manager_.async_client_manager_,
+    ON_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillByDefault(
             Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
@@ -89,7 +88,6 @@ public:
   }
 
 private:
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::SymbolTableImpl symbol_table_;
   Grpc::StatNames stat_names_;
 

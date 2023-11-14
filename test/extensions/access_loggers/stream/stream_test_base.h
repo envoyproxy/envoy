@@ -37,7 +37,8 @@ protected:
 
     auto file = std::make_shared<AccessLog::MockAccessLogFile>();
     Filesystem::FilePathAndType file_info{destination_type, ""};
-    EXPECT_CALL(context_.access_log_manager_, createAccessLog(file_info)).WillOnce(Return(file));
+    EXPECT_CALL(context_.server_factory_context_.access_log_manager_, createAccessLog(file_info))
+        .WillOnce(Return(file));
 
     AccessLog::InstanceSharedPtr logger = AccessLog::AccessLogFactory::fromProto(config, context_);
 
