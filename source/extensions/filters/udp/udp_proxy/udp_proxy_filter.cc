@@ -311,8 +311,10 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
 
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
+    const Formatter::HttpFormatterContext log_context{
+        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpSessionEnd};
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log({}, udp_session_info_);
+      access_log->log(log_context, udp_session_info_);
     }
   }
 }
@@ -741,9 +743,10 @@ void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_down
 TunnelingConnectionPoolImpl::TunnelingConnectionPoolImpl(
     Upstream::ThreadLocalCluster& thread_local_cluster, Upstream::LoadBalancerContext* context,
     const UdpTunnelingConfig& tunnel_config, UpstreamTunnelCallbacks& upstream_callbacks,
-    StreamInfo::StreamInfo& downstream_info)
+    StreamInfo::StreamInfo& downstream_info,
+    const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs)
     : upstream_callbacks_(upstream_callbacks), tunnel_config_(tunnel_config),
-      downstream_info_(downstream_info) {
+      downstream_info_(downstream_info), session_access_logs_(session_access_logs) {
   // TODO(ohadvano): support upstream HTTP/3.
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   conn_pool_data_ =
@@ -789,14 +792,23 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   upstream_->setRequestEncoder(request_encoder, is_ssl);
   upstream_->setTunnelCreationCallbacks(*this);
   downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
+
+  if (tunnel_config_.flushAccessLogOnConnected()) {
+    const Formatter::HttpFormatterContext log_context{
+        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpUpstreamConnected};
+    for (const auto& access_log : session_access_logs_) {
+      access_log->log(log_context, downstream_info_);
+    }
+  }
 }
 
 TunnelingConnectionPoolPtr TunnelingConnectionPoolFactory::createConnPool(
     Upstream::ThreadLocalCluster& thread_local_cluster, Upstream::LoadBalancerContext* context,
     const UdpTunnelingConfig& tunnel_config, UpstreamTunnelCallbacks& upstream_callbacks,
-    StreamInfo::StreamInfo& downstream_info) const {
+    StreamInfo::StreamInfo& downstream_info,
+    const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const {
   auto pool = std::make_unique<TunnelingConnectionPoolImpl>(
-      thread_local_cluster, context, tunnel_config, upstream_callbacks, downstream_info);
+      thread_local_cluster, context, tunnel_config, upstream_callbacks, downstream_info, session_access_logs);
   return (pool->valid() ? std::move(pool) : nullptr);
 }
 
@@ -850,7 +862,8 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
 
   conn_pool_ = conn_pool_factory_->createConnPool(cluster_.cluster_, load_balancer_context_.get(),
                                                   *cluster_.filter_.config_->tunnelingConfig(),
-                                                  *this, udp_session_info_);
+                                                  *this, udp_session_info_,
+                                                  cluster_.filter_.config_->sessionAccessLogs());
 
   if (conn_pool_) {
     connecting_ = true;

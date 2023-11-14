@@ -44,6 +44,8 @@ enum AccessLogType {
   UpstreamPeriodic = 8;
   UpstreamEnd = 9;
   DownstreamTunnelSuccessfullyEstablished = 10;
+  UdpUpstreamConnected = 11;
+  UdpSessionEnd = 12;
 }
 
 message TCPAccessLogEntry {

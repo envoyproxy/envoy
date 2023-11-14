@@ -66,7 +66,7 @@ message UdpProxyConfig {
 
   // Configuration for tunneling UDP over other transports or application layers.
   // Tunneling is currently supported over HTTP/2.
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message UdpTunnelingConfig {
     // Configuration for UDP datagrams buffering.
     message BufferOptions {
@@ -160,6 +160,10 @@ message UdpProxyConfig {
     // while the upstream is not ready will be dropped. In case this field is set but the options
     // are not configured, the default values will be applied as described in the ``BufferOptions``.
     BufferOptions buffer_options = 9;
+
+    // If set to true, access log will be flushed when the UDP proxy has successfully established a
+    // connection with the upstream. If the connection failed, the access log will not be flushed.
+    bool flush_access_log_on_connected = 10;
   }
 
   // The stat prefix used when emitting UDP proxy filter stats.

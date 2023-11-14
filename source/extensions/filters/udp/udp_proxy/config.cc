@@ -31,7 +31,8 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                               ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.buffer_options(),
                                                                 max_buffered_bytes,
                                                                 DefaultMaxBufferedBytes)
-                              : DefaultMaxBufferedBytes) {
+                              : DefaultMaxBufferedBytes),
+      flush_access_log_on_connected_(config.flush_access_log_on_connected()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }

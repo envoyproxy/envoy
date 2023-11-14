@@ -36,6 +36,7 @@ public:
   bool bufferEnabled() const override { return buffer_enabled_; };
   uint32_t maxBufferedDatagrams() const override { return max_buffered_datagrams_; };
   uint64_t maxBufferedBytes() const override { return max_buffered_bytes_; };
+  bool flushAccessLogOnConnected() const override { return flush_access_log_on_connected_; }
 
 private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
@@ -49,6 +50,7 @@ private:
   bool buffer_enabled_;
   uint32_t max_buffered_datagrams_;
   uint64_t max_buffered_bytes_;
+  bool flush_access_log_on_connected_;
 };
 
 class UdpProxyFilterConfigImpl : public UdpProxyFilterConfig,
