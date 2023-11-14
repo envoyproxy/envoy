@@ -29,9 +29,9 @@ Resource DynatraceResourceDetector::detect() {
   resource.schemaUrl_ = "";
   int failureCount = 0;
 
-  for (const auto& file_name : DT_METADATA_FILES) {
+  for (const auto& file_name : DynatraceResourceDetector::dynatraceMetadataFiles()) {
     TRY_NEEDS_AUDIT {
-      std::string content = dynatrace_file_reader_->readEnrichmentFile(std::string(file_name));
+      std::string content = dynatrace_file_reader_->readEnrichmentFile(file_name);
       if (content.empty()) {
         failureCount++;
       } else {

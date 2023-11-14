@@ -14,11 +14,6 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-constexpr std::array<const char*, 3> DT_METADATA_FILES = {
-    "dt_metadata_e617c525669e072eebe3d0f08212e8f2.properties",
-    "/var/lib/dynatrace/enrichment/dt_metadata.properties",
-    "/var/lib/dynatrace/enrichment/dt_host_metadata.properties"};
-
 /**
  * @brief A resource detector that reads the content of the Dynatrace metadata enrichment files.
  * When OneAgent is monitoring your application, it provides access to the enrichment files.
@@ -47,6 +42,15 @@ public:
                             DynatraceMetadataFileReaderPtr dynatrace_file_reader)
       : config_(config), dynatrace_file_reader_(std::move(dynatrace_file_reader)) {}
   Resource detect() override;
+
+  static const std::vector<std::string>& dynatraceMetadataFiles() {
+    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>,
+                           {
+                               "dt_metadata_e617c525669e072eebe3d0f08212e8f2.properties",
+                               "/var/lib/dynatrace/enrichment/dt_metadata.properties",
+                               "/var/lib/dynatrace/enrichment/dt_host_metadata.properties",
+                           });
+  }
 
 private:
   const envoy::extensions::tracers::opentelemetry::resource_detectors::v3::

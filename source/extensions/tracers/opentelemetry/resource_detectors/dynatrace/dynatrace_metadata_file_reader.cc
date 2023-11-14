@@ -22,7 +22,7 @@ bool isIndirectionFile(const std::string& file_name) {
   return absl::StartsWith(file_name, "dt_metadata_");
 }
 
-const std::string readFile(const std::string& file_name) {
+std::string readFile(const std::string& file_name) {
   if (file_name.empty()) {
     return "";
   }
