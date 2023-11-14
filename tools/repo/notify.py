@@ -138,7 +138,7 @@ class RepoNotifier(runner.Runner):
 
     @async_property(cache=True)
     async def oncall_string(self):
-        response =  await self.session.get(CALENDAR)
+        response = await self.session.get(CALENDAR)
         content = await response.read()
         parsed_calendar = icalendar.Calendar.from_ical(content)
 
