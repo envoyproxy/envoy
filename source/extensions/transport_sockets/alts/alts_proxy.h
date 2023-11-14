@@ -26,6 +26,11 @@ constexpr std::size_t MinMinorRpcVersion = 1;
 
 // Manages a bidirectional stream to the ALTS handshaker service. An AltsProxy
 // instance is tied to a single ALTS handshake and must not be reused.
+//
+// WARNING: Several methods block the worker thread performing the ALTS
+// handshake to make a gRPC call to the ALTS handshaker service. This can slow
+// down or halt the proxy if the ALTS handshaker service is unavailable or
+// experiencing high latency.
 class AltsProxy {
 public:
   static absl::StatusOr<std::unique_ptr<AltsProxy>>
@@ -35,15 +40,30 @@ public:
 
   // Sends a StartClientHandshakeReq message to the ALTS handshaker service and
   // returns the response.
+  //
+  // WARNING: Blocks the worker thread performing the ALTS handshake to make a
+  // gRPC call to the ALTS handshaker service. This can slow down or halt the
+  // proxy if the ALTS handshaker service is unavailable or experiencing high
+  // latency.
   absl::StatusOr<grpc::gcp::HandshakerResp> sendStartClientHandshakeReq();
 
   // Sends a StartServerHandshakeReq message to the ALTS handshaker service and
   // returns the response.
+  //
+  // WARNING: Blocks the worker thread performing the ALTS handshake to make a
+  // gRPC call to the ALTS handshaker service. This can slow down or halt the
+  // proxy if the ALTS handshaker service is unavailable or experiencing high
+  // latency.
   absl::StatusOr<grpc::gcp::HandshakerResp>
   sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes);
 
   // Sends a NextHandshakeMessageReq message to the ALTS handshaker service and
   // returns the response.
+  //
+  // WARNING: Blocks the worker thread performing the ALTS handshake to make a
+  // gRPC call to the ALTS handshaker service. This can slow down or halt the
+  // proxy if the ALTS handshaker service is unavailable or experiencing high
+  // latency.
   absl::StatusOr<grpc::gcp::HandshakerResp>
   sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes);
 
