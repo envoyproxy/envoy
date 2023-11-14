@@ -1847,23 +1847,23 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 
   for (const auto& header : route_entry_->internalRedirectPolicy().responseHeadersToPreserve()) {
     auto result = upstream_headers.get(header);
-    auto dresult = downstream_headers.get(header);
+    auto downstream_result = downstream_headers.get(header);
     if (result.empty()) {
       // Clear headers if present, else do nothing:
-      if (dresult.empty()) {
+      if (downstream_result.empty()) {
         continue;
       }
-      for (size_t idx = 0; idx < dresult.size(); idx++) {
-        saved_headers->addCopy(header, dresult[idx]->value().getStringView());
+      for (size_t idx = 0; idx < downstream_result.size(); idx++) {
+        saved_headers->addCopy(header, downstream_result[idx]->value().getStringView());
       }
       downstream_headers.remove(header);
     } else {
       // The header exists in the response, copy into the downstream headers
-      if (dresult.empty()) {
+      if (downstream_result.empty()) {
         headers_to_clear.emplace_back(header);
       } else {
-        for (size_t idx = 0; idx < dresult.size(); idx++) {
-          saved_headers->addCopy(header, dresult[idx]->value().getStringView());
+        for (size_t idx = 0; idx < downstream_result.size(); idx++) {
+          saved_headers->addCopy(header, downstream_result[idx]->value().getStringView());
         }
         downstream_headers.remove(header);
       }
