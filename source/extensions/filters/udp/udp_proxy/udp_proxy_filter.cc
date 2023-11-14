@@ -807,8 +807,9 @@ TunnelingConnectionPoolPtr TunnelingConnectionPoolFactory::createConnPool(
     const UdpTunnelingConfig& tunnel_config, UpstreamTunnelCallbacks& upstream_callbacks,
     StreamInfo::StreamInfo& downstream_info,
     const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const {
-  auto pool = std::make_unique<TunnelingConnectionPoolImpl>(
-      thread_local_cluster, context, tunnel_config, upstream_callbacks, downstream_info, session_access_logs);
+  auto pool = std::make_unique<TunnelingConnectionPoolImpl>(thread_local_cluster, context,
+                                                            tunnel_config, upstream_callbacks,
+                                                            downstream_info, session_access_logs);
   return (pool->valid() ? std::move(pool) : nullptr);
 }
 
@@ -860,10 +861,9 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
     cluster_.cluster_.info()->trafficStats()->upstream_rq_retry_.inc();
   }
 
-  conn_pool_ = conn_pool_factory_->createConnPool(cluster_.cluster_, load_balancer_context_.get(),
-                                                  *cluster_.filter_.config_->tunnelingConfig(),
-                                                  *this, udp_session_info_,
-                                                  cluster_.filter_.config_->sessionAccessLogs());
+  conn_pool_ = conn_pool_factory_->createConnPool(
+      cluster_.cluster_, load_balancer_context_.get(), *cluster_.filter_.config_->tunnelingConfig(),
+      *this, udp_session_info_, cluster_.filter_.config_->sessionAccessLogs());
 
   if (conn_pool_) {
     connecting_ = true;

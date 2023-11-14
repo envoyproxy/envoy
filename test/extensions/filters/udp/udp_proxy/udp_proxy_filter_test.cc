@@ -480,9 +480,10 @@ upstream_socket_config:
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
   EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
-  const std::string session_access_log_regex = "17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 "
-                                               "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} "
-                                               + AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
+  const std::string session_access_log_regex =
+      "17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 "
+      "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
+      AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
 
   EXPECT_TRUE(std::regex_match(output_.back(), std::regex(session_access_log_regex)));
 }
@@ -1900,9 +1901,8 @@ TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   EXPECT_FALSE(valid_pool == nullptr);
 
   EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
-  auto invalid_pool =
-      factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_,
-                             session_access_logs_);
+  auto invalid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_,
+                                             stream_info_, session_access_logs_);
   EXPECT_TRUE(invalid_pool == nullptr);
 }
 

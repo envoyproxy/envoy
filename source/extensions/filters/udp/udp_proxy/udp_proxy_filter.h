@@ -430,12 +430,11 @@ public:
    * @param session_access_logs is the list of access logs for the session.
    * @return may be null if pool creation failed.
    */
-  TunnelingConnectionPoolPtr createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                                            Upstream::LoadBalancerContext* context,
-                                            const UdpTunnelingConfig& tunnel_config,
-                                            UpstreamTunnelCallbacks& upstream_callbacks,
-                                            StreamInfo::StreamInfo& stream_info,
-                                            const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const;
+  TunnelingConnectionPoolPtr
+  createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                 Upstream::LoadBalancerContext* context, const UdpTunnelingConfig& tunnel_config,
+                 UpstreamTunnelCallbacks& upstream_callbacks, StreamInfo::StreamInfo& stream_info,
+                 const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const;
 };
 
 using TunnelingConnectionPoolFactoryPtr = std::unique_ptr<TunnelingConnectionPoolFactory>;

@@ -771,7 +771,9 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogOnConnected) {
 
   const std::string datagram = "hello";
   establishConnection(datagram);
-  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpUpstreamConnected)));
+  EXPECT_THAT(
+      waitForAccessLog(access_log_filename),
+      testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpUpstreamConnected)));
 
   // Wait for buffered datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
