@@ -47,14 +47,14 @@ TEST_F(CacheFilterFactoryTest, Disabled) {
 
 TEST_F(CacheFilterFactoryTest, NoTypedConfig) {
   EXPECT_THROW(
-      EXPECT_TRUE(factory_.createFilterFactoryFromProto(config_, "stats", context_).status().ok()),
+      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
       EnvoyException);
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
   config_.mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::cache::v3::CacheConfig());
-  EXPECT_THROW(EXPECT_TRUE(factory_.createFilterFactoryFromProto(config_, "stats", context_).ok()),
+  EXPECT_THROW(factory_.createFilterFactoryFromProto(config_, "stats", context_).IgnoreError(),
                EnvoyException);
 }
 

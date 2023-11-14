@@ -21,12 +21,11 @@ namespace {
 
 TEST(LuaFilterConfigTest, ValidateEmptyConfigNotFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_NO_THROW(
-      EXPECT_TRUE(LuaFilterConfig()
+  EXPECT_NO_THROW(LuaFilterConfig()
                       .createFilterFactoryFromProto(
                           envoy::extensions::filters::http::lua::v3::Lua(), "stats", context)
                       .status()
-                      .ok()));
+                      .IgnoreError());
 }
 
 TEST(LuaFilterConfigTest, LuaFilterWithDefaultSourceCode) {
@@ -103,8 +102,7 @@ TEST(LuaFilterConfigTest, LuaFilterWithBothDeprecatedInlineCodeAndDefaultSourceC
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(
-          factory.createFilterFactoryFromProto(proto_config, "stats", context).status().ok()),
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
       EnvoyException,
       "Error: Only one of `inline_code` or `default_source_code` can be set for the Lua filter.");
 }

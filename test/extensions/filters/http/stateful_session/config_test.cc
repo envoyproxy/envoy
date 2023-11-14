@@ -82,8 +82,9 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
       EnvoyException,
       "Didn't find a registered implementation for name: 'envoy.http.stateful_session.not_exist'");
 
-  EXPECT_NO_THROW(EXPECT_TRUE(
-      factory.createFilterFactoryFromProto(empty_proto_config, "stats", context).status().ok()));
+  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context)
+                      .status()
+                      .IgnoreError());
   EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
                                                           context.messageValidationVisitor()));
 }

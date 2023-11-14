@@ -248,9 +248,9 @@ xds_matcher:
 
   MatchDelegateConfig match_delegate_config;
   EXPECT_THROW_WITH_REGEX(
-      EXPECT_FALSE(match_delegate_config.createFilterFactoryFromProto(config, "", factory_context)
-                       .status()
-                       .ok()),
+      match_delegate_config.createFilterFactoryFromProto(config, "", factory_context)
+          .status()
+          .IgnoreError(),
       EnvoyException,
       "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "
       "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput not permitted "

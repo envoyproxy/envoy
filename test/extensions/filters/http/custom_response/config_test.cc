@@ -41,7 +41,7 @@ TEST(CustomResponseFilterConfigTest, InvalidURI) {
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, "stats", context).ok()),
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).IgnoreError(),
       EnvoyException,
       "Invalid uri specified for redirection for custom response: "
       "%#?*s://foo.example/gateway_error");
@@ -117,7 +117,7 @@ TEST(CustomResponseFilterConfigTest, RegexRewrite) {
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, "stats", context).ok()),
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).IgnoreError(),
       EnvoyException, "regex_rewrite is not supported for Custom Response");
 }
 
@@ -139,7 +139,7 @@ TEST(CustomResponseFilterConfigTest, HashFragmentUri) {
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, "stats", context).ok()),
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).IgnoreError(),
       EnvoyException,
       "Invalid uri specified for redirection for custom response: "
       "example.foo/abc/cde#ab");
@@ -164,7 +164,7 @@ TEST(CustomResponseFilterConfigTest, HashFragmentPathRedirect) {
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, "stats", context).ok()),
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).IgnoreError(),
       EnvoyException,
       "#fragment is not supported for custom response. Specified "
       "path_redirect is /abc/cde#ab");

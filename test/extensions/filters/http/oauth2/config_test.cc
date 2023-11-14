@@ -69,8 +69,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_FALSE(
-          factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().ok()),
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
       EnvoyException, exception_message);
 }
 
@@ -197,8 +196,7 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(
-      EXPECT_FALSE(
-          factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().ok()),
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
       EnvoyException, "value does not match regex pattern");
 }
 

@@ -71,11 +71,10 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(
-      EXPECT_FALSE(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
-                       .status()
-                       .ok()),
-      EnvoyException);
+  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
+                   .status()
+                   .IgnoreError(),
+               EnvoyException);
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) {
@@ -110,11 +109,11 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
 
-  EXPECT_THROW(EXPECT_FALSE(healthCheckFilterConfig
-                                .createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
-                                .status()
-                                .ok()),
-               EnvoyException);
+  EXPECT_THROW(
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
+          .status()
+          .IgnoreError(),
+      EnvoyException);
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {

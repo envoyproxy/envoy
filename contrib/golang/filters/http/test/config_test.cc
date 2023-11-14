@@ -28,12 +28,11 @@ std::string genSoPath(std::string name) {
 TEST(GolangFilterConfigTest, InvalidateEmptyConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
-      ASSERT_TRUE(
-          GolangFilterConfig()
-              .createFilterFactoryFromProto(
-                  envoy::extensions::filters::http::golang::v3alpha::Config(), "stats", context)
-              .status()
-              .ok()),
+      GolangFilterConfig()
+          .createFilterFactoryFromProto(envoy::extensions::filters::http::golang::v3alpha::Config(),
+                                        "stats", context)
+          .status()
+          .IgnoreError(),
       Envoy::ProtoValidationException,
       "ConfigValidationError.LibraryId: value length must be at least 1 characters");
 }

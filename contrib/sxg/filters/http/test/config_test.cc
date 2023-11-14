@@ -78,8 +78,7 @@ validity_url: "/.sxg/validity.msg"
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   EXPECT_THROW_WITH_MESSAGE(
-      ASSERT_TRUE(
-          factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().ok()),
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
       EnvoyException, exception_message);
 }
 
