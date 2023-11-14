@@ -110,7 +110,7 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     break; // throw the error below.
   }
   if (!route) {
-    throw EnvoyException("Invalid route config");
+    throwEnvoyExceptionOrPanic("Invalid route config");
   }
 
   if (validation_clusters.has_value()) {
@@ -119,7 +119,7 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
       if (!shadow_policy->cluster().empty()) {
         ASSERT(shadow_policy->clusterHeader().get().empty());
         if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
         }
       }
@@ -151,9 +151,9 @@ public:
 const envoy::config::route::v3::WeightedCluster::ClusterWeight& validateWeightedClusterSpecifier(
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
   if (!cluster.name().empty() && !cluster.cluster_header().empty()) {
-    throw EnvoyException("Only one of name or cluster_header can be specified");
+    throwEnvoyExceptionOrPanic("Only one of name or cluster_header can be specified");
   } else if (cluster.name().empty() && cluster.cluster_header().empty()) {
-    throw EnvoyException("At least one of name or cluster_header need to be specified");
+    throwEnvoyExceptionOrPanic("At least one of name or cluster_header need to be specified");
   }
   return cluster;
 }
@@ -195,7 +195,7 @@ getClusterSpecifierPluginByTheProto(const envoy::config::route::v3::ClusterSpeci
     if (plugin.is_optional()) {
       return std::make_shared<NullClusterSpecifierPlugin>();
     }
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
                     plugin.extension().name(),
                     Envoy::Config::Utility::getFactoryType(plugin.extension().typed_config())));
@@ -312,7 +312,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
       }
 
       if ((*max_interval_).count() < (*base_interval_).count()) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             "retry_policy.max_interval must greater than or equal to the base_interval");
       }
     }
@@ -400,13 +400,13 @@ absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectRespons
 void validateMirrorClusterSpecifier(
     const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
   if (!config.cluster().empty() && !config.cluster_header().empty()) {
-    throw EnvoyException(fmt::format("Only one of cluster '{}' or cluster_header '{}' "
-                                     "in request mirror policy can be specified",
-                                     config.cluster(), config.cluster_header()));
+    throwEnvoyExceptionOrPanic(fmt::format("Only one of cluster '{}' or cluster_header '{}' "
+                                           "in request mirror policy can be specified",
+                                           config.cluster(), config.cluster_header()));
   } else if (config.cluster().empty() && config.cluster_header().empty()) {
     // For shadow policies with `cluster_header_`, we only verify that this field is not
     // empty because the cluster name is not set yet at config time.
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         "Exactly one of cluster or cluster_header in request mirror policy need to be specified");
   }
 }
@@ -582,7 +582,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       weighted_clusters.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters.back()->clusterWeight();
       if (total_weight > std::numeric_limits<uint32_t>::max()) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("The sum of weights of all weighted clusters of route {} exceeds {}",
                         route_name_, std::numeric_limits<uint32_t>::max()));
       }
@@ -590,7 +590,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
     // Reject the config if the total_weight of all clusters is 0.
     if (total_weight == 0) {
-      throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
+      throwEnvoyExceptionOrPanic("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
     weighted_clusters_config_ =
@@ -644,7 +644,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                 Envoy::Http::LowerCaseString(upgrade_config.upgrade_type()).get(), enabled))
             .second;
     if (!success) {
-      throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
+      throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
     if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
                                Http::Headers::get().MethodValues.Connect) ||
@@ -653,8 +653,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                 Http::Headers::get().UpgradeValues.ConnectUdp))) {
       connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
     } else if (upgrade_config.has_connect_config()) {
-      throw EnvoyException(absl::StrCat("Non-CONNECT upgrade type ", upgrade_config.upgrade_type(),
-                                        " has ConnectConfig"));
+      throwEnvoyExceptionOrPanic(absl::StrCat("Non-CONNECT upgrade type ",
+                                              upgrade_config.upgrade_type(), " has ConnectConfig"));
     }
   }
 
@@ -672,12 +672,12 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (num_rewrite_polices > 1) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
   }
 
   if (!prefix_rewrite_.empty() && path_matcher_ != nullptr) {
-    throw EnvoyException("Cannot use prefix_rewrite with matcher extension");
+    throwEnvoyExceptionOrPanic("Cannot use prefix_rewrite with matcher extension");
   }
 
   if (route.route().has_regex_rewrite()) {
@@ -689,7 +689,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   if (path_rewriter_ != nullptr) {
     absl::Status compatible_status = path_rewriter_->isCompatiblePathMatcher(path_matcher_);
     if (!compatible_status.ok()) {
-      throw EnvoyException(std::string(compatible_status.message()));
+      throwEnvoyExceptionOrPanic(std::string(compatible_status.message()));
     }
   }
 
@@ -863,11 +863,8 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers,
-                                   stream_info.getRequestHeaders() == nullptr
-                                       ? *Http::StaticEmptyHeaders::get().request_headers
-                                       : *stream_info.getRequestHeaders(),
-                                   headers, stream_info);
+    header_parser->evaluateHeaders(headers, {stream_info.getRequestHeaders(), &headers},
+                                   stream_info);
   }
 }
 
@@ -1162,7 +1159,7 @@ RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
   absl::StatusOr<PathRewriterSharedPtr> rewriter = factory.createPathRewriter(*config);
 
   if (!rewriter.ok()) {
-    throw EnvoyException(std::string(rewriter.status().message()));
+    throwEnvoyExceptionOrPanic(std::string(rewriter.status().message()));
   }
 
   return rewriter.value();
@@ -1183,7 +1180,7 @@ RouteEntryImplBase::buildPathMatcher(envoy::config::route::v3::Route route,
   absl::StatusOr<PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
 
   if (!matcher.ok()) {
-    throw EnvoyException(std::string(matcher.status().message()));
+    throwEnvoyExceptionOrPanic(std::string(matcher.status().message()));
   }
 
   return matcher.value();
@@ -1345,14 +1342,14 @@ void RouteEntryImplBase::validateClusters(
   // route tables. This would enable the all CDS with static route table case.
   if (!cluster_name_.empty()) {
     if (!cluster_info_maps.hasCluster(cluster_name_)) {
-      throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
+      throwEnvoyExceptionOrPanic(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (weighted_clusters_config_ != nullptr) {
     for (const WeightedClusterEntrySharedPtr& cluster :
          weighted_clusters_config_->weighted_clusters_) {
       if (!cluster->clusterName().empty()) {
         if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
         }
       }
@@ -1360,13 +1357,13 @@ void RouteEntryImplBase::validateClusters(
       // not empty because the cluster name is not set yet at config time (hence the validation
       // here).
       else if (cluster->clusterHeaderName().get().empty()) {
-        throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
+        throwEnvoyExceptionOrPanic("route: unknown weighted cluster with no cluster_header field");
       }
     }
   }
 }
 
-bool RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
+absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
   absl::optional<bool> result = per_filter_configs_.disabled(config_name);
   if (result.has_value()) {
     return result.value();
@@ -1702,7 +1699,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 
   if (virtual_host.has_matcher() && !virtual_host.routes().empty()) {
-    throw EnvoyException("cannot set both matcher and routes on virtual host");
+    throwEnvoyExceptionOrPanic("cannot set both matcher and routes on virtual host");
   }
 
   if (!virtual_host.virtual_clusters().empty()) {
@@ -1734,7 +1731,7 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
       VirtualClusterBase(virtual_cluster.name(), stat_name_storage_.statName(),
                          scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
   if (virtual_cluster.headers().empty()) {
-    throw EnvoyException("virtual clusters must define 'headers'");
+    throwEnvoyExceptionOrPanic("virtual clusters must define 'headers'");
   }
 
   ASSERT(!virtual_cluster.headers().empty());
@@ -1743,7 +1740,7 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
 
-bool CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
+absl::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
   absl::optional<bool> result = per_filter_configs_.disabled(config_name);
   if (result.has_value()) {
     return result.value();
@@ -1814,8 +1811,9 @@ VirtualHostImpl::VirtualHostImpl(
 
     if (!validation_visitor.errors().empty()) {
       // TODO(snowp): Output all violations.
-      throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
-                                       validation_visitor.errors()[0]));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("requirement violation while creating route match tree: {}",
+                      validation_visitor.errors()[0]));
     }
   } else {
     for (const auto& route : virtual_host.routes()) {
@@ -1962,8 +1960,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
-          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted in route {}",
-                                           route_config.name()));
+          throwEnvoyExceptionOrPanic(fmt::format(
+              "Only a single wildcard domain is permitted in route {}", route_config.name()));
         }
         default_virtual_host_ = virtual_host;
       } else if (!domain.empty() && '*' == domain[0]) {
@@ -1978,9 +1976,10 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         duplicate_found = !virtual_hosts_.emplace(domain, virtual_host).second;
       }
       if (duplicate_found) {
-        throw EnvoyException(fmt::format("Only unique values for domains are permitted. Duplicate "
-                                         "entry of domain {} in route {}",
-                                         domain, route_config.name()));
+        throwEnvoyExceptionOrPanic(
+            fmt::format("Only unique values for domains are permitted. Duplicate "
+                        "entry of domain {} in route {}",
+                        domain, route_config.name()));
       }
     }
   }
@@ -2115,7 +2114,7 @@ ClusterSpecifierPluginSharedPtr
 CommonConfigImpl::clusterSpecifierPlugin(absl::string_view provider) const {
   auto iter = cluster_specifier_plugins_.find(provider);
   if (iter == cluster_specifier_plugins_.end() || iter->second == nullptr) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Unknown cluster specifier plugin name: {} is used in the route", provider));
   }
   return iter->second;
@@ -2172,7 +2171,7 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
                 name, Envoy::Config::Utility::getFactoryType(typed_config));
       return nullptr;
     } else {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'", name,
                       Envoy::Config::Utility::getFactoryType(typed_config)));
     }
@@ -2189,7 +2188,7 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
           "optional, so ignore it.",
           name);
     } else {
-      throw EnvoyException(fmt::format(
+      throwEnvoyExceptionOrPanic(fmt::format(
           "The filter {} doesn't support virtual host or route specific configurations", name));
     }
   }
@@ -2240,11 +2239,11 @@ PerFilterConfigs::PerFilterConfigs(
 
       // If the field `config` is not configured, we treat it as configuration error.
       if (!filter_config.has_config()) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
       }
 
-      // If the field `config` is configured but is empty, we treat the filter as disabled
+      // If the field `config` is configured but is empty, we treat the filter is enabled
       // explicitly.
       if (filter_config.config().type_url().empty()) {
         configs_.emplace(name, FilterConfig{nullptr, false});

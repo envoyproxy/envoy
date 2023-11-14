@@ -140,6 +140,8 @@ void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
+  request_headers_ = &headers;
+
   if (Http::Headers::get().MethodValues.Head == headers.getMethodValue()) {
     is_head_request_ = true;
   }
@@ -182,6 +184,8 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
+  request_trailers_ = &trailers;
+
   ASSERT(dispatcher().isThreadSafe());
   // See explanation in sendData.
   if (local_closed_) {

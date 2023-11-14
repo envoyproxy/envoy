@@ -21,7 +21,7 @@ cc_library(
     name = "server_envoy_jni_lib",
     testonly = True,
     srcs = [
-        "test_jni_interface.cc",
+        "test_jni_impl.cc",
     ],
     linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
@@ -82,4 +82,44 @@ envoy_mobile_so_to_jni_lib(
     name = "libenvoy_jni_with_test_and_listener_extensions_jnilib",
     testonly = True,
     native_dep = "libenvoy_jni_with_test_and_listener_extensions.so",
+)
+
+cc_library(
+    name = "jni_helper_test_lib",
+    srcs = [
+        "jni_helper_test.cc",
+    ],
+    deps = [
+        "//library/common/jni:jni_helper_lib",
+    ],
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_helper_test.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_helper_test_lib",
+    ],
+)
+
+cc_library(
+    name = "jni_utility_test_lib",
+    srcs = [
+        "jni_utility_test.cc",
+    ],
+    deps = [
+        "//library/common/jni:jni_utility_lib",
+    ],
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_utility_test.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_utility_test_lib",
+    ],
 )

@@ -18,7 +18,7 @@ The filter provides complete control over the position and order of the header m
 the route cache is cleared by a filter executing after the header mutation filter.
 
 
-In addition, this filter can be used as upstream filter and mutate the request headers after load balancing and host selection.
+In addition, this filter can be used as upstream HTTP filter and mutate the request headers after load balancing and host selection.
 
 
 Please note that as an encoder filter, this filter follows the standard rules of when it will execute in situations such as local replies - response

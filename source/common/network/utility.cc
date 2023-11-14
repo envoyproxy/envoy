@@ -57,7 +57,7 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   } else if (urlIsUnixScheme(url)) {
     return std::make_shared<Address::PipeInstance>(url.substr(UNIX_SCHEME.size()));
   } else {
-    throw EnvoyException(absl::StrCat("unknown protocol scheme: ", url));
+    throwEnvoyExceptionOrPanic(absl::StrCat("unknown protocol scheme: ", url));
   }
 }
 
@@ -223,7 +223,7 @@ Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Addres
 }
 
 void Utility::throwWithMalformedIp(absl::string_view ip_address) {
-  throw EnvoyException(absl::StrCat("malformed IP address: ", ip_address));
+  throwEnvoyExceptionOrPanic(absl::StrCat("malformed IP address: ", ip_address));
 }
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between
@@ -443,7 +443,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     }
 
     if (s.empty() || (min > 65535) || (max > 65535) || ss.fail() || !ss.eof()) {
-      throw EnvoyException(fmt::format("invalid port number or range '{}'", s_string));
+      throwEnvoyExceptionOrPanic(fmt::format("invalid port number or range '{}'", s_string));
     }
 
     list.emplace_back(PortRange(min, max));

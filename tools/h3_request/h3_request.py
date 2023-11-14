@@ -1,9 +1,8 @@
 import argparse
 import asyncio
-import os
 import sys
 from functools import cached_property
-from typing import AsyncIterator, cast
+from typing import cast
 from urllib.parse import urlparse
 
 import aioquic
@@ -44,7 +43,7 @@ class Http3Client(QuicConnectionProtocol):
             return
         for header, value in event.headers:
             print(f"{header.decode('utf-8')}: {value.decode('utf-8')}\n", end="")
-        print("")  # One blank newline after headers.
+        print("", flush=True)  # One blank newline after headers.
 
     def http_event_received(self, event: H3Event) -> None:
         stream_id = event.stream_id
@@ -53,7 +52,7 @@ class Http3Client(QuicConnectionProtocol):
         if isinstance(event, HeadersReceived):
             self.headers_received(event)
         elif isinstance(event, DataReceived):
-            print(event.data.decode("utf-8"), end="")
+            print(event.data.decode("utf-8"), end="", flush=True)
         else:
             raise H3Error(f"unexpected quic event type {event}")
         if event.stream_ended:

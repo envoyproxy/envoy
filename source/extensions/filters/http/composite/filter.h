@@ -75,13 +75,10 @@ public:
   void onMatchCallback(const Matcher::Action& action) override;
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type) override {
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& info) override {
     for (const auto& log : access_loggers_) {
-      log->log(request_headers, response_headers, response_trailers, stream_info, access_log_type);
+      log->log(log_context, info);
     }
   }
 

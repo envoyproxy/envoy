@@ -17,8 +17,7 @@ public:
   HeaderMutations(const ProtoHeaderMutatons& header_mutations);
 
   // Http::HeaderEvaluator
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
-                       const Http::ResponseHeaderMap& response_headers,
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo& stream_info) const override;
 
 private:

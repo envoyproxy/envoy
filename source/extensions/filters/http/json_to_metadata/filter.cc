@@ -85,31 +85,40 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
     Stats::Scope& scope)
-    : stats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata."))},
-      request_rules_(generateRequestRules(proto_config)),
-      request_allow_content_types_(generateRequestAllowContentTypes(proto_config)),
-      request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()) {}
+    : rqstats_{ALL_JSON_TO_METADATA_FILTER_STATS(
+          POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
+      respstats_{
+          ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.resp"))},
+      request_rules_(generateRules(proto_config.request_rules().rules())),
+      response_rules_(generateRules(proto_config.response_rules().rules())),
+      request_allow_content_types_(
+          generateAllowContentTypes(proto_config.request_rules().allow_content_types())),
+      response_allow_content_types_(
+          generateAllowContentTypes(proto_config.response_rules().allow_content_types())),
+      request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()),
+      response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()) {
+  if (request_rules_.empty() && response_rules_.empty()) {
+    throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
+                         "either request or response rules");
+  }
+}
 
-Rules FilterConfig::generateRequestRules(
-    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
-    const {
+Rules FilterConfig::generateRules(const ProtobufRepeatedRule& proto_rules) const {
   Rules rules;
-  for (const auto& rule : proto_config.request_rules().rules()) {
+  for (const auto& rule : proto_rules) {
     rules.emplace_back(rule);
   }
   return rules;
 }
 
-absl::flat_hash_set<std::string> FilterConfig::generateRequestAllowContentTypes(
-    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
-    const {
-  if (proto_config.request_rules().allow_content_types().empty()) {
+absl::flat_hash_set<std::string> FilterConfig::generateAllowContentTypes(
+    const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types) const {
+  if (proto_allow_content_types.empty()) {
     return {Http::Headers::get().ContentTypeValues.Json};
   }
 
   absl::flat_hash_set<std::string> allow_content_types;
-  for (const auto& request_allowed_content_type :
-       proto_config.request_rules().allow_content_types()) {
+  for (const auto& request_allowed_content_type : proto_allow_content_types) {
     allow_content_types.insert(request_allowed_content_type);
   }
   return allow_content_types;
@@ -123,26 +132,35 @@ bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) con
   return request_allow_content_types_.contains(content_type);
 }
 
+bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) const {
+  if (content_type.empty()) {
+    return response_allow_empty_content_type_;
+  }
+
+  return response_allow_content_types_.contains(content_type);
+}
+
 void Filter::applyKeyValue(const std::string& value, const KeyValuePair& keyval,
-                           StructMap& struct_map) {
+                           StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
   ASSERT(!value.empty());
 
   ProtobufWkt::Value val;
   val.set_string_value(value);
-  applyKeyValue(std::move(val), keyval, struct_map);
+  applyKeyValue(std::move(val), keyval, struct_map, filter_callback);
 }
 
-void Filter::applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map) {
+void Filter::applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map,
+                           Http::StreamFilterCallbacks& filter_callback) {
   ProtobufWkt::Value val;
   val.set_number_value(value);
-  applyKeyValue(std::move(val), keyval, struct_map);
+  applyKeyValue(std::move(val), keyval, struct_map, filter_callback);
 }
 
 void Filter::applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval,
-                           StructMap& struct_map) {
+                           StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
   const auto& nspace = decideNamespace(keyval.metadata_namespace());
   addMetadata(nspace, keyval.key(), std::move(value), keyval.preserve_existing_metadata_value(),
-              struct_map);
+              struct_map, filter_callback);
 }
 
 const std::string& Filter::decideNamespace(const std::string& nspace) const {
@@ -152,11 +170,10 @@ const std::string& Filter::decideNamespace(const std::string& nspace) const {
 
 bool Filter::addMetadata(const std::string& meta_namespace, const std::string& key,
                          ProtobufWkt::Value val, const bool preserve_existing_metadata_value,
-                         StructMap& struct_map) {
+                         StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
 
   if (preserve_existing_metadata_value) {
-    // TODO(kuochunghsu): support encoding
-    auto& filter_metadata = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    auto& filter_metadata = filter_callback.streamInfo().dynamicMetadata().filter_metadata();
     const auto entry_it = filter_metadata.find(meta_namespace);
 
     if (entry_it != filter_metadata.end()) {
@@ -177,7 +194,8 @@ bool Filter::addMetadata(const std::string& meta_namespace, const std::string& k
 }
 
 void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
-                                     const StructMap& struct_map, bool& processing_finished_flag) {
+                                     bool should_clear_route_cache, const StructMap& struct_map,
+                                     bool& processing_finished_flag) {
   ASSERT(!processing_finished_flag);
   processing_finished_flag = true;
   if (!struct_map.empty()) {
@@ -185,46 +203,59 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
       filter_callback.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
 
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+    if (should_clear_route_cache) {
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+    }
   }
 }
 
-void Filter::handleAllOnMissing(const Rules& rules, bool& processing_finished_flag) {
+void Filter::handleAllOnMissing(const Rules& rules, bool should_clear_route_cache,
+                                Http::StreamFilterCallbacks& filter_callback,
+                                bool& processing_finished_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_missing()) {
-      applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map);
+      applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map,
+                    filter_callback);
     }
   }
 
-  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, processing_finished_flag);
+  finalizeDynamicMetadata(filter_callback, should_clear_route_cache, struct_map,
+                          processing_finished_flag);
 }
 
-void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map) {
+void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map,
+                             Http::StreamFilterCallbacks& filter_callback) {
   if (rule.rule_.has_on_missing()) {
-    applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map);
+    applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map,
+                  filter_callback);
   }
 }
 
-void Filter::handleAllOnError(const Rules& rules, bool& processing_finished_flag) {
+void Filter::handleAllOnError(const Rules& rules, bool should_clear_route_cache,
+                              Http::StreamFilterCallbacks& filter_callback,
+                              bool& processing_finished_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_error()) {
-      applyKeyValue(rule.rule_.on_error().value(), rule.rule_.on_error(), struct_map);
+      applyKeyValue(rule.rule_.on_error().value(), rule.rule_.on_error(), struct_map,
+                    filter_callback);
     }
   }
-  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, processing_finished_flag);
+  finalizeDynamicMetadata(filter_callback, should_clear_route_cache, struct_map,
+                          processing_finished_flag);
 }
 
 absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const std::string& key,
-                                     const Rule& rule, StructMap& struct_map) {
+                                     const Rule& rule, StructMap& struct_map,
+                                     Http::StreamFilterCallbacks& filter_callback) {
   if (!rule.rule_.has_on_present()) {
     return absl::OkStatus();
   }
 
   auto& on_present_keyval = rule.rule_.on_present();
   if (on_present_keyval.has_value()) {
-    applyKeyValue(on_present_keyval.value(), on_present_keyval, struct_map);
+    applyKeyValue(on_present_keyval.value(), on_present_keyval, struct_map, filter_callback);
     return absl::OkStatus();
   }
 
@@ -239,7 +270,7 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
     if (auto value_result =
             absl::visit(JsonValueToProtobufValueConverter(), std::move(result.value()));
         value_result.ok()) {
-      applyKeyValue(value_result.value(), on_present_keyval, struct_map);
+      applyKeyValue(value_result.value(), on_present_keyval, struct_map, filter_callback);
     } else {
       return value_result.status();
     }
@@ -247,7 +278,7 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
   case envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::NUMBER:
     if (auto double_result = absl::visit(JsonValueToDoubleConverter(), std::move(result.value()));
         double_result.ok()) {
-      applyKeyValue(double_result.value(), on_present_keyval, struct_map);
+      applyKeyValue(double_result.value(), on_present_keyval, struct_map, filter_callback);
     } else {
       return double_result.status();
     }
@@ -265,19 +296,20 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
       return absl::OkStatus();
     }
 
-    applyKeyValue(std::move(str), on_present_keyval, struct_map);
+    applyKeyValue(std::move(str), on_present_keyval, struct_map, filter_callback);
     break;
   }
   return absl::OkStatus();
 }
 
 void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
-                         bool& processing_finished_flag, Stats::Counter& success,
-                         Stats::Counter& no_body, Stats::Counter& non_json) {
+                         bool should_clear_route_cache, JsonToMetadataStats& stats,
+                         Http::StreamFilterCallbacks& filter_callback,
+                         bool& processing_finished_flag) {
   // In case we have trailers but no body.
   if (!body || body->length() == 0) {
-    handleAllOnMissing(rules, request_processing_finished_);
-    no_body.inc();
+    handleAllOnMissing(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
+    stats.no_body_.inc();
     return;
   }
 
@@ -285,8 +317,8 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
       Json::Factory::loadFromStringNoThrow(body->toString());
   if (!result.ok()) {
     ENVOY_LOG(debug, result.status().message());
-    non_json.inc();
-    handleAllOnError(rules, processing_finished_flag);
+    stats.invalid_json_body_.inc();
+    handleAllOnError(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
     return;
   }
 
@@ -298,9 +330,9 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     ENVOY_LOG(
         debug,
         "Apply on_missing for all rules on a valid application/json body but not a json object.");
-    handleAllOnMissing(rules, request_processing_finished_);
+    handleAllOnMissing(rules, should_clear_route_cache, filter_callback, processing_finished_flag);
     // This JSON body is valid and successfully parsed.
-    success.inc();
+    stats.success_.inc();
     return;
   }
 
@@ -313,7 +345,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
       absl::StatusOr<Json::ObjectSharedPtr> next_node_result = node->getObjectNoThrow(keys[i]);
       if (!next_node_result.ok()) {
         ENVOY_LOG(warn, result.status().message());
-        handleOnMissing(rule, struct_map);
+        handleOnMissing(rule, struct_map, filter_callback);
         on_missing = true;
         break;
       }
@@ -322,41 +354,71 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     if (on_missing) {
       continue;
     }
-    absl::Status result = handleOnPresent(std::move(node), keys.back(), rule, struct_map);
+    absl::Status result =
+        handleOnPresent(std::move(node), keys.back(), rule, struct_map, filter_callback);
     if (!result.ok()) {
       ENVOY_LOG(warn, fmt::format("{} key: {}", result.message(), keys.back()));
-      handleOnMissing(rule, struct_map);
+      handleOnMissing(rule, struct_map, filter_callback);
     }
   }
-  success.inc();
+  stats.success_.inc();
 
-  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, processing_finished_flag);
+  finalizeDynamicMetadata(filter_callback, should_clear_route_cache, struct_map,
+                          processing_finished_flag);
 }
 
 void Filter::processRequestBody() {
-  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(),
-              request_processing_finished_, config_->stats().rq_success_,
-              config_->stats().rq_no_body_, config_->stats().rq_invalid_json_body_);
+  processBody(decoder_callbacks_->decodingBuffer(), config_->requestRules(), true,
+              config_->rqstats(), *decoder_callbacks_, request_processing_finished_);
+}
+
+void Filter::processResponseBody() {
+  processBody(encoder_callbacks_->encodingBuffer(), config_->responseRules(), false,
+              config_->respstats(), *encoder_callbacks_, response_processing_finished_);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  ASSERT(config_->doRequest());
+  if (!config_->doRequest()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
   if (!config_->requestContentTypeAllowed(headers.getContentTypeValue())) {
     request_processing_finished_ = true;
-    config_->stats().rq_mismatched_content_type_.inc();
+    config_->rqstats().mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->requestRules(), request_processing_finished_);
-    config_->stats().rq_no_body_.inc();
+    handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_,
+                       request_processing_finished_);
+    config_->rqstats().no_body_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+  return Http::FilterHeadersStatus::StopIteration;
+}
+
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
+  if (!config_->doResponse()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  if (!config_->responseContentTypeAllowed(headers.getContentTypeValue())) {
+    response_processing_finished_ = true;
+    config_->respstats().mismatched_content_type_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (end_stream) {
+    handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_,
+                       response_processing_finished_);
+    config_->respstats().no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
   return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(config_->doRequest());
+  if (!config_->doRequest()) {
+    return Http::FilterDataStatus::Continue;
+  }
   if (request_processing_finished_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -366,8 +428,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
     if (!decoder_callbacks_->decodingBuffer() ||
         decoder_callbacks_->decodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->requestRules(), request_processing_finished_);
-      config_->stats().rq_no_body_.inc();
+      handleAllOnMissing(config_->requestRules(), true, *decoder_callbacks_,
+                         request_processing_finished_);
+      config_->rqstats().no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
     processRequestBody();
@@ -377,10 +440,47 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
+Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
+  if (!config_->doResponse()) {
+    return Http::FilterDataStatus::Continue;
+  }
+  if (response_processing_finished_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  if (end_stream) {
+    encoder_callbacks_->addEncodedData(data, true);
+
+    if (!encoder_callbacks_->encodingBuffer() ||
+        encoder_callbacks_->encodingBuffer()->length() == 0) {
+      handleAllOnMissing(config_->responseRules(), false, *encoder_callbacks_,
+                         response_processing_finished_);
+      config_->respstats().no_body_.inc();
+      return Http::FilterDataStatus::Continue;
+    }
+    processResponseBody();
+    return Http::FilterDataStatus::Continue;
+  }
+
+  return Http::FilterDataStatus::StopIterationAndBuffer;
+}
+
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
-  ASSERT(config_->doRequest());
+  if (!config_->doRequest()) {
+    return Http::FilterTrailersStatus::Continue;
+  }
   if (!request_processing_finished_) {
     processRequestBody();
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
+  if (!config_->doResponse()) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  if (!response_processing_finished_) {
+    processResponseBody();
   }
   return Http::FilterTrailersStatus::Continue;
 }

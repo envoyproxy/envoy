@@ -38,8 +38,7 @@ public:
   // This executes the access logger with the fuzzed headers/trailers.
   void accessLog(AccessLog::Instance* access_logger, const StreamInfo::StreamInfo& stream_info) {
     ENVOY_LOG_MISC(debug, "Access logging");
-    access_logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info,
-                       AccessLog::AccessLogType::NotSet);
+    access_logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info);
   }
 
   // Fuzzed headers and trailers are needed for access logging, reset the data and destroy filters.

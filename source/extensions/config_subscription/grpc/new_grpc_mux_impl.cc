@@ -158,7 +158,14 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
 }
 
 // TODO(fredlas) to be removed from the GrpcMux interface very soon.
-void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
+void NewGrpcMuxImpl::start() {
+  ASSERT(!started_);
+  if (started_) {
+    return;
+  }
+  started_ = true;
+  grpc_stream_.establishNewStream();
+}
 
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const absl::flat_hash_set<std::string>& resources,

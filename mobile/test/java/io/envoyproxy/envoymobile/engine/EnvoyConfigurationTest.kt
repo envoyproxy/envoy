@@ -1,18 +1,16 @@
 package io.envoyproxy.envoymobile.engine
 
+import com.google.protobuf.Struct
+import com.google.protobuf.Value
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
-import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.HeaderMatchConfig
-import io.envoyproxy.envoymobile.engine.HeaderMatchConfig.Type
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
 import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.nio.ByteBuffer
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.Assert.fail
 import org.junit.Test
 import java.util.regex.Pattern
 
@@ -83,6 +81,7 @@ class EnvoyConfigurationTest {
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
+    quicCanonicalSuffixes: MutableList<String> = mutableListOf(".opq.com", ".xyz.com"),
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -105,16 +104,14 @@ class EnvoyConfigurationTest {
     rtdsTimeoutSeconds: Int = 0,
     xdsAddress: String = "",
     xdsPort: Int = 0,
-    xdsAuthHeader: String = "",
-    xdsAuthToken: String = "",
-    xdsJwtToken: String = "",
-    xdsJwtTokenLifetimeSeconds: Int = 0,
+    xdsGrpcInitialMetadata: Map<String, String> = emptyMap(),
     xdsSslRootCerts: String = "",
     xdsSni: String = "",
     nodeId: String = "",
     nodeRegion: String = "",
     nodeZone: String = "",
     nodeSubZone: String = "",
+    nodeMetadata: Struct = Struct.getDefaultInstance(),
     cdsResourcesLocator: String = "",
     cdsTimeoutSeconds: Int = 0,
     enableCds: Boolean = false,
@@ -136,6 +133,7 @@ class EnvoyConfigurationTest {
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
+      quicCanonicalSuffixes,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
@@ -160,16 +158,14 @@ class EnvoyConfigurationTest {
       rtdsTimeoutSeconds,
       xdsAddress,
       xdsPort,
-      xdsAuthHeader,
-      xdsAuthToken,
-      xdsJwtToken,
-      xdsJwtTokenLifetimeSeconds,
+      xdsGrpcInitialMetadata,
       xdsSslRootCerts,
       xdsSni,
       nodeId,
       nodeRegion,
       nodeZone,
       nodeSubZone,
+      nodeMetadata,
       cdsResourcesLocator,
       cdsTimeoutSeconds,
       enableCds
@@ -212,6 +208,9 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("hostname: www.abc.com");
     assertThat(resolvedTemplate).contains("hostname: www.def.com");
     assertThat(resolvedTemplate).contains("port: 443");
+    assertThat(resolvedTemplate).contains("canonical_suffixes:");
+    assertThat(resolvedTemplate).contains(".opq.com");
+    assertThat(resolvedTemplate).contains(".xyz.com");
     assertThat(resolvedTemplate).contains("connection_options: 5RTO");
     assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
 
@@ -427,4 +426,19 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
     assertThat(resolvedTemplate).contains("stats.example.com");
  }
+
+  @Test
+  fun `test node metadata`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      nodeMetadata = Struct.newBuilder()
+        .putFields("metadata_field", Value.newBuilder().setStringValue("metadata_value").build())
+        .build()
+    )
+
+    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+
+    assertThat(resolvedTemplate).contains("metadata_field")
+    assertThat(resolvedTemplate).contains("metadata_value")
+  }
 }

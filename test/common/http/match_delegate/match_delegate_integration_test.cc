@@ -39,7 +39,7 @@ public:
                                                                           {":authority", "host"}};
 
   const std::string default_config_ = R"EOF(
-      name: ext_proc
+      name: match_delegate_filter
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
         extension_config:
@@ -89,7 +89,7 @@ TEST_P(MatchDelegateInegrationTest, PerRouteConfig) {
     Any cfg_any;
     ASSERT_TRUE(cfg_any.PackFrom(matcher));
     route->mutable_typed_per_filter_config()->insert(
-        MapPair<std::string, Any>("envoy.filters.http.match_delegate", cfg_any));
+        MapPair<std::string, Any>("match_delegate_filter", cfg_any));
   });
   initialize();
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

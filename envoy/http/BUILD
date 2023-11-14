@@ -163,6 +163,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "query_params_interface",
     hdrs = ["query_params.h"],
+    external_deps = ["abseil_btree"],
 )
 
 envoy_cc_library(
@@ -216,6 +217,7 @@ envoy_cc_library(
     name = "header_evaluator",
     hdrs = ["header_evaluator.h"],
     deps = [
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
     ],

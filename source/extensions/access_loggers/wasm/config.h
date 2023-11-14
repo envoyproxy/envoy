@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/access_log_config.h"
+#include "envoy/access_log/access_log_config.h"
 
 #include "source/common/config/datasource.h"
 
@@ -12,7 +12,7 @@ namespace Wasm {
 /**
  * Config registration for the file access log. @see AccessLogInstanceFactory.
  */
-class WasmAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory,
+class WasmAccessLogFactory : public AccessLog::AccessLogInstanceFactory,
                              Logger::Loggable<Logger::Id::wasm> {
 public:
   AccessLog::InstanceSharedPtr
