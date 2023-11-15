@@ -1,0 +1,214 @@
+name: Envoy/dependency
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+  - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Select a task
+        required: true
+        default: bazel
+        type: choice
+        options:
+        - bazel
+        - bazel-api
+        - build-image
+        - check
+      dependency:
+        description: Dependency to update (if applicable)
+      version:
+        description: Version to set (optional)
+      pr:
+        type: boolean
+        default: true
+      pr-message:
+        description: Additional message for PR, eg to fix an issue (optional)
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  COMMITTER_NAME: dependency-envoy[bot]
+  COMMITTER_EMAIL: 148525496+dependency-envoy[bot]@users.noreply.github.com
+
+jobs:
+  update-bazel:
+    if: >-
+      ${{
+           github.event_name == 'workflow_dispatch'
+           && startsWith(inputs.task, 'bazel')
+      }}
+    name: >-
+      Update dep
+      (${{ inputs.pr && 'PR/' || '' }}${{ inputs.task == 'bazel' && 'bazel' || 'bazel/api' }}/${{ inputs.dependency }}/${{ inputs.version }})
+    runs-on: ubuntu-22.04
+    steps:
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
+      with:
+        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
+        app_key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+    - id: version
+      name: Shorten (possible) SHA
+      uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.8
+      with:
+        string: ${{ inputs.version }}
+        length: 7
+        min: 40
+    - run: |
+        echo "Updating(${TASK}): ${DEPENDENCY} -> ${VERSION}"
+        bazel run --config=ci //bazel:${TARGET} $DEPENDENCY $VERSION
+      name: Update dependency
+      env:
+        DEPENDENCY: ${{ inputs.dependency }}
+        VERSION: ${{ inputs.version }}
+        TARGET: ${{ inputs.task == 'bazel' && 'update' || 'api-update' }}
+        TASK: ${{ inputs.task == 'bazel' && 'bazel' || 'api/bazel' }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.1.8
+      name: Upload diff
+      with:
+        name: ${{ inputs.dependency }}-${{ steps.version.outputs.string }}
+    - name: Create a PR
+      if: ${{ inputs.pr }}
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.8
+      with:
+        base: main
+        body: |
+          Created by Envoy dependency bot for @${{ github.actor }}
+
+          ${{ inputs.pr-message }}
+        branch: >-
+          dependency/${{ inputs.task }}/${{ inputs.dependency }}/${{ steps.version.outputs.string }}
+        commit-message: |
+          ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}` -> ${{ steps.version.outputs.string }}
+
+          Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+        title: >-
+          ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}`
+          -> ${{ steps.version.outputs.string }}
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+
+  update-build-image:
+    if: >-
+      ${{
+           github.event_name == 'workflow_dispatch'
+           && github.event.inputs.task == 'build-image'
+      }}
+    name: Update build image (PR)
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
+      id: checkout
+      name: Checkout Envoy repository
+      with:
+        config: |
+          path: envoy
+          fetch-depth: 0
+        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
+        app_key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+    - uses: actions/checkout@v4
+      name: Checkout Envoy build tools repository
+      with:
+        repository: envoyproxy/envoy-build-tools
+        path: build-tools
+        fetch-depth: 0
+    - run: |
+        shas=(
+            tag
+            sha
+            mobile_sha
+            gcr_sha)
+        for sha in "${shas[@]}"; do
+            current_sha=$(bazel run //tools/dependency:build-image-sha "$sha")
+            echo "${sha}=${current_sha}" >> "$GITHUB_OUTPUT"
+        done
+      id: current
+      name: Current SHAs
+      working-directory: envoy
+    - run: |
+        # get current build image version
+        CONTAINER_TAG=$(git log -1 --pretty=format:"%H" "./docker")
+        echo "tag=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
+        echo "tag_short=${CONTAINER_TAG::7}" >> "$GITHUB_OUTPUT"
+      id: build-tools
+      name: Build image SHA
+      working-directory: build-tools
+
+    - name: Check Docker SHAs
+      id: build-images
+      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.1.8
+      with:
+        images: |
+           sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
+           mobile_sha: envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
+           gcr_sha: gcr.io/envoy-ci/envoy-build:${{ steps.build-tools.outputs.tag }}
+
+    - run: |
+        SHA_REPLACE=(
+            "$CURRENT_ENVOY_TAG:$ENVOY_TAG"
+            "$CURRENT_ENVOY_SHA:${OUTPUT_sha}"
+            "$CURRENT_ENVOY_MOBILE_SHA:${OUTPUT_mobile_sha}"
+            "$CURRENT_ENVOY_GCR_SHA:${OUTPUT_gcr_sha}")
+        echo "replace=${SHA_REPLACE[*]}" >> "$GITHUB_OUTPUT"
+      name: Find SHAs to replace
+      id: shas
+      env:
+        ENVOY_TAG: ${{ steps.build-tools.outputs.tag }}
+        CURRENT_ENVOY_TAG: ${{ steps.current.outputs.tag }}
+        CURRENT_ENVOY_SHA: ${{ steps.current.outputs.sha }}
+        CURRENT_ENVOY_MOBILE_SHA: ${{ steps.current.outputs.mobile_sha }}
+        CURRENT_ENVOY_GCR_SHA: ${{ steps.current.outputs.gcr_sha }}
+    - run: |
+        echo "${SHA_REPLACE}" | xargs bazel run @envoy_toolshed//sha:replace "${PWD}"
+      env:
+        SHA_REPLACE: ${{ steps.shas.outputs.replace }}
+      name: Update SHAs
+      working-directory: envoy
+    - name: Create a PR
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.8
+      with:
+        base: main
+        body: Created by Envoy dependency bot
+        branch: dependency-envoy/build-image/latest
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+        commit-message: |
+          deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`
+
+          Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
+        title: 'deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`'
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+        working-directory: envoy
+
+  scheduled:
+    runs-on: ubuntu-22.04
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || (!contains(github.actor, '[bot]')
+                  && inputs.task == 'check'))
+      }}
+    permissions:
+      contents: read
+      issues: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Run dependency checker
+      run: |
+        TODAY_DATE=$(date -u -I"date")
+        export TODAY_DATE
+        bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
+        bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

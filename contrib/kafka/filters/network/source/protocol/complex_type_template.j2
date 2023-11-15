@@ -19,7 +19,7 @@ struct {{ complex_type.name }} {
      there are different Kafka versions that are actually composed of precisely the same fields).
   #}
   {% for field in complex_type.fields %}
-  const {{ field.field_declaration() }}_;{% endfor %}
+  {{ field.field_declaration() }}_;{% endfor %}
   {% for constructor in complex_type.compute_constructors() %}
   // constructor used in versions: {{ constructor['versions'] }}
   {{ constructor['full_declaration'] }}{% endfor %}

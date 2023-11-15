@@ -235,6 +235,7 @@ envoy_cc_library(
         "//envoy/server:listener_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:generic_listener_filter_impl_base_lib",
         "//source/common/stats:timespan_lib",

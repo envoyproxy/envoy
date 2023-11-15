@@ -19,7 +19,7 @@ namespace LocalReply {
 class BodyFormatter {
 public:
   BodyFormatter()
-      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
+      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%", false)),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
@@ -78,8 +78,8 @@ public:
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
     if (filter_ == nullptr ||
-        !filter_->evaluate(stream_info, request_headers, response_headers, response_trailers,
-                           AccessLog::AccessLogType::NotSet)) {
+        !filter_->evaluate({&request_headers, &response_headers, &response_trailers},
+                           stream_info)) {
       return false;
     }
 
@@ -87,7 +87,7 @@ public:
       body = body_.value();
     }
 
-    header_parser_->evaluateHeaders(response_headers, request_headers, response_headers,
+    header_parser_->evaluateHeaders(response_headers, {&request_headers, &response_headers},
                                     stream_info);
 
     if (status_code_.has_value() && code != status_code_.value()) {

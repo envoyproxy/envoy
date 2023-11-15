@@ -137,7 +137,9 @@ envoy_entry_point(
     args = [
         "release",
         PATH,
+        "--release-message-path=$(location @envoy//changelogs:summary)",
     ],
+    data = ["@envoy//changelogs:summary"],
     pkg = "envoy.base.utils",
     script = "envoy.project",
     init_data = [":__init__.py"],
@@ -285,6 +287,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_grpc_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
+    _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
@@ -331,6 +334,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    _com_github_maxmind_libmaxminddb()
 
     # TODO(keith): Remove patch when we update rules_pkg
     external_http_archive(
@@ -338,7 +342,12 @@ def envoy_dependencies(skip_targets = []):
         patches = ["@envoy//bazel:rules_pkg.patch"],
     )
     external_http_archive("com_github_aignas_rules_shellcheck")
-    external_http_archive("aspect_bazel_lib")
+    external_http_archive(
+        "aspect_bazel_lib",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:aspect.patch"],
+    )
+
     _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
@@ -476,6 +485,10 @@ def _com_github_google_benchmark():
     external_http_archive(
         name = "com_github_google_benchmark",
     )
+    external_http_archive(
+        name = "libpfm",
+        build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
+    )
     native.bind(
         name = "benchmark",
         actual = "@com_github_google_benchmark//:benchmark",
@@ -513,9 +526,29 @@ def _com_github_intel_ipp_crypto_crypto_mb():
         # to create dynamic *.so library target. Linker fails when linking
         # with boringssl_fips library. Envoy uses only static library
         # anyways, so created dynamic library would not be used anyways.
+        patches = [
+            "@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch",
+            "@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch",
+        ],
+        patch_args = ["-p1"],
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_intel_ipp_crypto_crypto_mb_fips():
+    # Temporary fix for building ipp-crypto when boringssl-fips is used.
+    # Build will fail if bn2lebinpad patch is applied. Remove this archive
+    # when upstream dependency fixes this issue.
+    external_http_archive(
+        name = "com_github_intel_ipp_crypto_crypto_mb_fips",
+        # Patch removes from CMakeLists.txt instructions to
+        # to create dynamic *.so library target. Linker fails when linking
+        # with boringssl_fips library. Envoy uses only static library
+        # anyways, so created dynamic library would not be used anyways.
         patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
         patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
+        # Use existing ipp-crypto repository location name to avoid redefinition.
+        location_name = "com_github_intel_ipp_crypto_crypto_mb",
     )
 
 def _com_github_intel_qatlib():
@@ -788,6 +821,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/base",
     )
     native.bind(
+        name = "abseil_btree",
+        actual = "@com_google_absl//absl/container:btree",
+    )
+    native.bind(
         name = "abseil_flat_hash_map",
         actual = "@com_google_absl//absl/container:flat_hash_map",
     )
@@ -965,7 +1002,9 @@ def _io_opencensus_cpp():
     )
 
 def _com_github_curl():
-    # Used by OpenCensus Zipkin exporter.
+    # The usage by AWS extensions common utilities is deprecated and will be removed by Q3 2024 after
+    # the deprecation period of 2 releases. Please DO NOT USE curl dependency for any new or existing extensions.
+    # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
     external_http_archive(
         name = "com_github_curl",
         build_file_content = BUILD_ALL_CONTENT + """
@@ -988,7 +1027,10 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
 def _v8():
     external_http_archive(
         name = "v8",
-        patches = ["@envoy//bazel:v8.patch"],
+        patches = [
+            "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_include.patch",
+        ],
         patch_args = ["-p1"],
     )
     native.bind(
@@ -1383,18 +1425,12 @@ def _rules_ruby():
 def _foreign_cc_dependencies():
     external_http_archive("rules_foreign_cc")
 
-def _is_linux(ctxt):
-    return ctxt.os.name == "linux"
-
-def _is_arch(ctxt, arch):
-    res = ctxt.execute(["uname", "-m"])
-    return arch in res.stdout
-
-def _is_linux_ppc(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "ppc")
-
-def _is_linux_s390x(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "s390x")
-
-def _is_linux_x86_64(ctxt):
-    return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")
+def _com_github_maxmind_libmaxminddb():
+    external_http_archive(
+        name = "com_github_maxmind_libmaxminddb",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "maxmind",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux",
+    )

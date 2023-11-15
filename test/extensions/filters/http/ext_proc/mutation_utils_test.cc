@@ -224,6 +224,37 @@ TEST(MutationUtils, TestSetHeaderWithInvalidCharacter) {
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 }
 
+TEST(MutationUtils, TestSetHeaderWithContentLength) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
+  Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"host", "localhost:1000"},
+  };
+  // Use the default mutation rules
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  // Test header key contains content_length.
+  s->mutable_header()->set_key("content-length");
+  s->mutable_header()->set_value("10");
+
+  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+                                                  /*remove_content_length=*/true)
+                  .ok());
+  // When `remove_content_length` is true, content_length headers is not added.
+  EXPECT_EQ(headers.ContentLength(), nullptr);
+
+  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+                                                  /*remove_content_length=*/false)
+                  .ok());
+  // When `remove_content_length` is false, content_length headers is added.
+  EXPECT_EQ(headers.getContentLengthValue(), "10");
+}
+
 TEST(MutationUtils, TestRemoveHeaderWithInvalidCharacter) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},

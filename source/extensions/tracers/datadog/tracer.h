@@ -10,7 +10,18 @@
 #include "source/extensions/tracers/datadog/tracer_stats.h"
 
 #include "datadog/tracer.h"
-#include "datadog/tracer_config.h"
+
+namespace datadog {
+namespace tracing {
+
+class DictReader;
+class FinalizedTracerConfig;
+class Span;
+struct SpanConfig;
+struct TracerConfig;
+
+} // namespace tracing
+} // namespace datadog
 
 namespace Envoy {
 namespace Extensions {
@@ -73,8 +84,8 @@ public:
    * that the returned span will be a part of; otherwise, the returned span is
    * the root of a new trace
    * @param stream_info contains information about the stream.
-   * @param operation_name the name of the operation representation by this
-   * span, e.g. "handle.request"
+   * @param operation_name the Datadog "resource name" to associate with the span.
+   * See comments in the implementation for more information.
    * @param tracing_decision the sampling decision made in advance by Envoy for
    * this trace. If the decision is to drop the trace, then this tracer will
    * honor that decision. If the decision is to keep the trace, then this tracer
@@ -83,9 +94,13 @@ public:
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const StreamInfo::StreamInfo& stream_info,
                              const std::string& operation_name,
-                             const Tracing::Decision tracing_decision) override;
+                             Tracing::Decision tracing_decision) override;
 
 private:
+  datadog::tracing::Span extract_or_create_span(datadog::tracing::Tracer& tracer,
+                                                const datadog::tracing::SpanConfig& span_config,
+                                                const datadog::tracing::DictReader& reader);
+
   TracerStats tracer_stats_;
   ThreadLocal::TypedSlotPtr<ThreadLocalTracer> thread_local_slot_;
 };

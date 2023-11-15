@@ -24,7 +24,7 @@ def _protoxform_rule_impl(ctx):
         for path in dep[OutputGroupInfo].proto.to_list():
             envoy_api = (
                 path.short_path.startswith("../envoy_api") or
-                path.short_path.startswith("../com_github_cncf_udpa") or
+                path.short_path.startswith("../com_github_cncf_xds") or
                 path.short_path.startswith("tools/testdata")
             )
             if envoy_api:

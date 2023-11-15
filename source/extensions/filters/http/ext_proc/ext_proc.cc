@@ -235,13 +235,17 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     decoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (!decoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "decodeHeaders: Skipped");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (decoding_state_.sendHeaders()) {
+    status = onHeaders(decoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
   }
 
-  const auto status = onHeaders(decoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
+  if (!processing_complete_ && decoding_state_.shouldRemoveContentLength()) {
+    headers.removeContentLength();
+  }
   return status;
 }
 
@@ -509,13 +513,22 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     encoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (processing_complete_ || !encoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "encodeHeaders: Continue");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (!processing_complete_ && encoding_state_.sendHeaders()) {
+    status = onHeaders(encoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
   }
 
-  const auto status = onHeaders(encoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
+  // The content-length header will be kept when either one of the following conditions is met:
+  // (1) `shouldRemoveContentLength` returns false.
+  // (2) side stream processing has been completed. For example, it could be caused by stream error
+  // that triggers the local reply or due to spurious message that skips the side stream
+  // mutation.
+  if (!processing_complete_ && encoding_state_.shouldRemoveContentLength()) {
+    headers.removeContentLength();
+  }
   return status;
 }
 

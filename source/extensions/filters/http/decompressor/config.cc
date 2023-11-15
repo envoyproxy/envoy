@@ -20,8 +20,8 @@ Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyp
           Compression::Decompressor::NamedDecompressorLibraryConfigFactory>::
           getFactoryByType(decompressor_library_type);
   if (decompressor_library_factory == nullptr) {
-    throw EnvoyException(fmt::format("Didn't find a registered implementation for type: '{}'",
-                                     decompressor_library_type));
+    throwEnvoyExceptionOrPanic(fmt::format("Didn't find a registered implementation for type: '{}'",
+                                           decompressor_library_type));
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.decompressor_library().typed_config(), context.messageValidationVisitor(),

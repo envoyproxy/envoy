@@ -102,6 +102,7 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+  void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) override;
 
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
@@ -138,6 +139,7 @@ public:
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
+  Network::WriteFilterCallbacks* write_callbacks_{};
   PostgresFilterConfigSharedPtr config_;
   Buffer::OwnedImpl frontend_buffer_;
   Buffer::OwnedImpl backend_buffer_;

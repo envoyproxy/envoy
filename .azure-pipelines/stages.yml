@@ -8,18 +8,6 @@ parameters:
   default:
   - env
   - prechecks
-- name: macBuildStageDeps
-  displayName: "macOS stage dependencies"
-  type: object
-  default:
-  - env
-  - prechecks
-- name: windowsBuildStageDeps
-  displayName: "Windows stage dependencies"
-  type: object
-  default:
-  - env
-  - prechecks
 - name: checkStageDeps
   displayName: "Check stage dependencies"
   type: object
@@ -70,24 +58,30 @@ stages:
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
+      runPrechecks: stageDependencies.env.repo.outputs['run.releaseTests']
 
 - stage: linux_x64
   displayName: Linux x64
   dependsOn: ${{ parameters.buildStageDeps }}
   variables:
     RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
+    RUN_TESTS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
   jobs:
   - template: stage/linux.yml
     parameters:
       cacheTestResults: ${{ parameters.cacheTestResults }}
+      bazelConfigRBE: --config=remote-ci --config=rbe-google --jobs=200
+      pool: envoy-x64-large
+      # these are parsed differently and _must_ be expressed in this way
       runBuild: variables['RUN_BUILD']
-      tmpfsDockerDisabled: true
+      runTests: $(RUN_TESTS)
 
 - stage: linux_arm64
   displayName: Linux arm64
   dependsOn: ${{ parameters.buildStageDeps }}
   variables:
     RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
+    RUN_TESTS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
   jobs:
   - template: stage/linux.yml
     parameters:
@@ -97,6 +91,7 @@ stages:
       timeoutBuild: 180
       pool: envoy-arm-large
       runBuild: variables['RUN_BUILD']
+      runTests: $(RUN_TESTS)
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
 - stage: check
@@ -151,25 +146,3 @@ stages:
   - template: stage/verify.yml
     parameters:
       authGCP: $(GcpServiceAccountKey)
-
-- stage: macos
-  displayName: macOS
-  dependsOn: ${{ parameters.macBuildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-  jobs:
-  - template: stage/macos.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)
-      runBuild: variables['RUN_BUILD']
-
-- stage: windows
-  displayName: Windows
-  dependsOn: ${{ parameters.windowsBuildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-  jobs:
-  - template: stage/windows.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)
-      runBuild: variables['RUN_BUILD']

@@ -60,8 +60,7 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 }
 
 Api::IoCallUint64Result makeError(int sys_errno) {
-  return {0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
-                             Network::IoSocketError::deleteIoError)};
+  return {0, Network::IoSocketError::create(sys_errno)};
 }
 
 class UdpProxyFilterBase : public testing::Test {
@@ -180,9 +179,8 @@ public:
         // Return an EAGAIN result.
         EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
         EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
-            .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-                0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                   Network::IoSocketError::deleteIoError)))));
+            .WillOnce(Return(ByMove(
+                Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError()))));
       }
 
       // Kick off the receive.
@@ -429,7 +427,9 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
       "%DOWNSTREAM_REMOTE_ADDRESS% "
-      "%DOWNSTREAM_LOCAL_ADDRESS%";
+      "%DOWNSTREAM_LOCAL_ADDRESS% "
+      "%UPSTREAM_HOST% "
+      "%STREAM_ID%";
 
   const std::string proxy_access_log_format =
       "%DYNAMIC_METADATA(udp.proxy.proxy:bytes_received)% "
@@ -479,7 +479,9 @@ upstream_socket_config:
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
   EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
-  EXPECT_EQ(output_.back(), "17 3 17 3 10.0.0.1:1000 10.0.0.2:80");
+  EXPECT_TRUE(std::regex_match(output_.back(),
+                               std::regex("17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 "
+                                          "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")));
 }
 
 // Route with source IP.
@@ -1851,14 +1853,23 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolFailure) {
   setup();
   createNewStream();
   EXPECT_CALL(stream_callbacks_, onStreamFailure(_, _, _));
+
+  std::string upstream_host_name = "upstream_host_test";
+  EXPECT_CALL(*upstream_host_, hostname()).WillOnce(ReturnRef(upstream_host_name));
   pool_->onPoolFailure(Http::ConnectionPool::PoolFailureReason::Timeout, "reason", upstream_host_);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamTransportFailureReason(), "reason");
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
   setup();
   createNewStream();
   EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
+
+  std::string upstream_host_name = "upstream_host_test";
+  EXPECT_CALL(*upstream_host_, hostname()).WillOnce(ReturnRef(upstream_host_name));
   pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
@@ -1993,9 +2004,7 @@ TEST(TunnelingConfigImplTest, HeadersToAdd) {
   TunnelingConfigImpl config(proto_config, context);
 
   auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
-  config.headerEvaluator().evaluateHeaders(
-      headers, *Http::StaticEmptyHeaders::get().request_headers,
-      *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
   EXPECT_EQ("test_val", headers.getByKey("test_key"));
 }
 

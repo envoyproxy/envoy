@@ -3,7 +3,6 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
-
 import java.nio.ByteBuffer;
 
 public class JniLibrary {
@@ -312,15 +311,15 @@ public class JniLibrary {
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
       boolean enableHttp3, String http3ConnectionOptions, String http3ClientConnectionOptions,
-      byte[][] quicHints, boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableInterfaceBinding,
-      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
-      long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
-      long perTryIdleTimeoutSeconds, String appVersion, String appId,
+      byte[][] quicHints, byte[][] quicCanonicalSuffixes, boolean enableGzipDecompression,
+      boolean enableBrotliDecompression, boolean enableSocketTagging,
+      boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost, long statsFlushSeconds,
+      long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
       boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsResourceName,
-      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsAuthenticationHeader,
-      String xdsAuthenticationToken, String xdsJwtToken, long xdsJwtTokenLifetime,
+      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, byte[][] xdsGrpcInitialMetadata,
       String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
-      String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
+      String nodeSubZone, byte[] nodeMetadata, String cdsResourcesLocator, long cdsTimeoutSeconds,
+      boolean enableCds);
 }

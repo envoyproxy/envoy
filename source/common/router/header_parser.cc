@@ -22,7 +22,7 @@ namespace Router {
 
 namespace {
 
-HttpHeaderFormatterPtr
+Formatter::FormatterPtr
 parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_value) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
@@ -35,7 +35,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   // Host is disallowed as it created confusing and inconsistent behaviors for
   // HTTP/1 and HTTP/2. It could arguably be allowed on the response path.
   if (!Http::HeaderUtility::isModifiableHeader(key)) {
-    throw EnvoyException(":-prefixed or host headers may not be modified");
+    throwEnvoyExceptionOrPanic(":-prefixed or host headers may not be modified");
   }
 
   // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to colon
@@ -45,8 +45,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   final_header_value = HeaderParser::translatePerRequestState(final_header_value);
 
   // Let the substitution formatter parse the final_header_value.
-  return std::make_unique<HttpHeaderFormatterImpl>(
-      std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true));
+  return std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true);
 }
 
 } // namespace
@@ -58,7 +57,7 @@ HeadersToAddEntry::HeadersToAddEntry(const HeaderValueOption& header_value_optio
   if (header_value_option.has_append()) {
     // 'append' is set and ensure the 'append_action' value is equal to the default value.
     if (header_value_option.append_action() != HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
-      throw EnvoyException("Both append and append_action are set and it's not allowed");
+      throwEnvoyExceptionOrPanic("Both append and append_action are set and it's not allowed");
     }
 
     append_action_ = header_value_option.append().value()
@@ -112,7 +111,7 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
     // request finalization assume their existence and they are needed for well-formedness in most
     // cases.
     if (!Http::HeaderUtility::isRemovableHeader(header)) {
-      throw EnvoyException(":-prefixed or host headers may not be removed");
+      throwEnvoyExceptionOrPanic(":-prefixed or host headers may not be removed");
     }
     header_parser->headers_to_remove_.emplace_back(header);
   }
@@ -121,15 +120,13 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const Http::RequestHeaderMap& request_headers,
-                                   const Http::ResponseHeaderMap& response_headers,
+                                   const Formatter::HttpFormatterContext& context,
                                    const StreamInfo::StreamInfo& stream_info) const {
-  evaluateHeaders(headers, request_headers, response_headers, &stream_info);
+  evaluateHeaders(headers, context, &stream_info);
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const Http::RequestHeaderMap& request_headers,
-                                   const Http::ResponseHeaderMap& response_headers,
+                                   const Formatter::HttpFormatterContext& context,
                                    const StreamInfo::StreamInfo* stream_info) const {
   // Removing headers in the headers_to_remove_ list first makes
   // remove-before-add the default behavior as expected by users.
@@ -159,7 +156,7 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& [key, entry] : headers_to_add_) {
     absl::string_view value;
     if (stream_info != nullptr) {
-      value_buffer = entry.formatter_->format(request_headers, response_headers, *stream_info);
+      value_buffer = entry.formatter_->formatWithContext(context, *stream_info);
       value = value_buffer;
     } else {
       value = entry.original_value_;
@@ -204,9 +201,7 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
 
   for (const auto& [key, entry] : headers_to_add_) {
     if (do_formatting) {
-      const std::string value =
-          entry.formatter_->format(*Http::StaticEmptyHeaders::get().request_headers,
-                                   *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+      const std::string value = entry.formatter_->formatWithContext({}, stream_info);
       if (!value.empty() || entry.add_if_empty_) {
         switch (entry.append_action_) {
         case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:

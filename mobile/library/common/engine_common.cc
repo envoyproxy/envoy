@@ -54,6 +54,12 @@ void registerMobileProtoDescriptors() {
 
 namespace Envoy {
 
+class ServerLite : public Server::InstanceBase {
+public:
+  using Server::InstanceBase::InstanceBase;
+  void maybeCreateHeapShrinker() override {}
+};
+
 EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
     : options_(std::move(options)) {
 
@@ -61,9 +67,26 @@ EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
   registerMobileProtoDescriptors();
 #endif
 
+  StrippedMainBase::CreateInstanceFunction create_instance =
+      [](Init::Manager& init_manager, const Server::Options& options,
+         Event::TimeSystem& time_system, ListenerHooks& hooks, Server::HotRestart& restarter,
+         Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
+         Server::ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
+         ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+         Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
+         Buffer::WatermarkFactorySharedPtr watermark_factory) {
+        auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
+        auto server = std::make_unique<ServerLite>(
+            init_manager, options, time_system, hooks, restarter, store, access_log_lock,
+            std::move(random_generator), tls, thread_factory, file_system,
+            std::move(process_context), watermark_factory);
+        server->initialize(local_address, component_factory);
+        return server;
+      };
   base_ = std::make_unique<StrippedMainBase>(
       *options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-      std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
+      std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(), nullptr,
+      create_instance);
 
   // Disabling signal handling in the options makes it so that the server's event dispatcher _does
   // not_ listen for termination signals such as SIGTERM, SIGINT, etc
