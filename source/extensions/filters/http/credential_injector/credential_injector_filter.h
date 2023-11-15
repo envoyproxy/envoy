@@ -42,8 +42,9 @@ public:
   }
 
   // Inject configured credential to the HTTP request header.
-  // Throws EnvoyException if failed to inject the credential.
-  void injectCredential(Http::RequestHeaderMap& headers) { injector_->inject(headers, overwrite_); }
+  absl::Status injectCredential(Http::RequestHeaderMap& headers) {
+    return injector_->inject(headers, overwrite_);
+  }
 
   bool failRequest() const { return fail_request_; }
 

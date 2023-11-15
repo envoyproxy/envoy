@@ -5,16 +5,17 @@ namespace Extensions {
 namespace Credentials {
 namespace Generic {
 
-void GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
+absl::Status GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
   if (!overwrite && !headers.get(Http::LowerCaseString(header_)).empty()) {
-    throw EnvoyException("Credential already exists in the header.");
+    return absl::AlreadyExistsError("Credential already exists in the header");
   }
 
   if (secret_reader_->credential().empty()) {
-    throw EnvoyException("Failed to get credential from secret.");
+    return absl::NotFoundError("Failed to get credential from secret");
   }
 
   headers.setCopy(Http::LowerCaseString(header_), secret_reader_->credential());
+  return absl::OkStatus();
 }
 
 } // namespace Generic

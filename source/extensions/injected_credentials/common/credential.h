@@ -60,9 +60,9 @@ public:
    * @param headers supplies the reference to HTTP headers. The credential will be injected into the
    * headers.
    * @param overwrite whether to overwrite the existing credential in the headers.
-   * Must throw EnvoyException if failed to inject the credential.
+   * @return Status whether the injection is successful.
    */
-  virtual void inject(Http::RequestHeaderMap& headers, bool overwrite) PURE;
+  virtual absl::Status inject(Http::RequestHeaderMap& headers, bool overwrite) PURE;
 };
 
 using CredentialInjectorSharedPtr = std::shared_ptr<CredentialInjector>;

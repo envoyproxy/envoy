@@ -23,7 +23,7 @@ public:
     return nullptr;
   };
 
-  void inject(Http::RequestHeaderMap& headers, bool overwrite) override;
+  absl::Status inject(Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
   const std::string header_;

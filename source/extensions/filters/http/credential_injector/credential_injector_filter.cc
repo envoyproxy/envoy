@@ -29,14 +29,10 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
 
 void CredentialInjectorFilter::onSuccess() {
   decoder_callbacks_->dispatcher().post([this]() {
-    bool success = true;
+    absl::Status status = config_->injectCredential(*request_headers_);
 
-    try {
-      config_->injectCredential(*request_headers_);
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG(warn, "Failed to inject credential: {}", e.what());
-
-      success = false;
+    if (!status.ok()) {
+      ENVOY_LOG(warn, "Failed to inject credential: {}", status.message());
       config_->stats().failed_.inc();
 
       if (config_->failRequest()) {
@@ -46,7 +42,7 @@ void CredentialInjectorFilter::onSuccess() {
       }
     }
 
-    if (success) {
+    if (status.ok()) {
       config_->stats().injected_.inc();
     }
 
