@@ -2396,7 +2396,7 @@ message InternalRedirectPolicy {
   // Specifies a list of headers, by name, to copy from the internal redirect into the subsequent
   // request. If a header is specified here but not present in the redirect, it will be cleared in
   // the subsequent request.
-  repeated string response_headers_to_preserve = 5 [(validate.rules).repeated = {
+  repeated string response_headers_to_copy = 5 [(validate.rules).repeated = {
     unique: true
     items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];

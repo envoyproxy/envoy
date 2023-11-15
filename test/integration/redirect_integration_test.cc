@@ -51,12 +51,13 @@ public:
         ->set_inline_string(EMPTY_STRING);
     config_helper_.addVirtualHost(handle_by_direct_response);
 
-    auto preserve = config_helper_.createVirtualHost("handle.internal.redirect.and.preserve");
-    preserve.mutable_routes(0)->set_name("preserve_response_headers");
-    auto policy = preserve.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
-    policy->add_response_headers_to_preserve(kTestHeaderKey);
-    policy->add_response_headers_to_preserve(kTestHeaderKeyToClear);
-    config_helper_.addVirtualHost(preserve);
+    auto handle_with_copy = config_helper_.createVirtualHost("handle.internal.redirect.and.copy");
+    handle_with_copy.mutable_routes(0)->set_name("preserve_response_headers");
+    auto policy =
+        handle_with_copy.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+    policy->add_response_headers_to_copy(kTestHeaderKey);
+    policy->add_response_headers_to_copy(kTestHeaderKeyToClear);
+    config_helper_.addVirtualHost(handle_with_copy);
 
     HttpProtocolIntegrationTest::initialize();
   }
@@ -855,7 +856,7 @@ TEST_P(RedirectIntegrationTest, PreserveOrClearResponseHeaders) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.setHost("handle.internal.redirect.and.preserve");
+  default_request_headers_.setHost("handle.internal.redirect.and.copy");
   default_request_headers_.setCopy(Http::LowerCaseString(kTestHeaderKeyToClear), "to_clear");
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -868,7 +869,7 @@ TEST_P(RedirectIntegrationTest, PreserveOrClearResponseHeaders) {
 
   waitForNextUpstreamRequest();
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
-  EXPECT_EQ("http://handle.internal.redirect.and.preserve/test/long/url",
+  EXPECT_EQ("http://handle.internal.redirect.and.copy/test/long/url",
             upstream_request_->headers().getEnvoyOriginalUrlValue());
   EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
   EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());

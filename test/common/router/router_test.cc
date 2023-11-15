@@ -4375,7 +4375,7 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   router_->onDestroy();
 }
 
-TEST_F(RouterTest, ResponseHeadersToPreserveCopiesHeadersOrClears) {
+TEST_F(RouterTest, ResponseHeadersTCopyCopiesHeadersOrClears) {
   enableRedirects();
   default_request_headers_.setCopy(Http::LowerCaseString("x-to-clear"), "value");
 
@@ -4383,12 +4383,11 @@ TEST_F(RouterTest, ResponseHeadersToPreserveCopiesHeadersOrClears) {
 
   redirect_headers_->setCopy(Http::LowerCaseString("x-to-copy"), "bar");
 
-  std::vector<Http::LowerCaseString> toPreserve;
-  toPreserve.emplace_back("x-to-clear");
-  toPreserve.emplace_back("x-to-copy");
-  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
-              responseHeadersToPreserve())
-      .WillOnce(Return(toPreserve));
+  std::vector<Http::LowerCaseString> toCopy;
+  toCopy.emplace_back("x-to-clear");
+  toCopy.emplace_back("x-to-copy");
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(Return(toCopy));
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);

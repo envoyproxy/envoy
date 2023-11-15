@@ -1845,7 +1845,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
   auto saved_headers = Http::RequestHeaderMapImpl::create();
   std::vector<Http::LowerCaseString> headers_to_clear;
 
-  for (const auto& header : route_entry_->internalRedirectPolicy().responseHeadersToPreserve()) {
+  for (const auto& header : route_entry_->internalRedirectPolicy().responseHeadersToCopy()) {
     auto result = upstream_headers.get(header);
     auto downstream_result = downstream_headers.get(header);
     if (result.empty()) {

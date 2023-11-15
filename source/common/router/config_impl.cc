@@ -368,8 +368,8 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config);
     predicate_factories_.emplace_back(&factory, std::move(config));
   }
-  for (const auto& header : policy_config.response_headers_to_preserve()) {
-    response_headers_to_preserve_.emplace_back(header);
+  for (const auto& header : policy_config.response_headers_to_copy()) {
+    response_headers_to_copy_.emplace_back(header);
   }
 }
 
@@ -383,8 +383,8 @@ std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::pred
   return predicates;
 }
 
-std::vector<Http::LowerCaseString> InternalRedirectPolicyImpl::responseHeadersToPreserve() const {
-  return response_headers_to_preserve_;
+std::vector<Http::LowerCaseString> InternalRedirectPolicyImpl::responseHeadersToCopy() const {
+  return response_headers_to_copy_;
 }
 
 absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectResponseCodes(

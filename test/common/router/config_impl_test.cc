@@ -10221,7 +10221,7 @@ virtual_hosts:
   EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
   EXPECT_TRUE(internal_redirect_policy.predicates().empty());
   EXPECT_FALSE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
-  EXPECT_TRUE(internal_redirect_policy.responseHeadersToPreserve().empty());
+  EXPECT_TRUE(internal_redirect_policy.responseHeadersToCopy().empty());
 }
 
 TEST_F(RouteConfigurationV2, InternalRedirectPolicyDropsInvalidRedirectCode) {
@@ -10301,7 +10301,7 @@ virtual_hosts:
         route:
           cluster: some-cluster
           internal_redirect_policy:
-            response_headers_to_preserve: ["x-foo", "x-bar"]
+            response_headers_to_copy: ["x-foo", "x-bar"]
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
@@ -10311,7 +10311,7 @@ virtual_hosts:
   const auto& internal_redirect_policy =
       config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
   EXPECT_TRUE(internal_redirect_policy.enabled());
-  EXPECT_EQ(2, internal_redirect_policy.responseHeadersToPreserve().size());
+  EXPECT_EQ(2, internal_redirect_policy.responseHeadersToCopy().size());
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {
