@@ -4705,7 +4705,9 @@ TEST_P(RouterShadowingTest, NoShadowForConnect) {
   router_->onDestroy();
 }
 
-TEST_P(RouterShadowingTest, LahDeeDah) {
+// If the shadow stream watermark callbacks are invoked in the Router filter destructor,
+// it causes a potential MSAN bug, as the FilterManger may have already been freed.
+TEST_P(RouterShadowingTest, ShadowCallbacksNotCalledInDestructor) {
   if (!streaming_shadow_) {
     GTEST_SKIP();
   }
