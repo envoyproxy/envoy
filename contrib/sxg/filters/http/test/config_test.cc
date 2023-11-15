@@ -47,7 +47,8 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
   EXPECT_CALL(context, api());
   EXPECT_CALL(context, initManager()).Times(2);
   EXPECT_CALL(context, getTransportSocketFactoryContext());
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -76,8 +77,9 @@ validity_url: "/.sxg/validity.msg"
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
-                            EnvoyException, exception_message);
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException, exception_message);
 }
 
 } // namespace

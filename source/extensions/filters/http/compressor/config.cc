@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Compressor {
 
-Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(
@@ -19,7 +19,7 @@ Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped
       Registry::FactoryRegistry<
           Compression::Compressor::NamedCompressorLibraryConfigFactory>::getFactoryByType(type);
   if (config_factory == nullptr) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("Didn't find a registered implementation for type: '{}'", type));
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
