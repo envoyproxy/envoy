@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/exception.h"
 #include "envoy/http/header_map.h"
 
 namespace Envoy {
@@ -42,8 +43,9 @@ public:
 
     /**
      * Called when the async request for credentials fails.
+     * @param reason supplies the failure reason.
      */
-    virtual void onFailure() PURE;
+    virtual void onFailure(const std::string& reason) PURE;
   };
 
   /**
@@ -58,10 +60,9 @@ public:
    * @param headers supplies the reference to HTTP headers. The credential will be injected into the
    * headers.
    * @param overwrite whether to overwrite the existing credential in the headers.
-   *
-   * @return true if the credential is injected successfully.
+   * Must throw EnvoyException if failed to inject the credential.
    */
-  virtual bool inject(Http::RequestHeaderMap& headers, bool overwrite) PURE;
+  virtual void inject(Http::RequestHeaderMap& headers, bool overwrite) PURE;
 };
 
 using CredentialInjectorSharedPtr = std::shared_ptr<CredentialInjector>;

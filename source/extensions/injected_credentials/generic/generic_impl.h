@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/config/datasource.h"
-#include "source/common/common/logger.h"
 #include "source/extensions/injected_credentials/common/credential.h"
 #include "source/extensions/injected_credentials/common/secret_reader.h"
 
@@ -13,8 +12,7 @@ namespace Generic {
 /**
  * Implementation of credential injector's interface.
  */
-class GenericCredentialInjector : public Common::CredentialInjector,
-                                  public Logger::Loggable<Logger::Id::credential_injector> {
+class GenericCredentialInjector : public Common::CredentialInjector {
 public:
   GenericCredentialInjector(std::string header, Common::SecretReaderSharedPtr secret_reader)
       : header_(header), secret_reader_(secret_reader){};
@@ -25,7 +23,7 @@ public:
     return nullptr;
   };
 
-  bool inject(Http::RequestHeaderMap& headers, bool overwrite) override;
+  void inject(Http::RequestHeaderMap& headers, bool overwrite) override;
 
 private:
   const std::string header_;

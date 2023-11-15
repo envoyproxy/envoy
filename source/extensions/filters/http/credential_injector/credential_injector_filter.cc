@@ -29,28 +29,37 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
 
 void CredentialInjectorFilter::onSuccess() {
   decoder_callbacks_->dispatcher().post([this]() {
-    bool success = config_->injectCredential(*request_headers_);
+    bool success = true;
+
+    try {
+      config_->injectCredential(*request_headers_);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn, "Failed to inject credential: {}", e.what());
+
+      success = false;
+      config_->stats().failed_.inc();
+
+      if (config_->failRequest()) {
+        decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                           nullptr, absl::nullopt, "failed_to_inject_credential");
+        return;
+      }
+    }
 
     if (success) {
       config_->stats().injected_.inc();
-    } else {
-      config_->stats().failed_.inc();
-    }
-
-    if (!success && config_.failRequest()) {
-      decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                         nullptr, absl::nullopt, "failed_to_inject_credential");
-      return;
     }
 
     decoder_callbacks_->continueDecoding();
   });
 }
 
-void CredentialInjectorFilter::onFailure() {
+void CredentialInjectorFilter::onFailure(const std::string& reason) {
+  ENVOY_LOG(warn, "Failed to get credential: {}", reason);
+
   config_->stats().failed_.inc();
 
-  if (config_.failRequest()) {
+  if (config_->failRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
                                        nullptr, absl::nullopt, "failed_to_get_credential");
     return;

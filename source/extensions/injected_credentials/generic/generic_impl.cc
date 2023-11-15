@@ -5,19 +5,16 @@ namespace Extensions {
 namespace Credentials {
 namespace Generic {
 
-bool GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
+void GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
   if (!overwrite && !headers.get(Http::LowerCaseString(header_)).empty()) {
-    ENVOY_LOG(warn, "Credential already exists in the header.");
-    return false;
+    throw EnvoyException("Credential already exists in the header.");
   }
 
   if (secret_reader_->credential().empty()) {
-    ENVOY_LOG(warn, "Credential is empty.");
-    return false;
+    throw EnvoyException("Failed to get credential from secret.");
   }
 
   headers.setCopy(Http::LowerCaseString(header_), secret_reader_->credential());
-  return true;
 }
 
 } // namespace Generic

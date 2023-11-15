@@ -42,10 +42,8 @@ public:
   }
 
   // Inject configured credential to the HTTP request header.
-  // Return true if the credential has been successful injected into the header.
-  bool injectCredential(Http::RequestHeaderMap& headers) {
-    return injector_->inject(headers, overwrite_);
-  }
+  // Throws EnvoyException if failed to inject the credential.
+  void injectCredential(Http::RequestHeaderMap& headers) { injector_->inject(headers, overwrite_); }
 
   bool failRequest() const { return fail_request_; }
 
@@ -78,7 +76,7 @@ public:
 
   // CredentialInjector::Callbacks
   void onSuccess() override;
-  void onFailure() override;
+  void onFailure(const std::string& reason) override;
 
 private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
