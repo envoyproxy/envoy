@@ -936,7 +936,7 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
         break;
       } else {
         ENVOY_LOG(debug, "zookeeper_proxy: decodeOnData exception: {}", opcode.status().message());
-        goto exit_decode_loop;
+        return;
       }
     case DecodeType::WRITE:
       opcode = decodeOnWrite(data, offset);
@@ -945,11 +945,10 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
         break;
       } else {
         ENVOY_LOG(debug, "zookeeper_proxy: decodeOnWrite exception: {}", opcode.status().message());
-        goto exit_decode_loop;
+        return;
       }
     }
   }
-exit_decode_loop:;
 }
 
 absl::Status DecoderImpl::parseConnectResponse(Buffer::Instance& data, uint64_t& offset,
