@@ -276,11 +276,20 @@ bool Filter::parseV2Header(const char* buf) {
         la4.sin_family = AF_INET;
         la4.sin_port = v4->dst_port;
         la4.sin_addr.s_addr = v4->dst_addr;
-        proxy_protocol_header_.emplace(
-            WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
-                       hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
-                       std::make_shared<Network::Address::Ipv4Instance>(&ra4),
-                       std::make_shared<Network::Address::Ipv4Instance>(&la4)});
+
+        try {
+          // TODO(ggreenway): make this work without requiring operating system support for an
+          // address family.
+          proxy_protocol_header_.emplace(WireHeader{
+              PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
+              hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
+              std::make_shared<Network::Address::Ipv4Instance>(&ra4),
+              std::make_shared<Network::Address::Ipv4Instance>(&la4)});
+        } catch (const EnvoyException& e) {
+          ENVOY_LOG(debug, "Proxy protocol failure: {}", e.what());
+          return false;
+        }
+
         return true;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
         PACKED_STRUCT(struct pp_ipv6_addr {
@@ -302,11 +311,18 @@ bool Filter::parseV2Header(const char* buf) {
         la6.sin6_port = v6->dst_port;
         safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
-        proxy_protocol_header_.emplace(WireHeader{
-            PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
-            hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
-            std::make_shared<Network::Address::Ipv6Instance>(ra6),
-            std::make_shared<Network::Address::Ipv6Instance>(la6)});
+        try {
+          proxy_protocol_header_.emplace(WireHeader{
+              PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
+              hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
+              std::make_shared<Network::Address::Ipv6Instance>(ra6),
+              std::make_shared<Network::Address::Ipv6Instance>(la6)});
+        } catch (const EnvoyException& e) {
+          // TODO(ggreenway): make this work without requiring operating system support for an
+          // address family.
+          ENVOY_LOG(debug, "Proxy protocol failure: {}", e.what());
+          return false;
+        }
         return true;
       }
     }
