@@ -369,6 +369,9 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     predicate_factories_.emplace_back(&factory, std::move(config));
   }
   for (const auto& header : policy_config.response_headers_to_copy()) {
+    if (!Http::HeaderUtility::isModifiableHeader(header)) {
+      throwEnvoyExceptionOrPanic(":-prefixed headers or Hosts may not be specified here.");
+    }
     response_headers_to_copy_.emplace_back(header);
   }
 }
