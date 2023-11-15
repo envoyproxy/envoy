@@ -109,20 +109,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddinggrpcStatsDomainAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("stats.envoyproxy.io", config.grpcStatsDomain)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addGrpcStatsDomain("stats.envoyproxy.io")
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddingConnectTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -246,20 +232,6 @@ final class EngineBuilderTests: XCTestCase {
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addPlatformFilter(TestFilter.init)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
-  func testAddingStatsFlushSecondsAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual(42, config.statsFlushSeconds)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addStatsFlushSeconds(42)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }

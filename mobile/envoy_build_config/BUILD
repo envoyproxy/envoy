@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3", "envoy_select_envoy_mobile_listener", "envoy_select_envoy_mobile_request_compression", "envoy_select_envoy_mobile_stats_reporting")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3", "envoy_select_envoy_mobile_listener", "envoy_select_envoy_mobile_request_compression")
 
 licenses(["notice"])  # Apache 2
 
@@ -50,13 +50,6 @@ envoy_cc_library(
     ] + envoy_select_enable_http3(
         [
             "@envoy//source/common/quic:quic_transport_socket_factory_lib",
-        ],
-        "@envoy",
-    ) + envoy_select_envoy_mobile_stats_reporting(
-        [
-            "@envoy//source/extensions/stat_sinks/metrics_service:config",
-            "@envoy//source/extensions/stat_sinks/statsd:config",
-            "@envoy//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         ],
         "@envoy",
     ) + envoy_select_envoy_mobile_request_compression(

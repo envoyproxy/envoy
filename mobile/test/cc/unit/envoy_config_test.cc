@@ -44,10 +44,6 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
 TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
   engine_builder
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-      .addGrpcStatsDomain("asdf.fake.website")
-      .addStatsFlushSeconds(654)
-#endif
 #ifdef ENVOY_ENABLE_QUIC
       .setHttp3ConnectionOptions("5RTO")
       .setHttp3ClientConnectionOptions("MPQC")
@@ -275,28 +271,6 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 }
-
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-std::string statsdSinkConfig(int port) {
-  std::string config = R"({ name: envoy.stat_sinks.statsd,
-      typed_config: {
-        "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
-        address: { socket_address: { address: 127.0.0.1, port_value: )" +
-                       fmt::format("{}", port) + " } } } }";
-  return config;
-}
-
-TEST(TestConfig, AddStatsSinks) {
-  EngineBuilder engine_builder;
-
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  EXPECT_EQ(bootstrap->stats_sinks_size(), 0);
-
-  engine_builder.addStatsSinks({statsdSinkConfig(1), statsdSinkConfig(2)});
-  bootstrap = engine_builder.generateBootstrap();
-  EXPECT_EQ(bootstrap->stats_sinks_size(), 2);
-}
-#endif
 
 TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;

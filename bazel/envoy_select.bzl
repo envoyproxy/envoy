@@ -66,13 +66,6 @@ def envoy_select_envoy_mobile_request_compression(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Selects the given values if Envoy Mobile stats reporting is enabled in the current build.
-def envoy_select_envoy_mobile_stats_reporting(xs, repository = ""):
-    return select({
-        repository + "//bazel:disable_envoy_mobile_stats_reporting": [],
-        "//conditions:default": xs,
-    })
-
 # Selects the given values if the Envoy Mobile listener is enabled in the current build.
 def envoy_select_envoy_mobile_listener(xs, repository = ""):
     return select({
