@@ -24,8 +24,8 @@ public:
         /*xds_server_port=*/fake_upstreams_[1]->localAddress()->ip()->port());
     // Add the layered runtime config, which includes the RTDS layer.
     xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1)
-        .setSslRootCerts(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-            "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem")));
+        .setSslRootCerts(TestEnvironment::readFileToStringForTest(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem")));
     builder_.setXds(std::move(xds_builder));
     XdsIntegrationTest::createEnvoy();
   }

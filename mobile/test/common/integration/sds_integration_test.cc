@@ -35,8 +35,8 @@ public:
     Platform::XdsBuilder xds_builder(target_uri,
                                      fake_upstreams_.back()->localAddress()->ip()->port());
     xds_builder.addClusterDiscoveryService().setSslRootCerts(
-        TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-            "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem")));
+        TestEnvironment::readFileToStringForTest(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem")));
     builder_.setXds(std::move(xds_builder));
     XdsIntegrationTest::createEnvoy();
   }
