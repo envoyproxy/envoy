@@ -45,4 +45,4 @@ static_resources:
 default_regex_engine:
   name: envoy.regex_engines.hyperscan
   typed_config:
-    '@type': type.googleapis.com/envoy.extensions.regex_engines.hyperscan.v3alpha.Hyperscan
+    "@type": type.googleapis.com/envoy.extensions.regex_engines.hyperscan.v3alpha.Hyperscan
