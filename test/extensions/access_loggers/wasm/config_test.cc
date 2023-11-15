@@ -260,7 +260,7 @@ TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
 
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_CALL(context_.server_factory_context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
+  EXPECT_CALL(context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
   threadlocal.registered_ = true;
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(proto_config, nullptr, context_);
