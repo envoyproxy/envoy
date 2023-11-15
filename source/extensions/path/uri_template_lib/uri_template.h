@@ -28,6 +28,7 @@ struct ParsedSegment {
   absl::string_view value_;
   RewriteStringKind kind_;
 
+  // Value printer needed for unit tests only.
   friend std::ostream& operator<<(std::ostream& os, const ParsedSegment& parsed_segment);
 };
 
