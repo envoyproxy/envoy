@@ -1068,6 +1068,13 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
   }
 }
 
+namespace {
+// The maximal number of iterations for emulated pre-picking when initializing an EDF LB.
+// TODO(adisuissa): this value is somewhat arbitrary, and may be changed in the
+// future if more data is provided on what should be an optimal value.
+static constexpr uint32_t kMaxInitPrePickIterations = 2048;
+} // namespace
+
 void EdfLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
     // Nuke existing scheduler if it exists.
@@ -1081,7 +1088,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // case EDF creation is skipped. When all original weights are equal and no hosts are in slow
     // start mode we can rely on unweighted host pick to do optimal round robin and least-loaded
     // host selection with lower memory and CPU overhead.
-    if (hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
+    const bool no_hosts_are_in_slow_start = noHostsAreInSlowStart();
+    if (hostWeightsAreEqual(hosts) && no_hosts_are_in_slow_start) {
       // Skip edf creation.
       return;
     }
@@ -1101,9 +1109,15 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
+    // Note that in slow-start the host weight can be non-integer, and computing
+    // the right number of cycles to emulate during initialization isn't simple.
+    // That is why in slow-start Envoy still uses the old, buggy, initialization.
+    // TODO(adisuissa): Consider how to solve this issue for slow-start
+    // supported modes.
     // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the schedule across
     // refreshes for the weighted case.
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.edf_lb_scheduler_init_fix")) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.edf_lb_scheduler_init_fix") &&
+        no_hosts_are_in_slow_start) {
       // Only apply randomization if there are at least 2 hosts. If there's one host
       // (or no hosts), its weight doesn't matter for the load-balancer.
       if (hosts.size() > 1) {
@@ -1123,7 +1137,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
           weights_sum += host_weight;
         }
         normalizer = std::max(1U, normalizer);
-        const uint32_t scheduler_cycle_size = weights_sum / normalizer;
+        const uint32_t scheduler_cycle_size =
+            std::min(weights_sum / normalizer, kMaxInitPrePickIterations);
 
         for (uint32_t i = 0; i < seed_ % scheduler_cycle_size; ++i) {
           auto host =
