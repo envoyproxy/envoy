@@ -109,6 +109,7 @@ success_criteria:
       admission_control_filter_factory
           .createFilterFactoryFromProtoTyped(proto, "whatever", dual_info_,
                                              factory_context.getServerFactoryContext())
+          .status()
           .IgnoreError(),
       EnvoyException, "Success rate threshold cannot be less than 1.0%.");
 }

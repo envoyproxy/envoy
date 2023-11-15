@@ -112,8 +112,9 @@ arn: "arn:aws:lambda:region:424242:fun"
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).value(),
-               EnvoyException);
+  EXPECT_THROW(
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException);
 }
 
 TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARNThrows) {
