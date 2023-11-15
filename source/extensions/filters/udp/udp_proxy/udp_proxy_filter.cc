@@ -837,11 +837,13 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
            ->resourceManager(Upstream::ResourcePriority::Default)
            .connections()
            .canCreate()) {
+    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     cluster_.cluster_.info()->trafficStats()->upstream_cx_overflow_.inc();
     return false;
   }
 
   if (connect_attempts_ >= cluster_.filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
+    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     cluster_.cluster_.info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
     return false;
   } else if (connect_attempts_ >= 1) {
@@ -860,6 +862,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
     return true;
   }
 
+  udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
   return false;
 }
 
@@ -877,7 +880,13 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     onUpstreamEvent(Network::ConnectionEvent::LocalClose);
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
+    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+    onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
+    break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    if (connecting_) {
+      udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+    }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   }
