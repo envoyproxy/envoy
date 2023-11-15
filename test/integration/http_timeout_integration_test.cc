@@ -631,4 +631,81 @@ TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
   EXPECT_THAT(response, AllOf(HasSubstr("408"), HasSubstr("header")));
 }
 
+// Validate that Envoy correctly handles per try and per try IDLE timeouts
+// that are firing within the backoff interval.
+TEST_P(HttpTimeoutIntegrationTest, OriginalRequestCompletesBeforeBackoffTimer) {
+  auto host = config_helper_.createVirtualHost("example.com", "/test_retry");
+  host.set_include_is_timeout_retry_header(true);
+  config_helper_.addVirtualHost(host);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(1);
+        auto* route = virtual_host->mutable_routes(0)->mutable_route();
+        auto* retry_policy = route->mutable_retry_policy();
+        retry_policy->mutable_per_try_idle_timeout()->set_seconds(0);
+        // per try IDLE timeout is 400 ms
+        retry_policy->mutable_per_try_idle_timeout()->set_nanos(400 * 1000 * 1000);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/test_retry"},
+      {":scheme", "http"},
+      {":authority", "example.com"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"x-envoy-retry-on", "5xx"},
+      // Enable hedge_on_per_try_timeout so that original request is not reset
+      {"x-envoy-hedge-on-per-try-timeout", "true"},
+      {"x-envoy-upstream-rq-timeout-ms", "500"},
+      // Make per try timeout the same as the per try idle timeout
+      // NOTE: it can be a bit longer, within the back off interval
+      {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}});
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  codec_client_->sendData(*request_encoder_, 0, true);
+
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Trigger per try timeout (but not global timeout). This will actually trigger
+  // both IDLE and request timeouts in the same I/O operation.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(400));
+
+  // Trigger retry (there's a 25ms backoff before it's issued).
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(26));
+
+  // Wait for a second request to be sent upstream
+  FakeStreamPtr upstream_request2;
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
+
+  ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
+
+  // Expect the x-envoy-is-timeout-header to set to indicate to the upstream this is a retry
+  // initiated by a previous per try timeout.
+  EXPECT_EQ(upstream_request2->headers().getEnvoyIsTimeoutRetryValue(), "true");
+
+  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  // Respond to the second request (it does not matter which request gets response).
+  upstream_request2->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // The first request should be reset since we used the response from the second request.
+  ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
+
+  codec_client_->close();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 } // namespace Envoy

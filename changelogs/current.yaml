@@ -55,6 +55,9 @@ bug_fixes:
 - area: url matching
   change: |
     Fixed excessive CPU utilization when using regex URL template matcher.
+- area: http
+  change: |
+    Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
