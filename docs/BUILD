@@ -31,6 +31,9 @@ filegroup(
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/other_features/_include/dlb.yaml",
+            "root/configuration/other_features/_include/hyperscan_matcher.yaml",
+            "root/configuration/other_features/_include/hyperscan_matcher_multiple.yaml",
+            "root/configuration/other_features/_include/hyperscan_regex_engine.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
             "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
             "root/configuration/overview/_include/xds_api/oauth-sds-example.yaml",
