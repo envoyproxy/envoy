@@ -187,6 +187,11 @@ public:
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return whether external healthchecks are currently failed or not.
+   */
+  virtual bool healthCheckFailed() const PURE;
 };
 
 /**

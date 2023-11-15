@@ -77,10 +77,15 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
-    context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
-    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, address())
+    context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
+    ON_CALL(
+        *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+        address())
         .WillByDefault(Return(host_address_));
-    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, locality())
+    ON_CALL(
+        *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+        locality())
         .WillByDefault(ReturnRef(upstream_locality_));
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
@@ -92,19 +97,21 @@ public:
     NiceMock<Http::MockRequestEncoder> encoder;
     Http::ResponseDecoder* response_decoder = nullptr;
 
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-        .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                             Http::ConnectionPool::Callbacks& callbacks,
-                             const Http::ConnectionPool::Instance::StreamOptions&)
-                             -> Http::ConnectionPool::Cancellable* {
-          response_decoder = &decoder;
-          EXPECT_CALL(encoder.stream_, connectionInfoProvider())
-              .WillRepeatedly(ReturnRef(connection_info1_));
-          callbacks.onPoolReady(encoder,
-                                context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                stream_info_, Http::Protocol::Http10);
-          return nullptr;
-        }));
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+                newStream(_, _, _))
+        .WillOnce(
+            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Http::ConnectionPool::Instance::StreamOptions&)
+                       -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              EXPECT_CALL(encoder.stream_, connectionInfoProvider())
+                  .WillRepeatedly(ReturnRef(connection_info1_));
+              callbacks.onPoolReady(encoder,
+                                    context_.server_factory_context_.cluster_manager_
+                                        .thread_local_cluster_.conn_pool_.host_,
+                                    stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
 
     Http::TestRequestHeaderMapImpl headers;
     HttpTestUtility::addDefaultHeaders(headers);
@@ -116,7 +123,8 @@ public:
     Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl());
     response_headers->setStatus(200);
 
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
+                    .host_->outlier_detector_,
                 putHttpResponseCode(200));
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), true);

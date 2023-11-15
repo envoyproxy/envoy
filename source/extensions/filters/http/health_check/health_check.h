@@ -60,7 +60,7 @@ using HeaderDataVectorSharedPtr = std::shared_ptr<std::vector<Http::HeaderUtilit
  */
 class HealthCheckFilter : public Http::StreamFilter {
 public:
-  HealthCheckFilter(Server::Configuration::FactoryContext& context, bool pass_through_mode,
+  HealthCheckFilter(Server::Configuration::ServerFactoryContext& context, bool pass_through_mode,
                     HealthCheckCacheManagerSharedPtr cache_manager,
                     HeaderDataVectorSharedPtr header_match_data,
                     ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages)
@@ -100,7 +100,7 @@ public:
 private:
   void onComplete();
 
-  Server::Configuration::FactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   bool handling_{};
   bool health_check_request_{};

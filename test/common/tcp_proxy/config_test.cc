@@ -263,10 +263,10 @@ TEST(ConfigTest, WeightedClustersConfig) {
   Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   NiceMock<Network::MockConnection> connection;
-  EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(0));
+  EXPECT_CALL(factory_context.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
   EXPECT_EQ(std::string("cluster1"), config_obj.getRouteFromEntries(connection)->clusterName());
 
-  EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(2));
+  EXPECT_CALL(factory_context.server_factory_context_.api_.random_, random()).WillOnce(Return(2));
   EXPECT_EQ(std::string("cluster2"), config_obj.getRouteFromEntries(connection)->clusterName());
 }
 
@@ -303,7 +303,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
     HashedValue hv1(v1), hv2(v2);
 
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(factory_context.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
 
     const auto route = config_obj.getRouteFromEntries(connection);
     EXPECT_NE(nullptr, route);
@@ -330,7 +330,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
     HashedValue hv3(v3), hv4(v4);
 
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(factory_context.server_factory_context_.api_.random_, random()).WillOnce(Return(2));
 
     const auto route = config_obj.getRouteFromEntries(connection);
     EXPECT_NE(nullptr, route);
@@ -396,7 +396,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
     HashedValue hv1(v1), hv2(v2);
 
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(factory_context.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
 
     const auto route = config_obj.getRouteFromEntries(connection);
     EXPECT_NE(nullptr, route);
@@ -429,7 +429,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
     HashedValue hv3(v3), hv4(v4);
 
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(factory_context.server_factory_context_.api_.random_, random()).WillOnce(Return(2));
 
     const auto route = config_obj.getRouteFromEntries(connection);
     EXPECT_NE(nullptr, route);
@@ -686,14 +686,16 @@ public:
     cluster: fake_cluster
     )EOF";
 
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
   void initializeFilter() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+    filter_ = std::make_unique<Filter>(config_,
+                                       factory_context_.server_factory_context_.cluster_manager_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -714,7 +716,8 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999));
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
@@ -733,7 +736,8 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
 class TcpProxyHashingTest : public testing::Test {
 public:
   void setup(const std::string& yaml) {
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
@@ -743,7 +747,8 @@ public:
                         Network::MockConnection& connection) {
     EXPECT_CALL(filter_callbacks, connection()).WillRepeatedly(testing::ReturnRef(connection));
 
-    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+    filter_ = std::make_unique<Filter>(config_,
+                                       factory_context_.server_factory_context_.cluster_manager_);
     filter_->initializeReadFilterCallbacks(filter_callbacks);
   }
 
@@ -778,7 +783,8 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
 
     // Ensure there is no remote address (MockStreamInfo sets one by default), and expect no hash.
     mock_connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _))
         .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
           EXPECT_FALSE(context->computeHashKey().has_value());
           return absl::nullopt;
@@ -791,7 +797,8 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
     initializeFilter();
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _))
         .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
           EXPECT_TRUE(context->computeHashKey().has_value());
           return absl::nullopt;
@@ -817,7 +824,8 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
     NiceMock<Network::MockConnection> mock_connection;
     initializeFilter(filter_callbacks, mock_connection);
     // Expect no hash when filter state is unset.
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _))
         .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
           EXPECT_FALSE(context->computeHashKey().has_value());
           return absl::nullopt;
@@ -831,7 +839,8 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
     connection_.stream_info_.filter_state_->setData("foo", std::make_unique<HashableObj>(),
                                                     StreamInfo::FilterState::StateType::ReadOnly,
                                                     StreamInfo::FilterState::LifeSpan::FilterChain);
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _))
         .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
           EXPECT_EQ(31337, context->computeHashKey().value());
           return absl::nullopt;

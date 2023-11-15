@@ -63,9 +63,8 @@ public:
       throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
-    ON_CALL(context_.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
-      return Thread::threadFactoryForTest();
-    });
+    ON_CALL(context_.server_factory_context_.api_, threadFactory())
+        .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   }
 
   void initCache() {
@@ -281,7 +280,8 @@ public:
 class FileSystemHttpCacheTestWithMockFiles : public FileSystemHttpCacheTest {
 public:
   FileSystemHttpCacheTestWithMockFiles() {
-    ON_CALL(context_, singletonManager()).WillByDefault(ReturnRef(mock_singleton_manager_));
+    ON_CALL(context_.server_factory_context_, singletonManager())
+        .WillByDefault(ReturnRef(mock_singleton_manager_));
     ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _))
         .WillByDefault(Return(mock_async_file_manager_factory_));
     ON_CALL(*mock_async_file_manager_factory_, getAsyncFileManager(_, _))

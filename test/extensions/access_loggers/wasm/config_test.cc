@@ -31,14 +31,12 @@ class WasmAccessLogConfigTest
     : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmAccessLogConfigTest() : api_(Api::createApiForTest(stats_store_)) {
-    ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(context_, scope()).WillByDefault(ReturnRef(scope_));
     ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
     ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
-    ON_CALL(context_.server_factory_context_, clusterManager())
-        .WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
-        .WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(log_stream_info_, requestComplete())
         .WillByDefault(Return(std::chrono::milliseconds(30)));
   }

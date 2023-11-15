@@ -103,8 +103,7 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::ResponseHeaderM
           headers.EnvoyDegraded() != nullptr);
     }
 
-    headers.setEnvoyUpstreamHealthCheckedCluster(
-        context_.getServerFactoryContext().localInfo().clusterName());
+    headers.setEnvoyUpstreamHealthCheckedCluster(context_.localInfo().clusterName());
   }
 
   if (context_.healthCheckFailed()) {
@@ -133,7 +132,7 @@ void HealthCheckFilter::onComplete() {
     } else if (cluster_min_healthy_percentages_ != nullptr &&
                !cluster_min_healthy_percentages_->empty()) {
       // Check the status of the specified upstream cluster(s) to determine the right response.
-      auto& clusterManager = context_.getServerFactoryContext().clusterManager();
+      auto& clusterManager = context_.clusterManager();
       for (const auto& item : *cluster_min_healthy_percentages_) {
         details = &RcDetails::get().HealthCheckClusterHealthy;
         const std::string& cluster_name = item.first;

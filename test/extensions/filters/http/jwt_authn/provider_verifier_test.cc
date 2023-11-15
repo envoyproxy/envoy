@@ -34,7 +34,8 @@ ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
 class ProviderVerifierTest : public testing::Test {
 public:
   ProviderVerifierTest() {
-    mock_factory_ctx_.cluster_manager_.initializeThreadLocalClusters({"pubkey_cluster"});
+    mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"pubkey_cluster"});
   }
 
   void createVerifier() {
@@ -57,7 +58,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
       "my_payload");
   createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
       .WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
@@ -88,7 +89,7 @@ TEST_F(ProviderVerifierTest, TestOkJWTWithExtractedHeaderAndPayload) {
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_header_in_metadata(
       "my_header");
   createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
       .WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
@@ -115,7 +116,7 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
       "my_payload");
   createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
       .WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
@@ -128,7 +129,8 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
                      .setTimeout(std::chrono::milliseconds(5 * 1000))
                      .setParentSpan(parent_span_)
                      .setChildSpanName("JWT Remote PubKey Fetch");
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                  .async_client_,
               send_(_, _, Eq(options)));
 
   auto headers = Http::TestRequestHeaderMapImpl{
@@ -212,7 +214,7 @@ TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
   provider_and_audiences->set_provider_name("example_provider");
   provider_and_audiences->add_audiences("invalid_service");
   createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
   EXPECT_CALL(mock_cb_, onComplete(_))
       .WillOnce(
@@ -264,7 +266,7 @@ TEST_P(ProviderVerifiersJwtCacheTest, TestRequirementsWithAudiences) {
   VerifierConstPtr verifier2 =
       Verifier::create(require2, proto_config_.providers(), *filter_config_);
 
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
   {
     // First call, audience matched, so it is good.
