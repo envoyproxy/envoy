@@ -58,6 +58,7 @@ envoy_cc_library(
         "@envoy//source/common/common:random_generator_lib",
         "@envoy//source/common/runtime:runtime_lib",
         "@envoy//source/exe:stripped_main_base_lib",
+        "@envoy//source/server:null_overload_manager_lib",
     ] + envoy_select_signal_trace(
         ["@envoy//source/common/signal:sigaction_lib"],
         "@envoy",

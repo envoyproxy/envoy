@@ -44,7 +44,6 @@
 #endif
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/overload_manager_impl.h"
 #include "source/server/worker_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -246,6 +245,7 @@ public:
   ~InstanceBase() override;
 
   virtual void maybeCreateHeapShrinker() PURE;
+  virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
 
   void run() override;
 
@@ -391,7 +391,7 @@ private:
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
-  std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  std::unique_ptr<OverloadManager> overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
