@@ -29,7 +29,8 @@ class XdsTest {
 
   @Before
   fun setUp() {
-    val upstreamCert: String = File("../envoy/test/config/integration/certs/upstreamcacert.pem").readText()
+    val upstreamCert: String =
+      File("../envoy/test/config/integration/certs/upstreamcacert.pem").readText()
     TestJni.initXdsTestServer()
     val latch = CountDownLatch(1)
     engine =
