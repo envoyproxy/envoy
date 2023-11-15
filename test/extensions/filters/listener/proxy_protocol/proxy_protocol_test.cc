@@ -10,6 +10,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
@@ -237,6 +238,20 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(ProxyProtocolTest, V1UnsupportedIPv4) {
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, V1UnsupportedIPv6) {
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
+  expectProxyProtoError();
+}
+
 TEST_P(ProxyProtocolTest, V1Basic) {
   connect();
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -389,6 +404,34 @@ TEST_P(ProxyProtocolTest, V2BasicV6) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2UnsupportedIPv4) {
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
+  // A well-formed ipv6/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                0x0a, 0x21, 0x22, 0x00, 0x24, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
+                                0x01, 0x01, 0x00, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 'm',  'o',  'r',
+                                'e',  ' ',  'd',  'a',  't',  'a'};
+
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
