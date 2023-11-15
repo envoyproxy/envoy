@@ -68,7 +68,8 @@ public:
         }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamClusterInfo())
         .WillByDefault(ReturnPointee(&upstream_cluster_));
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
   }
 
   ~TcpProxyTestBase() override {
@@ -150,7 +151,9 @@ public:
     return connection;
   }
 
-  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::TestTimeSystem& timeSystem() {
+    return factory_context_.server_factory_context_.timeSystem();
+  }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
