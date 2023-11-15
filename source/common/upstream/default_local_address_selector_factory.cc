@@ -1,3 +1,5 @@
+#include "source/common/upstream/default_local_address_selector_factory.h"
+
 #include "source/common/upstream/default_local_address_selector.h"
 
 namespace Envoy {
@@ -12,14 +14,14 @@ validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_lo
          absl::optional<std::string> cluster_name) {
 
   if (upstream_local_addresses.empty()) {
-    return absl::InvalidArgumentexception(
+    return absl::InvalidArgumentError(
         fmt::format("{}'s upstream binding config has no valid source address.",
                     !(cluster_name.has_value()) ? "Bootstrap"
                                                 : fmt::format("Cluster {}", cluster_name.value())));
   }
 
   if (upstream_local_addresses.size() > 2) {
-    return absl::InvalidArgumentexception(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "{}'s upstream binding config has more than one extra/additional source addresses. Only "
         "one extra/additional source can be supported in BindConfig's "
         "extra_source_addresses/additional_source_addresses field",
@@ -41,7 +43,7 @@ validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_lo
 
     if (upstream_local_addresses[0].address_->ip()->version() ==
         upstream_local_addresses[1].address_->ip()->version()) {
-      return absl::InvalidArgumentexception(fmt::format(
+      return absl::InvalidArgumentError(fmt::format(
           "{}'s upstream binding config has two same IP version source addresses. Only two "
           "different IP version source addresses can be supported in BindConfig's source_address "
           "and extra_source_addresses/additional_source_addresses fields",

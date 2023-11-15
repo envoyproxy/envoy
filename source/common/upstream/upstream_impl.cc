@@ -362,7 +362,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{}))),
       cluster_name);
-  THROW_IF_STAUS_NOT_OK(selector_or_error);
+  THROW_IF_STATUS_NOT_OK(selector_or_error, throw);
   return selector_or_error.value();
 }
 
