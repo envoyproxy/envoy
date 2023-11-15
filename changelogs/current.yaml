@@ -15,6 +15,9 @@ bug_fixes:
   change: |
     Fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
     a PROXY protocol header with address type LOCAL (typically used for health checks).
+- area: url matching
+  change: |
+    Fixed excessive CPU utilization when using regex URL template matcher.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
