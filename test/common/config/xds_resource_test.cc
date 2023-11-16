@@ -119,13 +119,11 @@ TEST(XdsResourceNameTest, DecodeEmpty) {
 // Negative tests for URN decoding.
 TEST(XdsResourceNameTest, DecodeFail) {
   {
-    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrn("foo://"),
-                              XdsResourceIdentifier::DecodeException,
+    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrn("foo://"), EnvoyException,
                               "foo:// does not have an xdstp: scheme");
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrn("xdstp://foo"),
-                              XdsResourceIdentifier::DecodeException,
+    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrn("xdstp://foo"), EnvoyException,
                               "Resource type missing from /");
   }
 }
@@ -133,19 +131,16 @@ TEST(XdsResourceNameTest, DecodeFail) {
 // Negative tests for URL decoding.
 TEST(XdsResourceLocatorTest, DecodeFail) {
   {
-    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("foo://"),
-                              XdsResourceIdentifier::DecodeException,
+    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("foo://"), EnvoyException,
                               "foo:// does not have a xdstp:, http: or file: scheme");
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("xdstp://foo"),
-                              XdsResourceIdentifier::DecodeException,
+    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("xdstp://foo"), EnvoyException,
                               "Resource type missing from /");
   }
   {
     EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("xdstp://foo/some-type#bar=baz"),
-                              XdsResourceIdentifier::DecodeException,
-                              "Unknown fragment component bar=baz");
+                              EnvoyException, "Unknown fragment component bar=baz");
   }
 }
 

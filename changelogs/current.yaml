@@ -49,6 +49,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: buffer
+  change: |
+    Fixed a bug (https://github.com/envoyproxy/envoy/issues/28760) that the internal listener causes an undefined
+    behavior due to the unintended release of the buffer memory.
 - area: xds
   change: |
     Fixed a bug (https://github.com/envoyproxy/envoy/issues/27702) that caused ADS initialization

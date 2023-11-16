@@ -122,8 +122,12 @@ private:
     }
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, server_context_.messageValidationVisitor(), *factory);
-    Http::FilterFactoryCb callback =
+    absl::StatusOr<Http::FilterFactoryCb> callback_or_error =
         factory->createFilterFactoryFromProto(*message, stats_prefix_, factory_context_);
+    if (!callback_or_error.status().ok()) {
+      return callback_or_error.status();
+    }
+    Http::FilterFactoryCb callback = callback_or_error.value();
     dependency_manager.registerFilter(factory->name(), *factory->dependencies());
     const bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
     Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
