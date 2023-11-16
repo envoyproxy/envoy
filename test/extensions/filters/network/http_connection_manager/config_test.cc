@@ -181,7 +181,7 @@ http_filters:
                                      filter_config_provider_manager_);
 
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
-  EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
+  EXPECT_EQ(*context_.server_factory_context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
@@ -329,7 +329,7 @@ http_filters:
   tracing_config.mutable_http()->set_name("zipkin");
   tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
       envoy::config::trace::v3::ZipkinConfig{});
-  context_.http_context_.setDefaultTracingConfig(tracing_config);
+  context_.server_factory_context_.http_context_.setDefaultTracingConfig(tracing_config);
 
   // When tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
   // there is no reason to obtain an actual Tracer.
@@ -409,7 +409,7 @@ http_filters:
   tracing_config.mutable_http()->set_name("zipkin");
   tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
       envoy::config::trace::v3::ZipkinConfig{});
-  context_.http_context_.setDefaultTracingConfig(tracing_config);
+  context_.server_factory_context_.http_context_.setDefaultTracingConfig(tracing_config);
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
   // an actual Tracer must be obtained from the HttpTracerManager.
@@ -460,7 +460,7 @@ http_filters:
   bootstrap_tracing_config.mutable_http()->set_name("opencensus");
   bootstrap_tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
       envoy::config::trace::v3::OpenCensusConfig{});
-  context_.http_context_.setDefaultTracingConfig(bootstrap_tracing_config);
+  context_.server_factory_context_.http_context_.setDefaultTracingConfig(bootstrap_tracing_config);
 
   // Set up expected tracer provider configuration.
   envoy::config::trace::v3::Tracing_Http inlined_tracing_config;
@@ -807,7 +807,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfiguredViaRunti
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  ON_CALL(context_.runtime_loader_.snapshot_,
+  ON_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
           getInteger("envoy.reloadable_features.max_request_headers_size_kb", 60))
       .WillByDefault(Return(9000));
 
@@ -991,8 +991,9 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -1014,8 +1015,9 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -1037,8 +1039,9 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -1061,8 +1064,9 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -1084,8 +1088,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -1110,10 +1115,11 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .WillOnce(Return(true));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1136,10 +1142,11 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1162,10 +1169,11 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1563,7 +1571,7 @@ http_filters:
   auto proto_config = parseHttpConnectionManagerFromYaml(yaml_string);
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
-  EXPECT_CALL(context_.thread_local_, allocateSlot());
+  EXPECT_CALL(context_.server_factory_context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
   EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_.getServerFactoryContext()));
@@ -2806,11 +2814,12 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefault) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .WillRepeatedly(Return(0));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -2834,11 +2843,12 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .WillRepeatedly(Return(3));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -2850,7 +2860,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
             config.pathWithEscapedSlashesAction());
 
   // Check the UNESCAPE_AND_FORWARD override to mollify coverage check
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .WillRepeatedly(Return(4));
   HttpConnectionManagerConfig config1(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -2876,13 +2886,14 @@ TEST_F(HttpConnectionManagerConfigTest,
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
   // When configuration value is not the IMPLEMENTATION_SPECIFIC_DEFAULT the runtime override should
   // not even be considered.
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -2907,15 +2918,17 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.path_with_escaped_slashes_action_enabled",
                              An<const envoy::type::v3::FractionalPercent&>()))
       .WillRepeatedly(Return(false));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -3035,10 +3048,12 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
 
   TestHeaderValidatorFactoryConfig factory;
   Registry::InjectFactory<Http::HeaderValidatorFactoryConfig> registration(factory);
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
 #ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -3075,10 +3090,12 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfigWithRuntimeDisabled
 
   TestHeaderValidatorFactoryConfig factory;
   Registry::InjectFactory<Http::HeaderValidatorFactoryConfig> registration(factory);
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
 #ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -3119,10 +3136,12 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfigWithRuntimeE
       proto_config;
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
   Registry::InjectFactory<Http::HeaderValidatorFactoryConfig> registration(factory);
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
 #ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -3166,10 +3185,12 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
       proto_config;
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
   Registry::InjectFactory<Http::HeaderValidatorFactoryConfig> registration(factory);
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
@@ -3207,10 +3228,11 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
       proto_config;
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
   Registry::InjectFactory<Http::HeaderValidatorFactoryConfig> registration(factory);
-  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
 #ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
@@ -3244,9 +3266,10 @@ public:
   HcmUtilityTest() {
     // Although different Listeners will have separate FactoryContexts,
     // those contexts must share the same SingletonManager.
-    ON_CALL(context_two_, singletonManager()).WillByDefault([&]() -> Singleton::Manager& {
-      return *context_one_.singleton_manager_;
-    });
+    ON_CALL(context_two_.server_factory_context_, singletonManager())
+        .WillByDefault([this]() -> Singleton::Manager& {
+          return *context_one_.server_factory_context_.singleton_manager_;
+        });
   }
   NiceMock<Server::Configuration::MockFactoryContext> context_one_;
   NiceMock<Server::Configuration::MockFactoryContext> context_two_;

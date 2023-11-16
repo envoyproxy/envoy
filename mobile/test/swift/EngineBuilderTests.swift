@@ -109,20 +109,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddinggrpcStatsDomainAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("stats.envoyproxy.io", config.grpcStatsDomain)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addGrpcStatsDomain("stats.envoyproxy.io")
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddingConnectTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -246,20 +232,6 @@ final class EngineBuilderTests: XCTestCase {
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addPlatformFilter(TestFilter.init)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
-  func testAddingStatsFlushSecondsAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual(42, config.statsFlushSeconds)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addStatsFlushSeconds(42)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -397,7 +369,6 @@ final class EngineBuilderTests: XCTestCase {
       .addInitialStreamHeader(header: "x-goog-api-key", value: "A1B2C3")
       .addInitialStreamHeader(header: "x-android-package", value: "com.google.myapp")
       .setSslRootCerts(rootCerts: "fake_ssl_root_certs")
-      .setSni(sni: "fake_sni_address")
       .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
@@ -408,7 +379,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains("x-android-package"))
     XCTAssertTrue(bootstrapDebugDescription.contains("com.google.myapp"))
     XCTAssertTrue(bootstrapDebugDescription.contains("fake_ssl_root_certs"))
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_sni_address"))
   }
 #endif
 

@@ -2,6 +2,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "test/common/integration/xds_integration_test.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -22,7 +23,8 @@ public:
         /*xds_server_address=*/Network::Test::getLoopbackAddressUrlString(ipVersion()),
         /*xds_server_port=*/fake_upstreams_[1]->localAddress()->ip()->port());
     // Add the layered runtime config, which includes the RTDS layer.
-    xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1);
+    xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1)
+        .setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
     XdsIntegrationTest::createEnvoy();
   }

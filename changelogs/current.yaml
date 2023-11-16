@@ -191,8 +191,16 @@ new_features:
     configuration flag.
 - area: udp_proxy
   change: |
-    add :ref:`flush access log on connected
-    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.flush_access_log_on_connected>`
-    to allow recording an access log entry on the connection open event.
+    added support for propagating the response headers in :ref:`UdpTunnelingConfig
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.propagate_response_headers>` and
+    response trailers in :ref:`UdpTunnelingConfig
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.propagate_response_trailers>` to
+    the downstream info filter state.
+- area: udp_proxy
+  change: |
+    add :ref:`access log options
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log_options>`
+    to allow recording an access log entry periodically for the UDP session, and allow recording an access
+    log entry on the connection tunnel created successfully to upstream when UDP tunneling is configured.
 
 deprecated:

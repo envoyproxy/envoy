@@ -60,11 +60,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void flushStats() {
-    envoyEngine.flushStats();
-  }
-
-  @Override
   public String dumpStats() {
     return envoyEngine.dumpStats();
   }
