@@ -138,6 +138,26 @@ Compared to overload actions, Load Shed Points are also more flexible to
 integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
 has access to the Overload Manager to request the custom Load Shed Point.
 
+As an example, below is partial Overload Manager configuration with a core load shed point
+``envoy.load_shed_points.http_connection_manager_decode_headers`` and a maximum threshold
+for the ``envoy.resource_monitors.fixed_heap`` monitor. Once threshold is reached, Envoy
+will reject new HTTP streams by sending local reply. Monitor needs to be configured as well:
+
+.. code-block:: yaml
+
+  loadshed_points:
+    - name: "envoy.load_shed_points.http_connection_manager_decode_headers"
+      triggers:
+      - name: "envoy.resource_monitors.fixed_heap"
+        threshold:
+          value: 0.99
+  resource_monitors:
+    - name: "envoy.resource_monitors.fixed_heap"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
+        max_heap_size_bytes: 12000000000
+
+
 The following core load shed points are supported:
 
 .. list-table::
