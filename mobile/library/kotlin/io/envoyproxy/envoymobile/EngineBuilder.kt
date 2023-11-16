@@ -152,7 +152,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
   private var logLevel = LogLevel.INFO
-  private var grpcStatsDomain: String? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
@@ -175,7 +174,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
   private var maxConnectionsPerHost = 7
-  private var statsFlushSeconds = 60
   private var streamIdleTimeoutSeconds = 15
   private var perTryIdleTimeoutSeconds = 15
   private var appVersion = "unspecified"
@@ -185,7 +183,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
-  private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
   private var nodeId: String = ""
   private var nodeRegion: String = ""
@@ -202,33 +199,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
    */
   fun addLogLevel(logLevel: LogLevel): EngineBuilder {
     this.logLevel = logLevel
-    return this
-  }
-
-  /**
-   * Specifies the domain (e.g. `example.com`) to use in the default gRPC stat sink to flush stats.
-   *
-   * Setting this value enables the gRPC stat sink, which periodically flushes stats via the gRPC
-   * MetricsService API. The flush interval is specified via addStatsFlushSeconds.
-   *
-   * @param grpcStatsDomain The domain to use for the gRPC stats sink.
-   * @return this builder.
-   */
-  fun addGrpcStatsDomain(grpcStatsDomain: String?): EngineBuilder {
-    this.grpcStatsDomain = grpcStatsDomain
-    return this
-  }
-
-  /**
-   * Adds additional stats sinks, in the form of the raw YAML/JSON configuration. Sinks added in
-   * this fashion will be included in addition to the gRPC stats sink that may be enabled via
-   * addGrpcStatsDomain.
-   *
-   * @param statsSinks Configurations of stat sinks to add.
-   * @return this builder.
-   */
-  fun addStatsSinks(statsSinks: List<String>): EngineBuilder {
-    this.statsSinks = statsSinks
     return this
   }
 
@@ -436,17 +406,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
    */
   fun setMaxConnectionsPerHost(maxConnectionsPerHost: Int): EngineBuilder {
     this.maxConnectionsPerHost = maxConnectionsPerHost
-    return this
-  }
-
-  /**
-   * Add an interval at which to flush Envoy stats.
-   *
-   * @param statsFlushSeconds interval at which to flush Envoy stats.
-   * @return this builder.
-   */
-  fun addStatsFlushSeconds(statsFlushSeconds: Int): EngineBuilder {
-    this.statsFlushSeconds = statsFlushSeconds
     return this
   }
 
@@ -689,7 +648,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   fun build(): Engine {
     val engineConfiguration =
       EnvoyConfiguration(
-        grpcStatsDomain,
         connectTimeoutSeconds,
         dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase,
@@ -712,7 +670,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds,
         maxConnectionsPerHost,
-        statsFlushSeconds,
         streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds,
         appVersion,
@@ -722,7 +679,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         platformFilterChain,
         stringAccessors,
         keyValueStores,
-        statsSinks,
         runtimeGuards,
         enablePlatformCertificatesValidation,
         xdsBuilder?.rtdsResourceName,

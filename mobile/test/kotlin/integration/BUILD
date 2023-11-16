@@ -97,26 +97,6 @@ envoy_mobile_jni_kt_test(
 )
 
 envoy_mobile_jni_kt_test(
-    name = "stat_flush_integration_test",
-    srcs = [
-        "StatFlushIntegrationTest.kt",
-        "TestStatsdServer.kt",
-    ],
-    native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
-    native_lib_name = "envoy_jni_with_test_extensions",
-    deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-    ],
-)
-
-envoy_mobile_jni_kt_test(
     name = "cancel_stream_test",
     srcs = [
         "CancelStreamTest.kt",
@@ -384,6 +364,7 @@ envoy_mobile_android_test(
         "XdsTest.kt",
     ],
     native_deps = [
+        "@envoy//test/config/integration/certs",
         "//test/common/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [

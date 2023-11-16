@@ -18,7 +18,7 @@ class DefaultUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSe
 public:
   std::string name() const override;
 
-  UpstreamLocalAddressSelectorConstSharedPtr createLocalAddressSelector(
+  absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr> createLocalAddressSelector(
       std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
       absl::optional<std::string> cluster_name) const override;
 

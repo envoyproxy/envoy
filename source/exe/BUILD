@@ -69,16 +69,24 @@ envoy_cc_library(
     srcs = ["stripped_main_base.cc"],
     hdrs = ["stripped_main_base.h"],
     deps = [
-        ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/event:libevent_lib",
+        "//source/common/event:real_time_system_lib",
         "//source/common/grpc:google_grpc_context_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//source/server:drain_manager_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:listener_hooks_lib",
+        "//source/server:options_lib",
+        "//source/server:server_base_lib",
     ] + envoy_select_signal_trace([
         "//source/common/signal:sigaction_lib",
         ":terminate_handler_lib",
@@ -135,25 +143,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_common_with_core_extensions_lib",
-    deps = [
-               "//source/common/event:libevent_lib",
-               "//source/common/network:utility_lib",
-               "//source/common/stats:stats_lib",
-               "//source/common/stats:thread_local_store_lib",
-               "//source/server:drain_manager_lib",
-               "//source/server:listener_hooks_lib",
-               "//source/server:options_lib",
-               "//source/server:server_base_lib",
-           ] + envoy_all_core_extensions() +
-           # TODO(rojkov): drop io_uring dependency when it's fully integrated.
-           select({
-               "//bazel:linux": ["//source/common/io:io_uring_impl_lib"],
-               "//conditions:default": [],
-           }),
-)
-
-envoy_cc_library(
     name = "envoy_main_common_with_core_extensions_lib",
     srcs = [
         "main_common.cc",
@@ -164,23 +153,28 @@ envoy_cc_library(
         "stripped_main_base.h",
     ],
     deps = [
-        ":envoy_common_with_core_extensions_lib",
-        ":platform_impl_lib",
-        ":process_wide_lib",
-        "//envoy/server:platform_interface",
-        "//source/common/api:os_sys_calls_lib",
-        "//source/common/common:compiler_requirements_lib",
-        "//source/common/common:perf_annotation_lib",
-        "//source/common/grpc:google_grpc_context_lib",
-        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
-        "//source/server:hot_restart_lib",
-        "//source/server:hot_restart_nop_lib",
-        "//source/server:server_lib",
-        "//source/server/config_validation:server_lib",
-    ] + envoy_select_signal_trace([
-        "//source/common/signal:sigaction_lib",
-        ":terminate_handler_lib",
-    ]),
+               ":platform_impl_lib",
+               ":process_wide_lib",
+               "//envoy/server:platform_interface",
+               "//source/common/api:os_sys_calls_lib",
+               "//source/common/common:compiler_requirements_lib",
+               "//source/common/common:perf_annotation_lib",
+               "//source/common/grpc:google_grpc_context_lib",
+               "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+               "//source/server:hot_restart_lib",
+               "//source/server:hot_restart_nop_lib",
+               "//source/server:options_lib",
+               "//source/server:server_lib",
+               "//source/server/config_validation:server_lib",
+           ] + envoy_select_signal_trace([
+               "//source/common/signal:sigaction_lib",
+               ":terminate_handler_lib",
+           ]) + envoy_all_core_extensions() +
+           # TODO(rojkov): drop io_uring dependency when it's fully integrated.
+           select({
+               "//bazel:linux": ["//source/common/io:io_uring_impl_lib"],
+               "//conditions:default": [],
+           }),
 )
 
 envoy_cc_library(

@@ -60,6 +60,7 @@
 
 namespace Envoy {
 namespace Server {
+
 namespace {
 std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
 
@@ -606,9 +607,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, *stats_store_.rootScope(), thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options_);
+  overload_manager_ = createOverloadManager();
 
   maybeCreateHeapShrinker();
 
@@ -801,7 +800,8 @@ void InstanceBase::onRuntimeReady() {
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
+        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames(),
+        bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
