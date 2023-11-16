@@ -67,7 +67,7 @@ public:
     grpc_service->mutable_envoy_grpc()->set_cluster_name("sds_cluster");
   }
 
-  Http::FilterFactoryCb
+  virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
                Server::Configuration::FactoryContext& factory_context) override {
     auto secret_provider =

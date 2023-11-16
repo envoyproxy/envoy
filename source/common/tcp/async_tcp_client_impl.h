@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -15,6 +16,7 @@
 #include "source/common/network/filter_impl.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -57,6 +59,14 @@ public:
   bool connected() override { return !disconnected_; }
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+  OptRef<StreamInfo::StreamInfo> getStreamInfo() override {
+    if (connection_) {
+      return connection_->streamInfo();
+    } else {
+      return absl::nullopt;
+    }
+  }
 
 private:
   struct NetworkReadFilter : public Network::ReadFilterBaseImpl {

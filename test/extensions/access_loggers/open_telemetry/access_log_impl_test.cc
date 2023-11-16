@@ -144,8 +144,7 @@ TEST_F(AccessLogTest, Marshalling) {
           value:
             string_value: "10"
     )EOF");
-  access_log->log(&request_headers, &response_headers, nullptr, stream_info,
-                  Envoy::AccessLog::AccessLogType::NotSet);
+  access_log->log({&request_headers, &response_headers}, stream_info);
 }
 
 // Test log with empty config.
@@ -159,8 +158,7 @@ TEST_F(AccessLogTest, EmptyConfig) {
   expectLog(R"EOF(
       time_unix_nano: 3600000000000
     )EOF");
-  access_log->log(&request_headers, &response_headers, nullptr, stream_info,
-                  Envoy::AccessLog::AccessLogType::NotSet);
+  access_log->log({&request_headers, &response_headers}, stream_info);
 }
 
 } // namespace

@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",

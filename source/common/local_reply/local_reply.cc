@@ -19,7 +19,7 @@ namespace LocalReply {
 class BodyFormatter {
 public:
   BodyFormatter()
-      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
+      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%", false)),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
@@ -61,7 +61,8 @@ public:
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
     if (config.has_body()) {
-      body_ = Config::DataSource::read(config.body(), true, context.api());
+      body_ =
+          Config::DataSource::read(config.body(), true, context.getServerFactoryContext().api());
     }
 
     if (config.has_body_format_override()) {

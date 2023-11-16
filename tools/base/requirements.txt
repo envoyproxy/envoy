@@ -707,6 +707,10 @@ humanfriendly==10.0 \
     --hash=sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477 \
     --hash=sha256:6b0b831ce8f15f7300721aa49829fc4e83921a9a301cc7f606be6686a2288ddc
     # via coloredlogs
+icalendar==5.0.11 \
+    --hash=sha256:7a298bb864526589d0de81f4b736eeb6ff9e539fefb405f7977aa5c1e201ca00 \
+    --hash=sha256:81864971ac43a1b7d0a555dc1b667836ce59fc719a7f845a96f2f03205fb83b9
+    # via -r requirements.in
 idna==3.4 \
     --hash=sha256:814f528e8dead7d329833b91c5faa87d60bf71824cd12a7530b5526063d02cb4 \
     --hash=sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2
@@ -1108,7 +1112,9 @@ pyreadline==2.1 \
 python-dateutil==2.8.2 \
     --hash=sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86 \
     --hash=sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9
-    # via pygithub
+    # via
+    #   icalendar
+    #   pygithub
 python-gnupg==0.5.1 \
     --hash=sha256:5674bad4e93876c0b0d3197e314d7f942d39018bf31e2b833f6788a6813c3fb8 \
     --hash=sha256:bf9b2d9032ef38139b7d64184176cd0b293eaeae6e4f93f50e304c7051174482
@@ -1119,6 +1125,7 @@ pytz==2023.3.post1 \
     # via
     #   aio-core
     #   envoy-base-utils
+    #   icalendar
 pyu2f==0.1.5 \
     --hash=sha256:a3caa3a11842fc7d5746376f37195e6af5f17c0a15737538bb1cebf656fb306b
     # via google-reauth
@@ -1182,6 +1189,7 @@ requests==2.31.0 \
     --hash=sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f \
     --hash=sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1
     # via
+    #   -r requirements.in
     #   google-auth
     #   pygithub
     #   sphinx
