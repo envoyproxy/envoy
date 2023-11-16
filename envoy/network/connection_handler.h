@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -10,6 +11,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/ssl/context.h"
 
 #include "source/common/common/interval_value.h"
@@ -65,9 +67,10 @@ public:
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    * @param runtime the runtime for the server.
+   * @param random a random number generator.
    */
   virtual void addListener(absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
-                           Runtime::Loader& runtime) PURE;
+                           Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed
@@ -217,6 +220,20 @@ public:
    */
   virtual BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
+
+  /**
+   * Creates a TCP listener on a specific port.
+   * @param socket supplies the socket to listen on.
+   * @param cb supplies the callbacks to invoke for listener events.
+   * @param runtime supplies the runtime for this server.
+   * @param listener_config configuration for the TCP listener to be created.
+   * @return Network::ListenerPtr a new listener that is owned by the caller.
+   */
+  virtual Network::ListenerPtr
+  createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                 Runtime::Loader& runtime, Random::RandomGenerator& random,
+                 const Network::ListenerConfig& listener_config,
+                 Server::ThreadLocalOverloadStateOptRef overload_state) PURE;
 };
 
 /**

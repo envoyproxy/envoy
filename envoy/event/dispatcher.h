@@ -229,19 +229,6 @@ public:
   virtual Filesystem::WatcherPtr createFilesystemWatcher() PURE;
 
   /**
-   * Creates a listener on a specific port.
-   * @param socket supplies the socket to listen on.
-   * @param cb supplies the callbacks to invoke for listener events.
-   * @param runtime supplies the runtime for this server.
-   * @param listener_config configuration for the TCP listener to be created.
-   * @return Network::ListenerPtr a new listener that is owned by the caller.
-   */
-  virtual Network::ListenerPtr
-  createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                 Runtime::Loader& runtime, const Network::ListenerConfig& listener_config,
-                 Server::ThreadLocalOverloadStateOptRef overload_state) PURE;
-
-  /**
    * Submits an item for deferred delete. @see DeferredDeletable.
    */
   virtual void deferredDelete(DeferredDeletablePtr&& to_delete) PURE;

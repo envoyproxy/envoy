@@ -27,7 +27,8 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public Network::BalancedConnectionHandler {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
-                    Runtime::Loader& runtime, Network::SocketSharedPtr&& socket,
+                    Runtime::Loader& runtime, Random::RandomGenerator& random,
+                    Network::SocketSharedPtr&& socket,
                     Network::Address::InstanceConstSharedPtr& listen_address,
                     Network::ConnectionBalancer& connection_balancer,
                     ThreadLocalOverloadStateOptRef overload_state);
