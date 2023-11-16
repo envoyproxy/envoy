@@ -5,21 +5,6 @@ licenses(["notice"])  # Apache 2
 # TODO(jpsim): Fix remote execution for all the tests in this file.
 
 envoy_mobile_swift_test(
-    name = "test",
-    srcs = [
-        "StatFlushIntegrationTest.swift",
-    ],
-    tags = [
-        "no-remote-exec",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":test_extensions",
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
     name = "end_to_end_networking_test",
     srcs = [
         "EndToEndNetworkingTest.swift",
