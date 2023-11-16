@@ -1818,7 +1818,7 @@ public:
     config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
     stream_info_.downstream_connection_info_provider_->setConnectionID(0);
     pool_ = std::make_unique<TunnelingConnectionPoolImpl>(cluster_, &context_, *config_, callbacks_,
-                                                          stream_info_, session_access_logs_);
+                                                          stream_info_, false, *session_access_logs_);
   }
 
   void createNewStream() { pool_->newStream(stream_callbacks_); }
@@ -1829,7 +1829,7 @@ public:
   std::unique_ptr<NiceMock<MockUdpTunnelingConfig>> config_;
   NiceMock<MockUpstreamTunnelCallbacks> callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  const std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
+  std::unique_ptr<std::vector<AccessLog::InstanceSharedPtr>> session_access_logs_;
   NiceMock<MockHttpStreamCallbacks> stream_callbacks_;
   NiceMock<Http::MockRequestEncoder> request_encoder_;
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_{
@@ -1897,12 +1897,12 @@ TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
 
   TunnelingConnectionPoolFactory factory;
   auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_,
-                                           session_access_logs_);
+                                           false, *session_access_logs_);
   EXPECT_FALSE(valid_pool == nullptr);
 
   EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   auto invalid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_,
-                                             stream_info_, session_access_logs_);
+                                             stream_info_, false, *session_access_logs_);
   EXPECT_TRUE(invalid_pool == nullptr);
 }
 

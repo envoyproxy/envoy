@@ -31,8 +31,7 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                               ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.buffer_options(),
                                                                 max_buffered_bytes,
                                                                 DefaultMaxBufferedBytes)
-                              : DefaultMaxBufferedBytes),
-      flush_access_log_on_connected_(config.flush_access_log_on_connected()) {
+                              : DefaultMaxBufferedBytes) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }
@@ -111,6 +110,16 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
 
   if (config.has_tunneling_config()) {
     tunneling_config_ = std::make_unique<TunnelingConfigImpl>(config.tunneling_config(), context);
+  }
+
+  if (config.has_access_log_options()) {
+    flush_access_log_on_tunnel_connected_ = config.access_log_options().flush_access_log_on_tunnel_connected();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
   }
 
   for (const auto& filter : config.session_filters()) {

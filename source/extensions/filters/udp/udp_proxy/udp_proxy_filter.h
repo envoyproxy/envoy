@@ -102,7 +102,6 @@ public:
   virtual bool bufferEnabled() const PURE;
   virtual uint32_t maxBufferedDatagrams() const PURE;
   virtual uint64_t maxBufferedBytes() const PURE;
-  virtual bool flushAccessLogOnConnected() const PURE;
 };
 
 using UdpTunnelingConfigPtr = std::unique_ptr<const UdpTunnelingConfig>;
@@ -127,6 +126,8 @@ public:
   virtual const FilterChainFactory& sessionFilterFactory() const PURE;
   virtual bool hasSessionFilters() const PURE;
   virtual const UdpTunnelingConfigPtr& tunnelingConfig() const PURE;
+  virtual bool flushAccessLogOnTunnelConnected() const PURE;
+  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const PURE;
   virtual Random::RandomGenerator& randomGenerator() const PURE;
 };
 
@@ -376,6 +377,7 @@ public:
                               const UdpTunnelingConfig& tunnel_config,
                               UpstreamTunnelCallbacks& upstream_callbacks,
                               StreamInfo::StreamInfo& downstream_info,
+                              bool flush_access_log_on_tunnel_connected,
                               const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs);
   ~TunnelingConnectionPoolImpl() override = default;
 
@@ -411,6 +413,7 @@ private:
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   const UdpTunnelingConfig& tunnel_config_;
   StreamInfo::StreamInfo& downstream_info_;
+  bool flush_access_log_on_tunnel_connected_;
   const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
@@ -427,6 +430,7 @@ public:
    * @param tunnel_config the tunneling config.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
    * @param stream_info is the downstream session stream info.
+   * @param flush_access_log_on_tunnel_connected indicates whether to flush access log on tunnel connected.
    * @param session_access_logs is the list of access logs for the session.
    * @return may be null if pool creation failed.
    */
@@ -434,6 +438,7 @@ public:
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                  Upstream::LoadBalancerContext* context, const UdpTunnelingConfig& tunnel_config,
                  UpstreamTunnelCallbacks& upstream_callbacks, StreamInfo::StreamInfo& stream_info,
+                 bool flush_access_log_on_tunnel_connected,
                  const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const;
 };
 
@@ -534,6 +539,10 @@ private:
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
 
+    void onAccessLogFlushInterval();
+    void resetAccessLogFlushTimer();
+    void disableAccessLogFlushTimer();
+
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {
       ActiveReadFilterPtr wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
@@ -583,6 +592,7 @@ private:
     // idle timeouts work so we should consider unifying the implementation if we move to a time
     // stamp and scan approach.
     const Event::TimerPtr idle_timer_;
+    Event::TimerPtr access_log_flush_timer_;
 
     UdpProxySessionStats session_stats_{};
     StreamInfo::StreamInfoImpl udp_session_info_;

@@ -351,7 +351,7 @@ public:
     absl::optional<BufferOptions> buffer_options_;
     absl::optional<std::string> idle_timeout_;
     std::string session_access_log_config_ = "";
-    bool flush_access_log_on_connected_ = false;
+    std::string access_log_options_ = "";
   };
 
   void setup(const TestConfig& config) {
@@ -380,10 +380,9 @@ typed_config:
     default_target_port: {}
     retry_options:
       max_connect_attempts: {}
-    flush_access_log_on_connected: {}
 )EOF",
                     config.proxy_host_, config.target_host_, config.default_target_port_,
-                    config.max_connect_attempts_, config.flush_access_log_on_connected_);
+                    config.max_connect_attempts_);
 
     if (config.buffer_options_.has_value()) {
       filter_config += fmt::format(R"EOF(
@@ -410,7 +409,7 @@ typed_config:
                                    config.idle_timeout_.value());
     }
 
-    filter_config += config.session_access_log_config_;
+    filter_config += config.session_access_log_config_ + config.access_log_options_;
 
     config_helper_.renameListener("udp_proxy");
     config_helper_.addConfigModifier(
@@ -741,7 +740,7 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("2"));
 }
 
-TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogOnConnected) {
+TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogOnTunnelConnected) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
@@ -757,6 +756,11 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogOnConnected) {
 )EOF",
                                                             access_log_filename);
 
+  const std::string access_log_options = R"EOF(
+  access_log_options:
+    flush_access_log_on_tunnel_connected: true
+)EOF";
+
   const TestConfig config{"host.com",
                           "target.com",
                           1,
@@ -766,20 +770,63 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogOnConnected) {
                           BufferOptions{1, 30},
                           absl::nullopt,
                           session_access_log_config,
-                          true};
+                          access_log_options};
   setup(config);
 
   const std::string datagram = "hello";
   establishConnection(datagram);
   EXPECT_THAT(
       waitForAccessLog(access_log_filename),
-      testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpUpstreamConnected)));
+      testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpTunnelUpstreamConnected)));
 
   // Wait for buffered datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
   sendCapsuleDownstream("response", true);
 
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogPeriodically) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%ACCESS_LOG_TYPE%\n"
+)EOF",
+                                                            access_log_filename);
+  const std::string access_log_options = R"EOF(
+  access_log_options:
+    access_log_flush_interval: 0.5s
+)EOF";
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          access_log_options};
+  setup(config);
+
+  const std::string datagram = "hello";
+  establishConnection(datagram);
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+
+  sendCapsuleDownstream("response1", false);
+  EXPECT_THAT(
+      waitForAccessLog(access_log_filename),
+      testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpPeriodic)));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, UdpTunnelingIntegrationTest,
