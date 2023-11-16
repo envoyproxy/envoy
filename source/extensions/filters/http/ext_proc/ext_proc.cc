@@ -706,29 +706,41 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
 }
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
-                                std::unique_ptr<ProcessingResponse>& response) {
-  bool has_receiving_namespaces = state.untypedReceivingMetadataNamespaces().size() > 0;
-  if (!(has_receiving_namespaces && response->has_dynamic_metadata())) {
+                                ProcessingResponse& response) {
+  if (state.untypedReceivingMetadataNamespaces().size() == 0 || !response.has_dynamic_metadata()) {
+    if (response.has_dynamic_metadata()) {
+      ENVOY_LOG(debug, "processing response included dynamic metadata, but no receiving "
+                       "namespaces are configured.");
+    }
     return;
   }
 
-  if (response->has_dynamic_metadata()) {
-    auto response_metadata = response->dynamic_metadata().fields();
+  if (response.has_dynamic_metadata()) {
+    auto response_metadata = response.dynamic_metadata().fields();
     auto receiving_namespaces = state.untypedReceivingMetadataNamespaces();
     for (const auto& context_key : response_metadata) {
+      bool found_allowed_namespace = false;
       if (auto metadata_it = std::find(receiving_namespaces.begin(), receiving_namespaces.end(),
                                        context_key.first);
-          metadata_it != receiving_namespaces.end())
+          metadata_it != receiving_namespaces.end()) {
         cb->streamInfo().setDynamicMetadata(context_key.first,
                                             response_metadata.at(context_key.first).struct_value());
+        found_allowed_namespace = true;
+      }
+      if (!found_allowed_namespace) {
+        ENVOY_LOG(debug,
+                  "processing response included dynamic metadata for namespace not "
+                  "configured for receiving: {}",
+                  context_key.first);
+      }
     }
   }
 }
 
-void Filter::setEncoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
+void Filter::setEncoderDynamicMetadata(ProcessingResponse& response) {
   setDynamicMetadata(encoder_callbacks_, encoding_state_, response);
 }
-void Filter::setDecoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
+void Filter::setDecoderDynamicMetadata(ProcessingResponse& response) {
   setDynamicMetadata(decoder_callbacks_, decoding_state_, response);
 }
 
@@ -762,27 +774,27 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
-    setDecoderDynamicMetadata(response);
+    setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
-    setEncoderDynamicMetadata(response);
+    setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    setDecoderDynamicMetadata(response);
+    setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    setEncoderDynamicMetadata(response);
+    setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
-    setDecoderDynamicMetadata(response);
+    setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
-    setEncoderDynamicMetadata(response);
+    setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
@@ -792,7 +804,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
     } else {
-      setDecoderDynamicMetadata(response);
+      setDecoderDynamicMetadata(*response);
       // We won't be sending anything more to the stream after we
       // receive this message.
       ENVOY_LOG(debug, "Sending immediate response");

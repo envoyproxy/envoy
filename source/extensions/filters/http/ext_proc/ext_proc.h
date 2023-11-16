@@ -353,13 +353,10 @@ private:
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
-  void
-  setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
-                     std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
-  void setEncoderDynamicMetadata(
-      std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
-  void setDecoderDynamicMetadata(
-      std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
+  void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                          envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setEncoderDynamicMetadata(envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setDecoderDynamicMetadata(envoy::service::ext_proc::v3::ProcessingResponse& response);
   void addDynamicMetadata(ProcessorState& state,
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
 
