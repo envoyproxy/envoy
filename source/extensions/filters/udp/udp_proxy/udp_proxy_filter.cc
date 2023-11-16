@@ -390,8 +390,9 @@ void UdpProxyFilter::UdpActiveSession::onReadReady() {
 bool UdpProxyFilter::ActiveSession::onNewSession() {
   if (cluster_.filter_.config_->accessLogFlushInterval().has_value() &&
       !cluster_.filter_.config_->sessionAccessLogs().empty()) {
-    access_log_flush_timer_ = cluster_.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
-        [this] { onAccessLogFlushInterval(); });
+    access_log_flush_timer_ =
+        cluster_.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
+            [this] { onAccessLogFlushInterval(); });
     resetAccessLogFlushTimer();
   }
 
@@ -667,7 +668,8 @@ void UdpProxyFilter::ActiveSession::onAccessLogFlushInterval() {
 void UdpProxyFilter::ActiveSession::resetAccessLogFlushTimer() {
   if (access_log_flush_timer_ != nullptr) {
     ASSERT(cluster_.filter_.config_->accessLogFlushInterval().has_value());
-    access_log_flush_timer_->enableTimer(cluster_.filter_.config_->accessLogFlushInterval().value());
+    access_log_flush_timer_->enableTimer(
+        cluster_.filter_.config_->accessLogFlushInterval().value());
   }
 }
 
@@ -843,11 +845,9 @@ TunnelingConnectionPoolPtr TunnelingConnectionPoolFactory::createConnPool(
     const UdpTunnelingConfig& tunnel_config, UpstreamTunnelCallbacks& upstream_callbacks,
     StreamInfo::StreamInfo& downstream_info, bool flush_access_log_on_tunnel_connected,
     const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const {
-  auto pool = std::make_unique<TunnelingConnectionPoolImpl>(thread_local_cluster, context,
-                                                            tunnel_config, upstream_callbacks,
-                                                            downstream_info,
-                                                            flush_access_log_on_tunnel_connected,
-                                                            session_access_logs);
+  auto pool = std::make_unique<TunnelingConnectionPoolImpl>(
+      thread_local_cluster, context, tunnel_config, upstream_callbacks, downstream_info,
+      flush_access_log_on_tunnel_connected, session_access_logs);
   return (pool->valid() ? std::move(pool) : nullptr);
 }
 

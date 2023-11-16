@@ -135,7 +135,8 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
   }
 
   if (config.has_access_log_options()) {
-    flush_access_log_on_tunnel_connected_ = config.access_log_options().flush_access_log_on_tunnel_connected();
+    flush_access_log_on_tunnel_connected_ =
+        config.access_log_options().flush_access_log_on_tunnel_connected();
 
     if (config.access_log_options().has_access_log_flush_interval()) {
       const uint64_t flush_interval = DurationUtil::durationToMilliseconds(

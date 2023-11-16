@@ -443,7 +443,8 @@ public:
    * @param tunnel_config the tunneling config.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
    * @param stream_info is the downstream session stream info.
-   * @param flush_access_log_on_tunnel_connected indicates whether to flush access log on tunnel connected.
+   * @param flush_access_log_on_tunnel_connected indicates whether to flush access log on tunnel
+   * connected.
    * @param session_access_logs is the list of access logs for the session.
    * @return may be null if pool creation failed.
    */

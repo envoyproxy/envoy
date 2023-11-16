@@ -151,7 +151,9 @@ public:
   const FilterChainFactory& sessionFilterFactory() const override { return *this; };
   bool hasSessionFilters() const override { return !filter_factories_.empty(); }
   const UdpTunnelingConfigPtr& tunnelingConfig() const override { return tunneling_config_; };
-  bool flushAccessLogOnTunnelConnected() const override { return flush_access_log_on_tunnel_connected_; }
+  bool flushAccessLogOnTunnelConnected() const override {
+    return flush_access_log_on_tunnel_connected_;
+  }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const override {
     return access_log_flush_interval_;
   }

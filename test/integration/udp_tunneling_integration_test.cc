@@ -966,10 +966,9 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogPeriodically) {
   // Wait for buffered datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
 
-  sendCapsuleDownstream("response1", false);
-  EXPECT_THAT(
-      waitForAccessLog(access_log_filename),
-      testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpPeriodic)));
+  sendCapsuleDownstream("response", false);
+  EXPECT_THAT(waitForAccessLog(access_log_filename),
+              testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpPeriodic)));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, UdpTunnelingIntegrationTest,
