@@ -308,9 +308,12 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
-    auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
-                                                                  &headers, nullptr, nullptr);
-    auto proto = evaluateAttributes(std::move(activation_ptr), config_->requestExpr());
+    absl::optional<Envoy::ProtobufWkt::Struct> proto;
+    if (!config_->requestExpr().empty()) {
+      auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
+                                                                    &headers, nullptr, nullptr);
+      auto proto = evaluateAttributes(std::move(activation_ptr), config_->requestExpr());
+    }
 
     status = onHeaders(decoding_state_, headers, end_stream, proto);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
@@ -590,9 +593,12 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
-    auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
-                                                                  nullptr, &headers, nullptr);
-    auto proto = evaluateAttributes(std::move(activation_ptr), config_->responseExpr());
+    absl::optional<Envoy::ProtobufWkt::Struct> proto;
+    if (!config_->responseExpr().empty()) {
+      auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
+                                                                    nullptr, &headers, nullptr);
+      auto proto = evaluateAttributes(std::move(activation_ptr), config_->responseExpr());
+    }
 
     status = onHeaders(encoding_state_, headers, end_stream, proto);
     ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
