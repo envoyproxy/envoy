@@ -34,9 +34,8 @@ The OAuth filter's flow involves:
 When the authn server validates the client and returns an authorization token back to the OAuth filter,
 no matter what format that token is, if
 :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
-is set to true the filter will send over a
-cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`` header will be populated
-with the same value.
+is set to true the filter will send over a the bearer token as Authorization header using the `Bearer schema<https://tools.ietf.org/html/rfc6750#section-2.1>`_
+to upstream.
 
 The OAuth filer encodes URLs in query parameters using the
 `URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_

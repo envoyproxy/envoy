@@ -29,8 +29,8 @@ message OAuth2Credentials {
     // Cookie name to hold OAuth bearer token value. When the authentication server validates the
     // client and returns an authorization token back to the OAuth filter, no matter what format
     // that token is, if :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
-    // is set to true the filter will send over the bearer token as a cookie with this name to the
-    // upstream. Defaults to ``BearerToken``.
+    // is set to true the filter will send over the bearer token as Authorization header using the `Bearer schema
+    // <https://tools.ietf.org/html/rfc6750#section-2.1>`_ to upstream. Defaults to ``BearerToken``.
     string bearer_token = 1
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
