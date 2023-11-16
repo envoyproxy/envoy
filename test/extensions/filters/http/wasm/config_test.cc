@@ -34,12 +34,14 @@ class WasmFilterConfigTest : public Event::TestUsingSimulatedTime,
                              public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_scope_));
     ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
     EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
-    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.server_factory_context_, clusterManager())
+        .WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(dispatcher_));
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
@@ -957,7 +959,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
             return &request;
           }));
   NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
-  EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(threadlocal));
+  EXPECT_CALL(context_.server_factory_context_, threadLocal())
+      .WillRepeatedly(ReturnRef(threadlocal));
   threadlocal.registered_ = false;
   auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
   EXPECT_EQ(filter_config->createFilter(), nullptr);
@@ -990,7 +993,7 @@ TEST_P(WasmFilterConfigTest, FailedToGetThreadLocalPlugin) {
 
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_CALL(context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
+  EXPECT_CALL(context_.server_factory_context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
   threadlocal.registered_ = true;
   auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
   ASSERT_EQ(threadlocal.current_slot_, 1);
