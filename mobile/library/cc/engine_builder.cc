@@ -164,23 +164,6 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
-  stats_sinks_ = std::move(stats_sinks);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addGrpcStatsDomain(std::string stats_domain) {
-  stats_domain_ = std::move(stats_domain);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
-  stats_flush_seconds_ = stats_flush_seconds;
-  return *this;
-}
-#endif
-
 EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
   connect_timeout_seconds_ = connect_timeout_seconds;
   return *this;
@@ -697,27 +680,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_protocol_options;
   h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-  if (!stats_domain_.empty()) {
-    // Stats cluster
-    auto* stats_cluster = static_resources->add_clusters();
-    stats_cluster->set_name("stats");
-    stats_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
-    stats_cluster->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
-    stats_cluster->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
-    stats_cluster->mutable_transport_socket()->CopyFrom(base_tls_socket);
-    stats_cluster->mutable_load_assignment()->set_cluster_name("stats");
-    auto* address = stats_cluster->mutable_load_assignment()
-                        ->add_endpoints()
-                        ->add_lb_endpoints()
-                        ->mutable_endpoint()
-                        ->mutable_address();
-    address->mutable_socket_address()->set_address(stats_domain_);
-    address->mutable_socket_address()->set_port_value(443);
-    (*stats_cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(h2_protocol_options);
-    stats_cluster->mutable_wait_for_warm_on_init();
-  }
 
   // Base cluster config (DFP cluster config)
   auto* base_cluster = static_resources->add_clusters();
@@ -850,8 +812,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Set up stats.
-  bootstrap->mutable_stats_flush_interval()->set_seconds(stats_flush_seconds_);
-  bootstrap->mutable_stats_sinks();
   auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
   list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
   list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
@@ -913,26 +873,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
-
-  for (const std::string& sink_yaml : stats_sinks_) {
-#ifdef ENVOY_ENABLE_YAML
-    auto* sink = bootstrap->add_stats_sinks();
-    MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
-#else
-    UNREFERENCED_PARAMETER(sink_yaml);
-    IS_ENVOY_BUG("stats sinks can not be added when YAML is compiled out.");
-#endif
-  }
-  if (!stats_domain_.empty()) {
-    envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
-    metrics_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("stats");
-    metrics_config.mutable_report_counters_as_deltas()->set_value(true);
-    metrics_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-    metrics_config.set_emit_tags_as_labels(true);
-    auto* sink = bootstrap->add_stats_sinks();
-    sink->set_name("envoy.metrics_service");
-    sink->mutable_typed_config()->PackFrom(metrics_config);
-  }
 
   bootstrap->mutable_dynamic_resources();
 #ifdef ENVOY_GOOGLE_GRPC
