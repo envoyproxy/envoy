@@ -43,7 +43,7 @@
 namespace Envoy {
 namespace Platform {
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
@@ -321,7 +321,7 @@ EngineBuilder& EngineBuilder::setNodeMetadata(ProtobufWkt::Struct node_metadata)
   return *this;
 }
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
   xds_builder_ = std::move(xds_builder);
   // Add the XdsBuilder's xDS server hostname and port to the list of DNS addresses to preresolve in
@@ -651,7 +651,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
   } else {
     std::string certs;
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
     if (xds_builder_ && !xds_builder_->ssl_root_certs_.empty()) {
       certs = xds_builder_->ssl_root_certs_;
     }
@@ -878,7 +878,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
   bootstrap->mutable_dynamic_resources();
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   if (xds_builder_) {
     xds_builder_->build(*bootstrap);
   }

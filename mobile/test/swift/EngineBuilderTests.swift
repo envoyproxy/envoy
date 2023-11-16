@@ -328,7 +328,7 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
   func testAddingRtdsConfigurationWhenRunningEnvoy() {
     let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
       .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)

@@ -1323,7 +1323,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 
   std::string native_xds_address = Envoy::JNI::javaStringToString(jni_helper, xds_address);
   if (!native_xds_address.empty()) {
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
     Envoy::Platform::XdsBuilder xds_builder(std::move(native_xds_address), xds_port);
     auto initial_metadata =
         javaObjectArrayToStringPairVector(jni_helper, xds_grpc_initial_metadata);

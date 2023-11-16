@@ -14,10 +14,7 @@ using envoy::config::cluster::v3::Cluster;
 
 class CdsIntegrationTest : public XdsIntegrationTest {
 public:
-  CdsIntegrationTest() {
-    use_lds_ = false;
-    default_request_headers_.setScheme("http");
-  }
+  CdsIntegrationTest() { default_request_headers_.setScheme("http"); }
 
   void createEnvoy() override {
     sotw_or_delta_ = sotwOrDelta();

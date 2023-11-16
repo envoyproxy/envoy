@@ -1,4 +1,12 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3", "envoy_select_envoy_mobile_listener", "envoy_select_envoy_mobile_request_compression")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+    "envoy_select_enable_http3",
+    "envoy_select_envoy_mobile_listener",
+    "envoy_select_envoy_mobile_request_compression",
+    "envoy_select_envoy_mobile_xds",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -29,7 +37,6 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
         "@envoy//source/extensions/load_balancing_policies/cluster_provided:config",
-        "@envoy//source/extensions/load_balancing_policies/round_robin:config",
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
         "@envoy//source/extensions/path/match/uri_template:config",
         "@envoy//source/extensions/path/rewrite/uri_template:config",
@@ -65,6 +72,13 @@ envoy_cc_library(
             "@envoy//source/extensions/udp_packet_writer/default:config",
             "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
             "@envoy//source/extensions/listener_managers/listener_manager:connection_handler_lib",
+        ],
+        "@envoy",
+    ) + envoy_select_envoy_mobile_xds(
+        [
+            "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+            "@envoy//source/extensions/config_subscription/grpc:grpc_mux_lib",
+            "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         ],
         "@envoy",
     ),

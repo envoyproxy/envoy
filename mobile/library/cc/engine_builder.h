@@ -36,7 +36,7 @@ struct NodeLocality {
   std::string sub_zone;
 };
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 // A class for building the xDS configuration for the Envoy Mobile engine.
 // xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in:
 // https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
@@ -171,7 +171,7 @@ public:
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Sets the node.metadata field in the Bootstrap configuration.
   EngineBuilder& setNodeMetadata(ProtobufWkt::Struct node_metadata);
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   // Sets the xDS configuration for the Envoy Mobile engine.
   //
   // `xds_builder`: the XdsBuilder instance used to specify the xDS configuration options.
@@ -255,7 +255,7 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif
 };

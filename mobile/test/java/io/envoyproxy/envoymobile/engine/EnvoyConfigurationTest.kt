@@ -166,8 +166,8 @@ class EnvoyConfigurationTest {
     )
   }
 
-  fun isGoogleGrpcDisabled(): Boolean {
-    return System.getProperty("envoy_jni_google_grpc_disabled") != null;
+  fun isEnvoyMobileXdsDisabled(): Boolean {
+    return System.getProperty("envoy_jni_envoy_mobile_xds_disabled") != null;
   }
 
   @Test
@@ -317,7 +317,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -334,7 +334,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS and CDS`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -365,7 +365,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test enableCds with default string`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -382,7 +382,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test RTDS default timeout`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 

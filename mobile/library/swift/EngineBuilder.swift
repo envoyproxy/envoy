@@ -6,7 +6,7 @@ import Foundation
 
 // swiftlint:disable file_length
 
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
 /// Builder for generating the xDS configuration for the Envoy Mobile engine.
 /// xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in
 /// https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
@@ -192,7 +192,7 @@ open class EngineBuilder: NSObject {
   private var nodeRegion: String?
   private var nodeZone: String?
   private var nodeSubZone: String?
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
   private var xdsBuilder: XdsBuilder?
 #endif
   private var enableSwiftBootstrap = false
@@ -667,7 +667,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
   /// Sets the xDS configuration for the Envoy Mobile engine.
   ///
   /// - parameter xdsBuilder: The XdsBuilder instance which specifies the xDS config options.
@@ -749,7 +749,7 @@ open class EngineBuilder: NSObject {
     var cdsResourcesLocator: String?
     var cdsTimeoutSeconds: UInt32 = 0
 
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
     xdsServerAddress = self.xdsBuilder?.xdsServerAddress
     xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
     xdsGrpcInitialMetadata = self.xdsBuilder?.xdsGrpcInitialMetadata ?? [:]
@@ -897,7 +897,7 @@ private extension EngineBuilder {
   }
 
   private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
                                                     xdsBuilder.xdsServerPort)

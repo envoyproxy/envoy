@@ -7,7 +7,6 @@
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/environment.h"
 
-#include "extension_registry.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -21,11 +20,6 @@ constexpr absl::string_view SECRET_NAME = "client_cert";
 class SdsIntegrationTest : public XdsIntegrationTest {
 public:
   void initialize() override {
-    create_xds_upstream_ = true;
-    use_lds_ = false;
-    skip_tag_extraction_rule_check_ = true;
-    ExtensionRegistry::registerFactories();
-
     XdsIntegrationTest::initialize();
     initializeXdsStream();
   }

@@ -249,7 +249,7 @@
     builder.setNodeId([self.nodeId toCXXString]);
   }
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   if (self.xdsServerAddress != nil) {
     Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
     for (NSString *header in self.xdsGrpcInitialMetadata) {
