@@ -121,6 +121,7 @@ categories:
 - envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
+- envoy.injected_credentials
 - envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers

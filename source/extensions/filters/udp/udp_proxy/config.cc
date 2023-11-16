@@ -74,7 +74,8 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
       stats_(generateStats(config.stat_prefix(), context.scope())),
       // Default prefer_gro to true for upstream client traffic.
-      upstream_socket_config_(config.upstream_socket_config(), true) {
+      upstream_socket_config_(config.upstream_socket_config(), true),
+      random_generator_(context.api().randomGenerator()) {
   if (use_per_packet_load_balancing_ && config.has_tunneling_config()) {
     throw EnvoyException(
         "Only one of use_per_packet_load_balancing or tunneling_config can be used.");

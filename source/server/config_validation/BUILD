@@ -101,6 +101,7 @@ envoy_cc_library(
         "//source/common/version:version_lib",
         "//source/server:configuration_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:overload_manager_lib",
         "//source/server:server_lib",
         "//source/server:utils_lib",
         "//source/server/admin:admin_lib",

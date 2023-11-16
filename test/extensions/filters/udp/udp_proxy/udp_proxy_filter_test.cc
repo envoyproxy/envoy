@@ -427,7 +427,9 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
       "%DOWNSTREAM_REMOTE_ADDRESS% "
-      "%DOWNSTREAM_LOCAL_ADDRESS%";
+      "%DOWNSTREAM_LOCAL_ADDRESS% "
+      "%UPSTREAM_HOST% "
+      "%STREAM_ID%";
 
   const std::string proxy_access_log_format =
       "%DYNAMIC_METADATA(udp.proxy.proxy:bytes_received)% "
@@ -477,7 +479,9 @@ upstream_socket_config:
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
   EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
-  EXPECT_EQ(output_.back(), "17 3 17 3 10.0.0.1:1000 10.0.0.2:80");
+  EXPECT_TRUE(std::regex_match(output_.back(),
+                               std::regex("17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 "
+                                          "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")));
 }
 
 // Route with source IP.
@@ -1849,14 +1853,23 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolFailure) {
   setup();
   createNewStream();
   EXPECT_CALL(stream_callbacks_, onStreamFailure(_, _, _));
+
+  std::string upstream_host_name = "upstream_host_test";
+  EXPECT_CALL(*upstream_host_, hostname()).WillOnce(ReturnRef(upstream_host_name));
   pool_->onPoolFailure(Http::ConnectionPool::PoolFailureReason::Timeout, "reason", upstream_host_);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamTransportFailureReason(), "reason");
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
   setup();
   createNewStream();
   EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
+
+  std::string upstream_host_name = "upstream_host_test";
+  EXPECT_CALL(*upstream_host_, hostname()).WillOnce(ReturnRef(upstream_host_name));
   pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {

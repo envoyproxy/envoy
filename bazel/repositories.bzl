@@ -368,10 +368,8 @@ def envoy_dependencies(skip_targets = []):
         name = "com_google_googleapis_imports",
         cc = True,
         go = True,
+        python = True,
         grpc = True,
-        rules_override = {
-            "py_proto_library": ["@envoy_api//bazel:api_build_system.bzl", ""],
-        },
     )
     native.bind(
         name = "bazel_runfiles",

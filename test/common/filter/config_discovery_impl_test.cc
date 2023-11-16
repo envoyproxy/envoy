@@ -49,13 +49,13 @@ class TestHttpFilterFactory : public TestFilterFactory,
                               public Server::Configuration::NamedHttpFilterConfigFactory,
                               public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
     created_ = true;
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::UpstreamFactoryContext&) override {
     created_ = true;
@@ -654,9 +654,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   }
 
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(config_discovery_test.callbacks_
-                      ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
-                      .ok()),
+      config_discovery_test.callbacks_
+          ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
+          .IgnoreError(),
       EnvoyException,
       "Error: terminal filter named foo of type envoy.test.filter must be the last filter "
       "in a " +

@@ -36,8 +36,8 @@ class AddTrailersStreamFilterConfig
 public:
   AddTrailersStreamFilterConfig() : EmptyHttpDualFilterConfig("add-trailers-filter") {}
 
-  Http::FilterFactoryCb createDualFilter(const std::string&,
-                                         Server::Configuration::ServerFactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::AddTrailersStreamFilter>());
     };
