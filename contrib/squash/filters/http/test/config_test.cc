@@ -28,7 +28,7 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectYaml) {
   envoy::extensions::filters::http::squash::v3::Squash proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   SquashFilterConfigFactory factory;
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
