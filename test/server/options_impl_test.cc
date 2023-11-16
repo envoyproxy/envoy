@@ -296,7 +296,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
 }
 
 TEST_F(OptionsImplTest, DefaultParamsNoConstructorArgs) {
-  std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>();
+  std::unique_ptr<OptionsImplBase> options = std::make_unique<OptionsImplBase>();
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(Server::DrainStrategy::Gradual, options->drainStrategy());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());

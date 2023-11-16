@@ -41,7 +41,6 @@ envoy_cc_library(
         "//source/common/stats:thread_local_store_lib",
         "//source/server:drain_manager_lib",
         "//source/server:listener_hooks_lib",
-        "//source/server:options_lib",
         "//source/server:server_base_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
@@ -85,7 +84,7 @@ envoy_cc_library(
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
-        "//source/server:options_lib",
+        "//source/server:options_base",
         "//source/server:server_base_lib",
     ] + envoy_select_signal_trace([
         "//source/common/signal:sigaction_lib",
