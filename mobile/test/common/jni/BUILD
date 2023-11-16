@@ -103,3 +103,23 @@ cc_binary(
         ":jni_helper_test_lib",
     ],
 )
+
+cc_library(
+    name = "jni_utility_test_lib",
+    srcs = [
+        "jni_utility_test.cc",
+    ],
+    deps = [
+        "//library/common/jni:jni_utility_lib",
+    ],
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_utility_test.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_utility_test_lib",
+    ],
+)

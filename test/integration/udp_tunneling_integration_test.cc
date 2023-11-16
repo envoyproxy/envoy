@@ -351,6 +351,8 @@ public:
     absl::optional<BufferOptions> buffer_options_;
     absl::optional<std::string> idle_timeout_;
     std::string session_access_log_config_ = "";
+    bool propagate_response_headers_ = false;
+    bool propagate_response_trailers_ = false;
   };
 
   void setup(const TestConfig& config) {
@@ -379,9 +381,12 @@ typed_config:
     default_target_port: {}
     retry_options:
       max_connect_attempts: {}
+    propagate_response_headers: {}
+    propagate_response_trailers: {}
 )EOF",
                     config.proxy_host_, config.target_host_, config.default_target_port_,
-                    config.max_connect_attempts_);
+                    config.max_connect_attempts_, config.propagate_response_headers_,
+                    config.propagate_response_trailers_);
 
     if (config.buffer_options_.has_value()) {
       filter_config += fmt::format(R"EOF(
@@ -737,6 +742,141 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("2"));
+}
+
+TEST_P(UdpTunnelingIntegrationTest, PropagateValidResponseHeaders) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%FILTER_STATE(envoy.udp_proxy.propagate_response_headers:TYPED)%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          true,
+                          false};
+  setup(config);
+
+  const std::string datagram = "hello";
+  establishConnection(datagram);
+
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+
+  sendCapsuleDownstream("response", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  // Verify response header value is in the access log.
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("capsule-protocol"));
+}
+
+TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeaders) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%FILTER_STATE(envoy.udp_proxy.propagate_response_headers:TYPED)%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          true,
+                          false};
+  setup(config);
+
+  client_->write("hello", *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  // Verify response header value is in the access log.
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("404"));
+}
+
+TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailers) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%FILTER_STATE(envoy.udp_proxy.propagate_response_trailers:TYPED)%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          false,
+                          true};
+  setup(config);
+
+  const std::string datagram = "hello";
+  establishConnection(datagram);
+
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+  sendCapsuleDownstream("response", false);
+
+  const std::string trailer_value = "test-trailer-value";
+  Http::TestResponseTrailerMapImpl response_trailers{{"test-trailer-name", trailer_value}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  // Verify response trailer value is in the access log.
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(trailer_value));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, UdpTunnelingIntegrationTest,
