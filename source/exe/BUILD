@@ -153,28 +153,28 @@ envoy_cc_library(
         "stripped_main_base.h",
     ],
     deps = [
-        ":platform_impl_lib",
-        ":process_wide_lib",
-        "//envoy/server:platform_interface",
-        "//source/common/api:os_sys_calls_lib",
-        "//source/common/common:compiler_requirements_lib",
-        "//source/common/common:perf_annotation_lib",
-        "//source/common/grpc:google_grpc_context_lib",
-        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
-        "//source/server:hot_restart_lib",
-        "//source/server:hot_restart_nop_lib",
-        "//source/server:options_lib",
-        "//source/server:server_lib",
-        "//source/server/config_validation:server_lib",
-    ] + envoy_select_signal_trace([
-        "//source/common/signal:sigaction_lib",
-        ":terminate_handler_lib",
-    ]) + envoy_all_core_extensions() +
-    # TODO(rojkov): drop io_uring dependency when it's fully integrated.
-    select({
-        "//bazel:linux": ["//source/common/io:io_uring_impl_lib"],
-        "//conditions:default": [],
-    }),
+               ":platform_impl_lib",
+               ":process_wide_lib",
+               "//envoy/server:platform_interface",
+               "//source/common/api:os_sys_calls_lib",
+               "//source/common/common:compiler_requirements_lib",
+               "//source/common/common:perf_annotation_lib",
+               "//source/common/grpc:google_grpc_context_lib",
+               "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+               "//source/server:hot_restart_lib",
+               "//source/server:hot_restart_nop_lib",
+               "//source/server:options_lib",
+               "//source/server:server_lib",
+               "//source/server/config_validation:server_lib",
+           ] + envoy_select_signal_trace([
+               "//source/common/signal:sigaction_lib",
+               ":terminate_handler_lib",
+           ]) + envoy_all_core_extensions() +
+           # TODO(rojkov): drop io_uring dependency when it's fully integrated.
+           select({
+               "//bazel:linux": ["//source/common/io:io_uring_impl_lib"],
+               "//conditions:default": [],
+           }),
 )
 
 envoy_cc_library(
