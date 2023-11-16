@@ -369,7 +369,6 @@ final class EngineBuilderTests: XCTestCase {
       .addInitialStreamHeader(header: "x-goog-api-key", value: "A1B2C3")
       .addInitialStreamHeader(header: "x-android-package", value: "com.google.myapp")
       .setSslRootCerts(rootCerts: "fake_ssl_root_certs")
-      .setSni(sni: "fake_sni_address")
       .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
@@ -380,7 +379,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains("x-android-package"))
     XCTAssertTrue(bootstrapDebugDescription.contains("com.google.myapp"))
     XCTAssertTrue(bootstrapDebugDescription.contains("fake_ssl_root_certs"))
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_sni_address"))
   }
 #endif
 

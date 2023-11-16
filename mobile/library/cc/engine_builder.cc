@@ -44,7 +44,7 @@ namespace Envoy {
 namespace Platform {
 
 #ifdef ENVOY_GOOGLE_GRPC
-XdsBuilder::XdsBuilder(std::string xds_server_address, const int xds_server_port)
+XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
 XdsBuilder& XdsBuilder::addInitialStreamHeader(std::string header, std::string value) {
@@ -85,27 +85,15 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const
   ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
   ads_config->set_set_node_on_first_message_only(true);
   ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+
   auto& grpc_service = *ads_config->add_grpc_services();
-  grpc_service.mutable_google_grpc()->set_target_uri(
-      fmt::format(R"({}:{})", xds_server_address_, xds_server_port_));
-  grpc_service.mutable_google_grpc()->set_stat_prefix("ads");
-  if (!ssl_root_certs_.empty()) {
-    grpc_service.mutable_google_grpc()
-        ->mutable_channel_credentials()
-        ->mutable_ssl_credentials()
-        ->mutable_root_certs()
-        ->set_inline_string(ssl_root_certs_);
-  }
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("base");
+  grpc_service.mutable_envoy_grpc()->set_authority(
+      absl::StrCat(xds_server_address_, ":", xds_server_port_));
 
   if (!xds_initial_grpc_metadata_.empty()) {
     grpc_service.mutable_initial_metadata()->Assign(xds_initial_grpc_metadata_.begin(),
                                                     xds_initial_grpc_metadata_.end());
-  }
-
-  if (!sni_.empty()) {
-    auto& channel_args =
-        *grpc_service.mutable_google_grpc()->mutable_channel_args()->mutable_args();
-    channel_args["grpc.default_authority"].set_string_value(sni_);
   }
 
   if (!rtds_resource_name_.empty()) {
@@ -336,6 +324,10 @@ EngineBuilder& EngineBuilder::setNodeMetadata(ProtobufWkt::Struct node_metadata)
 #ifdef ENVOY_GOOGLE_GRPC
 EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
   xds_builder_ = std::move(xds_builder);
+  // Add the XdsBuilder's xDS server hostname and port to the list of DNS addresses to preresolve in
+  // the `base` DFP cluster.
+  dns_preresolve_hostnames_.push_back(
+      {xds_builder_->xds_server_address_ /* host */, xds_builder_->xds_server_port_ /* port */});
   return *this;
 }
 #endif
@@ -650,23 +642,34 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     validation->set_trust_chain_verification(envoy::extensions::transport_sockets::tls::v3::
                                                  CertificateValidationContext::ACCEPT_UNTRUSTED);
   }
+
   if (platform_certificates_validation_on_) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator
         validator;
     validation->mutable_custom_validator_config()->set_name(
         "envoy_mobile.cert_validator.platform_bridge_cert_validator");
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
-
   } else {
-    const char* inline_certs = ""
+    std::string certs;
+#ifdef ENVOY_GOOGLE_GRPC
+    if (xds_builder_ && !xds_builder_->ssl_root_certs_.empty()) {
+      certs = xds_builder_->ssl_root_certs_;
+    }
+#endif
+
+    if (certs.empty()) {
+      // The xDS builder doesn't supply root certs, so we'll use the certs packed with Envoy Mobile,
+      // if the build config allows it.
+      const char* inline_certs = ""
 #ifndef EXCLUDE_CERTIFICATES
 #include "library/common/config/certificates.inc"
 #endif
-                               "";
-    // The certificates in certificates.inc are prefixed with 2 spaces per
-    // line to be ingressed into YAML.
-    std::string certs = inline_certs;
-    absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+                                 "";
+      certs = inline_certs;
+      // The certificates in certificates.inc are prefixed with 2 spaces per
+      // line to be ingressed into YAML.
+      absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+    }
     validation->mutable_trusted_ca()->set_inline_string(certs);
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport

@@ -900,7 +900,7 @@ private extension EngineBuilder {
 #if ENVOY_GOOGLE_GRPC
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
-                                                    Int32(xdsBuilder.xdsServerPort))
+                                                    xdsBuilder.xdsServerPort)
       for (header, value) in xdsBuilder.xdsGrpcInitialMetadata {
         cxxXdsBuilder.addInitialStreamHeader(header.toCXX(), value.toCXX())
       }

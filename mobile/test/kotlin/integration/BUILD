@@ -364,6 +364,7 @@ envoy_mobile_android_test(
         "XdsTest.kt",
     ],
     native_deps = [
+        "@envoy//test/config/integration/certs",
         "//test/common/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
