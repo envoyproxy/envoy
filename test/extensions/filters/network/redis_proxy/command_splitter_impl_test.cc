@@ -94,7 +94,6 @@ TEST_F(RedisCommandSplitterImplTest, QuitSuccess) {
 TEST_F(RedisCommandSplitterImplTest, AskingSuccess) {
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"asking"});
-
   EXPECT_EQ(0UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
 
