@@ -151,6 +151,7 @@ envoy_cc_test_library(
         "@envoy//source/common/grpc:google_grpc_creds_lib",
         "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
         "@envoy//test/common/grpc:grpc_client_integration_lib",
+        "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_build_config//:test_extensions",

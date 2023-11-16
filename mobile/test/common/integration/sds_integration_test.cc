@@ -34,9 +34,7 @@ public:
     const std::string target_uri = Network::Test::getLoopbackAddressUrlString(ipVersion());
     Platform::XdsBuilder xds_builder(target_uri,
                                      fake_upstreams_.back()->localAddress()->ip()->port());
-    xds_builder.addClusterDiscoveryService().setSslRootCerts(
-        TestEnvironment::readFileToStringForTest(
-            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem")));
+    xds_builder.addClusterDiscoveryService().setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
     XdsIntegrationTest::createEnvoy();
   }

@@ -29,8 +29,7 @@ public:
       cds_resources_locator = cds_namespace_ + "/*";
     }
     xds_builder.addClusterDiscoveryService(cds_resources_locator, /*timeout_in_seconds=*/1)
-        .setSslRootCerts(TestEnvironment::readFileToStringForTest(
-            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem")));
+        .setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
 
     XdsIntegrationTest::createEnvoy();

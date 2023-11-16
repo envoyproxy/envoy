@@ -103,4 +103,9 @@ XdsIntegrationTest::createSingleEndpointClusterConfig(const std::string& cluster
   return config;
 }
 
+std::string XdsIntegrationTest::getUpstreamCert() {
+  return TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+}
+
 } // namespace Envoy
