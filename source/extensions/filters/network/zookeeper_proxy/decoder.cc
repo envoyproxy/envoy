@@ -831,8 +831,9 @@ Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data, Decod
 
   if (zk_filter_buffer_len == 0) {
     status = decodeAndBufferHelper(data, dtype, zk_filter_buffer);
-    WRITE_LOG_IF_STATUS_NOT_OK(
-        status, debug, "zookeeper_proxy: decodeAndBufferHelper exception: {}", status.message());
+    if (!status.ok()) {
+      ENVOY_LOG(debug, "zookeeper_proxy: decodeAndBufferHelper exception: {}", status.message());
+    }
 
     return Network::FilterStatus::Continue;
   }
@@ -843,8 +844,9 @@ Network::FilterStatus DecoderImpl::decodeAndBuffer(Buffer::Instance& data, Decod
   data.prepend(zk_filter_buffer);
 
   status = decodeAndBufferHelper(data, dtype, zk_filter_buffer);
-  WRITE_LOG_IF_STATUS_NOT_OK(status, debug, "zookeeper_proxy: decodeAndBufferHelper exception: {}",
-                             status.message());
+  if (!status.ok()) {
+    ENVOY_LOG(debug, "zookeeper_proxy: decodeAndBufferHelper exception: {}", status.message());
+  }
 
   // Drain the prepended ZooKeeper filter buffer.
   data.drain(zk_filter_buffer_len);

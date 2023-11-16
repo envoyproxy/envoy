@@ -48,11 +48,6 @@ private:
     return status;                                                                                 \
   }
 
-#define WRITE_LOG_IF_STATUS_NOT_OK(status, log_level, ...)                                         \
-  if (!status.ok()) {                                                                              \
-    ENVOY_LOG(log_level, ##__VA_ARGS__);                                                           \
-  }
-
 #define COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status)                                      \
   if (!status.ok()) {                                                                              \
     callbacks_.onDecodeError();                                                                    \
