@@ -1,4 +1,5 @@
 load("@base_pip3//:requirements.bzl", "requirement")
+load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
@@ -22,6 +23,7 @@ envoy_pytool_binary(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":validate_py_pb2",
         "//tools/api_versioning:utils",
         "//tools/protoxform:options",
         "//tools/protoxform:utils",
@@ -29,13 +31,17 @@ envoy_pytool_binary(
         requirement("packaging"),
         "//tools/type_whisperer",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
-        "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_xds//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_xds//xds/annotations/v3:pkg_py_proto",
         "@com_google_googleapis//google/api:annotations_py_proto",
         "@com_google_protobuf//:protobuf_python",
         "@envoy_api//envoy/annotations:pkg_py_proto",
     ],
+)
+
+py_proto_library(
+    name = "validate_py_pb2",
+    deps = ["@com_envoyproxy_protoc_gen_validate//validate:validate_proto"],
 )
 
 protoprint_rule(

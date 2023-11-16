@@ -57,7 +57,7 @@ class EdsReadyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFi
 public:
   EdsReadyFilterConfig() : EmptyHttpFilterConfig("eds-ready-filter") {}
 
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
                Server::Configuration::FactoryContext& factory_context) override {
     return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {

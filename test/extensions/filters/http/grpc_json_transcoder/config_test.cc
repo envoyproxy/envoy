@@ -16,10 +16,13 @@ namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(GrpcJsonTranscoderFilterConfig().createFilterFactoryFromProto(
-                   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder(),
-                   "stats", context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      GrpcJsonTranscoderFilterConfig()
+          .createFilterFactoryFromProto(
+              envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder(),
+              "stats", context)
+          .value(),
+      ProtoValidationException);
 }
 
 } // namespace

@@ -76,7 +76,7 @@ public:
                   config_with_hash_key, scope, skip_cluster_check);
             }));
     ExtAuthzFilterConfig factory;
-    return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_);
+    return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_).value();
   }
 
   Http::StreamFilterSharedPtr createFilterFromFilterFactory(Http::FilterFactoryCb filter_factory) {
