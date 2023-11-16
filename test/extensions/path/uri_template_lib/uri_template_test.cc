@@ -21,6 +21,7 @@ namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
+using testing::HasSubstr;
 
 // Capture regex for /{var1}/{var2}/{var3}/{var4}/{var5}
 static constexpr absl::string_view kCaptureRegex = "/(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
@@ -67,7 +68,17 @@ TEST_P(ParseRewriteHelperSuccess, ParseRewriteHelperSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_OK(parseRewritePattern(pattern));
+  const auto result = parseRewritePattern(pattern);
+  EXPECT_OK(result);
+
+  // The following is to exercise operator<< in ParseSegments.
+  const auto& parsed_segments_vec = result.value();
+  std::stringstream concat_segments;
+  for (const auto& parsed_segment : parsed_segments_vec) {
+    concat_segments << parsed_segment;
+  }
+  EXPECT_THAT(concat_segments.str(), HasSubstr("kind = Literal, value ="));
+  EXPECT_THAT(concat_segments.str(), HasSubstr("kind = Variable, value ="));
 }
 
 class ParseRewriteHelperFailure : public testing::TestWithParam<std::string> {};
