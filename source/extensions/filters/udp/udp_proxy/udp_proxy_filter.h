@@ -102,6 +102,14 @@ public:
   virtual bool bufferEnabled() const PURE;
   virtual uint32_t maxBufferedDatagrams() const PURE;
   virtual uint64_t maxBufferedBytes() const PURE;
+
+  virtual void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
+
+  virtual void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
 };
 
 using UdpTunnelingConfigPtr = std::unique_ptr<const UdpTunnelingConfig>;
@@ -314,6 +322,9 @@ private:
         is_valid_response = Http::HeaderUtility::isConnectUdpResponse(*headers);
       }
 
+      parent_.tunnel_config_.propagateResponseHeaders(std::move(headers),
+                                                      parent_.downstream_info_.filterState());
+
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.tunnel_creation_callbacks_.has_value()) {
@@ -329,7 +340,9 @@ private:
       }
     }
 
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
+      parent_.tunnel_config_.propagateResponseTrailers(std::move(trailers),
+                                                       parent_.downstream_info_.filterState());
       parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
     }
 
