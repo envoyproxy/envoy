@@ -40,7 +40,7 @@ public:
       bool return_empty_source_address = false)
       : num_calls_(num_calls), return_empty_source_address_{return_empty_source_address} {}
 
-  UpstreamLocalAddressSelectorConstSharedPtr createLocalAddressSelector(
+  absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr> createLocalAddressSelector(
       std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
       absl::optional<std::string>) const override {
     return std::make_shared<TestUpstreamLocalAddressSelector>(upstream_local_addresses, num_calls_,
