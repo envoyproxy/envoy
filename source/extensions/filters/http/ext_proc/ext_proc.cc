@@ -143,6 +143,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
   logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(callbacks.filterConfigName());
+  ASSERT(logging_info_ != nullptr);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -171,7 +172,7 @@ Filter::StreamOpenState Filter::openStream() {
     stats_.streams_started_.inc();
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
-    if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
+    if (grpc_service_.has_envoy_grpc()) {
       logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
     }
   }
@@ -564,7 +565,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 }
 
 void Filter::logGrpcStreamInfo() {
-  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
+  if (stream_ != nullptr && grpc_service_.has_envoy_grpc()) {
     const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
     if (upstream_meter != nullptr) {
       logging_info_->setBytesSent(upstream_meter->wireBytesSent());
