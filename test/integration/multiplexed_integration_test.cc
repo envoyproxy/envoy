@@ -2537,7 +2537,7 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   tcp_client_->close();
   // NOTE (soulxu): the connection may closed before all the streams are parsed when
   // using the iouring. So we need to check the number of reset streams equal to
-  // the number of streams received. Before check the number of reset stream, we need
+  // the number of streams recevied. Before check the number of reset stream, we need
   // ensure all the streams are reset by checking the active connection.
   test_server_->waitForGaugeEq("http.config_test.downstream_cx_active", 0,
                                TestUtility::DefaultTimeout * 3);
