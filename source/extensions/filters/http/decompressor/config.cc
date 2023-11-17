@@ -29,7 +29,7 @@ absl::StatusOr<Http::FilterFactoryCb> DecompressorFilterFactory::createFilterFac
   Compression::Decompressor::DecompressorFactoryPtr decompressor_factory =
       decompressor_library_factory->createDecompressorFactoryFromProto(*message, context);
   DecompressorFilterConfigSharedPtr filter_config = std::make_shared<DecompressorFilterConfig>(
-      proto_config, stats_prefix, context.scope(), context.runtime(),
+      proto_config, stats_prefix, context.scope(), context.getServerFactoryContext().runtime(),
       std::move(decompressor_factory));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<DecompressorFilter>(filter_config));

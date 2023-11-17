@@ -44,7 +44,7 @@ namespace Envoy {
 namespace Platform {
 
 #ifdef ENVOY_GOOGLE_GRPC
-XdsBuilder::XdsBuilder(std::string xds_server_address, const int xds_server_port)
+XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
 XdsBuilder& XdsBuilder::addInitialStreamHeader(std::string header, std::string value) {
@@ -85,27 +85,15 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const
   ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
   ads_config->set_set_node_on_first_message_only(true);
   ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+
   auto& grpc_service = *ads_config->add_grpc_services();
-  grpc_service.mutable_google_grpc()->set_target_uri(
-      fmt::format(R"({}:{})", xds_server_address_, xds_server_port_));
-  grpc_service.mutable_google_grpc()->set_stat_prefix("ads");
-  if (!ssl_root_certs_.empty()) {
-    grpc_service.mutable_google_grpc()
-        ->mutable_channel_credentials()
-        ->mutable_ssl_credentials()
-        ->mutable_root_certs()
-        ->set_inline_string(ssl_root_certs_);
-  }
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("base");
+  grpc_service.mutable_envoy_grpc()->set_authority(
+      absl::StrCat(xds_server_address_, ":", xds_server_port_));
 
   if (!xds_initial_grpc_metadata_.empty()) {
     grpc_service.mutable_initial_metadata()->Assign(xds_initial_grpc_metadata_.begin(),
                                                     xds_initial_grpc_metadata_.end());
-  }
-
-  if (!sni_.empty()) {
-    auto& channel_args =
-        *grpc_service.mutable_google_grpc()->mutable_channel_args()->mutable_args();
-    channel_args["grpc.default_authority"].set_string_value(sni_);
   }
 
   if (!rtds_resource_name_.empty()) {
@@ -163,23 +151,6 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   callbacks_->on_engine_running = std::move(closure);
   return *this;
 }
-
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
-  stats_sinks_ = std::move(stats_sinks);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addGrpcStatsDomain(std::string stats_domain) {
-  stats_domain_ = std::move(stats_domain);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
-  stats_flush_seconds_ = stats_flush_seconds;
-  return *this;
-}
-#endif
 
 EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
   connect_timeout_seconds_ = connect_timeout_seconds;
@@ -353,6 +324,10 @@ EngineBuilder& EngineBuilder::setNodeMetadata(ProtobufWkt::Struct node_metadata)
 #ifdef ENVOY_GOOGLE_GRPC
 EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
   xds_builder_ = std::move(xds_builder);
+  // Add the XdsBuilder's xDS server hostname and port to the list of DNS addresses to preresolve in
+  // the `base` DFP cluster.
+  dns_preresolve_hostnames_.push_back(
+      {xds_builder_->xds_server_address_ /* host */, xds_builder_->xds_server_port_ /* port */});
   return *this;
 }
 #endif
@@ -667,23 +642,34 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     validation->set_trust_chain_verification(envoy::extensions::transport_sockets::tls::v3::
                                                  CertificateValidationContext::ACCEPT_UNTRUSTED);
   }
+
   if (platform_certificates_validation_on_) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator
         validator;
     validation->mutable_custom_validator_config()->set_name(
         "envoy_mobile.cert_validator.platform_bridge_cert_validator");
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
-
   } else {
-    const char* inline_certs = ""
+    std::string certs;
+#ifdef ENVOY_GOOGLE_GRPC
+    if (xds_builder_ && !xds_builder_->ssl_root_certs_.empty()) {
+      certs = xds_builder_->ssl_root_certs_;
+    }
+#endif
+
+    if (certs.empty()) {
+      // The xDS builder doesn't supply root certs, so we'll use the certs packed with Envoy Mobile,
+      // if the build config allows it.
+      const char* inline_certs = ""
 #ifndef EXCLUDE_CERTIFICATES
 #include "library/common/config/certificates.inc"
 #endif
-                               "";
-    // The certificates in certificates.inc are prefixed with 2 spaces per
-    // line to be ingressed into YAML.
-    std::string certs = inline_certs;
-    absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+                                 "";
+      certs = inline_certs;
+      // The certificates in certificates.inc are prefixed with 2 spaces per
+      // line to be ingressed into YAML.
+      absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+    }
     validation->mutable_trusted_ca()->set_inline_string(certs);
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
@@ -697,27 +683,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_protocol_options;
   h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-  if (!stats_domain_.empty()) {
-    // Stats cluster
-    auto* stats_cluster = static_resources->add_clusters();
-    stats_cluster->set_name("stats");
-    stats_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
-    stats_cluster->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
-    stats_cluster->mutable_dns_refresh_rate()->set_seconds(dns_refresh_seconds_);
-    stats_cluster->mutable_transport_socket()->CopyFrom(base_tls_socket);
-    stats_cluster->mutable_load_assignment()->set_cluster_name("stats");
-    auto* address = stats_cluster->mutable_load_assignment()
-                        ->add_endpoints()
-                        ->add_lb_endpoints()
-                        ->mutable_endpoint()
-                        ->mutable_address();
-    address->mutable_socket_address()->set_address(stats_domain_);
-    address->mutable_socket_address()->set_port_value(443);
-    (*stats_cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(h2_protocol_options);
-    stats_cluster->mutable_wait_for_warm_on_init();
-  }
 
   // Base cluster config (DFP cluster config)
   auto* base_cluster = static_resources->add_clusters();
@@ -850,8 +815,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Set up stats.
-  bootstrap->mutable_stats_flush_interval()->set_seconds(stats_flush_seconds_);
-  bootstrap->mutable_stats_sinks();
   auto* list = bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
   list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
   list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
@@ -913,26 +876,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
-
-  for (const std::string& sink_yaml : stats_sinks_) {
-#ifdef ENVOY_ENABLE_YAML
-    auto* sink = bootstrap->add_stats_sinks();
-    MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
-#else
-    UNREFERENCED_PARAMETER(sink_yaml);
-    IS_ENVOY_BUG("stats sinks can not be added when YAML is compiled out.");
-#endif
-  }
-  if (!stats_domain_.empty()) {
-    envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
-    metrics_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("stats");
-    metrics_config.mutable_report_counters_as_deltas()->set_value(true);
-    metrics_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-    metrics_config.set_emit_tags_as_labels(true);
-    auto* sink = bootstrap->add_stats_sinks();
-    sink->set_name("envoy.metrics_service");
-    sink->mutable_typed_config()->PackFrom(metrics_config);
-  }
 
   bootstrap->mutable_dynamic_resources();
 #ifdef ENVOY_GOOGLE_GRPC
