@@ -196,6 +196,9 @@ new_features:
     response trailers in :ref:`UdpTunnelingConfig
     <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.propagate_response_trailers>` to
     the downstream info filter state.
+- area: tracing
+  change: |
+    Provide initial span attributes to a sampler used in the OpenTelemetry tracer.
 - area: udp_proxy
   change: |
     add :ref:`access log options
