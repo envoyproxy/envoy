@@ -214,6 +214,6 @@ new_features:
   change: |
     Added support to copy headers from the redirect response to the
     triggered request. See
-    :ref:`response_headers_to_copy<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_copy>`
+    :ref:`response_headers_to_copy<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_copy>`.
 
 deprecated:
