@@ -24,6 +24,14 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed =
 uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor* field, uint64_t seed);
 
+// MapFieldComparator uses selectCompareFn at init-time, rather than putting the
+// switch into the comparator, because that way the switch is only performed once,
+// rather than O(n*log(n)) times during std::sort.
+//
+// This uses a member-function pointer rather than a virtual function with a
+// polymorphic object selected during a create function because std::sort
+// does not accept a polymorphic object as a comparator (due to that argument
+// being taken by value).
 struct MapFieldComparator {
   MapFieldComparator(const Protobuf::Message& first_msg)
       : reflection_(*first_msg.GetReflection()), descriptor_(*first_msg.GetDescriptor()),
