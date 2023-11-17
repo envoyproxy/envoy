@@ -25,14 +25,14 @@ namespace TcpProxy {
 namespace {
 using envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
-class HttpUpstreamTest : public testing::TestWithParam<Http::CodecType> {
+template <typename T> class HttpUpstreamTest : public testing::Test {
 public:
   HttpUpstreamTest() {
     EXPECT_CALL(encoder_, getStream()).Times(AnyNumber());
     EXPECT_CALL(encoder_, encodeHeaders(_, false));
     EXPECT_CALL(encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
     EXPECT_CALL(encoder_, enableTcpTunneling()).Times(AnyNumber());
-    if (GetParam() == Http::CodecType::HTTP1) {
+    if (typeid(T) == typeid(Http1Upstream)) {
       ON_CALL(encoder_, http1StreamEncoderOptions())
           .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options_)));
     }
@@ -42,8 +42,7 @@ public:
 
   void setupUpstream() {
     config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, context_);
-    upstream_ = std::make_unique<HttpUpstream>(callbacks_, *this->config_, downstream_stream_info_,
-                                               GetParam());
+    upstream_ = std::make_unique<T>(callbacks_, *this->config_, downstream_stream_info_);
     upstream_->setRequestEncoder(encoder_, true);
   }
 
@@ -57,11 +56,13 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
-INSTANTIATE_TEST_SUITE_P(H1H2H3Codecs, HttpUpstreamTest,
-                         ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                                           Http::CodecType::HTTP3));
+using testing::Types;
 
-TEST_P(HttpUpstreamTest, WriteUpstream) {
+using Implementations = Types<Http1Upstream, Http2Upstream>;
+
+TYPED_TEST_SUITE(HttpUpstreamTest, Implementations);
+
+TYPED_TEST(HttpUpstreamTest, WriteUpstream) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_, encodeData(BufferStringEqual("foo"), false));
   Buffer::OwnedImpl buffer1("foo");
@@ -72,12 +73,12 @@ TEST_P(HttpUpstreamTest, WriteUpstream) {
   this->upstream_->encodeData(buffer2, true);
 
   // New upstream with no encoder.
-  this->upstream_ = std::make_unique<HttpUpstream>(this->callbacks_, *this->config_,
-                                                   this->downstream_stream_info_, GetParam());
+  this->upstream_ =
+      std::make_unique<TypeParam>(this->callbacks_, *this->config_, this->downstream_stream_info_);
   this->upstream_->encodeData(buffer2, true);
 }
 
-TEST_P(HttpUpstreamTest, WriteDownstream) {
+TYPED_TEST(HttpUpstreamTest, WriteDownstream) {
   this->setupUpstream();
   EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("foo"), false));
   Buffer::OwnedImpl buffer1("foo");
@@ -88,21 +89,21 @@ TEST_P(HttpUpstreamTest, WriteDownstream) {
   this->upstream_->responseDecoder().decodeData(buffer2, true);
 }
 
-TEST_P(HttpUpstreamTest, InvalidUpgradeWithEarlyFin) {
+TYPED_TEST(HttpUpstreamTest, InvalidUpgradeWithEarlyFin) {
   this->setupUpstream();
   EXPECT_CALL(this->callbacks_, onEvent(_));
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), true);
 }
 
-TEST_P(HttpUpstreamTest, InvalidUpgradeWithNon200) {
+TYPED_TEST(HttpUpstreamTest, InvalidUpgradeWithNon200) {
   this->setupUpstream();
   EXPECT_CALL(this->callbacks_, onEvent(_));
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "301"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
 }
 
-TEST_P(HttpUpstreamTest, ReadDisable) {
+TYPED_TEST(HttpUpstreamTest, ReadDisable) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, readDisable(true));
   EXPECT_TRUE(this->upstream_->readDisable(true));
@@ -111,31 +112,31 @@ TEST_P(HttpUpstreamTest, ReadDisable) {
   EXPECT_TRUE(this->upstream_->readDisable(false));
 
   // New upstream with no encoder.
-  this->upstream_ = std::make_unique<HttpUpstream>(this->callbacks_, *this->config_,
-                                                   this->downstream_stream_info_, GetParam());
+  this->upstream_ =
+      std::make_unique<TypeParam>(this->callbacks_, *this->config_, this->downstream_stream_info_);
   EXPECT_FALSE(this->upstream_->readDisable(true));
 }
 
-TEST_P(HttpUpstreamTest, AddBytesSentCallbackForCoverage) {
+TYPED_TEST(HttpUpstreamTest, AddBytesSentCallbackForCoverage) {
   this->setupUpstream();
   this->upstream_->addBytesSentCallback([&](uint64_t) { return true; });
 }
 
-TEST_P(HttpUpstreamTest, DownstreamDisconnect) {
+TYPED_TEST(HttpUpstreamTest, DownstreamDisconnect) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
   EXPECT_CALL(this->callbacks_, onEvent(_)).Times(0);
   EXPECT_TRUE(this->upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
 }
 
-TEST_P(HttpUpstreamTest, UpstreamReset) {
+TYPED_TEST(HttpUpstreamTest, UpstreamReset) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(this->callbacks_, onEvent(_));
   this->upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
 }
 
-TEST_P(HttpUpstreamTest, UpstreamWatermarks) {
+TYPED_TEST(HttpUpstreamTest, UpstreamWatermarks) {
   this->setupUpstream();
   EXPECT_CALL(this->callbacks_, onAboveWriteBufferHighWatermark());
   this->upstream_->onAboveWriteBufferHighWatermark();
@@ -150,7 +151,7 @@ public:
   MOCK_METHOD(void, onFailure, ());
 };
 
-TEST_P(HttpUpstreamTest, DownstreamDisconnectBeforeConnectResponse) {
+TYPED_TEST(HttpUpstreamTest, DownstreamDisconnectBeforeConnectResponse) {
   this->setupUpstream();
   auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
   auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
@@ -160,7 +161,7 @@ TEST_P(HttpUpstreamTest, DownstreamDisconnectBeforeConnectResponse) {
   EXPECT_TRUE(this->upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
 }
 
-TEST_P(HttpUpstreamTest, OnSuccessCalledOnValidResponse) {
+TYPED_TEST(HttpUpstreamTest, OnSuccessCalledOnValidResponse) {
   this->setupUpstream();
   auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
   auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
@@ -171,7 +172,7 @@ TEST_P(HttpUpstreamTest, OnSuccessCalledOnValidResponse) {
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
 }
 
-TEST_P(HttpUpstreamTest, OnFailureCalledOnInvalidResponse) {
+TYPED_TEST(HttpUpstreamTest, OnFailureCalledOnInvalidResponse) {
   this->setupUpstream();
   auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
   auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
@@ -182,7 +183,7 @@ TEST_P(HttpUpstreamTest, OnFailureCalledOnInvalidResponse) {
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
 }
 
-TEST_P(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
+TYPED_TEST(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   std::array<char, 256> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   this->setupUpstream();
@@ -193,7 +194,7 @@ TEST_P(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
 }
 
-TEST_P(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
+TYPED_TEST(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
   this->upstream_->doneWriting();
@@ -201,14 +202,14 @@ TEST_P(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
 
-class HttpUpstreamRequestEncoderTest : public testing::TestWithParam<Http::CodecType> {
+template <typename T> class HttpUpstreamRequestEncoderTest : public testing::Test {
 public:
   HttpUpstreamRequestEncoderTest() {
     EXPECT_CALL(encoder_, getStream()).Times(AnyNumber());
     EXPECT_CALL(encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
     EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
 
-    if (GetParam() == Http::CodecType::HTTP1) {
+    if (typeid(T) == typeid(Http1Upstream)) {
       ON_CALL(encoder_, http1StreamEncoderOptions())
           .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options_)));
       is_http2_ = false;
@@ -218,8 +219,7 @@ public:
 
   void setupUpstream() {
     config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, context_);
-    upstream_ = std::make_unique<HttpUpstream>(callbacks_, *this->config_,
-                                               this->downstream_stream_info_, GetParam());
+    upstream_ = std::make_unique<T>(callbacks_, *this->config_, this->downstream_stream_info_);
   }
 
   void populateMetadata(envoy::config::core::v3::Metadata& metadata, const std::string& ns,
@@ -242,11 +242,9 @@ public:
   bool is_http2_ = true;
 };
 
-INSTANTIATE_TEST_SUITE_P(H1H2H3Codecs, HttpUpstreamRequestEncoderTest,
-                         ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                                           Http::CodecType::HTTP3));
+TYPED_TEST_SUITE(HttpUpstreamRequestEncoderTest, Implementations);
 
-TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoder) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
@@ -258,7 +256,7 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoder) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
   this->config_message_.set_use_post(true);
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
@@ -277,7 +275,7 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
   this->config_message_.set_use_post(true);
   this->config_message_.set_post_path("/test");
   this->setupUpstream();
@@ -297,14 +295,14 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {
   this->config_message_.set_use_post(false);
   this->config_message_.set_post_path("/test");
   EXPECT_THROW_WITH_MESSAGE(this->setupUpstream(), EnvoyException,
                             "Can't set a post path when POST method isn't used");
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   auto* header = this->config_message_.add_headers_to_add();
   auto* hdr = header->mutable_header();
   hdr->set_key("header0");
@@ -337,7 +335,7 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest, ConfigReuse) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
   auto* header = this->config_message_.add_headers_to_add();
   auto* hdr = header->mutable_header();
   hdr->set_key("key");
@@ -367,12 +365,12 @@ TEST_P(HttpUpstreamRequestEncoderTest, ConfigReuse) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 
   Http::MockRequestEncoder another_encoder;
-  auto another_upstream = std::make_unique<HttpUpstream>(this->callbacks_, *this->config_,
-                                                         this->downstream_stream_info_, GetParam());
+  auto another_upstream =
+      std::make_unique<TypeParam>(this->callbacks_, *this->config_, this->downstream_stream_info_);
   EXPECT_CALL(another_encoder, getStream()).Times(AnyNumber());
   EXPECT_CALL(another_encoder, http1StreamEncoderOptions()).Times(AnyNumber());
   EXPECT_CALL(another_encoder, enableTcpTunneling()).Times(AnyNumber());
-  if (GetParam() == Http::CodecType::HTTP1) {
+  if (typeid(TypeParam) == typeid(Http1Upstream)) {
     ON_CALL(another_encoder, http1StreamEncoderOptions())
         .WillByDefault(
             Return(Http::Http1StreamEncoderOptionsOptRef(this->stream_encoder_options_)));
@@ -381,7 +379,7 @@ TEST_P(HttpUpstreamRequestEncoderTest, ConfigReuse) {
   another_upstream->setRequestEncoder(another_encoder, false);
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamInfo) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamInfo) {
   auto* header = this->config_message_.add_headers_to_add();
   auto* hdr = header->mutable_header();
   hdr->set_key("header0");
@@ -414,8 +412,8 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamInfo) 
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest,
-       RequestEncoderHostnameWithDownstreamInfoRequestedServerName) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest,
+           RequestEncoderHostnameWithDownstreamInfoRequestedServerName) {
   this->config_message_.set_hostname("%REQUESTED_SERVER_NAME%:443");
   this->setupUpstream();
 
@@ -439,7 +437,8 @@ TEST_P(HttpUpstreamRequestEncoderTest,
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderHostnameWithDownstreamInfoDynamicMetadata) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest,
+           RequestEncoderHostnameWithDownstreamInfoDynamicMetadata) {
   this->config_message_.set_hostname("%DYNAMIC_METADATA(tunnel:address)%:443");
   this->setupUpstream();
 
