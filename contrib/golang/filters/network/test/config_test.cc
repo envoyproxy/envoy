@@ -31,8 +31,10 @@ public:
   void testConfig(envoy::extensions::filters::network::golang::v3alpha::Config& config) {
     EXPECT_CALL(slot_allocator_, allocateSlot())
         .WillRepeatedly(Invoke(&slot_allocator_, &ThreadLocal::MockInstance::allocateSlotMock));
-    ON_CALL(context_, threadLocal()).WillByDefault(ReturnRef(slot_allocator_));
-    ON_CALL(context_.api_, threadFactory()).WillByDefault(ReturnRef(thread_factory_));
+    ON_CALL(context_.server_factory_context_, threadLocal())
+        .WillByDefault(ReturnRef(slot_allocator_));
+    ON_CALL(context_.server_factory_context_.api_, threadFactory())
+        .WillByDefault(ReturnRef(thread_factory_));
 
     Network::FilterFactoryCb cb;
     EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });

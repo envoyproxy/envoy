@@ -9,11 +9,85 @@
 
 #include "test/benchmark/main.h"
 #include "test/common/stats/real_thread_test_base.h"
+#include "test/mocks/upstream/cluster_manager.h"
 
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Server {
+
+class FastMockCluster;
+
+class FastMockClusterManager : public testing::StrictMock<Upstream::MockClusterManager> {
+public:
+  ClusterInfoMaps clusters() const override { return clusters_; }
+
+  ClusterInfoMaps clusters_;
+  std::vector<std::unique_ptr<FastMockCluster>> clusters_storage_;
+  Stats::TestUtil::TestStore store_;
+  bool per_endpoint_enabled_{false};
+};
+
+// Override the methods used by this test so that using a mock doesn't affect performance.
+class FastMockCluster : public testing::StrictMock<Upstream::MockCluster>,
+                        public testing::StrictMock<Upstream::MockPrioritySet> {
+public:
+  FastMockCluster(const std::string& name, FastMockClusterManager& cm)
+      : cm_(cm), scope_(name, cm_.store_), name_(name) {}
+
+  Upstream::ClusterInfoConstSharedPtr info() const override { return info_; }
+  const Upstream::PrioritySet& prioritySet() const override { return *this; }
+  PrioritySet& prioritySet() override { return *this; }
+  const std::vector<Upstream::HostSetPtr>& hostSetsPerPriority() const override {
+    return host_sets_;
+  }
+
+  class ClusterInfo : public testing::StrictMock<Upstream::MockClusterInfo> {
+  public:
+    ClusterInfo(FastMockCluster& parent) : parent_(parent) {}
+
+    bool perEndpointStatsEnabled() const override { return parent_.cm_.per_endpoint_enabled_; }
+    const std::string& observabilityName() const override { return parent_.name_; }
+    Stats::Scope& statsScope() const override { return parent_.scope_; }
+
+    FastMockCluster& parent_;
+  };
+
+  FastMockClusterManager& cm_;
+  Stats::TestUtil::TestScope scope_;
+  std::shared_ptr<ClusterInfo> info_{std::make_shared<ClusterInfo>(*this)};
+  std::string name_;
+  std::vector<Upstream::HostSetPtr> host_sets_;
+};
+
+class FastMockHostSet : public testing::StrictMock<Upstream::MockHostSet> {
+public:
+  const Upstream::HostVector& hosts() const override { return hosts_; }
+
+  Upstream::HostVector hosts_;
+};
+
+class FastMockHost : public testing::StrictMock<Upstream::MockHostLight> {
+public:
+  Network::Address::InstanceConstSharedPtr address() const override { return address_; }
+  const std::string& hostname() const override { return hostname_; }
+
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
+  counters() const override {
+    return host_stats_.counters();
+  }
+
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
+  gauges() const override {
+    return host_stats_.gauges();
+  }
+
+  Health coarseHealth() const override { return Upstream::Host::Health::Healthy; }
+
+  Network::Address::InstanceConstSharedPtr address_;
+  std::string hostname_;
+  mutable Upstream::HostStats host_stats_;
+};
 
 class StatsHandlerTest : public Stats::ThreadLocalRealThreadsMixin {
 public:
@@ -22,12 +96,14 @@ public:
     Envoy::benchmark::setCleanupHook([this]() { delete this; });
   }
 
+  static constexpr uint32_t NumClusters = 10000;
+
   void init() {
     // Benchmark will be 10k clusters each with 100 counters, with 100+
     // character names. The first counter in each scope will be given a value so
     // it will be included in 'usedonly'.
     const std::string prefix(100, 'a');
-    for (uint32_t s = 0; s < 10000; ++s) {
+    for (uint32_t s = 0; s < NumClusters; ++s) {
       Stats::ScopeSharedPtr scope = store_->createScope(absl::StrCat("scope_", s));
       scopes_.emplace_back(scope);
       for (uint32_t c = 0; c < 100; ++c) {
@@ -73,7 +149,27 @@ public:
       }
     }
     store_->mergeHistograms([]() {});
+
+    cm_.store_.fixed_tags_ = Stats::TagVector{{"fixed-tag", "fixed-value"}};
+    for (uint32_t i = 0; i < NumClusters; i++) {
+      std::string name = absl::StrCat("cluster_", i);
+      cm_.clusters_storage_.push_back(std::make_unique<FastMockCluster>(name, cm_));
+      FastMockCluster& cluster = *cm_.clusters_storage_.back();
+      auto host_set = std::make_unique<FastMockHostSet>();
+      for (uint32_t host_num = 0; host_num < 10; host_num++) {
+        auto host = std::make_unique<FastMockHost>();
+        host->hostname_ = fmt::format("host{}.example.com", host_num);
+        host->address_ = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", host_num + 1);
+
+        host_set->hosts_.push_back(std::move(host));
+      }
+
+      cluster.host_sets_.push_back(std::move(host_set));
+      cm_.clusters_.active_clusters_.emplace(name, cluster);
+    }
   }
+
+  void setPerEndpointStats(bool enabled) { cm_.per_endpoint_enabled_ = enabled; }
 
   /**
    * Issues an admin request against the stats saved in store_.
@@ -81,10 +177,10 @@ public:
   uint64_t handlerStats(const StatsParams& params) {
     Buffer::OwnedImpl data;
     if (params.format_ == StatsFormat::Prometheus) {
-      StatsHandler::prometheusRender(*store_, custom_namespaces_, params, data);
+      StatsHandler::prometheusRender(*store_, custom_namespaces_, cm_, params, data);
       return data.length();
     }
-    Admin::RequestPtr request = StatsHandler::makeRequest(*store_, params);
+    Admin::RequestPtr request = StatsHandler::makeRequest(*store_, params, cm_);
     auto response_headers = Http::ResponseHeaderMapImpl::create();
     request->start(*response_headers);
     uint64_t count = 0;
@@ -99,155 +195,233 @@ public:
 
   std::vector<Stats::ScopeSharedPtr> scopes_;
   Envoy::Stats::CustomStatNamespacesImpl custom_namespaces_;
+  FastMockClusterManager cm_;
 };
 
 } // namespace Server
 } // namespace Envoy
 
-Envoy::Server::StatsHandlerTest& testContext() {
-  Envoy::Event::Libevent::Global::initialize();
+static Envoy::Server::StatsHandlerTest& get() {
   MUTABLE_CONSTRUCT_ON_FIRST_USE(Envoy::Server::StatsHandlerTest);
 }
 
+Envoy::Server::StatsHandlerTest& testContext(bool per_endpoint_enabled) {
+  Envoy::Event::Libevent::Global::initialize();
+  auto& context = get();
+  context.setPerEndpointStats(per_endpoint_enabled);
+  return context;
+}
+
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_AllCountersText(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_AllCountersText(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   params.type_ = Envoy::Server::StatsType::Counters;
 
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count > 100 * 1000 * 1000, "expected count > 100M"); // actual = 117,789,000
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_AllCountersText)->Unit(benchmark::kMillisecond);
+// BENCHMARK(BM_AllCountersText)->Range(false, true)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_AllCountersText, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_AllCountersText, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_UsedCountersText(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_UsedCountersText(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?usedonly&type=Counters", response);
 
+  const uint64_t upper_limit = per_endpoint_stats ? 50 * 1000 * 1000 : 2 * 1000 * 1000;
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count > 1000 * 1000, "expected count > 1M");
-    RELEASE_ASSERT(count < 2 * 1000 * 1000, "expected count < 2M"); // actual = 1,168,890
+    RELEASE_ASSERT(count < upper_limit, "expected count < upper_limit");
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_UsedCountersText)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_UsedCountersText, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_UsedCountersText, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_FilteredCountersText(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_FilteredCountersText(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?filter=no-match&type=Counters", response);
 
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count == 0, "expected count == 0");
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_FilteredCountersText)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_FilteredCountersText, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_FilteredCountersText, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_AllCountersJson(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_AllCountersJson(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=json&type=Counters", response);
 
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count > 130 * 1000 * 1000, "expected count > 130M"); // actual = 135,789,011
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_AllCountersJson)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_AllCountersJson, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_AllCountersJson, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_UsedCountersJson(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_UsedCountersJson(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=json&usedonly&type=Counters", response);
 
+  const uint64_t upper_limit = per_endpoint_stats ? 60 * 1000 * 1000 : 2 * 1000 * 1000;
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count > 1000 * 1000, "expected count > 1M");
-    RELEASE_ASSERT(count < 2 * 1000 * 1000, "expected count < 2M"); // actual = 1,348,901
+    RELEASE_ASSERT(count < upper_limit, "expected count < upper_limit");
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_UsedCountersJson)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_UsedCountersJson, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_UsedCountersJson, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_FilteredCountersJson(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_FilteredCountersJson(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=json&filter=no-match&type=Counters", response);
 
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count < 100, "expected count < 100"); // actual = 12
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_FilteredCountersJson)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_FilteredCountersJson, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_FilteredCountersJson, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_AllCountersPrometheus(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_AllCountersPrometheus(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=prometheus&type=Counters", response);
 
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count > 250 * 1000 * 1000, "expected count > 250M"); // actual = 261,578,000
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_AllCountersPrometheus)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_AllCountersPrometheus, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_AllCountersPrometheus, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_UsedCountersPrometheus(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_UsedCountersPrometheus(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=prometheus&usedonly&type=Counters", response);
 
+  const uint64_t upper_limit = per_endpoint_stats ? 200 * 1000 * 1000 : 3 * 1000 * 1000;
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count > 1000 * 1000, "expected count > 1M");
-    RELEASE_ASSERT(count < 3 * 1000 * 1000, "expected count < 3M"); // actual = 2,597,780
+    RELEASE_ASSERT(count < upper_limit, "expected count < upper_limit");
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_UsedCountersPrometheus)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_UsedCountersPrometheus, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_UsedCountersPrometheus, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_FilteredCountersPrometheus(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+static void BM_FilteredCountersPrometheus(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=prometheus&filter=no-match&type=Counters", response);
 
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count == 0, "expected count == 0");
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
-BENCHMARK(BM_FilteredCountersPrometheus)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_FilteredCountersPrometheus, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_FilteredCountersPrometheus, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HistogramsJson(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
+  Envoy::Server::StatsHandlerTest& test_context = testContext(false);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=json&type=Histograms&histogram_buckets=detailed", response);
 
+  uint64_t count;
   for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
+    count = test_context.handlerStats(params);
     RELEASE_ASSERT(count > 1750000 && count < 2000000,
                    absl::StrCat("count=", count, ", expected > 1.7M"));
   }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
 }
 BENCHMARK(BM_HistogramsJson)->Unit(benchmark::kMillisecond);

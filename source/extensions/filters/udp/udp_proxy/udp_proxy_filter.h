@@ -102,6 +102,14 @@ public:
   virtual bool bufferEnabled() const PURE;
   virtual uint32_t maxBufferedDatagrams() const PURE;
   virtual uint64_t maxBufferedBytes() const PURE;
+
+  virtual void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
+
+  virtual void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
 };
 
 using UdpTunnelingConfigPtr = std::unique_ptr<const UdpTunnelingConfig>;
@@ -126,6 +134,7 @@ public:
   virtual const FilterChainFactory& sessionFilterFactory() const PURE;
   virtual bool hasSessionFilters() const PURE;
   virtual const UdpTunnelingConfigPtr& tunnelingConfig() const PURE;
+  virtual Random::RandomGenerator& randomGenerator() const PURE;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -313,6 +322,9 @@ private:
         is_valid_response = Http::HeaderUtility::isConnectUdpResponse(*headers);
       }
 
+      parent_.tunnel_config_.propagateResponseHeaders(std::move(headers),
+                                                      parent_.downstream_info_.filterState());
+
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.tunnel_creation_callbacks_.has_value()) {
@@ -328,7 +340,9 @@ private:
       }
     }
 
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
+      parent_.tunnel_config_.propagateResponseTrailers(std::move(trailers),
+                                                       parent_.downstream_info_.filterState());
       parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
     }
 
@@ -457,7 +471,7 @@ private:
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
-    void continueFilterChain() override { parent_.onContinueFilterChain(this); }
+    bool continueFilterChain() override { return parent_.onContinueFilterChain(this); }
     void injectDatagramToFilterChain(Network::UdpRecvData& data) override {
       parent_.onInjectReadDatagramToFilterChain(this, data);
     }
@@ -509,13 +523,13 @@ private:
       return absl::nullopt;
     }
 
-    void onNewSession();
+    bool onNewSession();
     void onData(Network::UdpRecvData& data);
     void processUpstreamDatagram(Network::UdpRecvData& data);
     void writeDownstream(Network::UdpRecvData& data);
     void resetIdleTimer();
 
-    virtual void createUpstream() PURE;
+    virtual bool createUpstream() PURE;
     virtual void writeUpstream(Network::UdpRecvData& data) PURE;
     virtual void onIdleTimer() PURE;
 
@@ -525,7 +539,7 @@ private:
 
     uint64_t sessionId() const { return session_id_; };
     StreamInfo::StreamInfo& streamInfo() { return udp_session_info_; };
-    void onContinueFilterChain(ActiveReadFilter* filter);
+    bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
 
@@ -595,7 +609,7 @@ private:
     ~UdpActiveSession() override = default;
 
     // ActiveSession
-    void createUpstream() override;
+    bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
 
@@ -644,7 +658,7 @@ private:
     ~TunnelingActiveSession() override = default;
 
     // ActiveSession
-    void createUpstream() override;
+    bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
 
@@ -666,7 +680,7 @@ private:
   private:
     using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
 
-    void establishUpstreamConnection();
+    bool establishUpstreamConnection();
     bool createConnectionPool();
     void maybeBufferDatagram(Network::UdpRecvData& data);
     void flushBuffer();

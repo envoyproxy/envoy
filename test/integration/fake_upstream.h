@@ -945,6 +945,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is

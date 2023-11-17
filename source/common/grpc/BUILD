@@ -55,6 +55,7 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ] + envoy_select_google_grpc([":google_async_client_lib"]),
 )
 

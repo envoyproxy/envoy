@@ -35,22 +35,25 @@ public:
     uint32_t max_buffered_bytes_;
   };
 
-  void setup(absl::optional<BufferConfig> buffer_config = absl::nullopt, uint32_t max_hosts = 1024,
+  void setup(std::string upsteam_host = "localhost",
+             absl::optional<BufferConfig> buffer_config = absl::nullopt, uint32_t max_hosts = 1024,
              uint32_t max_pending_requests = 1024) {
     setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
 
-    config_helper_.addConfigModifier([this, buffer_config, max_hosts, max_pending_requests](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Switch predefined cluster_0 to CDS filesystem sourcing.
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()
-          ->mutable_cds_config()
-          ->mutable_path_config_source()
-          ->set_path(cds_helper_.cdsPath());
-      bootstrap.mutable_static_resources()->clear_clusters();
+    config_helper_.addConfigModifier(
+        [this, upsteam_host, buffer_config, max_hosts,
+         max_pending_requests](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          // Switch predefined cluster_0 to CDS filesystem sourcing.
+          bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
+          bootstrap.mutable_dynamic_resources()
+              ->mutable_cds_config()
+              ->mutable_path_config_source()
+              ->set_path(cds_helper_.cdsPath());
+          bootstrap.mutable_static_resources()->clear_clusters();
 
-      std::string filter_config = fmt::format(R"EOF(
+          std::string filter_config = fmt::format(
+              R"EOF(
 name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
@@ -66,7 +69,7 @@ typed_config:
   - name: setter
     typed_config:
       '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DynamicForwardProxySetterFilterConfig
-      host: localhost
+      host: {}
       port: {}
   - name: dfp
     typed_config:
@@ -79,24 +82,23 @@ typed_config:
         dns_cache_circuit_breaker:
           max_pending_requests: {}
 )EOF",
-                                              fake_upstreams_[0]->localAddress()->ip()->port(),
-                                              Network::Test::ipVersionToDnsFamily(GetParam()),
-                                              max_hosts, max_pending_requests);
+              upsteam_host, fake_upstreams_[0]->localAddress()->ip()->port(),
+              Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests);
 
-      if (buffer_config.has_value()) {
-        filter_config += fmt::format(R"EOF(
+          if (buffer_config.has_value()) {
+            filter_config += fmt::format(R"EOF(
       buffer_options:
         max_buffered_datagrams: {}
         max_buffered_bytes: {}
 )EOF",
-                                     buffer_config.value().max_buffered_datagrams_,
-                                     buffer_config.value().max_buffered_bytes_);
-      }
+                                         buffer_config.value().max_buffered_datagrams_,
+                                         buffer_config.value().max_buffered_bytes_);
+          }
 
-      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter = listener->add_listener_filters();
-      TestUtility::loadFromYaml(filter_config, *filter);
-    });
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* filter = listener->add_listener_filters();
+          TestUtility::loadFromYaml(filter_config, *filter);
+        });
 
     // Setup the initial CDS cluster.
     cluster_.mutable_connect_timeout()->CopyFrom(
@@ -157,7 +159,7 @@ TEST_P(DynamicForwardProxyIntegrationTest, BasicFlow) {
 }
 
 TEST_P(DynamicForwardProxyIntegrationTest, BasicFlowWithBuffering) {
-  setup(BufferConfig{1, 1024});
+  setup("localhost", BufferConfig{1, 1024});
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -175,7 +177,7 @@ TEST_P(DynamicForwardProxyIntegrationTest, BasicFlowWithBuffering) {
 }
 
 TEST_P(DynamicForwardProxyIntegrationTest, BufferOverflowDueToDatagramSize) {
-  setup(BufferConfig{1, 2});
+  setup("localhost", BufferConfig{1, 2});
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -194,6 +196,26 @@ TEST_P(DynamicForwardProxyIntegrationTest, BufferOverflowDueToDatagramSize) {
   Network::UdpRecvData request_datagram;
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("hello2", request_datagram.buffer_->toString());
+}
+
+TEST_P(DynamicForwardProxyIntegrationTest, EmptyDnsResponseDueToDummyHost) {
+  setup("dummyhost");
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  Network::Test::UdpSyncPeer client(version_);
+
+  client.write("hello1", *listener_address);
+  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+
+  // The DNS response is empty, so will not be found any valid host and session will be removed.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_none_healthy", 1);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  // DNS cache hit but still no host found.
+  client.write("hello2", *listener_address);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_none_healthy", 2);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 
 } // namespace

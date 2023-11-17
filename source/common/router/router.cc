@@ -68,17 +68,20 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            Server::Configuration::FactoryContext& context,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config)
-    : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                   context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-                   PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                   config.start_child_span(), config.suppress_envoy_headers(),
-                   config.respect_expected_rq_timeout(),
-                   config.suppress_grpc_request_failure_code_stats(),
-                   config.has_upstream_log_options()
-                       ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
-                       : false,
-                   config.strict_check_headers(), context.api().timeSource(), context.httpContext(),
-                   context.routerContext()) {
+    : FilterConfig(
+          stat_prefix, context.getServerFactoryContext().localInfo(), context.scope(),
+          context.getServerFactoryContext().clusterManager(),
+          context.getServerFactoryContext().runtime(),
+          context.getServerFactoryContext().api().randomGenerator(), std::move(shadow_writer),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
+          config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
+          config.suppress_grpc_request_failure_code_stats(),
+          config.has_upstream_log_options()
+              ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
+              : false,
+          config.strict_check_headers(), context.getServerFactoryContext().api().timeSource(),
+          context.getServerFactoryContext().httpContext(),
+          context.getServerFactoryContext().routerContext()) {
   for (const auto& upstream_log : config.upstream_log()) {
     upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
   }
@@ -101,8 +104,8 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, server_factory_ctx, context.clusterManager(),
-               *upstream_ctx_, prefix);
+        helper(*filter_config_provider_manager, server_factory_ctx,
+               context.getServerFactoryContext().clusterManager(), *upstream_ctx_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
                                           "router upstream http", upstream_http_filter_factories_));
   }
@@ -151,11 +154,11 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
                                            stable_random);
 }
 
-FilterUtility::TimeoutData
-FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& request_headers,
-                            bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
-                            bool per_try_timeout_hedging_enabled,
-                            bool respect_expected_rq_timeout) {
+TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
+                                        Http::RequestHeaderMap& request_headers,
+                                        bool insert_envoy_expected_request_timeout_ms,
+                                        bool grpc_request, bool per_try_timeout_hedging_enabled,
+                                        bool respect_expected_rq_timeout) {
   // See if there is a user supplied timeout in a request header. If there is we take that.
   // Otherwise if the request is gRPC and a maximum gRPC timeout is configured we use the timeout
   // in the gRPC headers (or infinity when gRPC headers have no timeout), but cap that timeout to
@@ -239,8 +242,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   return timeout;
 }
 
-void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time,
-                                      const FilterUtility::TimeoutData& timeout,
+void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time, const TimeoutData& timeout,
                                       const RouteEntry& route,
                                       Http::RequestHeaderMap& request_headers,
                                       bool insert_envoy_expected_request_timeout_ms,
@@ -825,7 +827,8 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
       upstream_protocol = UpstreamProtocol::TCP;
     }
   }
-  return factory->createGenericConnPool(thread_local_cluster, upstream_protocol, *route_entry_,
+  return factory->createGenericConnPool(thread_local_cluster, upstream_protocol,
+                                        route_entry_->priority(),
                                         callbacks_->streamInfo().protocol(), this);
 }
 
@@ -1373,9 +1376,27 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 
-void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host,
+                                    bool pool_success) {
   if (retry_state_ && host) {
     retry_state_->onHostAttempted(host);
+  }
+
+  if (!pool_success) {
+    return;
+  }
+
+  if (request_vcluster_) {
+    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
+    // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
+    // here.
+    request_vcluster_->stats().upstream_rq_total_.inc();
+  }
+  if (route_stats_context_.has_value()) {
+    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
+    // callback. Hence, the upstream request increases the route level upstream_rq_total_ stat
+    // here.
+    route_stats_context_->stats().upstream_rq_total_.inc();
   }
 }
 

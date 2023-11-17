@@ -3704,6 +3704,22 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   EXPECT_EQ(min_retry_concurrency, 123UL);
 }
 
+TEST_F(ClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
+  std::string yaml = R"EOF(
+    name: name
+    type: STRICT_DNS
+    lb_policy: RANDOM
+    track_cluster_stats:
+      per_endpoint_stats: true
+  )EOF";
+
+  server_context_.bootstrap_.mutable_cluster_manager()->mutable_load_stats_config();
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Only one of cluster per_endpoint_stats and cluster manager "
+                            "load_stats_config can be specified");
+}
+
 TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
   std::string yaml = R"EOF(
     name: name
@@ -4278,7 +4294,7 @@ public:
   TestHttpFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
     PANIC("not implemented");

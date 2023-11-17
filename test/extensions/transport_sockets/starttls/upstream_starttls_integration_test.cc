@@ -93,7 +93,7 @@ public:
     Network::ReadFilterCallbacks* read_callbacks_{};
   };
 
-  // Helper read filter inserted into downstream filter chain. The filter reacts to
+  // Helper read filter inserted into downstream network filter chain. The filter reacts to
   // SwitchViaFilterManager string and signals to the filter manager to signal to the terminal
   // filter to switch upstream connection to secure mode.
   struct DownstreamReadFilter : public Network::ReadFilter {

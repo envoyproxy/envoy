@@ -59,7 +59,11 @@ FilterConfig::FilterConfig(
       has_descriptors_(!config.descriptors().empty()),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
-      vh_rate_limits_(config.vh_rate_limits()) {
+      vh_rate_limits_(config.vh_rate_limits()),
+      rate_limited_grpc_status_(
+          config.rate_limited_as_resource_exhausted()
+              ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
+              : absl::nullopt) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -147,7 +151,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       [this, config](Http::HeaderMap& headers) {
         config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
       },
-      absl::nullopt, "local_rate_limited");
+      config->rateLimitedGrpcStatus(), "local_rate_limited");
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
 
   return Http::FilterHeadersStatus::StopIteration;

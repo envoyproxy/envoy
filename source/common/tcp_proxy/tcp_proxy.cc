@@ -139,9 +139,9 @@ Config::SharedConfig::SharedConfig(
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
                Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
-      upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
+      upstream_drain_manager_slot_(context.getServerFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
-      random_generator_(context.api().randomGenerator()) {
+      random_generator_(context.getServerFactoryContext().api().randomGenerator()) {
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();
@@ -223,10 +223,12 @@ Filter::~Filter() {
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
 
+  const Formatter::HttpFormatterContext log_context{
+      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpConnectionEnd};
+
   // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
-                    AccessLog::AccessLogType::TcpConnectionEnd);
+    access_log->log(log_context, getStreamInfo());
   }
 
   ASSERT(generic_conn_pool_ == nullptr);
@@ -271,6 +273,15 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 }
 
 void Filter::onInitFailure(UpstreamFailureReason reason) {
+  // If ODCDS fails, the filter will not attempt to create a connection to
+  // upstream, as it does not have an assigned upstream. As such the filter will
+  // not have started attempting to connect to an upstream and there is no
+  // connection pool callback latency to record.
+  if (initial_upstream_connection_start_time_.has_value()) {
+    getStreamInfo().upstreamInfo()->upstreamTiming().recordConnectionPoolCallbackLatency(
+        initial_upstream_connection_start_time_.value(),
+        read_callbacks_->connection().dispatcher().timeSource());
+  }
   read_callbacks_->connection().close(
       Network::ConnectionCloseType::NoFlush,
       absl::StrCat(StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
@@ -428,6 +439,10 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                  cluster_name);
+  if (!initial_upstream_connection_start_time_.has_value()) {
+    initial_upstream_connection_start_time_.emplace(
+        read_callbacks_->connection().dispatcher().timeSource().monotonicTime());
+  }
 
   const Upstream::ClusterInfoConstSharedPtr& cluster = thread_local_cluster->info();
   getStreamInfo().setUpstreamClusterInfo(cluster);
@@ -572,6 +587,9 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+  upstream_info.upstreamTiming().recordConnectionPoolCallbackLatency(
+      initial_upstream_connection_start_time_.value(),
+      read_callbacks_->connection().dispatcher().timeSource());
   upstream_info.setUpstreamHost(host);
   upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
   upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
@@ -781,7 +799,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    upstream_.reset();
+    read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
     disableIdleTimer();
 
     if (connecting) {
@@ -836,9 +854,11 @@ void Filter::onUpstreamConnection() {
   }
 
   if (config_->flushAccessLogOnConnected()) {
+    const Formatter::HttpFormatterContext log_context{
+        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpUpstreamConnected};
+
     for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
-                      AccessLog::AccessLogType::TcpUpstreamConnected);
+      access_log->log(log_context, getStreamInfo());
     }
   }
 }
@@ -862,9 +882,11 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
+  const Formatter::HttpFormatterContext log_context{
+      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpPeriodic};
+
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo(),
-                    AccessLog::AccessLogType::TcpPeriodic);
+    access_log->log(log_context, getStreamInfo());
   }
   const SystemTime now = read_callbacks_->connection().dispatcher().timeSource().systemTime();
   getStreamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);

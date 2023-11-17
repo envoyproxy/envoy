@@ -22,16 +22,19 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
   std::call_once(store.init_once_, [&context, &tls, &store]() {
     // should be the singleton for use by the entire server.
     ClusterManagerContainer& cluster_manager_container = clusterManagerContainer();
-    cluster_manager_container.cluster_manager_ = &context.clusterManager();
+    cluster_manager_container.cluster_manager_ =
+        &context.getServerFactoryContext().clusterManager();
 
     SlotPtrContainer& slot_ptr_container = slotPtrContainer();
     slot_ptr_container.slot_ = tls.allocateSlot();
 
-    Thread::ThreadId main_thread_id = context.api().threadFactory().currentThreadId();
+    Thread::ThreadId main_thread_id =
+        context.getServerFactoryContext().api().threadFactory().currentThreadId();
     slot_ptr_container.slot_->set(
         [&context, main_thread_id,
          &store](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-          if (context.api().threadFactory().currentThreadId() == main_thread_id) {
+          if (context.getServerFactoryContext().api().threadFactory().currentThreadId() ==
+              main_thread_id) {
             return nullptr;
           }
 

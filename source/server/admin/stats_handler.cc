@@ -96,20 +96,21 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     server_.flushStats();
   }
 
+  bool active_mode;
 #ifdef ENVOY_ADMIN_HTML
-  const bool active_mode = params.format_ == StatsFormat::ActiveHtml;
-  return makeRequest(server_.stats(), params, [this, active_mode]() -> Admin::UrlHandler {
-    return statsHandler(active_mode);
-  });
+  active_mode = params.format_ == StatsFormat::ActiveHtml;
 #else
-  return makeRequest(server_.stats(), params,
-                     [this]() -> Admin::UrlHandler { return statsHandler(false); });
+  active_mode = false;
 #endif
+  return makeRequest(
+      server_.stats(), params, server_.clusterManager(),
+      [this, active_mode]() -> Admin::UrlHandler { return statsHandler(active_mode); });
 }
 
 Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
+                                            const Upstream::ClusterManager& cluster_manager,
                                             StatsRequest::UrlHandlerFn url_handler_fn) {
-  return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
+  return std::make_unique<StatsRequest>(stats, params, cluster_manager, url_handler_fn);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap&,
@@ -138,17 +139,19 @@ void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::I
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
-  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
+  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), server_.clusterManager(),
+                   params, response);
 }
 
 void StatsHandler::prometheusRender(Stats::Store& stats,
                                     const Stats::CustomStatNamespaces& custom_namespaces,
+                                    const Upstream::ClusterManager& cluster_manager,
                                     const StatsParams& params, Buffer::Instance& response) {
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              text_readouts_vec, response, params,
+                                              text_readouts_vec, cluster_manager, response, params,
                                               custom_namespaces);
 }
 

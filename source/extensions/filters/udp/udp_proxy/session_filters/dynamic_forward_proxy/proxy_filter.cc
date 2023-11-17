@@ -106,13 +106,21 @@ ReadFilterStatus ProxyFilter::onData(Network::UdpRecvData& data) {
   return ReadFilterStatus::StopIteration;
 }
 
-void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
+void ProxyFilter::onLoadDnsCacheComplete(
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_LOG(debug, "load DNS cache complete, continuing");
+  if (!host_info || !host_info->address()) {
+    ENVOY_LOG(debug, "empty DNS respose received");
+  }
+
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
 
   load_dns_cache_completed_ = true;
-  read_callbacks_->continueFilterChain();
+
+  if (!read_callbacks_->continueFilterChain()) {
+    return;
+  }
 
   while (!datagrams_buffer_.empty()) {
     BufferedDatagramPtr buffered_datagram = std::move(datagrams_buffer_.front());

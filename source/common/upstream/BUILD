@@ -250,8 +250,10 @@ envoy_cc_library(
     srcs = ["host_utility.cc"],
     hdrs = ["host_utility.h"],
     deps = [
+        "//envoy/stats:primitive_stats_interface",
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/config:well_known_names",
         "//source/common/runtime:runtime_lib",
     ],
 )
@@ -617,4 +619,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
+    # Ensure this factory in the source is always linked in.
+    alwayslink = 1,
 )

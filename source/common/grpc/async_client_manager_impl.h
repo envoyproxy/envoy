@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/singleton/manager.h"
@@ -46,8 +47,10 @@ private:
 
 class AsyncClientManagerImpl : public AsyncClientManager {
 public:
-  AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
-                         TimeSource& time_source, Api::Api& api, const StatNames& stat_names);
+  AsyncClientManagerImpl(
+      Upstream::ClusterManager& cm, ThreadLocal::Instance& tls, TimeSource& time_source,
+      Api::Api& api, const StatNames& stat_names,
+      const envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig& config);
   RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
                             bool skip_cluster_check) override;
@@ -61,7 +64,8 @@ public:
                                               bool skip_cluster_check) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
-    explicit RawAsyncClientCache(Event::Dispatcher& dispatcher);
+    explicit RawAsyncClientCache(Event::Dispatcher& dispatcher,
+                                 std::chrono::milliseconds max_cached_entry_idle_duration);
     void setCache(const GrpcServiceConfigWithHashKey& config_with_hash_key,
                   const RawAsyncClientSharedPtr& client);
 
@@ -83,7 +87,7 @@ public:
     absl::flat_hash_map<GrpcServiceConfigWithHashKey, LruList::iterator> lru_map_;
     Event::Dispatcher& dispatcher_;
     Envoy::Event::TimerPtr cache_eviction_timer_;
-    static constexpr std::chrono::seconds EntryTimeoutInterval{50};
+    const std::chrono::milliseconds max_cached_entry_idle_duration_;
   };
 
 private:

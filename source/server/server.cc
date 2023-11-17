@@ -60,6 +60,7 @@
 
 namespace Envoy {
 namespace Server {
+
 namespace {
 std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
 
@@ -74,14 +75,15 @@ std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
 
 } // namespace
 
-InstanceImpl::InstanceImpl(
-    Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
-    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-    HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-    ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
-    ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
-    Buffer::WatermarkFactorySharedPtr watermark_factory)
+InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
+                           Event::TimeSystem& time_system, ListenerHooks& hooks,
+                           HotRestart& restarter, Stats::StoreRoot& store,
+                           Thread::BasicLockable& access_log_lock,
+                           Random::RandomGeneratorPtr&& random_generator,
+                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+                           Filesystem::Instance& file_system,
+                           std::unique_ptr<ProcessContext> process_context,
+                           Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), live_(false), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields(),
@@ -103,52 +105,16 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
-  std::function set_up_logger = [&] {
-    TRY_ASSERT_MAIN_THREAD {
-      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-          options.logPath(), access_log_manager_, Logger::Registry::getSink());
-    }
-    END_TRY
-    CATCH(const EnvoyException& e, {
-      throw EnvoyException(
-          fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
-    });
-  };
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
 
-  TRY_ASSERT_MAIN_THREAD {
-    if (!options.logPath().empty()) {
-      set_up_logger();
-    }
-    restarter_.initialize(*dispatcher_, *this);
-    drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(std::move(local_address), component_factory);
-  }
-  END_TRY
-  MULTI_CATCH(
-      const EnvoyException& e,
-      {
-        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
-                  options.configProto().DebugString(), options.configYaml(), options.configPath(),
-                  e.what());
-        terminate();
-        throw;
-      },
-      {
-        ENVOY_LOG(critical, "error initializing due to unknown exception");
-        terminate();
-        throw;
-      });
-}
-
-InstanceImpl::~InstanceImpl() {
+InstanceBase::~InstanceBase() {
   terminate();
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
   file_logger_.reset();
 
-  // Destruct the ListenerManager explicitly, before InstanceImpl's local init_manager_ is
+  // Destruct the ListenerManager explicitly, before InstanceBase's local init_manager_ is
   // destructed.
   //
   // The ListenerManager's DestinationPortsMap contains FilterChainSharedPtrs. There is a rare race
@@ -173,17 +139,17 @@ InstanceImpl::~InstanceImpl() {
 #endif
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() {
+Upstream::ClusterManager& InstanceBase::clusterManager() {
   ASSERT(config_.clusterManager() != nullptr);
   return *config_.clusterManager();
 }
 
-const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
+const Upstream::ClusterManager& InstanceBase::clusterManager() const {
   ASSERT(config_.clusterManager() != nullptr);
   return *config_.clusterManager();
 }
 
-void InstanceImpl::drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) {
+void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
@@ -191,12 +157,14 @@ void InstanceImpl::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   drain_manager_->startDrainSequence([] {});
 }
 
-void InstanceImpl::failHealthcheck(bool fail) {
+void InstanceBase::failHealthcheck(bool fail) {
   live_.store(!fail);
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
+                                       Upstream::ClusterManager& cluster_manager,
+                                       TimeSource& time_source) {
   store.forEachSinkedCounter(
       [this](std::size_t size) {
         snapped_counters_.reserve(size);
@@ -237,22 +205,31 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         text_readouts_.push_back(text_readout);
       });
 
+  Upstream::HostUtility::forEachHostMetric(
+      cluster_manager,
+      [this](Stats::PrimitiveCounterSnapshot&& metric) {
+        host_counters_.emplace_back(std::move(metric));
+      },
+      [this](Stats::PrimitiveGaugeSnapshot&& metric) {
+        host_gauges_.emplace_back(std::move(metric));
+      });
+
   snapshot_time_ = time_source.systemTime();
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                       TimeSource& time_source) {
+                                       Upstream::ClusterManager& cm, TimeSource& time_source) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store, time_source);
+  MetricSnapshotImpl snapshot(store, cm, time_source);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
 }
 
-void InstanceImpl::flushStats() {
+void InstanceBase::flushStats() {
   if (stats_flush_in_progress_) {
     ENVOY_LOG(debug, "skipping stats flush as flush is already in progress");
     server_stats_->dropped_stat_flushes_.inc();
@@ -275,7 +252,7 @@ void InstanceImpl::flushStats() {
   }
 }
 
-void InstanceImpl::updateServerStats() {
+void InstanceBase::updateServerStats() {
   // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
   HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
 
@@ -302,10 +279,11 @@ void InstanceImpl::updateServerStats() {
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }
 
-void InstanceImpl::flushStatsInternal() {
+void InstanceBase::flushStatsInternal() {
   updateServerStats();
   auto& stats_config = config_.statsConfig();
-  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, timeSource());
+  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
+                                    timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
@@ -314,9 +292,9 @@ void InstanceImpl::flushStatsInternal() {
   stats_flush_in_progress_ = false;
 }
 
-bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
+bool InstanceBase::healthCheckFailed() { return !live_.load(); }
 
-ProcessContextOptRef InstanceImpl::processContext() {
+ProcessContextOptRef InstanceBase::processContext() {
   if (process_context_ == nullptr) {
     return absl::nullopt;
   }
@@ -408,8 +386,47 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   MessageUtil::validate(bootstrap, validation_visitor);
 }
 
-void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_address,
+void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
+  std::function set_up_logger = [&] {
+    TRY_ASSERT_MAIN_THREAD {
+      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
+          options_.logPath(), access_log_manager_, Logger::Registry::getSink());
+    }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      throw EnvoyException(
+          fmt::format("Failed to open log-file '{}'. e.what(): {}", options_.logPath(), e.what()));
+    });
+  };
+
+  TRY_ASSERT_MAIN_THREAD {
+    if (!options_.logPath().empty()) {
+      set_up_logger();
+    }
+    restarter_.initialize(*dispatcher_, *this);
+    drain_manager_ = component_factory.createDrainManager(*this);
+    initializeOrThrow(std::move(local_address), component_factory);
+  }
+  END_TRY
+  MULTI_CATCH(
+      const EnvoyException& e,
+      {
+        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+                  options_.configProto().DebugString(), options_.configYaml(),
+                  options_.configPath(), e.what());
+        terminate();
+        throw;
+      },
+      {
+        ENVOY_LOG(critical, "error initializing due to unknown exception");
+        terminate();
+        throw;
+      });
+}
+
+void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                                     ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options_.restartEpoch(), restarter_.baseId(), restarter_.version());
 
@@ -508,7 +525,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
-  InstanceImpl::failHealthcheck(false);
+  InstanceBase::failHealthcheck(false);
 
   // Check if bootstrap has server version override set, if yes, we should use that as
   // 'server.version' stat.
@@ -590,12 +607,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, *stats_store_.rootScope(), thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options_);
+  overload_manager_ = createOverloadManager();
 
-  heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_,
-                                                          *stats_store_.rootScope());
+  maybeCreateHeapShrinker();
 
   for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
     auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
@@ -719,7 +733,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
-  // is constructed as part of the InstanceImpl and then populated once
+  // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
 
@@ -768,12 +782,12 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       *stats_store_.rootScope(), config_.workerWatchdogConfig(), *api_, "workers");
 }
 
-void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
+void InstanceBase::onClusterManagerPrimaryInitializationComplete() {
   // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
   runtime().startRtdsSubscriptions([this]() { onRuntimeReady(); });
 }
 
-void InstanceImpl::onRuntimeReady() {
+void InstanceBase::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
   // Initializing can throw exceptions, so catch these.
   TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
@@ -786,7 +800,8 @@ void InstanceImpl::onRuntimeReady() {
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
+        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames(),
+        bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
@@ -802,18 +817,9 @@ void InstanceImpl::onRuntimeReady() {
       shutdown();
     });
   }
-
-  // TODO (nezdolik): Fully deprecate this runtime key in the next release.
-  if (runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
-    ENVOY_LOG(warn,
-              "Usage of the deprecated runtime key {}, consider switching to "
-              "`envoy.resource_monitors.downstream_connections` instead."
-              "This runtime key will be removed in future.",
-              Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
-  }
 }
 
-void InstanceImpl::startWorkers() {
+void InstanceBase::startWorkers() {
   // The callback will be called after workers are started.
   listener_manager_->startWorkers(*worker_guard_dog_, [this]() {
     if (isShutdown()) {
@@ -843,7 +849,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
       server.messageValidationContext().dynamicValidationVisitor(), server.api());
 }
 
-void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
+void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path) {
   if (!flags_path) {
     return;
   }
@@ -851,7 +857,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
   ENVOY_LOG(info, "server flags path: {}", flags_path.value());
   if (api_->fileSystem().fileExists(flags_path.value() + "/drain")) {
     ENVOY_LOG(info, "starting server in drain mode");
-    InstanceImpl::failHealthcheck(true);
+    InstanceBase::failHealthcheck(true);
   }
 }
 
@@ -896,7 +902,8 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
-          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
+      !instance.runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
                     "connections. Configure a "
                     "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
@@ -930,7 +937,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   });
 }
 
-void InstanceImpl::run() {
+void InstanceBase::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
@@ -952,7 +959,7 @@ void InstanceImpl::run() {
   terminate();
 }
 
-void InstanceImpl::terminate() {
+void InstanceBase::terminate() {
   if (terminated_) {
     return;
   }
@@ -1000,16 +1007,16 @@ void InstanceImpl::terminate() {
   FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
-Runtime::Loader& InstanceImpl::runtime() { return *runtime_; }
+Runtime::Loader& InstanceBase::runtime() { return *runtime_; }
 
-void InstanceImpl::shutdown() {
+void InstanceBase::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
   restarter_.sendParentTerminateRequest();
   notifyCallbacksForStage(Stage::ShutdownExit, [this] { dispatcher_->exit(); });
 }
 
-void InstanceImpl::shutdownAdmin() {
+void InstanceBase::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
   stat_flush_timer_.reset();
   handler_->stopListeners();
@@ -1022,21 +1029,21 @@ void InstanceImpl::shutdownAdmin() {
   restarter_.sendParentTerminateRequest();
 }
 
-ServerLifecycleNotifier::HandlePtr InstanceImpl::registerCallback(Stage stage,
+ServerLifecycleNotifier::HandlePtr InstanceBase::registerCallback(Stage stage,
                                                                   StageCallback callback) {
   auto& callbacks = stage_callbacks_[stage];
   return std::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback);
 }
 
 ServerLifecycleNotifier::HandlePtr
-InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
+InstanceBase::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
   auto& callbacks = stage_completable_callbacks_[stage];
   return std::make_unique<LifecycleCallbackHandle<StageCallbackWithCompletion>>(callbacks,
                                                                                 callback);
 }
 
-void InstanceImpl::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
+void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
@@ -1065,7 +1072,7 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, std::function<void()> co
   }
 }
 
-ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
+ProtobufTypes::MessagePtr InstanceBase::dumpBootstrapConfig() {
   auto config_dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
@@ -1073,7 +1080,7 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   return config_dump;
 }
 
-Network::DnsResolverSharedPtr InstanceImpl::getOrCreateDnsResolver() {
+Network::DnsResolverSharedPtr InstanceBase::getOrCreateDnsResolver() {
   if (!dns_resolver_) {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
@@ -1084,7 +1091,7 @@ Network::DnsResolverSharedPtr InstanceImpl::getOrCreateDnsResolver() {
   return dns_resolver_;
 }
 
-bool InstanceImpl::enableReusePortDefault() { return enable_reuse_port_default_; }
+bool InstanceBase::enableReusePortDefault() { return enable_reuse_port_default_; }
 
 } // namespace Server
 } // namespace Envoy

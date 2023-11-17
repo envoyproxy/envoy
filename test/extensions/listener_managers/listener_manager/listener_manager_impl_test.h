@@ -398,7 +398,7 @@ protected:
     EXPECT_CALL(listener_origin->target_, initialize());
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
     checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
-    EXPECT_CALL(*worker_, addListener(_, _, _, _));
+    EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
     listener_origin->target_.ready();
     worker_->callAddCompletion();
     EXPECT_EQ(1UL, manager_->listeners().size());
@@ -441,7 +441,7 @@ protected:
     EXPECT_CALL(listener_origin->target_, initialize());
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
     checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
-    EXPECT_CALL(*worker_, addListener(_, _, _, _));
+    EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
     listener_origin->target_.ready();
     worker_->callAddCompletion();
     EXPECT_EQ(1UL, manager_->listeners().size());

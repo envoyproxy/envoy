@@ -163,10 +163,10 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
-  framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
   framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
+  framer_.EnableTrailers();
 
   switch (message_type_) {
   case MessageType::Request:
@@ -278,8 +278,8 @@ void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*
 void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
   validateAndProcessHeadersOrTrailersImpl(headers, /* trailers = */ false);
 }
-void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
-  validateAndProcessHeadersOrTrailersImpl(trailer, /* trailers = */ true);
+void BalsaParser::OnTrailers(std::unique_ptr<quiche::BalsaHeaders> trailers) {
+  validateAndProcessHeadersOrTrailersImpl(*trailers, /* trailers = */ true);
 }
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,

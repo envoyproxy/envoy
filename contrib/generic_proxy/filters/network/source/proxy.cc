@@ -147,8 +147,10 @@ void ActiveStream::sendRequestFrameToUpstream() {
   }
 }
 
+// TODO(wbpcode): add the short_response_flags support to the sendLocalReply
+// method.
 void ActiveStream::sendLocalReply(Status status, ResponseUpdateFunction&& func) {
-  response_stream_ = parent_.message_creator_->response(status, *request_stream_);
+  response_stream_ = parent_.server_codec_->respond(status, "", *request_stream_);
   response_stream_frames_.clear();
   // Only one frame is allowed in the local reply.
   response_stream_end_ = true;
@@ -303,12 +305,13 @@ void ActiveStream::completeRequest() {
   }
 }
 
-Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
+Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool end_stream) {
   if (downstream_connection_closed_) {
     return Envoy::Network::FilterStatus::StopIteration;
   }
 
-  request_decoder_->decode(data);
+  // Basically this end_stream should always be false because we don't support half-close.
+  server_codec_->decode(data, end_stream);
   return Envoy::Network::FilterStatus::StopIteration;
 }
 
@@ -357,8 +360,8 @@ OptRef<Network::Connection> Filter::connection() {
   return {downstreamConnection()};
 }
 
-void Filter::sendFrameToDownstream(StreamFrame& frame, ResponseEncoderCallback& callback) {
-  response_encoder_->encode(frame, callback);
+void Filter::sendFrameToDownstream(StreamFrame& frame, EncodingCallbacks& callbacks) {
+  server_codec_->encode(frame, callbacks);
 }
 
 void Filter::registerFrameHandler(uint64_t stream_id, ActiveStream* raw_stream) {

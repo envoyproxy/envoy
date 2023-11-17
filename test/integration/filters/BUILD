@@ -487,6 +487,7 @@ envoy_cc_test_library(
         ":set_response_code_filter_config_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//envoy/registry",
+        "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],

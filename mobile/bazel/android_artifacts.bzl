@@ -27,7 +27,7 @@ load("@rules_java//java:defs.bzl", "java_binary")
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-def android_artifacts(name, android_library, manifest, archive_name, native_deps = [], proguard_rules = "", visibility = []):
+def android_artifacts(name, android_library, manifest, archive_name, native_deps = [], proguard_rules = "", visibility = [], substitutions = {}):
     """
     NOTE: The bazel android_library's implicit aar output doesn't flatten its transitive
     dependencies. Additionally, when using the kotlin rules, the kt_android_library rule
@@ -62,7 +62,7 @@ def android_artifacts(name, android_library, manifest, archive_name, native_deps
 
     # Generate other needed files for a maven publish
     _sources_name, _javadocs_name = _create_sources_javadocs(name, android_library)
-    _pom_name = _create_pom_xml(name, android_library, visibility)
+    _pom_name = _create_pom_xml(name, android_library, visibility, substitutions)
     native.genrule(
         name = name + "_with_artifacts",
         srcs = [
@@ -277,7 +277,7 @@ def _create_sources_javadocs(name, android_library):
 
     return _sources_name, _javadocs_name
 
-def _create_pom_xml(name, android_library, visibility):
+def _create_pom_xml(name, android_library, visibility, substitutions):
     """
     Creates a pom xml associated with the android_library target.
 
@@ -291,6 +291,7 @@ def _create_pom_xml(name, android_library, visibility):
         name = _pom_name,
         targets = [android_library],
         visibility = visibility,
+        substitutions = substitutions,
         template_file = "@envoy_mobile//bazel:pom_template.xml",
     )
 

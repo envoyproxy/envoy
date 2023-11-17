@@ -566,10 +566,6 @@ static void ios_track_event(envoy_map map, const void *context) {
   return record_counter_inc(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), count);
 }
 
-- (void)flushStats {
-  flush_stats(_engineHandle);
-}
-
 - (NSString *)dumpStats {
   envoy_data data;
   envoy_status_t status = dump_stats(_engineHandle, &data);
