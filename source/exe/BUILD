@@ -112,6 +112,7 @@ envoy_cc_library(
         "//source/common/grpc:google_grpc_context_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:options_lib",
         "//source/server/config_validation:server_lib",
     ] + envoy_select_signal_trace([
         "//source/common/signal:sigaction_lib",
@@ -143,15 +144,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_common_with_core_extensions_lib",
-    srcs = [
-        "main_common.cc",
-        "stripped_main_base.cc",
-    ],
-    hdrs = [
-        "main_common.h",
-        "stripped_main_base.h",
-    ],
     deps = [
+               ":main_common_lib",
                ":platform_impl_lib",
                ":process_wide_lib",
                "//envoy/server:platform_interface",
