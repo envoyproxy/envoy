@@ -73,7 +73,7 @@ def run_buildozer(cmds, contents):
         return r.stdout.decode('utf-8')
 
 
-# Add an Apache 2 license and  import and rule as needed.
+# Add an Apache 2 license, envoy_package / envoy_mobile_package import and rule as needed.
 def fix_package_and_license(path, contents):
     regex_to_use = PACKAGE_LOAD_BLOCK_REGEX
     package_string = 'envoy_package'
