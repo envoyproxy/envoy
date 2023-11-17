@@ -253,7 +253,7 @@ public:
   void run() override;
 
   // Server::Instance
-  OptRef<Admin> admin() override { return makeOptRefFromPtr<Admin>(admin_.get()); }
+  OptRef<Admin> admin() override { return makeOptRefFromPtr(admin_.get()); }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override;
   const Upstream::ClusterManager& clusterManager() const override;
@@ -372,7 +372,7 @@ private:
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
-  std::unique_ptr<AdminImpl> admin_;
+  std::unique_ptr<Admin> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::Loader> runtime_;

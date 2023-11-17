@@ -703,15 +703,17 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   if (initial_config.admin().address()) {
-    if (!admin_) {
-      throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
-    }
-
-    initial_config.initAdminAccessLog(bootstrap_, admin_->factoryContext());
-
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+    // Admin instance always be created if admin support is not compiled out.
+    RELEASE_ASSERT(admin_ != nullptr, "Admin instance should be created but actually not.");
+    auto typed_admin = dynamic_cast<AdminImpl*>(admin_.get());
+    RELEASE_ASSERT(typed_admin != nullptr, "Admin implementation is not an AdminImpl.");
+    initial_config.initAdminAccessLog(bootstrap_, typed_admin->factoryContext());
     admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
                               initial_config.admin().socketOptions());
-
+#else
+    throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
+#endif
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
