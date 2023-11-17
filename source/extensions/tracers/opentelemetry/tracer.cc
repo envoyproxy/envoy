@@ -62,8 +62,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
   SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled(), tracestate());
-  return parent_tracer_.startSpan(name, start_time, span_context,
-                                  makeOptRefFromPtr<const Tracing::TraceContext>(nullptr),
+  return parent_tracer_.startSpan(name, start_time, span_context, {},
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
 }
 
@@ -178,7 +177,6 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
 }
 
 Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, SystemTime start_time,
-
                                    Tracing::Decision tracing_decision,
                                    OptRef<const Tracing::TraceContext> trace_context,
                                    OTelSpanKind span_kind) {
