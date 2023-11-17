@@ -1,7 +1,7 @@
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_mobile_package",
     "envoy_select_enable_http3",
     "envoy_select_envoy_mobile_listener",
     "envoy_select_envoy_mobile_request_compression",
@@ -10,7 +10,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "extension_registry",
