@@ -1,8 +1,5 @@
 #include "source/server/config_validation/admin.h"
 
-#include "source/common/config/metadata.h"
-#include "source/extensions/access_loggers/common/file_access_log_impl.h"
-
 namespace Envoy {
 namespace Server {
 

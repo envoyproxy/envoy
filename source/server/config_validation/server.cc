@@ -12,7 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/version/version.h"
-#include "source/server/admin/admin.h"
+#include "source/server/admin/admin_factory_context.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/overload_manager_impl.h"
 #include "source/server/regex_engine.h"
