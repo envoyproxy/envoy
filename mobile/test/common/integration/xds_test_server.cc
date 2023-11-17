@@ -5,7 +5,6 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/event/libevent.h"
-#include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
@@ -51,7 +50,6 @@ XdsTestServer::XdsTestServer()
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock_, false, false);
   upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
-  Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
   Config::forceRegisterAdsConfigSubscriptionFactory();
   Config::forceRegisterGrpcConfigSubscriptionFactory();
   Config::forceRegisterDeltaGrpcConfigSubscriptionFactory();
