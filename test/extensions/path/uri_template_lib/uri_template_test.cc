@@ -73,12 +73,12 @@ TEST_P(ParseRewriteHelperSuccess, ParseRewriteHelperSuccessTest) {
 
   // The following is to exercise operator<< in ParseSegments.
   const auto& parsed_segments_vec = result.value();
-  std::stringstream concat_segments;
+  std::stringstream all_segments_str;
   for (const auto& parsed_segment : parsed_segments_vec) {
-    concat_segments << parsed_segment;
+    all_segments_str << parsed_segment;
   }
-  EXPECT_THAT(concat_segments.str(), HasSubstr("kind = Literal, value ="));
-  EXPECT_THAT(concat_segments.str(), HasSubstr("kind = Variable, value ="));
+  EXPECT_THAT(all_segments_str.str(), HasSubstr("kind = Literal, value ="));
+  EXPECT_THAT(all_segments_str.str(), HasSubstr("kind = Variable, value ="));
 }
 
 class ParseRewriteHelperFailure : public testing::TestWithParam<std::string> {};
