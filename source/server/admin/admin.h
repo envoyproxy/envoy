@@ -58,6 +58,79 @@ class AdminInternalAddressConfig : public Http::InternalAddressConfig {
   bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
 };
 
+class AdminFactoryContext final : public Configuration::FactoryContext {
+public:
+  AdminFactoryContext(Envoy::Server::Instance& server)
+      : server_(server), scope_(server_.stats().createScope("")),
+        listener_scope_(server_.stats().createScope("listener.admin.")) {}
+
+  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
+  Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Event::Dispatcher& mainThreadDispatcher() override { return server_.dispatcher(); }
+  const Server::Options& options() override { return server_.options(); }
+  Grpc::Context& grpcContext() override { return server_.grpcContext(); }
+  bool healthCheckFailed() override { return server_.healthCheckFailed(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
+  Router::Context& routerContext() override { return server_.routerContext(); }
+  const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
+  Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
+  Stats::Scope& serverScope() override { return *server_.stats().rootScope(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return server_.messageValidationContext();
+  }
+  Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
+  OverloadManager& overloadManager() override { return server_.overloadManager(); }
+  ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
+  OptRef<Admin> admin() override { return OptRef<Admin>(server_.admin()); }
+  TimeSource& timeSource() override { return server_.timeSource(); }
+  Api::Api& api() override { return server_.api(); }
+  ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
+  ProcessContextOptRef processContext() override { return server_.processContext(); }
+
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+    return server_.serverFactoryContext();
+  }
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
+    return server_.transportSocketFactoryContext();
+  }
+  Stats::Scope& scope() override { return *scope_; }
+  Stats::Scope& listenerScope() override { return *listener_scope_; }
+  bool isQuicListener() const override { return false; }
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override {
+    return metadata_.proto_metadata_;
+  }
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override {
+    return metadata_.typed_metadata_;
+  }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
+  }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Always use the static validation visitor for the admin handler.
+    return server_.messageValidationContext().staticValidationVisitor();
+  }
+  Init::Manager& initManager() override {
+    // Reuse the server init manager to avoid creating a new one for this special listener.
+    return server_.initManager();
+  }
+  Network::DrainDecision& drainDecision() override {
+    // Reuse the server drain manager to avoid creating a new one for this special listener.
+    return server_.drainManager();
+  }
+
+private:
+  Envoy::Server::Instance& server_;
+
+  // Listener scope without the listener prefix.
+  Stats::ScopeSharedPtr scope_;
+  // Listener scope with the listener prefix.
+  Stats::ScopeSharedPtr listener_scope_;
+
+  // Empty metadata for the admin handler.
+  Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
+};
+using AdminFactoryContextPtr = std::unique_ptr<AdminFactoryContext>;
+
 /**
  * Implementation of Server::Admin.
  */
@@ -76,6 +149,8 @@ public:
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutableSocket() { return *socket_; }
 
+  Configuration::FactoryContext& factoryContext() { return factory_context_; }
+
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
   // Wins would be no manual removeHandler() and code reuse.
@@ -90,11 +165,9 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
-  void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
-                         const std::string& address_out_path,
+  void startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
                          Network::Address::InstanceConstSharedPtr address,
-                         const Network::Socket::OptionsSharedPtr& socket_options,
-                         Stats::ScopeSharedPtr&& listener_scope) override;
+                         Network::Socket::OptionsSharedPtr socket_options) override;
   uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
@@ -369,9 +442,9 @@ private:
 
   class AdminListener : public Network::ListenerConfig {
   public:
-    AdminListener(AdminImpl& parent, Stats::ScopeSharedPtr&& listener_scope)
-        : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
-          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
+    AdminListener(AdminImpl& parent, Stats::Scope& listener_scope)
+        : parent_(parent), name_("admin"), scope_(listener_scope),
+          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", scope_)),
           init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
 
     // Network::ListenerConfig
@@ -385,7 +458,7 @@ private:
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
-    Stats::Scope& listenerScope() override { return *scope_; }
+    Stats::Scope& listenerScope() override { return scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
@@ -409,7 +482,7 @@ private:
 
     AdminImpl& parent_;
     const std::string name_;
-    Stats::ScopeSharedPtr scope_;
+    Stats::Scope& scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl open_connections_;
@@ -448,6 +521,7 @@ private:
   };
 
   Server::Instance& server_;
+  AdminFactoryContext factory_context_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const bool flush_access_log_on_new_request_ = false;
@@ -490,7 +564,7 @@ private:
   Network::SocketSharedPtr socket_;
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   AdminListenerPtr listener_;
-  const AdminInternalAddressConfig internal_address_config_;
+  AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};

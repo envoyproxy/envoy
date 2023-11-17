@@ -693,8 +693,6 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_ = component_factory.createRuntime(*this, initial_config);
-
-  initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
 
   if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
@@ -708,10 +706,12 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
     if (!admin_) {
       throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
     }
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
-                              initial_config.admin().address(),
-                              initial_config.admin().socketOptions(),
-                              stats_store_.createScope("listener.admin."));
+
+    initial_config.initAdminAccessLog(bootstrap_, admin_->factoryContext());
+
+    admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
+                              initial_config.admin().socketOptions());
+
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }

@@ -13,6 +13,7 @@ envoy_cc_library(
         "//envoy/server:admin_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/server/admin:admin_lib",
         "//source/server/admin:config_tracker_lib",
     ],
 )

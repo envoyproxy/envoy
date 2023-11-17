@@ -26,6 +26,7 @@ envoy_cc_test_library(
     srcs = envoy_select_admin_functionality(["admin_instance.cc"]),
     hdrs = envoy_select_admin_functionality(["admin_instance.h"]),
     deps = [
+        "//source/server:configuration_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:instance_mocks",

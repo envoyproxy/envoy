@@ -50,27 +50,26 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
-                                  const std::string& address_out_path,
+void AdminImpl::startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
                                   Network::Address::InstanceConstSharedPtr address,
-                                  const Network::Socket::OptionsSharedPtr& socket_options,
-                                  Stats::ScopeSharedPtr&& listener_scope) {
-  for (const auto& access_log : access_logs) {
-    access_logs_.emplace_back(access_log);
-  }
+                                  Network::Socket::OptionsSharedPtr socket_options) {
+  access_logs_ = std::move(access_logs);
+
   null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   RELEASE_ASSERT(0 == socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_,
                  "listen() failed on admin listener");
   socket_factories_.emplace_back(std::make_unique<AdminListenSocketFactory>(socket_));
-  listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
+  listener_ = std::make_unique<AdminListener>(*this, factory_context_.listenerScope());
+
   ENVOY_LOG(info, "admin address: {}",
             socket().connectionInfoProvider().localAddress()->asString());
-  if (!address_out_path.empty()) {
-    std::ofstream address_out_file(address_out_path);
+
+  if (!server_.options().adminAddressPath().empty()) {
+    std::ofstream address_out_file(server_.options().adminAddressPath());
     if (!address_out_file) {
       ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
-                address_out_path);
+                server_.options().adminAddressPath());
     } else {
       address_out_file << socket_->connectionInfoProvider().localAddress()->asString();
     }
@@ -109,7 +108,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                      bool ignore_global_conn_limit)
-    : server_(server),
+    : server_(server), factory_context_(server),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
       profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
