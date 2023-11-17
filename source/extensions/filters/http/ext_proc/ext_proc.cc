@@ -312,7 +312,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     if (!config_->requestExpr().empty()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
                                                                     &headers, nullptr, nullptr);
-      auto proto = evaluateAttributes(std::move(activation_ptr), config_->requestExpr());
+      proto = evaluateAttributes(std::move(activation_ptr), config_->requestExpr());
     }
 
     status = onHeaders(decoding_state_, headers, end_stream, proto);
@@ -597,7 +597,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     if (!config_->responseExpr().empty()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
                                                                     nullptr, &headers, nullptr);
-      auto proto = evaluateAttributes(std::move(activation_ptr), config_->responseExpr());
+      proto = evaluateAttributes(std::move(activation_ptr), config_->responseExpr());
     }
 
     status = onHeaders(encoding_state_, headers, end_stream, proto);
