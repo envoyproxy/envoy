@@ -13,11 +13,15 @@ namespace {
 class RtdsIntegrationTest : public XdsIntegrationTest {
 public:
   void initialize() override {
+    // using http1 because the h1 cluster has a plaintext socket
+    setUpstreamProtocol(Http::CodecType::HTTP1);
+
     XdsIntegrationTest::initialize();
 
     default_request_headers_.setScheme("http");
     initializeXdsStream();
   }
+
   void createEnvoy() override {
     Platform::XdsBuilder xds_builder(
         /*xds_server_address=*/Network::Test::getLoopbackAddressUrlString(ipVersion()),
@@ -29,8 +33,7 @@ public:
     XdsIntegrationTest::createEnvoy();
   }
 
-  // using http1 because the h1 cluster has a plaintext socket
-  void SetUp() override { setUpstreamProtocol(Http::CodecType::HTTP1); }
+  void SetUp() override { initialize(); }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -41,8 +44,6 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw)));
 
 TEST_P(RtdsIntegrationTest, RtdsReload) {
-  initialize();
-
   // Send a request on the data plane.
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();

@@ -17,10 +17,11 @@ using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
 using ::testing::AssertionSuccess;
 
-XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {
+XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {}
+
+void XdsIntegrationTest::initialize() {
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
-  skip_tag_extraction_rule_check_ = true;
   sotw_or_delta_ = sotwOrDelta();
 
   // Register the extensions required for Envoy Mobile.
@@ -33,10 +34,9 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
 
   // xDS upstream is created separately in the test infra, and there's only one non-xDS cluster.
   setUpstreamCount(1);
-}
 
-void XdsIntegrationTest::initialize() {
   BaseClientIntegrationTest::initialize();
+
   default_request_headers_.setScheme("https");
 }
 

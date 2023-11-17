@@ -14,7 +14,14 @@ using envoy::config::cluster::v3::Cluster;
 
 class CdsIntegrationTest : public XdsIntegrationTest {
 public:
-  CdsIntegrationTest() { default_request_headers_.setScheme("http"); }
+  void initialize() override {
+    setUpstreamProtocol(Http::CodecType::HTTP1);
+
+    XdsIntegrationTest::initialize();
+
+    default_request_headers_.setScheme("http");
+    initializeXdsStream();
+  }
 
   void createEnvoy() override {
     sotw_or_delta_ = sotwOrDelta();
@@ -32,11 +39,7 @@ public:
     XdsIntegrationTest::createEnvoy();
   }
 
-  void SetUp() override {
-    setUpstreamProtocol(Http::CodecType::HTTP1);
-    initialize();
-    initializeXdsStream();
-  }
+  void SetUp() override { initialize(); }
 
 protected:
   Cluster createCluster() {

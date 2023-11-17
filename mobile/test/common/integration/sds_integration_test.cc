@@ -33,6 +33,8 @@ public:
     XdsIntegrationTest::createEnvoy();
   }
 
+  void SetUp() override { initialize(); }
+
 protected:
   void sendCdsResponse() {
     auto cds_cluster = createSingleEndpointClusterConfig(std::string(XDS_CLUSTER_NAME));
@@ -88,8 +90,6 @@ INSTANTIATE_TEST_SUITE_P(
 
 // Note: Envoy Mobile does not have listener sockets, so we aren't including a downstream test.
 TEST_P(SdsIntegrationTest, SdsForUpstreamCluster) {
-  initialize();
-
   // Wait until the new cluster from CDS is added before sending the SDS response.
   sendCdsResponse();
   ASSERT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
