@@ -27,7 +27,7 @@ make(
 envoy_cc_contrib_extension(
     name = "connection_balancer",
     srcs = select({
-        "//bazel:linux": ["connection_balancer_impl.cc",],
+        "//bazel:linux": ["connection_balancer_impl.cc"],
         "//conditions:default": [],
     }),
     hdrs = ["connection_balancer_impl.h"],
