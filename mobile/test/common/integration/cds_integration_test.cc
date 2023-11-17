@@ -2,6 +2,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "test/common/integration/xds_integration_test.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -27,7 +28,8 @@ public:
       cds_namespace_ = "xdstp://" + target_uri + "/envoy.config.cluster.v3.Cluster";
       cds_resources_locator = cds_namespace_ + "/*";
     }
-    xds_builder.addClusterDiscoveryService(cds_resources_locator, /*timeout_in_seconds=*/1);
+    xds_builder.addClusterDiscoveryService(cds_resources_locator, /*timeout_in_seconds=*/1)
+        .setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
 
     XdsIntegrationTest::createEnvoy();

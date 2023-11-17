@@ -64,13 +64,10 @@ cc_library(
 
 # Implementations of the various "native" Java methods for classes
 # in library/java/io/envoyproxy/envoymobile.
-# TODO(RyanTheOptimist): Is there a better name for this? I'm not sure what
-#     "interface" refers to in this file/lib. Maybe we should have a convention
-#     where the name of the java classes are part of the file name?
 cc_library(
-    name = "jni_interface_lib",
+    name = "jni_impl_lib",
     srcs = [
-        "jni_interface.cc",
+        "jni_impl.cc",
     ],
     defines = envoy_mobile_defines("@envoy"),
     deps = [
@@ -114,13 +111,13 @@ cc_library(
 
 # Implementations of the "native" Java methods for AndroidJniLibrary.java
 cc_library(
-    name = "android_jni_interface_lib",
+    name = "android_jni_impl_lib",
     srcs = [
-        "android_jni_interface.cc",
+        "android_jni_impl.cc",
     ],
     deps = [
         ":android_network_utility_lib",
-        ":jni_interface_lib",
+        ":jni_impl_lib",
         ":jni_support_lib",
         ":jni_utility_lib",
         "//library/common:envoy_main_interface_lib",
@@ -138,9 +135,9 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        ":android_jni_interface_lib",
+        ":android_jni_impl_lib",
         ":android_network_utility_lib",
-        ":jni_interface_lib",
+        ":jni_impl_lib",
         ":jni_support_lib",
         ":jni_utility_lib",
     ],

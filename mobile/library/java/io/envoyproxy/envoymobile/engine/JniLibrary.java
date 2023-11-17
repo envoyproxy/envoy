@@ -203,15 +203,6 @@ public class JniLibrary {
                                                int count);
 
   /**
-   * Flush the stats sinks outside of a flushing interval.
-   * Note: stat flushing is done asynchronously, this function will never block.
-   * This is a noop if called before the underlying EnvoyEngine has started.
-   *
-   * @param engine engine whose stats should be flushed.
-   */
-  protected static native int flushStats(long engine);
-
-  /**
    * Retrieve the value of all active stats. Note that this function may block for some time.
    * @param engine,  handle to the engine that owns the counter.
    * @return The list of active stats and their values, or empty string of the operation failed
@@ -306,17 +297,16 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      String grpcStatsDomain, long connectTimeoutSeconds, long dnsRefreshSeconds,
-      long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
-      long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
-      boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, String http3ConnectionOptions, String http3ClientConnectionOptions,
-      byte[][] quicHints, byte[][] quicCanonicalSuffixes, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, boolean enableSocketTagging,
-      boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost, long statsFlushSeconds,
-      long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
-      boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
+      long connectTimeoutSeconds, long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase,
+      long dnsFailureRefreshSecondsMax, long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds,
+      byte[][] dnsPreresolveHostnames, boolean enableDNSCache, long dnsCacheSaveIntervalSeconds,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
+      String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
+      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
+      long maxConnectionsPerHost, long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds,
+      String appVersion, String appId, boolean trustChainVerification, byte[][] filterChain,
       boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsResourceName,
       long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, byte[][] xdsGrpcInitialMetadata,
       String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,

@@ -22,7 +22,7 @@ TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   fault.mutable_abort();
-  EXPECT_THROW(FaultFilterFactory().createFilterFactoryFromProto(fault, "stats", context),
+  EXPECT_THROW(FaultFilterFactory().createFilterFactoryFromProto(fault, "stats", context).value(),
                ProtoValidationException);
 }
 
@@ -40,7 +40,8 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   const auto proto_config = convertYamlStrToProtoConfig(yaml_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -77,7 +78,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -87,7 +88,8 @@ TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context)
+          .value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

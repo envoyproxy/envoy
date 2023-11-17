@@ -493,6 +493,10 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigAndEnableDowngrade) {
 };
 
 TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.no_downgrade_to_canonical_name", "true"}});
+
   initialize();
 
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());

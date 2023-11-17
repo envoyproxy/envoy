@@ -5,6 +5,7 @@
 
 #include "test/common/integration/xds_integration_test.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/environment.h"
 
 #include "extension_registry.h"
 #include "gtest/gtest.h"
@@ -33,7 +34,7 @@ public:
     const std::string target_uri = Network::Test::getLoopbackAddressUrlString(ipVersion());
     Platform::XdsBuilder xds_builder(target_uri,
                                      fake_upstreams_.back()->localAddress()->ip()->port());
-    xds_builder.addClusterDiscoveryService();
+    xds_builder.addClusterDiscoveryService().setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
     XdsIntegrationTest::createEnvoy();
   }

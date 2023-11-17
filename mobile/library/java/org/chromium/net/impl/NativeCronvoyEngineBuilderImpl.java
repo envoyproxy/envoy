@@ -33,7 +33,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   // TODO(refactor) move unshared variables into their specific methods.
   private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
   private final EnvoyEventTracker mEnvoyEventTracker = null;
-  private String mGrpcStatsDomain = null;
   private int mConnectTimeoutSeconds = 30;
   private int mDnsRefreshSeconds = 60;
   private int mDnsFailureRefreshSecondsBase = 2;
@@ -54,7 +53,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private int mMaxConnectionsPerHost = 7;
-  private int mStatsFlushSeconds = 60;
   private int mStreamIdleTimeoutSeconds = 15;
   private int mPerTryIdleTimeoutSeconds = 15;
   private String mAppVersion = "unspecified";
@@ -119,21 +117,19 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     List<EnvoyHTTPFilterFactory> platformFilterChain = Collections.emptyList();
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
-    List<String> statSinks = Collections.emptyList();
     Map<String, Boolean> runtimeGuards = Collections.emptyMap();
 
     return new EnvoyConfiguration(
-        mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
+        mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
         mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
         quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
         mEnableGzipDecompression, brotliEnabled(), mEnableSocketTag, mEnableInterfaceBinding,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
-        mMaxConnectionsPerHost, mStatsFlushSeconds, mStreamIdleTimeoutSeconds,
-        mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
-        platformFilterChain, stringAccessors, keyValueStores, statSinks, runtimeGuards,
-        mEnablePlatformCertificatesValidation,
+        mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
+        mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
+        keyValueStores, runtimeGuards, mEnablePlatformCertificatesValidation,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
         /*xdsSslRootCerts=*/"",

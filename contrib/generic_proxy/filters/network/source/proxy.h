@@ -62,7 +62,8 @@ public:
         codec_factory_(std::move(codec)), route_config_provider_(std::move(route_config_provider)),
         factories_(std::move(factories)), drain_decision_(context.drainDecision()),
         tracer_(std::move(tracer)), tracing_config_(std::move(tracing_config)),
-        access_logs_(std::move(access_logs)), time_source_(context.timeSource()) {}
+        access_logs_(std::move(access_logs)),
+        time_source_(context.getServerFactoryContext().timeSource()) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {

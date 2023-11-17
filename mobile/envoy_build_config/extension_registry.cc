@@ -11,6 +11,7 @@
 #include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/default_client_connection_factory.h"
+#include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/upstream/default_local_address_selector_factory.h"
@@ -54,12 +55,6 @@
 #include "source/extensions/udp_packet_writer/default/config.h"
 #endif
 #include "source/common/quic/quic_transport_socket_factory.h"
-#endif
-
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
-#include "source/extensions/stat_sinks/metrics_service/config.h"
-#include "source/extensions/stat_sinks/statsd/config.h"
 #endif
 
 #include "extension_registry_platform_additions.h"
@@ -169,6 +164,8 @@ void ExtensionRegistry::registerFactories() {
   // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
 
+  Network::Address::forceRegisterIpResolver();
+
   // This is Envoy's lightweight listener manager which lets E-M avoid the 1M
   // hit of compiling in downstream code.
   Server::forceRegisterApiListenerManagerFactoryImpl();
@@ -183,13 +180,6 @@ void ExtensionRegistry::registerFactories() {
   // This is required for load balancers of upstreams.
   Envoy::Extensions::LoadBalancingPolices::ClusterProvided::forceRegisterFactory();
   Envoy::Extensions::LoadBalancingPolices::RoundRobin::forceRegisterFactory();
-
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-  Network::Address::forceRegisterIpResolver();
-  Upstream::forceRegisterLogicalDnsClusterFactory();
-  Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
-  Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
-#endif
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with

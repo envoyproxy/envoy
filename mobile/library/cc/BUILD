@@ -52,7 +52,6 @@ envoy_cc_library(
         "@envoy",
     ) + envoy_select_google_grpc(
         [
-            "@envoy//source/common/grpc:google_grpc_creds_lib",
             "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
             "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
             "@envoy//source/extensions/clusters/static:static_cluster_lib",

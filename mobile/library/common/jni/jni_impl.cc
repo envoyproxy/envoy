@@ -176,14 +176,6 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   return result;
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_flushStats(JNIEnv* env,
-                                                            jclass, // class
-                                                            jlong engine) {
-  jni_log("[Envoy]", "flushStats");
-  flush_stats(engine);
-}
-
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
                                                            jclass, // class
@@ -1202,23 +1194,21 @@ javaObjectArrayToStringPairVector(Envoy::JNI::JniHelper& jni_helper, jobjectArra
   return ret;
 }
 
-void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jstring grpc_stats_domain,
-                      jlong connect_timeout_seconds, jlong dns_refresh_seconds,
-                      jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
-                      jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
-                      jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-                      jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
-                      jboolean enable_http3, jstring http3_connection_options,
-                      jstring http3_client_connection_options, jobjectArray quic_hints,
-                      jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
-                      jboolean enable_brotli_decompression, jboolean enable_socket_tagging,
-                      jboolean enable_interface_binding,
+void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_seconds,
+                      jlong dns_refresh_seconds, jlong dns_failure_refresh_seconds_base,
+                      jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
+                      jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
+                      jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
+                      jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
+                      jstring http3_connection_options, jstring http3_client_connection_options,
+                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
+                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
+                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
-                      jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
-                      jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
-                      jboolean trust_chain_verification, jobjectArray filter_chain,
-                      jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
+                      jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
+                      jstring app_version, jstring app_id, jboolean trust_chain_verification,
+                      jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
                       jobjectArray runtime_guards, jstring node_id, jstring node_region,
                       jstring node_zone, jstring node_sub_zone, jbyteArray serialized_node_metadata,
                       Envoy::Platform::EngineBuilder& builder) {
@@ -1276,14 +1266,6 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jstring grpc_stats_doma
     builder.addNativeFilter(filter.first, filter.second);
   }
 
-  std::vector<std::string> sinks = javaObjectArrayToStringVector(jni_helper, stat_sinks);
-
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-  builder.addStatsSinks(std::move(sinks));
-  builder.addStatsFlushSeconds((stats_flush_seconds));
-  setString(jni_helper, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
-#endif
-
   std::vector<std::string> hostnames =
       javaObjectArrayToStringVector(jni_helper, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
@@ -1303,10 +1285,10 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jstring grpc_stats_doma
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
-    JNIEnv* env, jclass, jstring grpc_stats_domain, jlong connect_timeout_seconds,
-    jlong dns_refresh_seconds, jlong dns_failure_refresh_seconds_base,
-    jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
-    jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+    JNIEnv* env, jclass, jlong connect_timeout_seconds, jlong dns_refresh_seconds,
+    jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
+    jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
+    jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
     jboolean enable_http3, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
@@ -1314,9 +1296,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean enable_brotli_decompression, jboolean enable_socket_tagging,
     jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
-    jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
-    jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
-    jboolean trust_chain_verification, jobjectArray filter_chain, jobjectArray stat_sinks,
+    jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
+    jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
     jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
     jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
     jobjectArray xds_grpc_initial_metadata, jstring xds_root_certs, jstring xds_sni,
@@ -1326,7 +1307,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
-  configureBuilder(jni_helper, grpc_stats_domain, connect_timeout_seconds, dns_refresh_seconds,
+  configureBuilder(jni_helper, connect_timeout_seconds, dns_refresh_seconds,
                    dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max,
                    dns_query_timeout_seconds, dns_min_refresh_seconds, dns_preresolve_hostnames,
                    enable_dns_cache, dns_cache_save_interval_seconds, enable_drain_post_dns_refresh,
@@ -1335,10 +1316,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                    enable_brotli_decompression, enable_socket_tagging, enable_interface_binding,
                    h2_connection_keepalive_idle_interval_milliseconds,
                    h2_connection_keepalive_timeout_seconds, max_connections_per_host,
-                   stats_flush_seconds, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
-                   app_version, app_id, trust_chain_verification, filter_chain, stat_sinks,
-                   enable_platform_certificates_validation, runtime_guards, node_id, node_region,
-                   node_zone, node_sub_zone, serialized_node_metadata, builder);
+                   stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,
+                   trust_chain_verification, filter_chain, enable_platform_certificates_validation,
+                   runtime_guards, node_id, node_region, node_zone, node_sub_zone,
+                   serialized_node_metadata, builder);
 
   std::string native_xds_address = Envoy::JNI::javaStringToString(jni_helper, xds_address);
   if (!native_xds_address.empty()) {
