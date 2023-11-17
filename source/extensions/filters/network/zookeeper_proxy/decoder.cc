@@ -626,27 +626,19 @@ absl::Status DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& of
     switch (static_cast<OpCodes>(opcode.value())) {
     case OpCodes::Create:
       status = parseCreateRequest(data, offset, len, OpCodes::Create);
-      COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
-          status, debug, "zookeeper_proxy: multi request (create) decoding exception {}",
-          status.message());
+      COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
       break;
     case OpCodes::SetData:
       status = parseSetRequest(data, offset, len);
-      COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
-          status, debug, "zookeeper_proxy: multi request (set) decoding exception {}",
-          status.message());
+      COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
       break;
     case OpCodes::Check:
       status = parseCheckRequest(data, offset, len);
-      COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
-          status, debug, "zookeeper_proxy: multi request (check) decoding exception {}",
-          status.message());
+      COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
       break;
     case OpCodes::Delete:
       status = parseDeleteRequest(data, offset, len);
-      COUNT_DECODER_ERR_WITH_LOG_AND_RETURN_IF_STATUS_NOT_OK(
-          status, debug, "zookeeper_proxy: multi request (delete) decoding exception {}",
-          status.message());
+      COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
       break;
     default:
       callbacks_.onDecodeError();
