@@ -1,8 +1,8 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_envoy_mobile_request_compression", "envoy_select_google_grpc")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package", "envoy_select_envoy_mobile_request_compression", "envoy_select_google_grpc")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "engine_builder_lib",

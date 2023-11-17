@@ -2,7 +2,7 @@
 
 # Enforces:
 # - License headers on Envoy BUILD files
-# - envoy_package() or envoy_extension_package() top-level invocation for standard Envoy package setup.
+# -  or envoy_extension_package() top-level invocation for standard Envoy package setup.
 # - Infers API dependencies from source files.
 # - Misc. cleanups: avoids redundant blank lines, removes unused loads.
 # - Maybe more later?
@@ -71,12 +71,12 @@ def run_buildozer(cmds, contents):
         return r.stdout.decode('utf-8')
 
 
-# Add an Apache 2 license and envoy_package() import and rule as needed.
+# Add an Apache 2 license and  import and rule as needed.
 def fix_package_and_license(path, contents):
     regex_to_use = PACKAGE_LOAD_BLOCK_REGEX
     package_string = 'envoy_package'
 
-    if 'source/extensions' in path:
+    if 'source/extensions' in path or 'library/common/extensions' in path:
         regex_to_use = EXTENSION_PACKAGE_LOAD_BLOCK_REGEX
         package_string = 'envoy_extension_package'
 
@@ -84,7 +84,7 @@ def fix_package_and_license(path, contents):
         regex_to_use = CONTRIB_PACKAGE_LOAD_BLOCK_REGEX
         package_string = 'envoy_contrib_package'
 
-    if 'mobile/' in path:
+    if os.getcwd().endswith('mobile') and 'library/common/extensions' not in path:
         regex_to_use = MOBILE_PACKAGE_LOAD_BLOCK_REGEX
         package_string = 'envoy_mobile_package'
 
