@@ -28,33 +28,33 @@ struct MapFieldComparator {
   MapFieldComparator(const Protobuf::Message& first_msg)
       : reflection_(*first_msg.GetReflection()), descriptor_(*first_msg.GetDescriptor()),
         key_field_(*descriptor_.map_key()), compare_fn_(selectCompareFn()) {}
-  bool operator()(const Protobuf::Message& a, const Protobuf::Message& b) {
+  bool operator()(const Protobuf::Message& a, const Protobuf::Message& b) const {
     return (this->*compare_fn_)(a, b);
   }
 
 private:
-  bool compareByInt32(const Protobuf::Message& a, const Protobuf::Message& b) {
+  bool compareByInt32(const Protobuf::Message& a, const Protobuf::Message& b) const {
     return reflection_.GetInt32(a, &key_field_) < reflection_.GetInt32(b, &key_field_);
   }
-  bool compareByUInt32(const Protobuf::Message& a, const Protobuf::Message& b) {
+  bool compareByUInt32(const Protobuf::Message& a, const Protobuf::Message& b) const {
     return reflection_.GetUInt32(a, &key_field_) < reflection_.GetUInt32(b, &key_field_);
   }
-  bool compareByInt64(const Protobuf::Message& a, const Protobuf::Message& b) {
+  bool compareByInt64(const Protobuf::Message& a, const Protobuf::Message& b) const {
     return reflection_.GetInt64(a, &key_field_) < reflection_.GetInt64(b, &key_field_);
   }
-  bool compareByUInt64(const Protobuf::Message& a, const Protobuf::Message& b) {
+  bool compareByUInt64(const Protobuf::Message& a, const Protobuf::Message& b) const {
     return reflection_.GetUInt64(a, &key_field_) < reflection_.GetUInt64(b, &key_field_);
   }
-  bool compareByBool(const Protobuf::Message& a, const Protobuf::Message& b) {
+  bool compareByBool(const Protobuf::Message& a, const Protobuf::Message& b) const {
     return reflection_.GetBool(a, &key_field_) < reflection_.GetBool(b, &key_field_);
   }
-  bool compareByString(const Protobuf::Message& a, const Protobuf::Message& b) {
+  bool compareByString(const Protobuf::Message& a, const Protobuf::Message& b) const {
     std::string scratch_a, scratch_b;
     return reflection_.GetStringReference(a, &key_field_, &scratch_a) <
            reflection_.GetStringReference(b, &key_field_, &scratch_b);
   }
   using CompareMemberFn = bool (MapFieldComparator::*)(const Protobuf::Message& a,
-                                                       const Protobuf::Message& b);
+                                                       const Protobuf::Message& b) const;
   CompareMemberFn selectCompareFn() {
     using Protobuf::FieldDescriptor;
     switch (key_field_.cpp_type()) {
