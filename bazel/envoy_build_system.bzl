@@ -61,7 +61,6 @@ load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
-    "MOBILE_PACKAGE_VISIBILITY",
 )
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
@@ -81,10 +80,8 @@ def envoy_extension_package(enabled_default = True, default_visibility = EXTENSI
         flag_values = {":enabled": "True"},
     )
 
-def envoy_mobile_package():
-    # Mobile packages should only be visible to other mobile packages, not any other
-    # parts of the Envoy codebase.
-    envoy_extension_package(default_visibility = MOBILE_PACKAGE_VISIBILITY)
+def envoy_mobile_package(default_visibility = ["//visibility:public"]):
+    envoy_extension_package(default_visibility = default_visibility)
 
 def envoy_contrib_package():
     envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)

@@ -1,13 +1,13 @@
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test_binary",
-    "envoy_package",
+    "envoy_mobile_package",
     "envoy_select_google_grpc",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 # This is a envoy_cc_test_binary instead of an envoy_cc_test because we don't want it to be run
 # when `bazel test //test/...` is called.

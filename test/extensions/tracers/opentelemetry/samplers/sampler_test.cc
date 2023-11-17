@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -27,8 +28,8 @@ class TestSampler : public Sampler {
 public:
   MOCK_METHOD(SamplingResult, shouldSample,
               ((const absl::optional<SpanContext>), (const std::string&), (const std::string&),
-               (::opentelemetry::proto::trace::v1::Span::SpanKind),
-               (const std::map<std::string, std::string>&), (const std::vector<SpanContext>&)),
+               (OTelSpanKind), (OptRef<const Tracing::TraceContext>),
+               (const std::vector<SpanContext>&)),
               (override));
   MOCK_METHOD(std::string, getDescription, (), (const, override));
 };
@@ -134,8 +135,8 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   // shouldSample returns a result without additional attributes and Decision::RECORD_AND_SAMPLE
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _))
       .WillOnce([](const absl::optional<SpanContext>, const std::string&, const std::string&,
-                   ::opentelemetry::proto::trace::v1::Span::SpanKind,
-                   const std::map<std::string, std::string>&, const std::vector<SpanContext>&) {
+                   OTelSpanKind, OptRef<const Tracing::TraceContext>,
+                   const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::RECORD_AND_SAMPLE;
         res.tracestate = "this_is=tracesate";
@@ -154,8 +155,8 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   // shouldSamples return a result containing additional attributes and Decision::DROP
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _))
       .WillOnce([](const absl::optional<SpanContext>, const std::string&, const std::string&,
-                   ::opentelemetry::proto::trace::v1::Span::SpanKind,
-                   const std::map<std::string, std::string>&, const std::vector<SpanContext>&) {
+                   OTelSpanKind, OptRef<const Tracing::TraceContext>,
+                   const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::DROP;
         std::map<std::string, std::string> attributes;
@@ -171,6 +172,37 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   std::unique_ptr<Span> unsampled_span(dynamic_cast<Span*>(tracing_span.release()));
   EXPECT_FALSE(unsampled_span->sampled());
   EXPECT_STREQ(unsampled_span->tracestate().c_str(), "this_is=another_tracesate");
+}
+
+// Test that sampler receives trace_context
+TEST_F(SamplerFactoryTest, TestInitialAttributes) {
+  auto test_sampler = std::make_shared<NiceMock<TestSampler>>();
+  TestSamplerFactory sampler_factory;
+  Registry::InjectFactory<SamplerFactory> sampler_factory_registration(sampler_factory);
+
+  EXPECT_CALL(sampler_factory, createSampler(_, _)).WillOnce(Return(test_sampler));
+
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    service_name: my-service
+    sampler:
+      name: envoy.tracers.opentelemetry.samplers.testsampler
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+    )EOF";
+
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto driver = std::make_unique<Driver>(opentelemetry_config, context);
+
+  auto expected = makeOptRef<const Tracing::TraceContext>(trace_context);
+  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, expected, _));
+  driver->startSpan(config, trace_context, stream_info, "operation_name",
+                    {Tracing::Reason::Sampling, true});
 }
 
 // Test sampling result decision
