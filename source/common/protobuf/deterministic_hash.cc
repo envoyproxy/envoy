@@ -10,12 +10,12 @@ namespace {
 
 #define REFLECTION_FOR_EACH(get_type, value_type)                                                  \
   if (field->is_repeated()) {                                                                      \
-    for (const auto q : reflection->GetRepeatedFieldRef<value_type>(message, field)) {             \
+    for (const value_type& q : reflection->GetRepeatedFieldRef<value_type>(message, field)) {      \
       seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)},   \
                                 seed);                                                             \
     }                                                                                              \
   } else {                                                                                         \
-    const auto q = reflection->Get##get_type(message, field);                                      \
+    const value_type q = reflection->Get##get_type(message, field);                                \
     seed =                                                                                         \
         HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed); \
   }
@@ -24,8 +24,8 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed =
 uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor* field, uint64_t seed);
 
-struct MapFieldComparer {
-  MapFieldComparer(const Protobuf::Message& first_msg)
+struct MapFieldComparator {
+  MapFieldComparator(const Protobuf::Message& first_msg)
       : reflection_(*first_msg.GetReflection()), descriptor_(*first_msg.GetDescriptor()),
         key_field_(*descriptor_.map_key()), compare_fn_(selectCompareFn()) {}
   bool operator()(const Protobuf::Message& a, const Protobuf::Message& b) {
@@ -53,23 +53,23 @@ private:
     return reflection_.GetStringReference(a, &key_field_, &scratch_a) <
            reflection_.GetStringReference(b, &key_field_, &scratch_b);
   }
-  using CompareMemberFn = bool (MapFieldComparer::*)(const Protobuf::Message& a,
-                                                     const Protobuf::Message& b);
+  using CompareMemberFn = bool (MapFieldComparator::*)(const Protobuf::Message& a,
+                                                       const Protobuf::Message& b);
   CompareMemberFn selectCompareFn() {
     using Protobuf::FieldDescriptor;
     switch (key_field_.cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32:
-      return &MapFieldComparer::compareByInt32;
+      return &MapFieldComparator::compareByInt32;
     case FieldDescriptor::CPPTYPE_UINT32:
-      return &MapFieldComparer::compareByUInt32;
+      return &MapFieldComparator::compareByUInt32;
     case FieldDescriptor::CPPTYPE_INT64:
-      return &MapFieldComparer::compareByInt64;
+      return &MapFieldComparator::compareByInt64;
     case FieldDescriptor::CPPTYPE_UINT64:
-      return &MapFieldComparer::compareByUInt64;
+      return &MapFieldComparator::compareByUInt64;
     case FieldDescriptor::CPPTYPE_BOOL:
-      return &MapFieldComparer::compareByBool;
+      return &MapFieldComparator::compareByBool;
     case FieldDescriptor::CPPTYPE_STRING:
-      return &MapFieldComparer::compareByString;
+      return &MapFieldComparator::compareByString;
     case FieldDescriptor::CPPTYPE_DOUBLE:
     case FieldDescriptor::CPPTYPE_FLOAT:
     case FieldDescriptor::CPPTYPE_ENUM:
@@ -88,7 +88,7 @@ std::vector<std::reference_wrapper<const Protobuf::Message>>
 sortedMapField(const Protobuf::RepeatedFieldRef<Protobuf::Message> map_entries) {
   std::vector<std::reference_wrapper<const Protobuf::Message>> entries(map_entries.begin(),
                                                                        map_entries.end());
-  auto compare = MapFieldComparer(*entries.begin());
+  MapFieldComparator compare(*entries.begin());
   std::sort(entries.begin(), entries.end(), compare);
   return entries;
 }
@@ -98,13 +98,13 @@ sortedMapField(const Protobuf::RepeatedFieldRef<Protobuf::Message> map_entries) 
 // or lexicographical order for strings, and then hash them in that order.
 uint64_t reflectionHashMapField(const Protobuf::Message& message,
                                 const Protobuf::FieldDescriptor* field, uint64_t seed) {
-  const auto reflection = message.GetReflection();
+  const Protobuf::Reflection* reflection = message.GetReflection();
   auto sorted_entries =
       sortedMapField(reflection->GetRepeatedFieldRef<Protobuf::Message>(message, field));
-  const auto map_descriptor = sorted_entries.begin()->get().GetDescriptor();
-  const auto key_field = map_descriptor->map_key();
-  const auto value_field = map_descriptor->map_value();
-  for (const auto& entry : sorted_entries) {
+  const Protobuf::Descriptor* map_descriptor = sorted_entries.begin()->get().GetDescriptor();
+  const Protobuf::FieldDescriptor* key_field = map_descriptor->map_key();
+  const Protobuf::FieldDescriptor* value_field = map_descriptor->map_value();
+  for (const Protobuf::Message& entry : sorted_entries) {
     seed = reflectionHashField(entry, key_field, seed);
     seed = reflectionHashField(entry, value_field, seed);
   }
@@ -114,9 +114,9 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
 uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor* field, uint64_t seed) {
   using Protobuf::FieldDescriptor;
-  const auto reflection = message.GetReflection();
+  const Protobuf::Reflection* reflection = message.GetReflection();
   {
-    const auto q = field->number();
+    const int q = field->number();
     seed =
         HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed);
   }
@@ -168,7 +168,7 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
     if (field->is_map()) {
       seed = reflectionHashMapField(message, field, seed);
     } else if (field->is_repeated()) {
-      for (const auto& submsg :
+      for (const Protobuf::Message& submsg :
            reflection->GetRepeatedFieldRef<Protobuf::Message>(message, field)) {
         seed = reflectionHashMessage(submsg, seed);
       }
@@ -197,7 +197,7 @@ std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const ProtobufWkt::Any
   }
   const Protobuf::Message* prototype =
       Protobuf::MessageFactory::generated_factory()->GetPrototype(descriptor);
-  auto msg = std::unique_ptr<Protobuf::Message>(prototype->New());
+  std::unique_ptr<Protobuf::Message> msg(prototype->New());
   any.UnpackTo(msg.get());
   return msg;
 }
@@ -206,12 +206,12 @@ std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const ProtobufWkt::Any
 uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) {
   using Protobuf::FieldDescriptor;
   std::string scratch;
-  const auto reflection = message.GetReflection();
-  const auto descriptor = message.GetDescriptor();
+  const Protobuf::Reflection* reflection = message.GetReflection();
+  const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   seed = HashUtil::xxHash64(descriptor->full_name(), seed);
   if (descriptor->well_known_type() == Protobuf::Descriptor::WELLKNOWNTYPE_ANY) {
     const ProtobufWkt::Any* any = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
-    auto submsg = unpackAnyForReflection(*any);
+    std::unique_ptr<Protobuf::Message> submsg = unpackAnyForReflection(*any);
     if (submsg == nullptr) {
       // If we wanted to handle unknown types in Any, this is where we'd have to do it.
       return seed;
@@ -221,7 +221,7 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
   std::vector<const FieldDescriptor*> fields;
   reflection->ListFields(message, &fields);
   // If we wanted to handle unknown fields, we'd need to also GetUnknownFields here.
-  for (const auto field : fields) {
+  for (const FieldDescriptor* field : fields) {
     seed = reflectionHashField(message, field, seed);
   }
   // Hash one extra character to signify end of message, so that
