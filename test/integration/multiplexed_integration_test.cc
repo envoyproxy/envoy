@@ -2523,6 +2523,17 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   // Ensure premature reset detection does not get in the way
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count", "1001");
+  // Disable the request timeout, iouring may failed the test due to request timeout.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_route()
+            ->mutable_timeout()
+            ->set_seconds(0);
+      });
   beginSession();
 
   std::string buffer;
