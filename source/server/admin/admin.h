@@ -564,7 +564,7 @@ private:
   Network::SocketSharedPtr socket_;
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   AdminListenerPtr listener_;
-  AdminInternalAddressConfig internal_address_config_;
+  const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
