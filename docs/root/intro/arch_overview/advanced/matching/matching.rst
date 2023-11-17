@@ -1,3 +1,5 @@
+.. _arch_overview_generic_matching:
+
 Generic Matching
 ================
 
