@@ -107,6 +107,22 @@ sortedMapField(const Protobuf::RepeatedFieldRef<Protobuf::Message> map_entries) 
 uint64_t reflectionHashMapField(const Protobuf::Message& message,
                                 const Protobuf::FieldDescriptor* field, uint64_t seed) {
   const Protobuf::Reflection* reflection = message.GetReflection();
+  // For repeated fields in general the order is significant. For map fields,
+  // the implementation may have a fixed order or a nondeterministic order,
+  // but conceptually a map field is supposed to be order agnostic.
+  //
+  // We should definitely *not* sort repeated fields in general; maps, however,
+  // are represented on the wire and in reflection format as repeated fields.
+  // Since the order is canonically not part of the data in the case of maps,
+  // this means for consistent hashing it must be ensured that the fields are
+  // handled in a deterministic order.
+  //
+  // It may be that if we didn't sort them the order would be deterministic, but
+  // that would be a non-guaranteed implementation detail, and a future version
+  // of protobuf could potentially change the internal map representation. Sorting
+  // also means theoretically we could produce a cross-language compatible hash;
+  // golang, for example, explicitly randomly orders map fields in its implementation.
+  ASSERT(field->is_map());
   auto sorted_entries =
       sortedMapField(reflection->GetRepeatedFieldRef<Protobuf::Message>(message, field));
   const Protobuf::Descriptor* map_descriptor = sorted_entries.begin()->get().GetDescriptor();
