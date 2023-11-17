@@ -979,18 +979,17 @@ static ProcessingMode allDisabledMode() {
 }
 
 void Filter::mergePerRouteConfig() {
-  if (route_config_merged_) {
+  if (route_config_merged_.has_value()) {
     return;
   }
-  route_config_merged_ = true;
-
-  auto merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
+  route_config_merged_ = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
       decoder_callbacks_,
       [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
-  if (!merged_config.has_value()) {
+
+  if (!route_config_merged_.has_value()) {
     return;
   }
-  if (merged_config->disabled()) {
+  if (route_config_merged_->disabled()) {
     // Rather than introduce yet another flag, use the processing mode
     // structure to disable all the callbacks.
     ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
@@ -999,39 +998,39 @@ void Filter::mergePerRouteConfig() {
     encoding_state_.setProcessingMode(all_disabled);
     return;
   }
-  if (merged_config->processingMode()) {
+  if (route_config_merged_->processingMode()) {
     ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
-    decoding_state_.setProcessingMode(*(merged_config->processingMode()));
-    encoding_state_.setProcessingMode(*(merged_config->processingMode()));
+    decoding_state_.setProcessingMode(*(route_config_merged_->processingMode()));
+    encoding_state_.setProcessingMode(*(route_config_merged_->processingMode()));
   }
-  if (merged_config->grpcService()) {
+  if (route_config_merged_->grpcService()) {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
-    grpc_service_ = *merged_config->grpcService();
-    config_with_hash_key_.setConfig(*merged_config->grpcService());
+    grpc_service_ = *route_config_merged_->grpcService();
+    config_with_hash_key_.setConfig(*route_config_merged_->grpcService());
   }
-  if (merged_config->untypedForwardingMetadataNamespaces()) {
+  if (route_config_merged_->untypedForwardingMetadataNamespaces()) {
     ENVOY_LOG(trace,
               "Setting new untyped forwarding metadata namespaces from per-route configuration");
     decoding_state_.setUntypedForwardingMetadataNamespaces(
-        *merged_config->untypedForwardingMetadataNamespaces());
+        *route_config_merged_->untypedForwardingMetadataNamespaces());
     encoding_state_.setUntypedForwardingMetadataNamespaces(
-        *merged_config->untypedForwardingMetadataNamespaces());
+        *route_config_merged_->untypedForwardingMetadataNamespaces());
   }
-  if (merged_config->typedForwardingMetadataNamespaces()) {
+  if (route_config_merged_->typedForwardingMetadataNamespaces()) {
     ENVOY_LOG(trace,
               "Setting new typed forwarding metadata namespaces from per-route configuration");
     decoding_state_.setTypedForwardingMetadataNamespaces(
-        *merged_config->typedForwardingMetadataNamespaces());
+        *route_config_merged_->typedForwardingMetadataNamespaces());
     encoding_state_.setTypedForwardingMetadataNamespaces(
-        *merged_config->typedForwardingMetadataNamespaces());
+        *route_config_merged_->typedForwardingMetadataNamespaces());
   }
-  if (merged_config->untypedReceivingMetadataNamespaces()) {
+  if (route_config_merged_->untypedReceivingMetadataNamespaces()) {
     ENVOY_LOG(trace,
               "Setting new untyped receiving metadata namespaces from per-route configuration");
     decoding_state_.setUntypedReceivingMetadataNamespaces(
-        *merged_config->untypedReceivingMetadataNamespaces());
+        *route_config_merged_->untypedReceivingMetadataNamespaces());
     encoding_state_.setUntypedReceivingMetadataNamespaces(
-        *merged_config->untypedReceivingMetadataNamespaces());
+        *route_config_merged_->untypedReceivingMetadataNamespaces());
   }
 }
 
