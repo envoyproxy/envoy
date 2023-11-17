@@ -243,7 +243,7 @@ upstream will be modified by:
 #. Putting the fully qualified original request URL in the ``x-envoy-original-url`` header.
 #. Replacing the ``Authority``/``Host``, ``Scheme``, and ``Path`` headers with the values from the ``Location`` header.
 #. Copying any headers listed in
-   :ref:`response_headers_to_preserve<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_preserve>`
+   :ref:`response_headers_to_copy<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_copy>`
    from the redirect response into the headers that will be used in the
    subsequent request.
 
@@ -259,7 +259,7 @@ and then shipped upstream with all of the normal Envoy request sanitization taki
 .. warning::
   Note that no downstream filters will see the response that triggers the internal redirect. If there is a need
   to pass data between the redirect response and the followup request, see
-  :ref:`response_headers_to_preserve<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_preserve>`
+  :ref:`response_headers_to_copy<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_copy>`
   
 A sample redirect flow might look like this:
 
