@@ -10,12 +10,9 @@ envoy_contrib_package()
 
 envoy_cc_test(
     name = "config_test",
-    srcs = ["config_test.cc"],
-    defines = select({
-        "//bazel:linux_x86_64": [],
-        "//conditions:default": [
-            "DLB_DISABLED=1",
-        ],
+    srcs = select({
+        "//bazel:linux_x86_64": ["config_test.cc"],
+        "//conditions:default": [],
     }),
     deps = [
         "//contrib/dlb/source:connection_balancer",
