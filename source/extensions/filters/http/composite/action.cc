@@ -20,7 +20,6 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
         fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
   }
 
-  // Process dynamic filter configuration and setup extension configuration discovery service.
   if (composite_action.has_typed_config()) {
     // Static filter configuration.
     auto& factory =
@@ -49,11 +48,11 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
       return std::make_unique<ExecuteFilterAction>(cb);
     };
   } else {
+    // Create a dynamic filter config provider and register it with the server factory context.
     auto config_discovery = composite_action.dynamic_config().config_discovery();
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
     Server::Configuration::ServerFactoryContext& server_factory_context =
         context.server_factory_context_.value();
-    // Create a dynamic filter config provider and register it with the server factory context.
     auto provider = server_factory_context.createHttpDynamicFilterConfigProvider(
         factory_context, config_discovery, composite_action.dynamic_config().name(), false);
     return [provider = std::move(provider)]() -> Matcher::ActionPtr {
