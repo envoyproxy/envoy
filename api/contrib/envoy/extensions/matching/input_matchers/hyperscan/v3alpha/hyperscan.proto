@@ -12,6 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/mat
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Hyperscan matcher]
+// Hyperscan :ref:`configuration overview <config_hyperscan>`.
 // [#extension: envoy.matching.input_matchers.hyperscan]
 
 // `Hyperscan <https://github.com/intel/hyperscan>`_ regex matcher. The matcher uses the Hyperscan

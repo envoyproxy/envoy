@@ -41,10 +41,7 @@ FORMAT_ARGS+=(
     ./library/objective-c ./test/java ./test/java
     ./test/objective-c ./test/swift ./experimental/swift
     --build_fixer_check_excluded_paths
-    ./envoy ./BUILD ./dist ./examples ./library/java
-    ./library/kotlin ./library/objective-c ./library/swift
-    ./library/common/extensions ./test/java ./test/kotlin ./test/objective-c
-    ./test/swift ./experimental/swift)
+    ./envoy ./BUILD ./dist)
 
 export ENVOY_BAZEL_PREFIX="@envoy" && ./bazelw run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
 
