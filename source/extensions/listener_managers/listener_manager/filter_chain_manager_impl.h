@@ -17,7 +17,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"

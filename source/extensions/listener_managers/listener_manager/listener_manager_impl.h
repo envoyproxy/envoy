@@ -236,7 +236,6 @@ public:
 
   Instance& server_;
   std::unique_ptr<ListenerComponentFactory> factory_;
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{};
 
 private:
   using ListenerList = std::list<ListenerImplPtr>;

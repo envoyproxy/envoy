@@ -111,8 +111,6 @@ envoy_cc_library(
         "//envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
-        "//source/common/filter:config_discovery_lib",
-        "//source/common/http:filter_chain_helper_lib",
         "//source/common/init:manager_lib",
         "//source/common/matcher:matcher_lib",
         "//source/common/network:cidr_range_lib",

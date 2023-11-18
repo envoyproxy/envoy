@@ -19,7 +19,6 @@
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
-#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/quic/quic_stat_names.h"

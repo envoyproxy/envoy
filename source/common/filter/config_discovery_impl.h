@@ -579,6 +579,7 @@ public:
           getDefaultConfig(config_source.default_config(), filter_config_name, server_context,
                            last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
+
     std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> provider =
         std::make_unique<DynamicFilterConfigImpl>(subscription, require_type_urls, server_context,
                                                   factory_context, std::move(default_config),

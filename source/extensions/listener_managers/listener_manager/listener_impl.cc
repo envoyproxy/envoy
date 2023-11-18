@@ -299,7 +299,6 @@ ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
 }
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
 bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
-
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { return server_.initManager(); }
@@ -920,12 +919,10 @@ const Envoy::Config::TypedMetadata& PerListenerFactoryContextImpl::listenerTyped
 envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
   return listener_factory_context_base_->direction();
 };
-
 TimeSource& PerListenerFactoryContextImpl::timeSource() { return api().timeSource(); }
 const Network::ListenerConfig& PerListenerFactoryContextImpl::listenerConfig() const {
   return *listener_config_;
 }
-
 ProtobufMessage::ValidationContext& PerListenerFactoryContextImpl::messageValidationContext() {
   return getServerFactoryContext().messageValidationContext();
 }
@@ -953,7 +950,6 @@ Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
 bool PerListenerFactoryContextImpl::isQuicListener() const {
   return listener_factory_context_base_->isQuicListener();
 }
-
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
 bool ListenerImpl::createNetworkFilterChain(

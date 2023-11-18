@@ -350,8 +350,6 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          bool enable_dispatcher_stats,
                                          Quic::QuicStatNames& quic_stat_names)
     : server_(server), factory_(std::move(factory)),
-      filter_config_provider_manager_(
-          std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
   if (!factory_) {

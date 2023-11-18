@@ -51,5 +51,6 @@ public:
 template <class FactoryCallback>
 class DynamicExtensionConfigProvider : public DynamicExtensionConfigProviderBase,
                                        public ExtensionConfigProvider<FactoryCallback> {};
+
 } // namespace Config
 } // namespace Envoy
