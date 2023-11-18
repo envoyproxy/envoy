@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/tracing/trace_context.h"
@@ -28,6 +29,13 @@ enum class Decision {
   // IsRecording will be true and the Sampled flag MUST be set.
   RECORD_AND_SAMPLE
 };
+
+/**
+ * @brief The type of the span.
+ * see
+ * https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#spankind
+ */
+using OTelSpanKind = ::opentelemetry::proto::trace::v1::Span::SpanKind;
 
 struct SamplingResult {
   /// @see Decision
@@ -64,14 +72,14 @@ public:
    * TraceId, they MUST always match.
    * @param name Name of the Span to be created.
    * @param spankind Span kind of the Span to be created.
-   * @param attributes Initial set of Attributes of the Span to be created.
+   * @param trace_context TraceContext containing potential initial span attributes
    * @param links Collection of links that will be associated with the Span to be created.
    * @return SamplingResult @see SamplingResult
    */
   virtual SamplingResult shouldSample(const absl::optional<SpanContext> parent_context,
                                       const std::string& trace_id, const std::string& name,
-                                      ::opentelemetry::proto::trace::v1::Span::SpanKind spankind,
-                                      const std::map<std::string, std::string>& attributes,
+                                      OTelSpanKind spankind,
+                                      OptRef<const Tracing::TraceContext> trace_context,
                                       const std::vector<SpanContext>& links) PURE;
 
   /**

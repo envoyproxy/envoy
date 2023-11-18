@@ -155,11 +155,6 @@ type requestHeaderMapImpl struct {
 
 var _ api.RequestHeaderMap = (*requestHeaderMapImpl)(nil)
 
-func (h *requestHeaderMapImpl) Protocol() string {
-	v, _ := h.Get(":protocol")
-	return v
-}
-
 func (h *requestHeaderMapImpl) Scheme() string {
 	v, _ := h.Get(":scheme")
 	return v

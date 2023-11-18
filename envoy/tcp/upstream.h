@@ -105,9 +105,9 @@ public:
 
 // Interface for a generic Upstream, which can communicate with a TCP or HTTP
 // upstream.
-class GenericUpstream : public Event::DeferredDeletable {
+class GenericUpstream {
 public:
-  ~GenericUpstream() override = default;
+  virtual ~GenericUpstream() = default;
 
   /**
    * Enable/disable further data from this stream.

@@ -1,4 +1,8 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 filegroup(
     name = "proguard_rules",

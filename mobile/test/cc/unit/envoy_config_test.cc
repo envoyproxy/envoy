@@ -295,7 +295,7 @@ TEST(TestConfig, DisableHttp3) {
 #endif
 }
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 TEST(TestConfig, XdsConfig) {
   EngineBuilder engine_builder;
   const std::string host = "fake-td.googleapis.com";
@@ -491,7 +491,7 @@ TEST(TestConfig, SetNodeMetadata) {
   EXPECT_EQ(bootstrap->node().metadata().fields().at("number_field").number_value(), 3.14);
 }
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 TEST(TestConfig, AddCdsLayer) {
   XdsBuilder xds_builder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);
   xds_builder.addClusterDiscoveryService();

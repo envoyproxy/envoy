@@ -2,14 +2,14 @@ load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
-    "envoy_package",
-    "envoy_select_google_grpc",
+    "envoy_mobile_package",
+    "envoy_select_envoy_mobile_xds",
     "envoy_select_signal_trace",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_test(
     name = "client_integration_test",
@@ -33,8 +33,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "rtds_integration_test",
-    # The test relies on the Google gRPC library.
-    srcs = envoy_select_google_grpc(
+    srcs = envoy_select_envoy_mobile_xds(
         ["rtds_integration_test.cc"],
         "@envoy",
     ),
@@ -60,8 +59,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cds_integration_test",
-    # The test relies on the Google gRPC library.
-    srcs = envoy_select_google_grpc(
+    srcs = envoy_select_envoy_mobile_xds(
         ["cds_integration_test.cc"],
         "@envoy",
     ),
@@ -87,8 +85,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "sds_integration_test",
-    # The test relies on the Google gRPC library.
-    srcs = envoy_select_google_grpc(
+    srcs = envoy_select_envoy_mobile_xds(
         ["sds_integration_test.cc"],
         "@envoy",
     ),
@@ -112,7 +109,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
-        "@envoy_build_config//:extension_registry",
     ],
 )
 
@@ -148,12 +144,10 @@ envoy_cc_test_library(
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",
-        "@envoy//source/common/grpc:google_grpc_creds_lib",
-        "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
-        "@envoy//test/common/grpc:grpc_client_integration_lib",
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_build_config//:extension_registry",
         "@envoy_build_config//:test_extensions",
     ],
 )
@@ -200,7 +194,6 @@ envoy_cc_test_library(
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/event:libevent_lib",
-        "@envoy//source/common/grpc:google_grpc_creds_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//source/extensions/transport_sockets/tls:context_config_lib",
         "@envoy//source/extensions/transport_sockets/tls:context_lib",
