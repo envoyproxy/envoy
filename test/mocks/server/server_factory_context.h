@@ -82,7 +82,7 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
-  HttpExtensionConfigProvider
+  HttpExtensionConfigProviderSharedPtr
   createHttpDynamicFilterConfigProvider(Configuration::FactoryContext&,
                                         const envoy::config::core::v3::ExtensionConfigSource&,
                                         const std::string&, bool) override {
@@ -92,7 +92,7 @@ public:
   downstreamFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
-  
+
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
@@ -154,7 +154,7 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
-    HttpExtensionConfigProvider
+  HttpExtensionConfigProviderSharedPtr
   createHttpDynamicFilterConfigProvider(Configuration::FactoryContext&,
                                         const envoy::config::core::v3::ExtensionConfigSource&,
                                         const std::string&, bool) override {

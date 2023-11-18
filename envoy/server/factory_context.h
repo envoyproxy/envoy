@@ -43,7 +43,7 @@ template <class FactoryCb, class FactoryCtx> class FilterConfigProviderManager;
 namespace Server {
 namespace Configuration {
 
-using HttpExtensionConfigProvider =
+using HttpExtensionConfigProviderSharedPtr =
     std::shared_ptr<Config::DynamicExtensionConfigProvider<Envoy::Http::NamedHttpFilterFactoryCb>>;
 
 // Shared factory context between server factories and cluster factories
@@ -198,7 +198,7 @@ public:
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
 
-    /**
+  /**
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;
@@ -217,9 +217,9 @@ public:
    * @param last_filter_in_filter_chain indicates whether this filter is the last filter in the
    * configured chain
    *
-   * @return HttpExtensionConfigProvider
+   * @return HttpExtensionConfigProviderSharedPtr
    */
-  virtual Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
+  virtual Configuration::HttpExtensionConfigProviderSharedPtr createHttpDynamicFilterConfigProvider(
       Configuration::FactoryContext& factory_context,
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, bool last_filter_in_filter_chain) PURE;

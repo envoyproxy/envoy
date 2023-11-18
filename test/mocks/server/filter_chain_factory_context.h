@@ -12,7 +12,7 @@ public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
 
-  HttpExtensionConfigProvider
+  HttpExtensionConfigProviderSharedPtr
   createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
                                     const std::string&, bool) override {
     return nullptr;

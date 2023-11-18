@@ -202,7 +202,7 @@ public:
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
-  Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
+  Configuration::HttpExtensionConfigProviderSharedPtr createHttpDynamicFilterConfigProvider(
       Configuration::FactoryContext& factory_context,
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, bool last_filter_in_filter_chain) override {
