@@ -75,7 +75,7 @@ public:
 private:
   HeaderMutationConfigSharedPtr config_{};
   // The lifetime of route config pointers is same as the matched route.
-  std::vector<const PerRouteHeaderMutation*> route_configs_{};
+  absl::InlinedVector<const PerRouteHeaderMutation*, 3> route_configs_{};
 };
 
 } // namespace HeaderMutation

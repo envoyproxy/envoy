@@ -685,12 +685,13 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
  * and their lifetime is the same as the matched route.
  */
 template <class ConfigType>
-std::vector<const ConfigType*> getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
+absl::InlinedVector<const ConfigType*, 3>
+getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   static_assert(std::is_copy_constructible<ConfigType>::value,
                 "ConfigType must be copy constructible");
   ASSERT(callbacks != nullptr);
 
-  std::vector<const ConfigType*> all_configs;
+  absl::InlinedVector<const ConfigType*, 3> all_configs;
 
   callbacks->traversePerFilterConfig([&all_configs](const Router::RouteSpecificFilterConfig& cfg) {
     const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
