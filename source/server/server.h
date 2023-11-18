@@ -193,12 +193,15 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   Api::Api& api() override { return server_.api(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
+  OverloadManager& overloadManager() override { return server_.overloadManager(); }
+  bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
   Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
       Configuration::FactoryContext& factory_context,
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
@@ -207,7 +210,6 @@ public:
         config_source, filter_config_name, *this, factory_context, clusterManager(),
         last_filter_in_filter_chain, "http", nullptr);
   }
-
   Configuration::DownstreamFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override {
     return filter_config_provider_manager_;

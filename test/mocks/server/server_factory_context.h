@@ -71,6 +71,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  Http::Context& httpContext() override { return http_context_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
@@ -79,6 +80,8 @@ public:
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
+  MOCK_METHOD(OverloadManager&, overloadManager, ());
+  MOCK_METHOD(bool, healthCheckFailed, (), (const));
   HttpExtensionConfigProvider
   createHttpDynamicFilterConfigProvider(Configuration::FactoryContext&,
                                         const envoy::config::core::v3::ExtensionConfigSource&,
@@ -89,7 +92,7 @@ public:
   downstreamFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
-
+  
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
@@ -107,6 +110,8 @@ public:
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Api::MockApi> api_;
+  testing::NiceMock<MockOverloadManager> overload_manager_;
+  Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
@@ -138,6 +143,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(Http::Context&, httpContext, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Router::Context&, routerContext, ());
   MOCK_METHOD(envoy::config::bootstrap::v3::Bootstrap&, bootstrap, ());
@@ -146,7 +152,9 @@ public:
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
-  HttpExtensionConfigProvider
+  MOCK_METHOD(OverloadManager&, overloadManager, ());
+  MOCK_METHOD(bool, healthCheckFailed, (), (const));
+    HttpExtensionConfigProvider
   createHttpDynamicFilterConfigProvider(Configuration::FactoryContext&,
                                         const envoy::config::core::v3::ExtensionConfigSource&,
                                         const std::string&, bool) override {

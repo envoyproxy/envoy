@@ -169,12 +169,17 @@ public:
   ~ServerFactoryContext() override = default;
 
   /**
-   * @return the server-wide grpc context.
+   * @return Http::Context& the server-wide HTTP context.
+   */
+  virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return Grpc::Context& the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return Router::Context& a reference to the router context.
+   * @return Router::Context& the server-wide router context.
    */
   virtual Router::Context& routerContext() PURE;
 
@@ -192,6 +197,16 @@ public:
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
+
+    /**
+   * @return OverloadManager& the overload manager for the server.
+   */
+  virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return whether external healthchecks are currently failed or not.
+   */
+  virtual bool healthCheckFailed() const PURE;
 
   /**
    * Create an FilterConfigProviderPtr for a filter config. The config providers may share

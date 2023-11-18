@@ -27,9 +27,9 @@ absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFacto
       *config_factory);
   Compression::Compressor::CompressorFactoryPtr compressor_factory =
       config_factory->createCompressorFactoryFromProto(*message, context);
-  CompressorFilterConfigSharedPtr config =
-      std::make_shared<CompressorFilterConfig>(proto_config, stats_prefix, context.scope(),
-                                               context.runtime(), std::move(compressor_factory));
+  CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
+      proto_config, stats_prefix, context.scope(), context.getServerFactoryContext().runtime(),
+      std::move(compressor_factory));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CompressorFilter>(config));
   };
