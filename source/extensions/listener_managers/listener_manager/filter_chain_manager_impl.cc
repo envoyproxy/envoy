@@ -194,20 +194,6 @@ bool PerFilterChainFactoryContextImpl::isQuicListener() const {
   return parent_context_.isQuicListener();
 }
 
-Configuration::HttpExtensionConfigProvider
-PerFilterChainFactoryContextImpl::createHttpDynamicFilterConfigProvider(
-    const envoy::config::core::v3::ExtensionConfigSource& config_source,
-    const std::string& filter_config_name, bool last_filter_in_filter_chain) {
-  return downstreamFilterConfigProviderManager()->createDynamicFilterConfigProvider(
-      config_source, filter_config_name, getServerFactoryContext(), *this, clusterManager(),
-      last_filter_in_filter_chain, "http", nullptr);
-}
-
-Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-PerFilterChainFactoryContextImpl::downstreamFilterConfigProviderManager() {
-  return parent_context_.downstreamFilterConfigProviderManager();
-}
-
 FilterChainManagerImpl::FilterChainManagerImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
     Configuration::FactoryContext& factory_context, Init::Manager& init_manager,

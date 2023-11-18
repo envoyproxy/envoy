@@ -229,15 +229,13 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager,
-    Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager)
+    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : server_(server), metadata_(config.metadata()), typed_metadata_(config.metadata()),
       direction_(config.traffic_direction()), global_scope_(server.stats().createScope("")),
       listener_scope_(
           server_.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config)))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
-      is_quic_(config.udp_listener_config().has_quic_options()),
-      filter_config_provider_manager_(filter_config_provider_manager) {}
+      is_quic_(config.udp_listener_config().has_quic_options()) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -301,15 +299,6 @@ ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
 }
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
 bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
-Configuration::HttpExtensionConfigProvider
-ListenerFactoryContextBaseImpl::createHttpDynamicFilterConfigProvider(
-    const envoy::config::core::v3::ExtensionConfigSource&, const std::string&, bool) {
-  return nullptr;
-}
-Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-ListenerFactoryContextBaseImpl::downstreamFilterConfigProviderManager() {
-  return filter_config_provider_manager_;
-}
 
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
@@ -349,8 +338,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
-          parent_.factory_->createDrainManager(config.drain_type()),
-          parent_.filter_config_provider_manager_)),
+          parent_.factory_->createDrainManager(config.drain_type()))),
       reuse_port_(getReusePortOrDefault(parent_.server_, config_, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
@@ -964,17 +952,6 @@ Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
 }
 bool PerListenerFactoryContextImpl::isQuicListener() const {
   return listener_factory_context_base_->isQuicListener();
-}
-Configuration::HttpExtensionConfigProvider
-PerListenerFactoryContextImpl::createHttpDynamicFilterConfigProvider(
-    const envoy::config::core::v3::ExtensionConfigSource& config_source,
-    const std::string& filter_config_name, bool last_filter_in_filter_chain) {
-  return listener_factory_context_base_->createHttpDynamicFilterConfigProvider(
-      config_source, filter_config_name, last_filter_in_filter_chain);
-}
-Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-PerListenerFactoryContextImpl::downstreamFilterConfigProviderManager() {
-  return listener_factory_context_base_->downstreamFilterConfigProviderManager();
 }
 
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }

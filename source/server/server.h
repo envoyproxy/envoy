@@ -172,8 +172,9 @@ class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
                                  public Configuration::TransportSocketFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
-      : server_(server), server_scope_(server_.stats().createScope("")) , filter_config_provider_manager_(
-          std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()){}
+      : server_(server), server_scope_(server_.stats().createScope("")),
+        filter_config_provider_manager_(
+            std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
@@ -201,12 +202,13 @@ public:
   Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
       Configuration::FactoryContext& factory_context,
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain) override{
-        return    downstreamFilterConfigProviderManager()->createDynamicFilterConfigProvider(
-      config_source, filter_config_name, *this, factory_context, clusterManager(),	 last_filter_in_filter_chain,    "http", nullptr);
-      }
+      const std::string& filter_config_name, bool last_filter_in_filter_chain) override {
+    return downstreamFilterConfigProviderManager()->createDynamicFilterConfigProvider(
+        config_source, filter_config_name, *this, factory_context, clusterManager(),
+        last_filter_in_filter_chain, "http", nullptr);
+  }
 
-       Configuration::DownstreamFilterConfigProviderManagerSharedPtr
+  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }

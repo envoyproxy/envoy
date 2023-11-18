@@ -193,7 +193,7 @@ public:
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
 
-    /**
+  /**
    * Create an FilterConfigProviderPtr for a filter config. The config providers may share
    * the underlying subscriptions to the filter config discovery service.
    * @param factory_context supplies the factory context.
@@ -205,7 +205,7 @@ public:
    * @return HttpExtensionConfigProvider
    */
   virtual Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
-       Configuration::FactoryContext& factory_context,
+      Configuration::FactoryContext& factory_context,
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, bool last_filter_in_filter_chain) PURE;
 
@@ -311,28 +311,6 @@ public:
    * @return Router::Context& a reference to the router context.
    */
   virtual Router::Context& routerContext() PURE;
-
-  /**
-   * Create an FilterConfigProviderPtr for a filter config. The config providers may share
-   * the underlying subscriptions to the filter config discovery service.
-   * @param config_source supplies the extension configuration source for the filter configs.
-   * @param filter_config_name the filter config resource name.
-   * @param last_filter_in_filter_chain indicates whether this filter is the last filter in the
-   * configured chain
-   *
-   * @return HttpExtensionConfigProvider
-   */
-  virtual Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain) PURE;
-
-  /**
-   * Returns the downstream filter config provider manager.
-   *
-   * @return DownstreamFilterConfigProviderManagerSharedPtr
-   */
-  virtual DownstreamFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() PURE;
 };
 
 /**

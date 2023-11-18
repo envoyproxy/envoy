@@ -126,10 +126,10 @@ private:
 class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContext,
                                              public Network::DrainDecision {
 public:
-  ListenerFactoryContextBaseImpl(
-      Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-      const envoy::config::listener::v3::Listener& config, Server::DrainManagerPtr drain_manager,
-      Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager);
+  ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor,
+                                 const envoy::config::listener::v3::Listener& config,
+                                 Server::DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& mainThreadDispatcher() override;
@@ -161,11 +161,6 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
-  Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain) override;
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override;
 
   // DrainDecision
   bool drainClose() const override {
@@ -188,7 +183,6 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
   bool is_quic_;
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{};
 };
 
 class ListenerImpl;
@@ -198,15 +192,13 @@ class ListenerImpl;
 // listener update or during the lifetime of listener?
 class PerListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
 public:
-  PerListenerFactoryContextImpl(
-      Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-      const envoy::config::listener::v3::Listener& config_message,
-      const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl,
-      DrainManagerPtr drain_manager,
-      Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager)
+  PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
+                                ProtobufMessage::ValidationVisitor& validation_visitor,
+                                const envoy::config::listener::v3::Listener& config_message,
+                                const Network::ListenerConfig* listener_config,
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
       : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-            server, validation_visitor, config_message, std::move(drain_manager),
-            filter_config_provider_manager)),
+            server, validation_visitor, config_message, std::move(drain_manager))),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
@@ -247,11 +239,6 @@ public:
 
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
-  Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain) override;
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override;
 
   // ListenerFactoryContext
   const Network::ListenerConfig& listenerConfig() const override;

@@ -90,11 +90,6 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
-  Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain) override;
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override;
   void startDraining() override { is_draining_.store(true); }
 
 private:

@@ -24,10 +24,11 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   if (composite_action.has_dynamic_config()) {
     auto config_discovery = composite_action.dynamic_config().config_discovery();
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
-    Server::Configuration::ServerFactoryContext& server_factory_context = context.server_factory_context_.value();
+    Server::Configuration::ServerFactoryContext& server_factory_context =
+        context.server_factory_context_.value();
     // Create a dynamic filter config provider and register it with the server factory context.
-    auto provider = server_factory_context.createHttpDynamicFilterConfigProvider(factory_context,
-        config_discovery, composite_action.dynamic_config().name(), false);
+    auto provider = server_factory_context.createHttpDynamicFilterConfigProvider(
+        factory_context, config_discovery, composite_action.dynamic_config().name(), false);
     return [provider = std::move(provider)]() -> Matcher::ActionPtr {
       auto config_value = provider->config();
       if (config_value.has_value()) {
@@ -50,9 +51,9 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     // First, try to create the filter factory creation function from factory context (if exists).
     if (context.factory_context_.has_value()) {
       auto callback_or_status = factory.createFilterFactoryFromProto(
-        *message, context.stat_prefix_, context.factory_context_.value());
-    THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
-    callback = callback_or_status.value();
+          *message, context.stat_prefix_, context.factory_context_.value());
+      THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
+      callback = callback_or_status.value();
     }
 
     // If above failed, try to create the filter factory creation function from server factory

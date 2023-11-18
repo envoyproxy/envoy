@@ -49,11 +49,6 @@ public:
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
-  Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain) override;
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override;
 
 private:
   Server::Instance& server_;

@@ -57,16 +57,6 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
-  HttpExtensionConfigProvider
-  createHttpDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
-                                        const std::string&, bool) override {
-    return nullptr;
-  }
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override {
-    return filter_config_provider_manager_;
-  }
-
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -92,8 +82,6 @@ public:
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
-      std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()};
 };
 
 class MockUpstreamFactoryContext : public UpstreamFactoryContext {
