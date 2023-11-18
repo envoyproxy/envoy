@@ -49,10 +49,6 @@ constructor(
     envoyEngine.terminate()
   }
 
-  override fun flushStats() {
-    envoyEngine.flushStats()
-  }
-
   override fun dumpStats(): String {
     return envoyEngine.dumpStats()
   }

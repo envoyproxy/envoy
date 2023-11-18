@@ -110,17 +110,9 @@ TEST_F(QuicPlatformTest, QuicClientStats) {
 
 TEST_F(QuicPlatformTest, QuicExpectBug) {
   auto bug = [](const char* error_message) { QUIC_BUG(bug_id) << error_message; };
-
   auto peer_bug = [](const char* error_message) { QUIC_PEER_BUG(bug_id) << error_message; };
   EXPECT_QUIC_BUG(bug("bug one is expected"), "bug one");
   EXPECT_QUIC_BUG(bug("bug two is expected"), "bug two");
-#ifdef NDEBUG
-  // The 3rd triggering in release mode should not be logged.
-  EXPECT_LOG_NOT_CONTAINS("error", "bug three", bug("bug three is expected"));
-#else
-  EXPECT_QUIC_BUG(bug("bug three is expected"), "bug three");
-#endif
-
   EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_1 is expected"), "peer_bug_1");
   EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_2 is expected"), "peer_bug_2");
 }

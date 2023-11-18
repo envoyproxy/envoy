@@ -112,10 +112,6 @@ envoy_status_t dump_stats(envoy_engine_t engine, envoy_data* out) {
   return ENVOY_SUCCESS;
 }
 
-void flush_stats(envoy_engine_t e) {
-  runOnEngineDispatcher(e, [](auto& engine) { engine.flushStats(); });
-}
-
 envoy_status_t register_platform_api(const char* name, void* api) {
   Envoy::Api::External::registerApi(std::string(name), api);
   return ENVOY_SUCCESS;

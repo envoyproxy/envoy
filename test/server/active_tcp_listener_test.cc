@@ -39,6 +39,16 @@ public:
               (uint64_t listener_tag, const Network::Address::Instance&));
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByAddress,
               (const Network::Address::Instance& address));
+  MOCK_METHOD(Network::Listener*, createListener_,
+              (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
+               Runtime::Loader& runtime, Random::RandomGenerator& random,
+               const Network::ListenerConfig& listener_config,
+               Server::ThreadLocalOverloadStateOptRef overload_state));
+  MOCK_METHOD(Network::ListenerPtr, createListener,
+              (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
+               Runtime::Loader& runtime, Random::RandomGenerator& random,
+               const Network::ListenerConfig& listener_config,
+               Server::ThreadLocalOverloadStateOptRef overload_state));
 };
 
 class ActiveTcpListenerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {

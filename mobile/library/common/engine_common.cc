@@ -2,6 +2,7 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/server/null_overload_manager.h"
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
 
@@ -58,6 +59,9 @@ class ServerLite : public Server::InstanceBase {
 public:
   using Server::InstanceBase::InstanceBase;
   void maybeCreateHeapShrinker() override {}
+  std::unique_ptr<Envoy::Server::OverloadManager> createOverloadManager() override {
+    return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
+  }
 };
 
 EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)

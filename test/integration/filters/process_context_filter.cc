@@ -40,7 +40,7 @@ class ProcessContextFilterConfig : public Extensions::HttpFilters::Common::Empty
 public:
   ProcessContextFilterConfig() : EmptyHttpFilterConfig("process-context-filter") {}
 
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
                Server::Configuration::FactoryContext& factory_context) override {
     return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {

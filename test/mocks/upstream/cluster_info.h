@@ -85,7 +85,8 @@ public:
 
 class MockUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
 public:
-  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, createLocalAddressSelector,
+  MOCK_METHOD(absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>,
+              createLocalAddressSelector,
               (std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
                absl::optional<std::string> cluster_name),
               (const));

@@ -45,10 +45,7 @@ TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
 
 class MockAccessLog : public AccessLog::Instance {
 public:
-  MOCK_METHOD(void, log,
-              (const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-               const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
-               AccessLog::AccessLogType));
+  MOCK_METHOD(void, log, (const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&));
 };
 
 class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {

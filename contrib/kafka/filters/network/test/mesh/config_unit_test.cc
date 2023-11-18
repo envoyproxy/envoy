@@ -48,7 +48,8 @@ forwarding_rules:
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   testing::NiceMock<MockThreadFactory> thread_factory;
-  ON_CALL(context.api_, threadFactory()).WillByDefault(ReturnRef(thread_factory));
+  ON_CALL(context.server_factory_context_.api_, threadFactory())
+      .WillByDefault(ReturnRef(thread_factory));
   KafkaMeshConfigFactory factory;
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);

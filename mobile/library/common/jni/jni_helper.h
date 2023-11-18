@@ -31,6 +31,9 @@ class LocalRefDeleter {
 public:
   explicit LocalRefDeleter(JNIEnv* env) : env_(env) {}
 
+  // This is to allow move semantics in `LocalRefUniquePtr`.
+  LocalRefDeleter& operator=(const LocalRefDeleter&) { return *this; }
+
   void operator()(jobject object) const {
     if (object != nullptr) {
       env_->DeleteLocalRef(object);
@@ -120,10 +123,12 @@ private:
 };
 
 /** A unique pointer for JNI primitive array critical. */
-using PrimitiveArrayCriticalUniquePtr = std::unique_ptr<void, PrimitiveArrayCriticalDeleter>;
+template <typename T>
+using PrimitiveArrayCriticalUniquePtr =
+    std::unique_ptr<typename std::remove_pointer<T>::type, PrimitiveArrayCriticalDeleter>;
 
 /**
- * A thin wrapper around JNI API with memory-safety.
+ * A thin wrapper around JNI API with automatic memory management.
  *
  * NOTE: Do not put any other helper functions that are not part of the JNI API here.
  */
@@ -266,8 +271,19 @@ public:
    */
   void setObjectArrayElement(jobjectArray array, jsize index, jobject value);
 
-  [[nodiscard]] PrimitiveArrayCriticalUniquePtr getPrimitiveArrayCritical(jarray array,
-                                                                          jboolean* is_copy);
+  /**
+   * Returns the pointer into the primitive array.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getprimitivearraycritical-releaseprimitivearraycritical
+   */
+  template <typename T = void*>
+  [[nodiscard]] PrimitiveArrayCriticalUniquePtr<T> getPrimitiveArrayCritical(jarray array,
+                                                                             jboolean* is_copy) {
+    PrimitiveArrayCriticalUniquePtr<T> result(
+        static_cast<T>(env_->GetPrimitiveArrayCritical(array, is_copy)),
+        PrimitiveArrayCriticalDeleter(env_, array));
+    return result;
+  }
 
   /**
    * Sets a region of an `array` from a `buffer` with the specified `start` index and `length`.
@@ -357,6 +373,15 @@ public:
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getdirectbuffercapacity
    */
   jlong getDirectBufferCapacity(jobject buffer);
+
+  /**
+   * Gets the address of memory associated with the given NIO direct buffer.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getdirectbufferaddress
+   */
+  template <typename T = void*> T getDirectBufferAddress(jobject buffer) {
+    return static_cast<T>(env_->GetDirectBufferAddress(buffer));
+  }
 
 private:
   /** Rethrows the Java exception occurred. */

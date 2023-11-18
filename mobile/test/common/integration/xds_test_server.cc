@@ -2,14 +2,18 @@
 
 #include <utility>
 
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+
 #include "source/common/event/libevent.h"
-#include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/fake_upstream.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -19,6 +23,14 @@ XdsTestServer::XdsTestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),
       version_(Network::Address::IpVersion::v4),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>), upstream_config_(time_system_) {
+  std::string runfiles_error;
+  runfiles_ = std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles>{
+      bazel::tools::cpp::runfiles::Runfiles::Create("", &runfiles_error)};
+  RELEASE_ASSERT(TestEnvironment::getOptionalEnvVar("NORUNFILES").has_value() ||
+                     runfiles_ != nullptr,
+                 runfiles_error);
+  TestEnvironment::setRunfiles(runfiles_.get());
+
   if (!Envoy::Event::Libevent::Global::initialized()) {
     // Required by the Dispatcher.
     Envoy::Event::Libevent::Global::initialize();
@@ -38,7 +50,6 @@ XdsTestServer::XdsTestServer()
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock_, false, false);
   upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
-  Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
   Config::forceRegisterAdsConfigSubscriptionFactory();
   Config::forceRegisterGrpcConfigSubscriptionFactory();
   Config::forceRegisterDeltaGrpcConfigSubscriptionFactory();
@@ -47,7 +58,20 @@ XdsTestServer::XdsTestServer()
   Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
   Config::forceRegisterGrpcMuxFactory();
   Config::forceRegisterNewGrpcMuxFactory();
-  xds_upstream_ = std::make_unique<FakeUpstream>(0, version_, upstream_config_);
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto* common_tls_context = tls_context.mutable_common_tls_context();
+  common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+  auto* tls_cert = common_tls_context->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+  tls_cert->mutable_private_key()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, factory_context_);
+  auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+      std::move(cfg), context_manager_, *stats_store_.rootScope(), std::vector<std::string>{});
+  xds_upstream_ = std::make_unique<FakeUpstream>(std::move(context), 0, version_, upstream_config_);
 }
 
 std::string XdsTestServer::getHost() const {
