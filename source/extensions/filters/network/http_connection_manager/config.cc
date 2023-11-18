@@ -230,7 +230,7 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
   auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
   std::shared_ptr<Server::Configuration::DownstreamFilterConfigProviderManager>
-      filter_config_provider_manager = context.downstreamFilterConfigProviderManager();
+      filter_config_provider_manager = context.getServerFactoryContext().downstreamFilterConfigProviderManager();
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
           tracer_manager, filter_config_provider_manager};

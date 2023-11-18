@@ -151,6 +151,14 @@ public:
   virtual Init::Manager& initManager() PURE;
 };
 
+class FactoryContext;
+
+using DownstreamFilterConfigProviderManager =
+    Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
+                                        Server::Configuration::FactoryContext>;
+using DownstreamFilterConfigProviderManagerSharedPtr =
+    std::shared_ptr<DownstreamFilterConfigProviderManager>;
+
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
  * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
@@ -184,6 +192,30 @@ public:
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
+
+    /**
+   * Create an FilterConfigProviderPtr for a filter config. The config providers may share
+   * the underlying subscriptions to the filter config discovery service.
+   * @param factory_context supplies the factory context.
+   * @param config_source supplies the extension configuration source for the filter configs.
+   * @param filter_config_name the filter config resource name.
+   * @param last_filter_in_filter_chain indicates whether this filter is the last filter in the
+   * configured chain
+   *
+   * @return HttpExtensionConfigProvider
+   */
+  virtual Configuration::HttpExtensionConfigProvider createHttpDynamicFilterConfigProvider(
+       Configuration::FactoryContext& factory_context,
+      const envoy::config::core::v3::ExtensionConfigSource& config_source,
+      const std::string& filter_config_name, bool last_filter_in_filter_chain) PURE;
+
+  /**
+   * Returns the downstream filter config provider manager.
+   *
+   * @return DownstreamFilterConfigProviderManagerSharedPtr
+   */
+  virtual DownstreamFilterConfigProviderManagerSharedPtr
+  downstreamFilterConfigProviderManager() PURE;
 };
 
 /**
@@ -213,13 +245,6 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 };
 
-class FactoryContext;
-
-using DownstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
-                                        Server::Configuration::FactoryContext>;
-using DownstreamFilterConfigProviderManagerSharedPtr =
-    std::shared_ptr<DownstreamFilterConfigProviderManager>;
 /**
  * Context passed to network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only

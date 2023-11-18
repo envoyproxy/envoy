@@ -24,8 +24,9 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   if (composite_action.has_dynamic_config()) {
     auto config_discovery = composite_action.dynamic_config().config_discovery();
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
+    Server::Configuration::ServerFactoryContext& server_factory_context = context.server_factory_context_.value();
     // Create a dynamic filter config provider and register it with the server factory context.
-    auto provider = factory_context.createHttpDynamicFilterConfigProvider(
+    auto provider = server_factory_context.createHttpDynamicFilterConfigProvider(factory_context,
         config_discovery, composite_action.dynamic_config().name(), false);
     return [provider = std::move(provider)]() -> Matcher::ActionPtr {
       auto config_value = provider->config();
