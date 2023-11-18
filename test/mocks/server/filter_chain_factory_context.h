@@ -11,16 +11,6 @@ class MockFilterChainFactoryContext : public MockFactoryContext, public FilterCh
 public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
-
-  HttpExtensionConfigProviderSharedPtr
-  createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
-                                    const std::string&, bool) override {
-    return nullptr;
-  }
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override {
-    return nullptr;
-  }
 };
 } // namespace Configuration
 } // namespace Server
