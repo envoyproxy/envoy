@@ -494,17 +494,6 @@ std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   return fmt::format("https://{}{}", headers.getHostValue(), headers.getPathValue());
 }
 
-Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
-  size_t start = url.find('?');
-  if (start == std::string::npos) {
-    QueryParams params;
-    return params;
-  }
-
-  start++;
-  return parseParameters(url, start, /*decode_params=*/false);
-}
-
 Utility::QueryParamsMulti Utility::QueryParamsMulti::parseQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
@@ -513,17 +502,6 @@ Utility::QueryParamsMulti Utility::QueryParamsMulti::parseQueryString(absl::stri
 
   start++;
   return Utility::QueryParamsMulti::parseParameters(url, start, /*decode_params=*/false);
-}
-
-Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
-  size_t start = url.find('?');
-  if (start == std::string::npos) {
-    QueryParams params;
-    return params;
-  }
-
-  start++;
-  return parseParameters(url, start, /*decode_params=*/true);
 }
 
 Utility::QueryParamsMulti
@@ -535,38 +513,6 @@ Utility::QueryParamsMulti::parseAndDecodeQueryString(absl::string_view url) {
 
   start++;
   return Utility::QueryParamsMulti::parseParameters(url, start, /*decode_params=*/true);
-}
-
-Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
-  return parseParameters(body, 0, /*decode_params=*/true);
-}
-
-Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start,
-                                              bool decode_params) {
-  QueryParams params;
-
-  while (start < data.size()) {
-    size_t end = data.find('&', start);
-    if (end == std::string::npos) {
-      end = data.size();
-    }
-    absl::string_view param(data.data() + start, end - start);
-
-    const size_t equal = param.find('=');
-    if (equal != std::string::npos) {
-      const auto param_name = StringUtil::subspan(data, start, start + equal);
-      const auto param_value = StringUtil::subspan(data, start + equal + 1, end);
-      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
-                     decode_params ? PercentEncoding::decode(param_value) : param_value);
-    } else {
-      const auto param_name = StringUtil::subspan(data, start, end);
-      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name, "");
-    }
-
-    start = end + 1;
-  }
-
-  return params;
 }
 
 Utility::QueryParamsMulti Utility::QueryParamsMulti::parseParameters(absl::string_view data,
@@ -634,18 +580,6 @@ std::string Utility::stripQueryString(const HeaderString& path) {
   absl::string_view path_str = path.getStringView();
   size_t query_offset = path_str.find('?');
   return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
-}
-
-std::string Utility::replaceQueryString(const HeaderString& path,
-                                        const Utility::QueryParams& params) {
-  std::string new_path{Http::Utility::stripQueryString(path)};
-
-  if (!params.empty()) {
-    const auto new_query_string = Http::Utility::queryParamsToString(params);
-    absl::StrAppend(&new_path, new_query_string);
-  }
-
-  return new_path;
 }
 
 std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) {
@@ -1090,18 +1024,6 @@ RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri
   message->headers().setHost(host);
 
   return message;
-}
-
-// TODO(jmarantz): make QueryParams a real class and put this serializer there,
-// along with proper URL escaping of the name and value.
-std::string Utility::queryParamsToString(const QueryParams& params) {
-  std::string out;
-  std::string delim = "?";
-  for (const auto& p : params) {
-    absl::StrAppend(&out, delim, p.first, "=", p.second);
-    delim = "&";
-  }
-  return out;
 }
 
 std::string Utility::QueryParamsMulti::toString() {
