@@ -928,19 +928,17 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
       if (opcode.ok()) {
         callbacks_.onRequestBytes(opcode.value(), offset - current);
         break;
-      } else {
-        ENVOY_LOG(debug, "zookeeper_proxy: decodeOnData exception: {}", opcode.status().message());
-        return;
       }
+      ENVOY_LOG(debug, "zookeeper_proxy: decodeOnData exception: {}", opcode.status().message());
+      return;
     case DecodeType::WRITE:
       opcode = decodeOnWrite(data, offset);
       if (opcode.ok()) {
         callbacks_.onResponseBytes(opcode.value(), offset - current);
         break;
-      } else {
-        ENVOY_LOG(debug, "zookeeper_proxy: decodeOnWrite exception: {}", opcode.status().message());
-        return;
       }
+      ENVOY_LOG(debug, "zookeeper_proxy: decodeOnWrite exception: {}", opcode.status().message());
+      return;
     }
   }
 }
