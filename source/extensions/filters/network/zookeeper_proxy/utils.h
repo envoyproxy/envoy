@@ -48,7 +48,7 @@ private:
     return status;                                                                                 \
   }
 
-#define COUNT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status)                                      \
+#define EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status)                                       \
   if (!status.ok()) {                                                                              \
     callbacks_.onDecodeError();                                                                    \
     return status;                                                                                 \
@@ -59,7 +59,7 @@ private:
     return absl::InvalidArgumentError(message);                                                    \
   }
 
-#define COUNT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message)             \
+#define EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message)              \
   if (!status.ok()) {                                                                              \
     callbacks_.onDecodeError();                                                                    \
     return absl::InvalidArgumentError(message);                                                    \
