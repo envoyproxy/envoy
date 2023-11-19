@@ -128,8 +128,10 @@ ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
-      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
-          config_with_hash_key, context.scope(), true),
+      context.getServerFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true),
       timeout);
 }
 

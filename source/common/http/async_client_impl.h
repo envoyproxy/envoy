@@ -208,13 +208,10 @@ private:
   }
   // The async client won't pause if sending 1xx headers so simply swallow any.
   void encode1xxHeaders(ResponseHeaderMapPtr&&) override {}
-  ResponseHeaderMapOptRef informationalHeaders() const override { return {}; }
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
-  ResponseHeaderMapOptRef responseHeaders() const override { return {}; }
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
-  ResponseTrailerMapOptRef responseTrailers() const override { return {}; }
   void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override {
     ++high_watermark_calls_;
@@ -254,6 +251,13 @@ private:
   void setUpstreamOverrideHost(absl::string_view) override {}
   absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }
   absl::string_view filterConfigName() const override { return ""; }
+  RequestHeaderMapOptRef requestHeaders() override { return makeOptRefFromPtr(request_headers_); }
+  RequestTrailerMapOptRef requestTrailers() override {
+    return makeOptRefFromPtr(request_trailers_);
+  }
+  ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
+  ResponseHeaderMapOptRef responseHeaders() override { return {}; }
+  ResponseTrailerMapOptRef responseTrailers() override { return {}; }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {
@@ -275,6 +279,8 @@ private:
   Buffer::InstancePtr buffered_body_;
   Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
   absl::optional<uint32_t> buffer_limit_{absl::nullopt};
+  RequestHeaderMap* request_headers_{};
+  RequestTrailerMap* request_trailers_{};
   bool encoded_response_headers_{};
   bool is_grpc_request_{};
   bool is_head_request_{false};

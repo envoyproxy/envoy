@@ -109,20 +109,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddinggrpcStatsDomainAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("stats.envoyproxy.io", config.grpcStatsDomain)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addGrpcStatsDomain("stats.envoyproxy.io")
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddingConnectTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -250,20 +236,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingStatsFlushSecondsAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual(42, config.statsFlushSeconds)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addStatsFlushSeconds(42)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddingStreamIdleTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -356,7 +328,7 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
   func testAddingRtdsConfigurationWhenRunningEnvoy() {
     let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
       .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
@@ -394,9 +366,9 @@ final class EngineBuilderTests: XCTestCase {
 
   func testAddingXdsSecurityConfigurationWhenRunningEnvoy() {
     let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
-      .setAuthenticationToken(header: "x-goog-api-key", token: "A1B2C3")
+      .addInitialStreamHeader(header: "x-goog-api-key", value: "A1B2C3")
+      .addInitialStreamHeader(header: "x-android-package", value: "com.google.myapp")
       .setSslRootCerts(rootCerts: "fake_ssl_root_certs")
-      .setSni(sni: "fake_sni_address")
       .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
@@ -404,23 +376,9 @@ final class EngineBuilderTests: XCTestCase {
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("x-goog-api-key"))
     XCTAssertTrue(bootstrapDebugDescription.contains("A1B2C3"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("x-android-package"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("com.google.myapp"))
     XCTAssertTrue(bootstrapDebugDescription.contains("fake_ssl_root_certs"))
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_sni_address"))
-  }
-
-  func testAddingXdsJwtSecurityConfigurationWhenRunningEnvoy() {
-    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
-      .setJwtAuthenticationToken(token: "fake_jwt_token", tokenLifetimeInSeconds: 12345)
-      .setSslRootCerts(rootCerts: "fake_ssl_root_certs")
-      .setSni(sni: "fake_sni_address")
-      .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
-    let bootstrapDebugDescription = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .setXds(xdsBuilder)
-      .bootstrapDebugDescription()
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_jwt_token"))
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_ssl_root_certs"))
-    XCTAssertTrue(bootstrapDebugDescription.contains("fake_sni_address"))
   }
 #endif
 

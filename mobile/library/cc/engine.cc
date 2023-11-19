@@ -38,7 +38,8 @@ std::string Engine::dumpStats() {
 
 envoy_status_t Engine::terminate() {
   if (terminated_) {
-    throw std::runtime_error("attempting to double terminate Engine");
+    IS_ENVOY_BUG("attempted to double terminate engine");
+    return ENVOY_FAILURE;
   }
   envoy_status_t ret = terminate_engine(engine_, /* release */ false);
   terminated_ = true;

@@ -20,7 +20,8 @@ SubsetSelectorImpl::SubsetSelectorImpl(
     // defining fallback_keys_subset_ for a fallback policy other than KEYS_SUBSET doesn't have
     // any effect and it is probably a user mistake. We should let the user know about it.
     if (!fallback_keys_subset_.empty()) {
-      throw EnvoyException("fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
+      throwEnvoyExceptionOrPanic(
+          "fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
     }
     return;
   }
@@ -29,7 +30,7 @@ SubsetSelectorImpl::SubsetSelectorImpl(
   // it would be the same as not defining fallback policy at all (global fallback policy would be
   // used)
   if (fallback_keys_subset_.empty()) {
-    throw EnvoyException("fallback_keys_subset cannot be empty");
+    throwEnvoyExceptionOrPanic("fallback_keys_subset cannot be empty");
   }
 
   // We allow only for a fallback to a subset of the selector keys because this is probably the
@@ -38,13 +39,13 @@ SubsetSelectorImpl::SubsetSelectorImpl(
   // for this.
   if (!std::includes(selector_keys_.begin(), selector_keys_.end(), fallback_keys_subset_.begin(),
                      fallback_keys_subset_.end())) {
-    throw EnvoyException("fallback_keys_subset must be a subset of selector keys");
+    throwEnvoyExceptionOrPanic("fallback_keys_subset must be a subset of selector keys");
   }
 
   // Enforce that the fallback_keys_subset_ set is smaller than the selector_keys_ set. Otherwise
   // we could end up with a infinite recursion of SubsetLoadBalancer::chooseHost().
   if (selector_keys_.size() == fallback_keys_subset_.size()) {
-    throw EnvoyException("fallback_keys_subset cannot be equal to keys");
+    throwEnvoyExceptionOrPanic("fallback_keys_subset cannot be equal to keys");
   }
 }
 

@@ -60,6 +60,7 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = ["quiche_time_utils_impl.h"],
     external_deps = [
         "abseil_base",
+        "abseil_optional",
         "abseil_time",
     ],
 )
@@ -79,17 +80,6 @@ envoy_quiche_platform_impl_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:stl_helpers",
         "//source/common/common:utility_lib",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "mobile_quiche_bug_tracker_impl_lib",
-    hdrs = [
-        "mobile_quiche_bug_tracker_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_mobile_quiche_logging_lib",
     ],
 )
 
@@ -117,15 +107,10 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = [
         "quiche_iovec_impl.h",
     ],
-    external_deps = [
-        "abseil_base",
-        "abseil_hash",
-        "abseil_inlined_vector",
-        "abseil_memory",
-        "abseil_node_hash_map",
-        "abseil_node_hash_set",
-    ],
     tags = ["nofips"],
+    deps = [
+        "//envoy/common:base_includes",
+    ],
 )
 
 envoy_quiche_platform_impl_cc_library(

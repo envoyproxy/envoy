@@ -99,7 +99,7 @@ public:
    *   from cluster config. If the bind config from the cluster manager, the param
    *   is empty.
    */
-  virtual UpstreamLocalAddressSelectorConstSharedPtr
+  virtual absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
   createLocalAddressSelector(std::vector<UpstreamLocalAddress> upstream_local_addresses,
                              absl::optional<std::string> cluster_name) const PURE;
 
@@ -1171,6 +1171,11 @@ public:
    * budgets for this cluster.
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
+
+  /**
+   * @return true if this cluster should produce per-endpoint stats.
+   */
+  virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.

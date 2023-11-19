@@ -55,6 +55,27 @@ typed_config:
                                  true);
 
     config_helper_.prependFilter(R"EOF(
+name: downstream-header-mutation-disabled-by-default
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "downstream-request-global-flag-header-disabled-by-default"
+          value: "downstream-request-global-flag-header-value-disabled-by-default"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    response_mutations:
+    - append:
+        header:
+          key: "downstream-global-flag-header-disabled-by-default"
+          value: "downstream-global-flag-header-value-disabled-by-default"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+disabled: true
+)EOF",
+                                 true);
+
+    config_helper_.prependFilter(R"EOF(
 name: upstream-header-mutation
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
@@ -211,17 +232,18 @@ typed_config:
                 {"upstream-header-mutation", per_route_config_rt_2});
           }
 
-          // Per route disable downstream header mutation.
-          envoy::config::route::v3::FilterConfig filter_config;
-          filter_config.mutable_config();
-          filter_config.set_disabled(true);
-          ProtobufWkt::Any per_route_config_3;
-          per_route_config_3.PackFrom(filter_config);
-          another_route->mutable_typed_per_filter_config()->insert(
-              {"donwstream-header-mutation", per_route_config_3});
-          // Try disable upstream header mutation but this is not supported and should not work.
-          another_route->mutable_typed_per_filter_config()->insert(
-              {"upstream-header-mutation", per_route_config_3});
+          {
+            // Per route disable downstream header mutation.
+            envoy::config::route::v3::FilterConfig filter_config;
+            filter_config.set_disabled(true);
+            ProtobufWkt::Any per_route_config;
+            per_route_config.PackFrom(filter_config);
+            another_route->mutable_typed_per_filter_config()->insert(
+                {"donwstream-header-mutation", per_route_config});
+            // Try disable upstream header mutation but this is not supported and should not work.
+            another_route->mutable_typed_per_filter_config()->insert(
+                {"upstream-header-mutation", per_route_config});
+          }
         });
     HttpIntegrationTest::initialize();
   }
@@ -356,6 +378,12 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRoute) {
                 .get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
+  EXPECT_EQ("downstream-request-global-flag-header-value-disabled-by-default",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString(
+                    "downstream-request-global-flag-header-disabled-by-default"))[0]
+                ->value()
+                .getStringView());
 
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
@@ -487,6 +515,10 @@ TEST_P(HeaderMutationIntegrationTest, TestDisableDownstreamHeaderMutation) {
   EXPECT_EQ(0, upstream_request_->headers()
                    .get(Http::LowerCaseString("downstream-request-global-flag-header"))
                    .size());
+  EXPECT_EQ(0, upstream_request_->headers()
+                   .get(Http::LowerCaseString("downstream-request-global-flag-header-disabled-by-"
+                                              "default"))
+                   .size());
 
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
@@ -506,6 +538,9 @@ TEST_P(HeaderMutationIntegrationTest, TestDisableDownstreamHeaderMutation) {
 
   EXPECT_EQ(0,
             response->headers().get(Http::LowerCaseString("downstream-global-flag-header")).size());
+  EXPECT_EQ(0, response->headers()
+                   .get(Http::LowerCaseString("downstream-global-flag-header-disabled-by-default"))
+                   .size());
   EXPECT_EQ(
       0, response->headers().get(Http::LowerCaseString("downstream-per-route-flag-header")).size());
   EXPECT_EQ(

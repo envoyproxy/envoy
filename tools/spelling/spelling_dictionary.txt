@@ -35,8 +35,10 @@ CIO
 deadcode
 DFP
 DOM
+Gasd
 GiB
 IPTOS
+OTEL
 Repick
 Reserializer
 SION
@@ -170,6 +172,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+curr
 eslint
 freeifaddrs
 FUZZER
@@ -181,6 +184,7 @@ dnsresolvers
 endpos
 eps
 fo
+gb
 ghi
 golang
 guarddog
@@ -252,11 +256,13 @@ LF
 LHS
 hls
 iframe
+ilp
 ingressed
 integrations
 iouring
 jkl
 lang
+libcurl
 libsxg
 LLVM
 LPT
@@ -303,6 +309,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+na
 oghttp
 OID
 OK
@@ -817,6 +824,7 @@ hostnames
 hostset
 hotrestart
 hrefs
+htpasswd
 huffman
 hystrix
 idempotency
@@ -1352,6 +1360,7 @@ transcoder
 transcoding
 transferral
 trds
+tri
 triaged
 trie
 tuple

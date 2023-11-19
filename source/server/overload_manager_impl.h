@@ -157,11 +157,7 @@ public:
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
   LoadShedPoint* getLoadShedPoint(absl::string_view point_name) override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
-
-  // Stop the overload manager timer and wait for any pending resource updates to complete.
-  // After this returns, overload manager clients should not receive any more callbacks
-  // about overload state changes.
-  void stop();
+  void stop() override;
 
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.

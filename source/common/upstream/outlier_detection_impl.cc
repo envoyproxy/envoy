@@ -293,7 +293,7 @@ DetectorImpl::create(Cluster& cluster, const envoy::config::cluster::v3::Outlier
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger, random));
 
   if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         "outlier detector's max_ejection_time cannot be smaller than base_ejection_time");
   }
   detector->initialize(cluster);

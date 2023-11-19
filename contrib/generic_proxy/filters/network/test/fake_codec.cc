@@ -7,30 +7,18 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-RequestDecoderPtr FakeStreamCodecFactory::requestDecoder() const {
-  return std::make_unique<FakeRequestDecoder>();
+ServerCodecPtr FakeStreamCodecFactory::createServerCodec() const {
+  return std::make_unique<FakeServerCodec>();
 }
 
-ResponseDecoderPtr FakeStreamCodecFactory::responseDecoder() const {
-  return std::make_unique<FakeResponseDecoder>();
+ClientCodecPtr FakeStreamCodecFactory::createClientCodec() const {
+  return std::make_unique<FakeClientCodec>();
 }
-RequestEncoderPtr FakeStreamCodecFactory::requestEncoder() const {
-  return std::make_unique<FakeRequestEncoder>();
-}
-ResponseEncoderPtr FakeStreamCodecFactory::responseEncoder() const {
-  return std::make_unique<FakeResponseEncoder>();
-}
-MessageCreatorPtr FakeStreamCodecFactory::messageCreator() const {
-  return std::make_unique<FakeMessageCreator>();
-}
-ProtocolOptions FakeStreamCodecFactory::protocolOptions() const { return protocol_options_; }
 
 CodecFactoryPtr
 FakeStreamCodecFactoryConfig::createCodecFactory(const Protobuf::Message&,
                                                  Envoy::Server::Configuration::FactoryContext&) {
-  auto factory = std::make_unique<FakeStreamCodecFactory>();
-  factory->protocol_options_ = protocol_options_;
-  return factory;
+  return std::make_unique<FakeStreamCodecFactory>();
 }
 
 } // namespace GenericProxy

@@ -53,7 +53,8 @@ public:
 
   // Server::Worker
   void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
-                   AddListenerCompletion completion, Runtime::Loader& loader) override;
+                   AddListenerCompletion completion, Runtime::Loader& loader,
+                   Random::RandomGenerator& random) override;
   uint64_t numConnections() const override;
 
   void removeListener(Network::ListenerConfig& listener, std::function<void()> completion) override;

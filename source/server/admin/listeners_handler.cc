@@ -22,12 +22,19 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
                                                  : ListenerManager::StopListenersType::All;
 
   const bool graceful = params.find("graceful") != params.end();
+  const bool skip_exit = params.find("skip_exit") != params.end();
+  if (skip_exit && !graceful) {
+    response.add("skip_exit requires graceful\n");
+    return Http::Code::BadRequest;
+  }
   if (graceful) {
     // Ignore calls to /drain_listeners?graceful if the drain sequence has
     // already started.
     if (!server_.drainManager().draining()) {
-      server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
-        server_.listenerManager().stopListeners(stop_listeners_type, {});
+      server_.drainManager().startDrainSequence([this, stop_listeners_type, skip_exit]() {
+        if (!skip_exit) {
+          server_.listenerManager().stopListeners(stop_listeners_type, {});
+        }
       });
     }
   } else {

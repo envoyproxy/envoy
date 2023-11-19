@@ -32,6 +32,11 @@ std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
   }
   return args;
 }
+
+void throwMalformedArgExceptionOrPanic(std::string message) {
+  throwExceptionOrPanic(MalformedArgvException, message);
+}
+
 } // namespace
 
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
@@ -179,7 +184,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
   END_TRY
   MULTI_CATCH(
-      TCLAP::ArgException & e, { failure_function(e); }, { throw NoServingException(); });
+      TCLAP::ArgException & e, { failure_function(e); },
+      { throw NoServingException("NoServingException"); });
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
@@ -208,7 +214,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     mode_ = Server::Mode::InitOnly;
   } else {
     const std::string message = fmt::format("error: unknown mode '{}'", mode.getValue());
-    throw MalformedArgvException(message);
+    throwMalformedArgExceptionOrPanic(message);
   }
 
   if (local_address_ip_version.getValue() == "v4") {
@@ -218,7 +224,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   } else {
     const std::string message =
         fmt::format("error: unknown IP address version '{}'", local_address_ip_version.getValue());
-    throw MalformedArgvException(message);
+    throwMalformedArgExceptionOrPanic(message);
   }
   base_id_ = base_id.getValue();
   use_dynamic_base_id_ = use_dynamic_base_id.getValue();
@@ -228,7 +234,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   if (use_dynamic_base_id_ && restart_epoch_ > 0) {
     const std::string message = fmt::format(
         "error: cannot use --restart-epoch={} with --use-dynamic-base-id", restart_epoch_);
-    throw MalformedArgvException(message);
+    throwMalformedArgExceptionOrPanic(message);
   }
 
   if (!concurrency.isSet() && cpuset_threads_) {
@@ -269,8 +275,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   } else {
     uint64_t socket_mode_helper;
     if (!StringUtil::atoull(socket_mode.getValue().c_str(), socket_mode_helper, 8)) {
-      throw MalformedArgvException(
-          fmt::format("error: invalid socket-mode '{}'", socket_mode.getValue()));
+      throwExceptionOrPanic(MalformedArgvException,
+                            fmt::format("error: invalid socket-mode '{}'", socket_mode.getValue()));
     }
     socket_mode_ = socket_mode_helper;
   }
@@ -280,13 +286,13 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   } else if (drain_strategy.getValue() == "gradual") {
     drain_strategy_ = Server::DrainStrategy::Gradual;
   } else {
-    throw MalformedArgvException(
-        fmt::format("error: unknown drain-strategy '{}'", mode.getValue()));
+    throwExceptionOrPanic(MalformedArgvException,
+                          fmt::format("error: unknown drain-strategy '{}'", mode.getValue()));
   }
 
   if (hot_restart_version_option.getValue()) {
     std::cerr << hot_restart_version_cb(!hot_restart_disabled_);
-    throw NoServingException();
+    throwExceptionOrPanic(NoServingException, "NoServingException");
   }
 
   if (!disable_extensions.getValue().empty()) {
@@ -299,20 +305,22 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       std::vector<absl::string_view> cli_tag_pair_tokens =
           absl::StrSplit(cli_tag_pair, absl::MaxSplits(':', 1));
       if (cli_tag_pair_tokens.size() != 2) {
-        throw MalformedArgvException(
-            fmt::format("error: misformatted stats-tag '{}'", cli_tag_pair));
+        throwExceptionOrPanic(MalformedArgvException,
+                              fmt::format("error: misformatted stats-tag '{}'", cli_tag_pair));
       }
 
       auto name = cli_tag_pair_tokens[0];
       if (!Stats::TagUtility::isTagNameValid(name)) {
-        throw MalformedArgvException(
+        throwExceptionOrPanic(
+            MalformedArgvException,
             fmt::format("error: misformatted stats-tag '{}' contains invalid char in '{}'",
                         cli_tag_pair, name));
       }
 
       auto value = cli_tag_pair_tokens[1];
       if (!Stats::TagUtility::isTagValueValid(value)) {
-        throw MalformedArgvException(
+        throwExceptionOrPanic(
+            MalformedArgvException,
             fmt::format("error: misformatted stats-tag '{}' contains invalid char in '{}'",
                         cli_tag_pair, value));
       }
@@ -377,7 +385,7 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
 
 uint32_t OptionsImpl::count() const { return count_; }
 
-void OptionsImpl::logError(const std::string& error) { throw MalformedArgvException(error); }
+void OptionsImpl::logError(const std::string& error) { throwMalformedArgExceptionOrPanic(error); }
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =

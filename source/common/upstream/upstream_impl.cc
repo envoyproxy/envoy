@@ -97,15 +97,16 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   }
 
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format("Didn't find a registered network or http filter or protocol "
-                                     "options implementation for name: '{}'",
-                                     name));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("Didn't find a registered network or http filter or protocol "
+                    "options implementation for name: '{}'",
+                    name));
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyProtocolOptionsProto();
 
   if (proto_config == nullptr) {
-    throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
+    throwEnvoyExceptionOrPanic(fmt::format("filter {} does not support protocol options", name));
   }
 
   Envoy::Config::Utility::translateOpaqueConfig(
@@ -287,10 +288,10 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
   if (upstream_local_addresses.size() > 1) {
     for (auto const& upstream_local_address : upstream_local_addresses) {
       if (upstream_local_address.address_ == nullptr) {
-        throw EnvoyException(fmt::format("{}'s upstream binding config has invalid IP addresses.",
-                                         !(cluster_name.has_value())
-                                             ? "Bootstrap"
-                                             : fmt::format("Cluster {}", cluster_name.value())));
+        throwEnvoyExceptionOrPanic(fmt::format(
+            "{}'s upstream binding config has invalid IP addresses.",
+            !(cluster_name.has_value()) ? "Bootstrap"
+                                        : fmt::format("Cluster {}", cluster_name.value())));
       }
     }
   }
@@ -317,7 +318,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
   if (bind_config.has_value()) {
     if (bind_config->additional_source_addresses_size() > 0 &&
         bind_config->extra_source_addresses_size() > 0) {
-      throw EnvoyException(fmt::format(
+      throwEnvoyExceptionOrPanic(fmt::format(
           "Can't specify both `extra_source_addresses` and `additional_source_addresses` "
           "in the {}'s upstream binding config",
           !(cluster_name.has_value()) ? "Bootstrap"
@@ -327,7 +328,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
     if (!bind_config->has_source_address() &&
         (bind_config->extra_source_addresses_size() > 0 ||
          bind_config->additional_source_addresses_size() > 0)) {
-      throw EnvoyException(fmt::format(
+      throwEnvoyExceptionOrPanic(fmt::format(
           "{}'s upstream binding config has extra/additional source addresses but no "
           "source_address. Extra/additional addresses cannot be specified if "
           "source_address is not set.",
@@ -353,7 +354,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
                                                                                  false);
   }
-  return local_address_selector_factory->createLocalAddressSelector(
+  auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       parseBindConfig(
           bind_config, cluster_name,
           buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
@@ -361,6 +362,8 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{}))),
       cluster_name);
+  THROW_IF_STATUS_NOT_OK(selector_or_error, throw);
+  return selector_or_error.value();
 }
 
 } // namespace
@@ -411,7 +414,7 @@ HostDescriptionImpl::HostDescriptionImpl(
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
     // for a pipe address is a misconfiguration. Throw an exception.
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Invalid host configuration: non-zero port for non-IP address"));
   }
   health_check_address_ = resolveHealthCheckAddress(health_check_config, dest_address);
@@ -874,8 +877,9 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
   if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_CONFIGURED_PROTOCOL) {
     // Make sure multiple protocol configurations are not present
     if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {
-      throw EnvoyException(fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
-                                       "configured with non-default 'protocol_selection' values"));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
+                      "configured with non-default 'protocol_selection' values"));
     }
   }
 
@@ -1080,18 +1084,29 @@ ClusterInfoImpl::ClusterInfoImpl(
                   common_lb_config_->ignore_new_hosts_until_first_hc()),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
-      added_via_api_(added_via_api), has_configured_http_filters_(false) {
+      added_via_api_(added_via_api), has_configured_http_filters_(false),
+      per_endpoint_stats_(config.has_track_cluster_stats() &&
+                          config.track_cluster_stats().per_endpoint_stats()) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
-    throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
-                         "on Windows platforms");
+    throwEnvoyExceptionOrPanic(
+        "set_local_interface_name_on_upstream_connections_ cannot be set to true "
+        "on Windows platforms");
   }
 #endif
 
+  // Both LoadStatsReporter and per_endpoint_stats need to `latch()` the counters, so if both are
+  // configured they will interfere with each other and both get incorrect values.
+  if (perEndpointStatsEnabled() &&
+      server_context.bootstrap().cluster_manager().has_load_stats_config()) {
+    throwEnvoyExceptionOrPanic("Only one of cluster per_endpoint_stats and cluster manager "
+                               "load_stats_config can be specified");
+  }
+
   if (config.has_max_requests_per_connection() &&
       http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
-    throw EnvoyException("Only one of max_requests_per_connection from Cluster or "
-                         "HttpProtocolOptions can be specified");
+    throwEnvoyExceptionOrPanic("Only one of max_requests_per_connection from Cluster or "
+                               "HttpProtocolOptions can be specified");
   }
 
   // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
@@ -1103,7 +1118,7 @@ ClusterInfoImpl::ClusterInfoImpl(
         config, server_context.messageValidationVisitor());
 
     if (!lb_pair.ok()) {
-      throw EnvoyException(std::string(lb_pair.status().message()));
+      throwEnvoyExceptionOrPanic(std::string(lb_pair.status().message()));
     }
 
     load_balancer_config_ = std::move(lb_pair->config);
@@ -1143,7 +1158,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       break;
     case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
       if (config.has_lb_subset_config()) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
                         envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
       }
@@ -1161,9 +1176,9 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   if (config.lb_subset_config().locality_weight_aware() &&
       !config.common_lb_config().has_locality_weighted_lb_config()) {
-    throw EnvoyException(fmt::format("Locality weight aware subset LB requires that a "
-                                     "locality_weighted_lb_config be set in {}",
-                                     name_));
+    throwEnvoyExceptionOrPanic(fmt::format("Locality weight aware subset LB requires that a "
+                                           "locality_weighted_lb_config be set in {}",
+                                           name_));
   }
 
   // Use default (1h) or configured `idle_timeout`, unless it's set to 0, indicating that no
@@ -1209,7 +1224,7 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   if (config.has_eds_cluster_config()) {
     if (config.type() != envoy::config::cluster::v3::Cluster::EDS) {
-      throw EnvoyException("eds_cluster_config set in a non-EDS cluster");
+      throwEnvoyExceptionOrPanic("eds_cluster_config set in a non-EDS cluster");
     }
   }
 
@@ -1218,18 +1233,18 @@ ClusterInfoImpl::ClusterInfoImpl(
   // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_->update_merge_window());
 
-  // Create upstream filter factories
+  // Create upstream network filter factories
   const auto& filters = config.filters();
   ASSERT(filter_factories_.empty());
   filter_factories_.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const bool is_terminal = i == filters.size() - 1;
-    ENVOY_LOG(debug, "  upstream filter #{}:", i);
+    ENVOY_LOG(debug, "  upstream network filter #{}:", i);
 
     if (proto_config.has_config_discovery()) {
       if (proto_config.has_typed_config()) {
-        throw EnvoyException("Only one of typed_config or config_discovery can be used");
+        throwEnvoyExceptionOrPanic("Only one of typed_config or config_discovery can be used");
       }
 
       ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
@@ -1264,8 +1279,8 @@ ClusterInfoImpl::ClusterInfoImpl(
           envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
-      throw EnvoyException(
-          fmt::format("The codec filter is the only valid terminal upstream filter"));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("The codec filter is the only valid terminal upstream HTTP filter"));
     }
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
@@ -1283,18 +1298,19 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
                                           Server::Configuration::ServerFactoryContext& context) {
   // Check if load_balancing_policy is set first.
   if (!config.has_load_balancing_policy()) {
-    throw EnvoyException("cluster: field load_balancing_policy need to be set");
+    throwEnvoyExceptionOrPanic("cluster: field load_balancing_policy need to be set");
   }
 
   if (config.has_lb_subset_config()) {
-    throw EnvoyException("cluster: load_balancing_policy cannot be combined with lb_subset_config");
+    throwEnvoyExceptionOrPanic(
+        "cluster: load_balancing_policy cannot be combined with lb_subset_config");
   }
 
   if (config.has_common_lb_config()) {
     const auto& lb_config = config.common_lb_config();
     if (lb_config.has_zone_aware_lb_config() || lb_config.has_locality_weighted_lb_config() ||
         lb_config.has_consistent_hashing_lb_config()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           "cluster: load_balancing_policy cannot be combined with partial fields "
           "(zone_aware_lb_config, "
           "locality_weighted_lb_config, consistent_hashing_lb_config) of common_lb_config");
@@ -1322,9 +1338,10 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
   }
 
   if (load_balancer_factory_ == nullptr) {
-    throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
-                                     "implementation for cluster: '{}' with names from [{}]",
-                                     name_, absl::StrJoin(missing_policies, ", ")));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("cluster: didn't find a registered load balancer factory "
+                    "implementation for cluster: '{}' with names from [{}]",
+                    name_, absl::StrJoin(missing_policies, ", ")));
   }
 
   lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
@@ -1458,13 +1475,13 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN)) {
     if (!raw_factory_pointer->supportsAlpn()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
     }
     if (!matcher_supports_alpn &&
         !runtime_.snapshot().featureEnabled(ClusterImplBase::DoNotValidateAlpnRuntimeKey, 0)) {
-      throw EnvoyException(fmt::format(
+      throwEnvoyExceptionOrPanic(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));
     }
@@ -1473,12 +1490,12 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
 #if defined(ENVOY_ENABLE_QUIC)
     if (!validateTransportSocketSupportsQuic(cluster.transport_socket())) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {} {}",
                       cluster.name(), cluster.transport_socket().DebugString()));
     }
 #else
-    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+    throwEnvoyExceptionOrPanic("HTTP3 configured but not enabled in the build.");
 #endif
   }
 
@@ -1683,9 +1700,10 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
   CATCH(EnvoyException & e, {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||
         info_->type() == envoy::config::cluster::v3::Cluster::EDS) {
-      throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "
-                                       "to 'STRICT_DNS' or 'LOGICAL_DNS'",
-                                       e.what()));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("{}. Consider setting resolver_name or setting cluster type "
+                      "to 'STRICT_DNS' or 'LOGICAL_DNS'",
+                      e.what()));
     }
     throw e;
   });
@@ -1694,7 +1712,7 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
 void ClusterImplBase::validateEndpointsForZoneAwareRouting(
     const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const {
   if (local_cluster_ && endpoints.priority() > 0) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Unexpected non-zero priority for local cluster '{}'.", info()->name()));
   }
 }
@@ -1882,7 +1900,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     if (per_host_it->has_max_pending_requests() || per_host_it->has_max_requests() ||
         per_host_it->has_max_retries() || per_host_it->has_max_connection_pools() ||
         per_host_it->has_retry_budget()) {
-      throw EnvoyException("Unsupported field in per_host_thresholds");
+      throwEnvoyExceptionOrPanic("Unsupported field in per_host_thresholds");
     }
     if (per_host_it->has_max_connections()) {
       max_connections_per_host = per_host_it->max_connections().value();

@@ -201,15 +201,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirectHttpRequest) {
     EXPECT_EQ("301", response->headers().getStatusValue());
     EXPECT_EQ("https://www.redirect.com/foo",
               response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                           BytesCountExpectation(69, 30, 69, 30),
-                                           BytesCountExpectation(0, 30, 0, 30));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                           BytesCountExpectation(0, 30, 0, 30),
-                                           BytesCountExpectation(0, 30, 0, 30));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
+                                         BytesCountExpectation(69, 30, 69, 30),
+                                         BytesCountExpectation(0, 30, 0, 30));
   } else {
     // All QUIC requests use https, and should not be redirected. (Even those sent with http scheme
     // will be overridden to https by HCM.)
@@ -717,15 +711,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(40, 58, 40, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
-  } else {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(0, 58, 0, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
-  }
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                       BytesCountExpectation(40, 58, 40, 58),
+                                       BytesCountExpectation(7, 10, 7, 8));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {

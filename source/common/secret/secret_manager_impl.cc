@@ -34,7 +34,7 @@ void SecretManagerImpl::addStaticSecret(
         std::make_shared<TlsCertificateConfigProviderImpl>(secret.tls_certificate());
     if (!static_tls_certificate_providers_.insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           absl::StrCat("Duplicate static TlsCertificate secret name ", secret.name()));
     }
     break;
@@ -45,7 +45,7 @@ void SecretManagerImpl::addStaticSecret(
     if (!static_certificate_validation_context_providers_
              .insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(absl::StrCat(
+      throwEnvoyExceptionOrPanic(absl::StrCat(
           "Duplicate static CertificateValidationContext secret name ", secret.name()));
     }
     break;
@@ -56,7 +56,7 @@ void SecretManagerImpl::addStaticSecret(
     if (!static_session_ticket_keys_providers_
              .insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           absl::StrCat("Duplicate static TlsSessionTicketKeys secret name ", secret.name()));
     }
     break;
@@ -66,13 +66,13 @@ void SecretManagerImpl::addStaticSecret(
         std::make_shared<GenericSecretConfigProviderImpl>(secret.generic_secret());
     if (!static_generic_secret_providers_.insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           absl::StrCat("Duplicate static GenericSecret secret name ", secret.name()));
     }
     break;
   }
   default:
-    throw EnvoyException("Secret type not implemented");
+    throwEnvoyExceptionOrPanic("Secret type not implemented");
   }
 }
 

@@ -42,6 +42,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	_ "github.com/envoyproxy/envoy/contrib/golang/common/go/api_impl"
 )
 
 const (

@@ -2159,11 +2159,6 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   // Check access log if the agnostic stream lifetime is not extended.
   // It should have access logged since it has received the entire response.
   int hcm_logged_wire_bytes_sent, hcm_logged_wire_header_bytes_sent;
-  if (!Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
-    hcm_logged_wire_bytes_sent = access_log_values[0];
-    hcm_logged_wire_header_bytes_sent = access_log_values[1];
-  }
 
   // Grant the sender (Envoy) additional window so it can finish sending the
   // stream.
@@ -2181,13 +2176,11 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   EXPECT_EQ(accumulator.bodyWireBytesReceivedDiscountingHeaders(),
             accumulator.bodyWireBytesReceivedGivenPayloadAndFrames());
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    // Access logs are only available now due to the expanded agnostic stream
-    // lifetime.
-    auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
-    hcm_logged_wire_bytes_sent = access_log_values[0];
-    hcm_logged_wire_header_bytes_sent = access_log_values[1];
-  }
+  // Access logs are only available now due to the expanded agnostic stream
+  // lifetime.
+  auto access_log_values = stoiAccessLogString(waitForAccessLog(access_log_name_));
+  hcm_logged_wire_bytes_sent = access_log_values[0];
+  hcm_logged_wire_header_bytes_sent = access_log_values[1];
   EXPECT_EQ(accumulator.stream_wire_header_bytes_recieved_, hcm_logged_wire_header_bytes_sent);
   EXPECT_EQ(accumulator.stream_wire_bytes_recieved_, hcm_logged_wire_bytes_sent)
       << "Received " << accumulator.stream_wire_bytes_recieved_
@@ -2284,6 +2277,98 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequests) {
   tcp_client_->close();
 }
 
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
+  // Allow metadata usage.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  config_helper_.prependFilter(R"EOF(
+  name: metadata-control-filter
+  )EOF");
+
+  const int kRequestsSentPerIOCycle = 20;
+  autonomous_upstream_ = true;
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  beginSession();
+
+  std::string buffer;
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto request =
+        Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                    {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    Http::MetadataMap metadata_map{{"should_continue", absl::StrCat(i)}};
+    auto metadata = Http2Frame::makeMetadataFrameFromMetadataMap(
+        Http2Frame::makeClientStreamId(i), metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+    absl::StrAppend(&buffer, std::string(metadata));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "",
+                                          Http2Frame::DataFlags::EndStream);
+    absl::StrAppend(&buffer, std::string(data));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto frame = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+    EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+  }
+  tcp_client_->close();
+}
+
+// Validate the request completion during processing of deferred list works.
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
+  const int kRequestsSentPerIOCycle = 20;
+  // The local-reply-during-decode will call sendLocalReply, completing them
+  // when processing headers. This will cause the ConnectionManagerImpl::ActiveRequest
+  // object to be removed from the streams_ list during the onDeferredRequestProcessing call.
+  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  // Process more than 1 deferred request at a time to validate the removal of elements from
+  // the list does not break reverse iteration.
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "3");
+  beginSession();
+
+  std::string buffer;
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto request =
+        Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                    {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a",
+                                          Http2Frame::DataFlags::EndStream);
+    absl::StrAppend(&buffer, std::string(data));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  // The local-reply-during-decode filter sends 500 status to the client
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto frame = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+    EXPECT_EQ(Http2Frame::ResponseStatus::InternalServerError, frame.responseStatus());
+  }
+  tcp_client_->close();
+}
+
 TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailers) {
   const int kRequestsSentPerIOCycle = 20;
   autonomous_upstream_ = true;
@@ -2319,6 +2404,59 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailers) {
     auto frame = readFrame();
     EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
     EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+  }
+  tcp_client_->close();
+}
+
+// Validate the request completion during processing of headers in the deferred requests,
+// is ok, when deferred data and trailers are also present.
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersDecodeHeadersEndsRequest) {
+  const int kRequestsSentPerIOCycle = 20;
+  autonomous_upstream_ = true;
+  config_helper_.addFilter("{ name: local-reply-during-decode }");
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "6");
+  beginSession();
+
+  std::string buffer;
+  // Make every 4th request to be reset by the local-reply-during-decode filter, this will give a
+  // good distribution of removed requests from the deferred sequence.
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                               {{"response_data_blocks", "0"},
+                                                {"no_trailers", "1"},
+                                                {"skip-local-reply", i % 4 ? "true" : "false"}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a");
+    absl::StrAppend(&buffer, std::string(data));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto trailers = Http2Frame::makeEmptyHeadersFrame(
+        Http2Frame::makeClientStreamId(i),
+        static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+            Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+    trailers.appendHeaderWithoutIndexing({"k", "v"});
+    trailers.adjustPayloadSize();
+    absl::StrAppend(&buffer, std::string(trailers));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto frame = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+    uint32_t stream_id = frame.streamId();
+    // Client stream indexes are multiples of 2 starting at 1
+    if ((stream_id / 2) % 4) {
+      EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus())
+          << " for stream=" << stream_id;
+    } else {
+      EXPECT_EQ(Http2Frame::ResponseStatus::InternalServerError, frame.responseStatus())
+          << " for stream=" << stream_id;
+    }
   }
   tcp_client_->close();
 }
@@ -2381,7 +2519,7 @@ TEST_P(Http2FrameIntegrationTest, ResettingDeferredRequestsTriggersPrematureRese
 TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   // Use large number of requests to ensure close is detected while there are
   // still some deferred streams.
-  const int kRequestsSentPerIOCycle = 1000;
+  const int kRequestsSentPerIOCycle = 20000;
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   // Ensure premature reset detection does not get in the way
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count", "1001");
@@ -2389,8 +2527,7 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
 
   std::string buffer;
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
-    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "a", "/",
-                                           {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "a", "/");
     absl::StrAppend(&buffer, std::string(request));
   }
 
@@ -2399,8 +2536,9 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   // Drop the downstream connection
   tcp_client_->close();
   // Test that Envoy can clean-up deferred streams
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset",
-                                 kRequestsSentPerIOCycle);
+  // Make the timeout longer to accommodate non optimized builds
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", kRequestsSentPerIOCycle,
+                                 TestUtility::DefaultTimeout * 3);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,

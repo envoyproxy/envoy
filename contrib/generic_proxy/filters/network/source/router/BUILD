@@ -30,6 +30,7 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:tracer_lib",
         "//source/common/upstream:load_balancer_lib",
+        "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/router/v3:pkg_cc_proto",
     ],
 )
 

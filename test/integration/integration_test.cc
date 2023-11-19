@@ -1593,6 +1593,7 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
 
 // Ensure that connect behaves the same with allow_absolute_url enabled and without
 TEST_P(IntegrationTest, Connect) {
+  setListenersBoundTimeout(3 * TestUtility::DefaultTimeout);
   const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\n\r\n";
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     // Clone the whole listener.

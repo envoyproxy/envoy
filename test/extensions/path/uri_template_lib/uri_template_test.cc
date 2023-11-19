@@ -32,15 +32,15 @@ static constexpr absl::string_view kCaptureRegex = "/(?P<var1>[a-zA-Z0-9-._~%!$&
 TEST(ConvertPathPattern, ValidPattern) {
   EXPECT_THAT(convertPathPatternSyntaxToRegex("/abc"), IsOkAndHolds("/abc"));
   EXPECT_THAT(convertPathPatternSyntaxToRegex("/**.mpd"),
-              IsOkAndHolds("/[a-zA-Z0-9-._~%!$&'()+,;:@/]*\\.mpd"));
+              IsOkAndHolds("/[a-zA-Z0-9-._~%!$&'()+,;:@=/]*\\.mpd"));
   EXPECT_THAT(convertPathPatternSyntaxToRegex("/api/*/{resource=*}/{method=**}"),
-              IsOkAndHolds("/api/[a-zA-Z0-9-._~%!$&'()+,;:@]+/"
-                           "(?P<resource>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
-                           "(?P<method>[a-zA-Z0-9-._~%!$&'()+,;:@/]*)"));
+              IsOkAndHolds("/api/[a-zA-Z0-9-._~%!$&'()+,;:@=]+/"
+                           "(?P<resource>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)/"
+                           "(?P<method>[a-zA-Z0-9-._~%!$&'()+,;:@=/]*)"));
   EXPECT_THAT(convertPathPatternSyntaxToRegex("/api/{VERSION}/{version}/{verSION}"),
-              IsOkAndHolds("/api/(?P<VERSION>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
-                           "(?P<version>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
-                           "(?P<verSION>[a-zA-Z0-9-._~%!$&'()+,;:@]+)"));
+              IsOkAndHolds("/api/(?P<VERSION>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)/"
+                           "(?P<version>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)/"
+                           "(?P<verSION>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)"));
 }
 
 TEST(ConvertPathPattern, InvalidPattern) {

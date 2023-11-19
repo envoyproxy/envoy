@@ -3,7 +3,6 @@
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.validate.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/access_log_config.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/assert.h"
@@ -63,8 +62,8 @@ std::string AccessLogFactory::name() const { return "envoy.access_loggers.open_t
 /**
  * Static registration for the OpenTelemetry (gRPC) access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(AccessLogFactory, Server::Configuration::AccessLogInstanceFactory){
-    "envoy.open_telemetry_access_log"};
+REGISTER_FACTORY(AccessLogFactory,
+                 Envoy::AccessLog::AccessLogInstanceFactory){"envoy.open_telemetry_access_log"};
 
 } // namespace OpenTelemetry
 } // namespace AccessLoggers

@@ -25,14 +25,15 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
   if (ignore_global_conn_limit_) {
     return false;
   }
-
+  // TODO(nezdolik): deprecate `overload.global_downstream_max_connections` key once
+  // downstream connections monitor extension is stable.
   if (track_global_cx_limit_in_overload_manager_) {
-    // Check if deprecated runtime flag `overload.global_downstream_max_connections` is configured
+    // Check if runtime flag `overload.global_downstream_max_connections` is configured
     // simultaneously with downstream connections monitor in overload manager.
     if (runtime_.threadsafeSnapshot()->get(GlobalMaxCxRuntimeKey)) {
       ENVOY_LOG_ONCE_MISC(
           warn,
-          "Global downstream connections limits is configured via deprecated runtime key {} and in "
+          "Global downstream connections limits is configured via runtime key {} and in "
           "{}. Using overload manager config.",
           GlobalMaxCxRuntimeKey,
           Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections);
@@ -116,7 +117,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   cb_.recordConnectionsAcceptedOnSocketEvent(connections_accepted_from_kernel_count);
 }
 
-TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
+TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                  Runtime::Loader& runtime, SocketSharedPtr socket,
                                  TcpListenerCallbacks& cb, bool bind_to_port,
                                  bool ignore_global_conn_limit,

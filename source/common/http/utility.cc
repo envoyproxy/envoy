@@ -122,15 +122,16 @@ void validateCustomSettingsParameters(
     switch (it.identifier().value()) {
     case http2::adapter::ENABLE_PUSH:
       if (it.value().value() == 1) {
-        throw EnvoyException("server push is not supported by Envoy and can not be enabled via a "
-                             "SETTINGS parameter.");
+        throwEnvoyExceptionOrPanic(
+            "server push is not supported by Envoy and can not be enabled via a "
+            "SETTINGS parameter.");
       }
       break;
     case http2::adapter::ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the
       // use of a primitive type (bool).
-      throw EnvoyException("the \"allow_connect\" SETTINGS parameter must only be configured "
-                           "through the named field");
+      throwEnvoyExceptionOrPanic("the \"allow_connect\" SETTINGS parameter must only be configured "
+                                 "through the named field");
     case http2::adapter::HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         parameter_collisions.push_back("hpack_table_size");
@@ -153,12 +154,12 @@ void validateCustomSettingsParameters(
   }
 
   if (!custom_parameter_collisions.empty()) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "inconsistent HTTP/2 custom SETTINGS parameter(s) detected; identifiers = {{{}}}",
         absl::StrJoin(custom_parameter_collisions, ",")));
   }
   if (!parameter_collisions.empty()) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "the {{{}}} HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
         "custom parameters",
         absl::StrJoin(parameter_collisions, ",")));
@@ -1420,7 +1421,7 @@ void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+      throwEnvoyExceptionOrPanic("max_interval must be greater than or equal to the base_interval");
     }
   }
 }

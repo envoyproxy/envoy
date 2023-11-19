@@ -905,6 +905,7 @@ public:
     setByKey(key, val);
   }
   void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
+  void removeByKey(absl::string_view key) override { context_map_.erase(std::string(key)); }
 
   std::string context_protocol_;
   std::string context_host_;
@@ -1177,6 +1178,7 @@ public:
     ASSERT(header_map_);
     header_map_->setByReferenceKey(key, val);
   }
+  void removeByKey(absl::string_view key) override { header_map_->removeByKey(key); }
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;

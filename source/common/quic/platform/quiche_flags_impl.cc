@@ -63,13 +63,6 @@ template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int
 // Flag definitions
 #define QUIC_FLAG(flag, value) ABSL_FLAG(bool, envoy_##flag, maybeOverride(#flag, value), "");
 #include "quiche/quic/core/quic_flags_list.h"
-QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)    // NOLINT
-QUIC_FLAG(quic_restart_flag_spdy_testonly_default_false, false)     // NOLINT
-QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, true)       // NOLINT
-QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_false, false) // NOLINT
-QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_true, true)   // NOLINT
-QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)    // NOLINT
-QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)      // NOLINT
 #undef QUIC_FLAG
 
 #define DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                         \

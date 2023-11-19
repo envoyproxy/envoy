@@ -1,7 +1,10 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_stream.h"
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "source/common/quic/http_datagram_handler.h"
+#endif
 #include "source/common/quic/quic_stats_gatherer.h"
 
 #include "quiche/common/platform/api/quiche_reference_counted.h"

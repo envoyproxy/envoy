@@ -89,3 +89,17 @@ type NetworkCAPI interface {
 	// UpstreamInfo gets the upstream connection info of infoType
 	UpstreamInfo(f unsafe.Pointer, infoType int) string
 }
+
+type CommonCAPI interface {
+	Log(level LogType, message string)
+	LogLevel() LogType
+}
+
+type commonCApiImpl struct{}
+
+var cAPI CommonCAPI = &commonCApiImpl{}
+
+// SetCommonCAPI for mock cAPI
+func SetCommonCAPI(api CommonCAPI) {
+	cAPI = api
+}

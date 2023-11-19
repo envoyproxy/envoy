@@ -20,7 +20,7 @@ public:
   Router::GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        const Router::RouteEntry& route_entry,
+                        Upstream::ResourcePriority priority,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const override;
 

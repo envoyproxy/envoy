@@ -523,7 +523,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    shard_count = 8,
+    shard_count = 10,
     tags = [
         "cpu:3",
     ],
@@ -535,6 +535,8 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//test/integration/filters:encode1xx_local_reply_config_lib",
+        "//test/integration/filters:local_reply_during_decoding_filter_lib",
+        "//test/integration/filters:metadata_control_filter_lib",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
@@ -721,7 +723,7 @@ envoy_cc_test(
     ]),
     deps = [
         ":http_integration_lib",
-        "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:set_route_filter_lib",
     ],
 )
 
@@ -1552,7 +1554,9 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//test/extensions/quic/proof_source:pending_proof_source_factory_impl_lib",
+    ]),
 )
 
 envoy_cc_test(
@@ -1747,6 +1751,7 @@ envoy_cc_test(
         "cpu:3",
     ],
     deps = [
+        ":fake_access_log_lib",
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
         ":tcp_proxy_integration_test_lib",
@@ -2472,6 +2477,21 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "fake_access_log_proto",
+    srcs = ["fake_access_log.proto"],
+)
+
+envoy_cc_test_library(
+    name = "fake_access_log_lib",
+    hdrs = [
+        "fake_access_log.h",
+    ],
+    deps = [
+        ":fake_access_log_proto_cc_proto",
     ],
 )
 

@@ -366,6 +366,10 @@ modify different aspects of the server:
    This behaviour and duration is configurable via server options or CLI
    (:option:`--drain-time-s` and :option:`--drain-strategy`).
 
+   .. http:post:: /drain_listeners?graceful&skip_exit
+
+   When draining listeners, do not exit after the drain period. This must be used with `graceful`.
+
 .. attention::
 
    This operation directly stops the matched listeners on workers. Once listeners in a given

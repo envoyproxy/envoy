@@ -980,6 +980,8 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
+  bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
+
   UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }
@@ -1042,7 +1044,7 @@ public:
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
-    // Upgrade filter chains not yet supported for upstream filters.
+    // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
 
@@ -1152,6 +1154,7 @@ private:
   const bool added_via_api_ : 1;
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
+  const bool per_endpoint_stats_ : 1;
 };
 
 /**

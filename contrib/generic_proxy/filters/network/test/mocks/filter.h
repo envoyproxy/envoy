@@ -78,28 +78,6 @@ public:
   MOCK_METHOD(void, addFilter, (StreamFilterSharedPtr filter));
 };
 
-class MockUpstreamBindingCallback : public UpstreamBindingCallback {
-public:
-  MockUpstreamBindingCallback();
-
-  MOCK_METHOD(void, onBindFailure,
-              (ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
-               Upstream::HostDescriptionConstSharedPtr host));
-  MOCK_METHOD(void, onBindSuccess,
-              (Network::ClientConnection & conn, Upstream::HostDescriptionConstSharedPtr host));
-};
-
-class MockPendingResponseCallback : public PendingResponseCallback {
-public:
-  MockPendingResponseCallback();
-
-  MOCK_METHOD(void, onDecodingSuccess, (StreamFramePtr response));
-  MOCK_METHOD(void, onDecodingFailure, ());
-  MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
-  MOCK_METHOD(OptRef<Network::Connection>, connection, ());
-  MOCK_METHOD(void, onConnectionClose, (Network::ConnectionEvent event));
-};
-
 class MockFilterChainManager : public FilterChainManager {
 public:
   MockFilterChainManager();
@@ -124,78 +102,6 @@ public:
   MOCK_METHOD(const Network::Connection*, connection, (), (const));
 };
 
-class MockUpstreamManager : public UpstreamManager {
-public:
-  MockUpstreamManager();
-
-  MOCK_METHOD(void, registerUpstreamCallback, (uint64_t stream_id, UpstreamBindingCallback& cb));
-  MOCK_METHOD(void, unregisterUpstreamCallback, (uint64_t stream_id));
-
-  MOCK_METHOD(void, registerResponseCallback, (uint64_t stream_id, PendingResponseCallback& cb));
-  MOCK_METHOD(void, unregisterResponseCallback, (uint64_t stream_id));
-
-  void setupConnectionPool(Upstream::TcpPoolData&& data) {
-    // Mock the connection creation and callbacks.
-    upstream_cancellable_ = data.newConnection(pool_callbacks_);
-  }
-
-  void callOnBindSuccess(uint64_t stream_id) {
-    auto it = upstream_callbacks_.find(stream_id);
-    auto cb = it->second;
-
-    upstream_callbacks_.erase(it);
-    cb->onBindSuccess(upstream_conn_, upstream_host_);
-  }
-
-  void callOnBindFailure(uint64_t stream_id, ConnectionPool::PoolFailureReason reason) {
-    auto it = upstream_callbacks_.find(stream_id);
-    auto cb = it->second;
-
-    upstream_callbacks_.erase(it);
-    cb->onBindFailure(reason, "", upstream_host_);
-  }
-
-  void callOnDecodingSuccess(uint64_t stream_id, StreamFramePtr response) {
-    auto it = response_callbacks_.find(stream_id);
-    auto cb = it->second;
-
-    if (response->frameFlags().endStream()) {
-      response_callbacks_.erase(it);
-    }
-
-    cb->onDecodingSuccess(std::move(response));
-  }
-
-  void callOnConnectionClose(uint64_t stream_id, Network::ConnectionEvent event) {
-    auto it = response_callbacks_.find(stream_id);
-    auto cb = it->second;
-
-    response_callbacks_.erase(it);
-
-    cb->onConnectionClose(event);
-  }
-
-  void callOnDecodingFailure(uint64_t stream_id) {
-    auto it = response_callbacks_.find(stream_id);
-    auto cb = it->second;
-
-    response_callbacks_.erase(it);
-    cb->onDecodingFailure();
-  }
-
-  bool call_on_bind_success_immediately_{};
-  bool call_on_bind_failure_immediately_{};
-
-  std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> upstream_host_;
-  testing::NiceMock<Network::MockClientConnection> upstream_conn_;
-
-  Tcp::ConnectionPool::Cancellable* upstream_cancellable_{};
-  testing::NiceMock<Tcp::ConnectionPool::MockCallbacks> pool_callbacks_;
-
-  absl::flat_hash_map<uint64_t, UpstreamBindingCallback*> upstream_callbacks_;
-  absl::flat_hash_map<uint64_t, PendingResponseCallback*> response_callbacks_;
-};
-
 class MockDecoderFilterCallback : public MockStreamFilterCallbacks<DecoderFilterCallback> {
 public:
   MockDecoderFilterCallback();
@@ -206,11 +112,6 @@ public:
   MOCK_METHOD(void, onResponseFrame, (StreamFramePtr frame));
   MOCK_METHOD(void, setRequestFramesHandler, (StreamFrameHandler & handler));
   MOCK_METHOD(void, completeDirectly, ());
-  MOCK_METHOD(void, bindUpstreamConn, (Upstream::TcpPoolData &&));
-  MOCK_METHOD(OptRef<UpstreamManager>, boundUpstreamConn, ());
-
-  bool has_upstream_manager_{};
-  testing::NiceMock<MockUpstreamManager> upstream_manager_;
 };
 
 class MockEncoderFilterCallback : public MockStreamFilterCallbacks<EncoderFilterCallback> {

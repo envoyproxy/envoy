@@ -81,7 +81,7 @@ std::string FileAccessLogFactory::name() const { return "envoy.access_loggers.fi
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(FileAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+LEGACY_REGISTER_FACTORY(FileAccessLogFactory, AccessLog::AccessLogInstanceFactory,
                         "envoy.file_access_log");
 
 } // namespace File

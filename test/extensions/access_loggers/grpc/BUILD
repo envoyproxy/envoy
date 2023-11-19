@@ -35,6 +35,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
         "//source/extensions/access_loggers/grpc:grpc_access_log_utils",
+        "//source/extensions/filters/common/expr:cel_state_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
