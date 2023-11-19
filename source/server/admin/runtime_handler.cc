@@ -87,7 +87,7 @@ Http::Code RuntimeHandler::handlerRuntimeModify(Http::ResponseHeaderMap&,
     return Http::Code::BadRequest;
   }
   absl::node_hash_map<std::string, std::string> overrides;
-  for (const auto it : params.data()) {
+  for (const auto& it : params.data()) {
     overrides.insert({it.first, it.second[0]});
   }
   TRY_ASSERT_MAIN_THREAD { server_.runtime().mergeValues(overrides); }
