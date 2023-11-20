@@ -486,7 +486,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     io_vectorscan = dict(
         project_name = "Vectorscan",
-        project_desc = "Hyperscan port to additional CPU architectures",
+        project_desc = "Hyperscan port for additional CPU architectures",
         project_url = "https://www.vectorcamp.gr/vectorscan/",
         version = "5.4.11",
         sha256 = "b949e2f11a461545a67177a934b4886a1b7d685be51d365d46db49779d4483b3",
