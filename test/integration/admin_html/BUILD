@@ -34,8 +34,8 @@ envoy_sh_test(
     cc_binary = [":test_server"],
     data = [
         ":test_server_files",
+        "//source/server:options_lib",
         "//source/server/admin/html:admin_web_files",
-        "//source/server:options_lib"
         "//test/integration:test_utility.sh",
     ],
 
