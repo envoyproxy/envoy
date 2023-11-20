@@ -13,10 +13,10 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManage
 
 ExternalProcessorStreamPtr
 ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
-                                   const envoy::config::core::v3::GrpcService& grpc_service,
+                                   const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                    const StreamInfo::StreamInfo& stream_info) {
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
-      client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true));
+      client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true));
   return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, stream_info);
 }
 

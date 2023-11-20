@@ -91,7 +91,6 @@ public:
   MOCK_METHOD(uint64_t, packetsRetransmitted, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
-  MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
   MOCK_METHOD(void, setVirtualClusterName,
               (const absl::optional<std::string>& virtual_cluster_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
@@ -140,6 +139,9 @@ public:
   MOCK_METHOD(bool, isShadow, (), (const, override));
   MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(bool, shouldDrainConnectionUponCompletion, (), (const));
+  MOCK_METHOD(void, setShouldDrainConnectionUponCompletion, (bool));
+
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;

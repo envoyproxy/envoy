@@ -185,9 +185,9 @@ public:
   OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
                      on_demand_message,
                  Server::Configuration::FactoryContext& context, Stats::Scope& scope)
-      : odcds_(context.clusterManager().allocateOdCdsApi(on_demand_message.odcds_config(),
-                                                         OptRef<xds::core::v3::ResourceLocator>(),
-                                                         context.messageValidationVisitor())),
+      : odcds_(context.getServerFactoryContext().clusterManager().allocateOdCdsApi(
+            on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
+            context.messageValidationVisitor())),
         lookup_timeout_(std::chrono::milliseconds(
             PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
         stats_(generateStats(scope)) {}
@@ -423,6 +423,10 @@ public:
     return &read_callbacks_->connection();
   }
 
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &read_callbacks_->connection().streamInfo();
+  }
+
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return transport_socket_options_;
   }
@@ -534,6 +538,10 @@ protected:
   // This will be non-null from when an upstream connection is attempted until
   // it either succeeds or fails.
   std::unique_ptr<GenericConnPool> generic_conn_pool_;
+  // Time the filter first attempted to connect to the upstream after the
+  // cluster is discovered. Capture the first time as the filter may try multiple times to connect
+  // to the upstream.
+  absl::optional<MonotonicTime> initial_upstream_connection_start_time_;
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;

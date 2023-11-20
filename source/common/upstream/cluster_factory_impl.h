@@ -128,9 +128,9 @@ protected:
 
 private:
   /**
-   * Create an instance of ClusterImplBase.
+   * Create an instance of ClusterImplBase or return failure.
    */
-  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) PURE;
   const std::string name_;
@@ -153,19 +153,16 @@ protected:
   ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
                                            context.messageValidationVisitor(), *config);
-    auto status_or_cluster =
-        createClusterWithConfig(cluster,
-                                MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                    *config, context.messageValidationVisitor()),
-                                context);
-    THROW_IF_STATUS_NOT_OK(status_or_cluster, throw);
-    return std::move(status_or_cluster.value());
+    return createClusterWithConfig(cluster,
+                                   MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                       *config, context.messageValidationVisitor()),
+                                   context);
   }
 
   virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>

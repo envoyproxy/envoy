@@ -17,11 +17,11 @@ public:
    * @param socket the listening socket for this listener. It might be shared
    * with other listeners if all listeners use single listen socket.
    */
-  BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket);
+  BaseListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr socket);
 
 protected:
   Address::InstanceConstSharedPtr local_address_;
-  Event::DispatcherImpl& dispatcher_;
+  Event::Dispatcher& dispatcher_;
   const SocketSharedPtr socket_;
 };
 

@@ -201,7 +201,7 @@ IpList::IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRan
     if (list_entry.isValid()) {
       ip_list_.push_back(std::move(list_entry));
     } else {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
                       entry.address_prefix(), entry.prefix_len().value()));
     }

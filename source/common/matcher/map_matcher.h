@@ -20,7 +20,7 @@ public:
       : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)) {
     auto input_type = data_input_->dataInputType();
     if (input_type != DefaultMatchingDataType) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           absl::StrCat("Unsupported data input type: ", input_type,
                        ", currently only string type is supported in map matcher"));
     }

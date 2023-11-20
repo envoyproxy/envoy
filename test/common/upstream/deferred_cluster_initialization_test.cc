@@ -62,7 +62,7 @@ protected:
         router_context_(factory_.stats_.symbolTable()) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
+    cluster_manager_ = TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
@@ -426,7 +426,7 @@ protected:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    VERBOSE_EXPECT_NO_THROW(callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, ""));
+    EXPECT_TRUE(callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
   }
 
   void addEndpoint(envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment,
@@ -514,6 +514,85 @@ TEST_P(EdsTest, ShouldMergeAddingHosts) {
   EXPECT_EQ(cluster.info()->endpointStats().membership_total_.value(), 10);
   EXPECT_TRUE(hostsInHostsVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts(),
                                  {1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000}));
+}
+
+TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
+  const std::string bootstrap_yaml = R"EOF(
+    static_resources:
+      clusters:
+      - name: eds
+        connect_timeout: 0.250s
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: bootstrap_cluster
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 60000
+    )EOF";
+
+  auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster(bootstrap_yaml);
+  create(bootstrap);
+
+  EXPECT_CALL(factory_, create(_))
+      .Times(2)
+      .WillRepeatedly(
+          testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
+            callbacks_ = &data.callbacks_;
+            return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+          }));
+
+  const std::string eds_cluster_yaml = R"EOF(
+      name: cluster_1
+      connect_timeout: 0.25s
+      lb_policy: RING_HASH
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            api_type: REST
+            transport_api_version: V3
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+    )EOF";
+  auto cluster = parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType());
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "version1"));
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  addEndpoint(cluster_load_assignment, 1000);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  auto initiailization_instance =
+      cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
+  EXPECT_NE(nullptr, initiailization_instance->load_balancer_factory_);
+  // RING_HASH lb policy requires Envoy re-create the load balancer when the cluster is updated.
+  EXPECT_TRUE(initiailization_instance->load_balancer_factory_->recreateOnHostChange());
+
+  // Update the cluster with a different lb policy. Now it's a different cluster and should
+  // not be merged.
+  cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "version2"));
+
+  // Because the eds_service_name is the same, we can reuse the same load assignment here.
+  cluster_load_assignment.clear_endpoints();
+  // Note we only add one endpoint to the priority 1 to the new cluster.
+  addEndpoint(cluster_load_assignment, 100, 1);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  auto new_initialization_instance =
+      cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
+  EXPECT_NE(initiailization_instance.get(), new_initialization_instance.get());
+
+  EXPECT_EQ(1, new_initialization_instance->per_priority_state_.at(1).hosts_added_.size());
+  // Ensure the hosts_added_ is empty for priority 0. Because if unexpected merge happens,
+  // the hosts_added_ will be non-empty.
+  EXPECT_TRUE(!new_initialization_instance->per_priority_state_.contains(0) ||
+              new_initialization_instance->per_priority_state_.at(0).hosts_added_.empty());
 }
 
 // Test that removed hosts do not appear when initializing a deferred eds cluster.

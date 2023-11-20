@@ -16,7 +16,6 @@ type filter struct {
 	callbacks       api.FilterCallbackHandler
 	req_body_length uint64
 	query_params    url.Values
-	protocol        string
 	scheme          string
 	method          string
 	path            string
@@ -55,7 +54,6 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 	f.req_body_length = 0
 
-	f.protocol = header.Protocol()
 	f.scheme = header.Scheme()
 	f.method = header.Method()
 	f.path = header.Path()
@@ -217,6 +215,11 @@ func (f *filter) decodeData(buffer api.BufferInstance, endStream bool) api.Statu
 	f.req_body_length += uint64(buffer.Len())
 	if buffer.Len() != 0 {
 		data := buffer.String()
+		if string(buffer.Bytes()) != data {
+			return f.sendLocalReply(fmt.Sprintf("data in bytes: %s vs data in string: %s",
+				string(buffer.Bytes()), data))
+		}
+
 		buffer.SetString(strings.ToUpper(data))
 		buffer.AppendString("_append")
 		buffer.PrependString("prepend_")

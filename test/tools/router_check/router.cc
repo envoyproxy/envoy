@@ -113,8 +113,8 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
     }
   }
 
-  return ToolConfig(std::move(request_headers), std::move(response_headers),
-                    check_config.input().random_value());
+  return {std::move(request_headers), std::move(response_headers),
+          static_cast<int>(check_config.input().random_value())};
 }
 
 ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
@@ -144,8 +144,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
     MessageUtil::checkForUnexpectedFields(route_config, visitor);
   }
 
-  return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
-                         std::move(api), Coverage(route_config));
+  return {std::move(factory_context), std::move(config), std::move(stats), std::move(api),
+          Coverage(route_config)};
 }
 
 void RouterCheckTool::assignUniqueRouteNames(
@@ -226,7 +226,7 @@ RouterCheckTool::RouterCheckTool(
 }
 
 Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
-  std::string contents = api.fileSystem().fileReadToEnd(file_path);
+  std::string contents = api.fileSystem().fileReadToEnd(file_path).value();
   if (absl::EndsWith(file_path, ".yaml")) {
     contents = MessageUtil::getJsonStringFromMessageOrError(ValueUtil::loadFromYaml(contents));
   }
@@ -238,7 +238,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
   envoy::RouterCheckToolSchema::Validation validation_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
+  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes).value();
   TestUtility::loadFromFile(expected_routes, validation_config, *api);
   TestUtility::validate(validation_config);
 
@@ -618,6 +618,7 @@ bool RouterCheckTool::runtimeMock(absl::string_view key,
 }
 
 Options::Options(int argc, char** argv) {
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,

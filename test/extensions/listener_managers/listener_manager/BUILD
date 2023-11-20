@@ -95,6 +95,7 @@ envoy_cc_test(
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/integration/filters:test_listener_filter_lib",
         "//test/integration/filters:test_network_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",

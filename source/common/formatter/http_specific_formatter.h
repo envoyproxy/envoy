@@ -27,14 +27,12 @@ public:
   LocalReplyBodyFormatter() = default;
 
   // Formatter::format
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view local_reply_body,
-                                     AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view local_reply_body,
-                                 AccessLog::AccessLogType) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -45,14 +43,12 @@ public:
   AccessLogTypeFormatter() = default;
 
   // Formatter::format
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view local_reply_body,
-                                     AccessLog::AccessLogType access_log_type) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view local_reply_body,
-                                 AccessLog::AccessLogType access_log_type) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class HeaderFormatter {
@@ -82,16 +78,12 @@ public:
 
   HeadersByteSizeFormatter(const HeaderType header_type);
 
-  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
-                                     const Http::ResponseHeaderMap& response_headers,
-                                     const Http::ResponseTrailerMap& response_trailers,
-                                     const StreamInfo::StreamInfo&, absl::string_view,
-                                     AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
-                                 const Http::ResponseHeaderMap& response_headers,
-                                 const Http::ResponseTrailerMap& response_trailers,
-                                 const StreamInfo::StreamInfo&, absl::string_view,
-                                 AccessLog::AccessLogType) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   uint64_t extractHeadersByteSize(const Http::RequestHeaderMap& request_headers,
@@ -109,13 +101,12 @@ public:
                          absl::optional<size_t> max_length);
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
-                                     const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -127,13 +118,12 @@ public:
                           absl::optional<size_t> max_length);
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&,
-                                     const Http::ResponseHeaderMap& response_headers,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -145,13 +135,12 @@ public:
                            absl::optional<size_t> max_length);
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap& response_trailers,
-                                     const StreamInfo::StreamInfo&, absl::string_view,
-                                     AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
@@ -166,14 +155,12 @@ public:
                       absl::optional<size_t> max_length, Format format);
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&,
-                                     const Http::ResponseHeaderMap& response_headers,
-                                     const Http::ResponseTrailerMap& response_trailers,
-                                     const StreamInfo::StreamInfo&, absl::string_view,
-                                     AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 
   static Format parseFormat(absl::string_view format);
 
@@ -192,13 +179,12 @@ public:
                                    absl::optional<size_t> max_length);
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
-                                     const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class HttpBuiltInCommandParser : public CommandParser {

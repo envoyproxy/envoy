@@ -13,7 +13,8 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
       emit_tags_as_attributes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
       use_tag_extracted_name_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)) {}
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
+      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : "") {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
@@ -52,14 +53,24 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
 
   for (const auto& gauge : snapshot.gauges()) {
     if (predicate_(gauge)) {
-      flushGauge(*scope_metrics->add_metrics(), gauge, snapshot_time_ns);
+      flushGauge(*scope_metrics->add_metrics(), gauge.get(), snapshot_time_ns);
     }
+  }
+
+  for (const auto& gauge : snapshot.hostGauges()) {
+    flushGauge(*scope_metrics->add_metrics(), gauge, snapshot_time_ns);
   }
 
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_)) {
-      flushCounter(*scope_metrics->add_metrics(), counter, snapshot_time_ns);
+      flushCounter(*scope_metrics->add_metrics(), counter.counter_.get(),
+                   counter.counter_.get().value(), counter.delta_, snapshot_time_ns);
     }
+  }
+
+  for (const auto& counter : snapshot.hostCounters()) {
+    flushCounter(*scope_metrics->add_metrics(), counter, counter.value(), counter.delta(),
+                 snapshot_time_ns);
   }
 
   for (const auto& histogram : snapshot.histograms()) {
@@ -71,8 +82,9 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   return request;
 }
 
+template <class GaugeType>
 void OtlpMetricsFlusherImpl::flushGauge(opentelemetry::proto::metrics::v1::Metric& metric,
-                                        const Stats::Gauge& gauge_stat,
+                                        const GaugeType& gauge_stat,
                                         int64_t snapshot_time_ns) const {
   auto* data_point = metric.mutable_gauge()->add_data_points();
   data_point->set_time_unix_nano(snapshot_time_ns);
@@ -81,21 +93,21 @@ void OtlpMetricsFlusherImpl::flushGauge(opentelemetry::proto::metrics::v1::Metri
   data_point->set_as_int(gauge_stat.value());
 }
 
-void OtlpMetricsFlusherImpl::flushCounter(
-    opentelemetry::proto::metrics::v1::Metric& metric,
-    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-    int64_t snapshot_time_ns) const {
+template <class CounterType>
+void OtlpMetricsFlusherImpl::flushCounter(opentelemetry::proto::metrics::v1::Metric& metric,
+                                          const CounterType& counter, uint64_t value,
+                                          uint64_t delta, int64_t snapshot_time_ns) const {
   auto* sum = metric.mutable_sum();
   sum->set_is_monotonic(true);
   auto* data_point = sum->add_data_points();
-  setMetricCommon(metric, *data_point, snapshot_time_ns, counter_snapshot.counter_);
+  setMetricCommon(metric, *data_point, snapshot_time_ns, counter);
 
   if (config_->reportCountersAsDeltas()) {
     sum->set_aggregation_temporality(AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
-    data_point->set_as_int(counter_snapshot.delta_);
+    data_point->set_as_int(delta);
   } else {
     sum->set_aggregation_temporality(AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
-    data_point->set_as_int(counter_snapshot.counter_.get().value());
+    data_point->set_as_int(value);
   }
 }
 
@@ -125,13 +137,16 @@ void OtlpMetricsFlusherImpl::flushHistogram(opentelemetry::proto::metrics::v1::M
   }
 }
 
+template <class StatType>
 void OtlpMetricsFlusherImpl::setMetricCommon(
     opentelemetry::proto::metrics::v1::Metric& metric,
     opentelemetry::proto::metrics::v1::NumberDataPoint& data_point, int64_t snapshot_time_ns,
-    const Stats::Metric& stat) const {
+    const StatType& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
   // TODO(ohadvano): support ``start_time_unix_nano`` optional field
-  metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
+  metric.set_name(absl::StrCat(config_->statPrefix(), config_->useTagExtractedName()
+                                                          ? stat.tagExtractedName()
+                                                          : stat.name()));
 
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
@@ -148,7 +163,9 @@ void OtlpMetricsFlusherImpl::setMetricCommon(
     const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
   // TODO(ohadvano): support ``start_time_unix_nano optional`` field
-  metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
+  metric.set_name(absl::StrCat(config_->statPrefix(), config_->useTagExtractedName()
+                                                          ? stat.tagExtractedName()
+                                                          : stat.name()));
 
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {

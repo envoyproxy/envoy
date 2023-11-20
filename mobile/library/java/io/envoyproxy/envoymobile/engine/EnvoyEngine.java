@@ -69,13 +69,6 @@ public interface EnvoyEngine {
 
   int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
 
-  /**
-   * Flush the stats sinks outside of a flushing interval.
-   * Note: stat flushing is done asynchronously, this function will never block.
-   * This is a noop if called before the underlying EnvoyEngine has started.
-   */
-  void flushStats();
-
   String dumpStats();
 
   /**
@@ -99,4 +92,16 @@ public interface EnvoyEngine {
    * @param port The proxy port.
    */
   void setProxySettings(String host, int port);
+
+  /*
+   * These are the available log levels for Envoy Mobile.
+   */
+  public enum LogLevel { TRACE, DEBUG, INFO, WARN, ERR, CRITICAL, OFF }
+
+  /**
+   * Set the log level for Envoy mobile
+   *
+   * @param log_level the verbosity of logging Envoy should use.
+   */
+  public void setLogLevel(LogLevel log_level);
 }

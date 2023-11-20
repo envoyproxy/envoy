@@ -1,3 +1,5 @@
+#pragma once
+
 #import "library/common/types/c_types.h"
 #import "library/objective-c/EnvoyKeyValueStore.h"
 

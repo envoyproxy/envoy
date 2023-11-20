@@ -1,5 +1,5 @@
-load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 
 # This is the magic function which helps get the name of the native library
 # from the native dependency. In general, the bazel cc_binary rules will

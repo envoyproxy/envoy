@@ -79,7 +79,7 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
     slices.emplace_back(raw_slice.mem_, raw_slice.len_,
                         &BufferInstanceContainer::derefBufferInstanceContainer, container);
   }
-  return {&slices[0], slices.size()};
+  return {&slices[0], slices.size()}; // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 }
 
 class GrpcSliceBufferFragmentImpl : public Buffer::BufferFragment {

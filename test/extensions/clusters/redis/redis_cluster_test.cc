@@ -31,7 +31,6 @@
 
 using testing::_;
 using testing::ContainerEq;
-using testing::Eq;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;

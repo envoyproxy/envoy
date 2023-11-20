@@ -227,11 +227,11 @@ MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
 namespace Http {
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
-  return IsSubsetOfHeadersMatcher(expected_headers);
+  return {expected_headers};
 }
 
 IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers) {
-  return IsSupersetOfHeadersMatcher(expected_headers);
+  return {expected_headers};
 }
 
 MockReceivedSettings::MockReceivedSettings() {

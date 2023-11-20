@@ -25,7 +25,7 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
       dispatcher_(dispatcher), api_(api),
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
-      sds_config_name_(sds_config_name), secret_hash_(0), clean_up_(std::move(destructor_cb)),
+      sds_config_name_(sds_config_name), clean_up_(std::move(destructor_cb)),
       subscription_factory_(subscription_factory),
       time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
                                               time_source_.systemTime()} {
@@ -79,14 +79,17 @@ void SdsApi::onWatchUpdate() {
   });
 }
 
-void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                            const std::string& version_info) {
-  validateUpdateSize(resources.size());
+absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                    const std::string& version_info) {
+  const absl::Status status = validateUpdateSize(resources.size());
+  if (!status.ok()) {
+    return status;
+  }
   const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
       resources[0].get().resource());
 
   if (secret.name() != sds_config_name_) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name()));
   }
 
@@ -116,8 +119,9 @@ void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resou
         for (auto const& filename : files) {
           // Watch for directory instead of file. This allows users to do atomic renames
           // on directory level (e.g. Kubernetes secret update).
-          const auto result = api_.fileSystem().splitPathFromFilename(filename);
-          watcher_->addWatch(absl::StrCat(result.directory_, "/"),
+          const auto result_or_error = api_.fileSystem().splitPathFromFilename(filename);
+          THROW_IF_STATUS_NOT_OK(result_or_error, throw);
+          watcher_->addWatch(absl::StrCat(result_or_error.value().directory_, "/"),
                              Filesystem::Watcher::Events::MovedTo,
                              [this](uint32_t) { onWatchUpdate(); });
         }
@@ -129,12 +133,17 @@ void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resou
   secret_data_.last_updated_ = time_source_.systemTime();
   secret_data_.version_info_ = version_info;
   init_target_.ready();
+  return absl::OkStatus();
 }
 
-void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(added_resources.size());
-  onConfigUpdate(added_resources, added_resources[0].get().version());
+absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                    const Protobuf::RepeatedPtrField<std::string>&,
+                                    const std::string&) {
+  const absl::Status status = validateUpdateSize(added_resources.size());
+  if (!status.ok()) {
+    return status;
+  }
+  return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
 void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -144,14 +153,16 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
   init_target_.ready();
 }
 
-void SdsApi::validateUpdateSize(int num_resources) {
+absl::Status SdsApi::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
   }
   if (num_resources != 1) {
-    throw EnvoyException(fmt::format("Unexpected SDS secrets length: {}", num_resources));
+    return absl::InvalidArgumentError(
+        fmt::format("Unexpected SDS secrets length: {}", num_resources));
   }
+  return absl::OkStatus();
 }
 
 void SdsApi::initialize() {
@@ -165,7 +176,9 @@ SdsApi::SecretData SdsApi::secretData() { return secret_data_; }
 SdsApi::FileContentMap SdsApi::loadFiles() {
   FileContentMap files;
   for (auto const& filename : getDataSourceFilenames()) {
-    files[filename] = api_.fileSystem().fileReadToEnd(filename);
+    auto file_or_error = api_.fileSystem().fileReadToEnd(filename);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    files[filename] = file_or_error.value();
   }
   return files;
 }

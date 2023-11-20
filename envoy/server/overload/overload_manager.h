@@ -99,6 +99,13 @@ public:
    * Get a factory for constructing scaled timer managers that respond to overload state.
    */
   virtual Event::ScaledRangeTimerManagerFactory scaledTimerFactory() PURE;
+
+  /**
+   * Stop the overload manager timer and wait for any pending resource updates to complete.
+   * After this returns, overload manager clients should not receive any more callbacks
+   * about overload state changes.
+   */
+  virtual void stop() PURE;
 };
 
 } // namespace Server

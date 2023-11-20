@@ -74,11 +74,11 @@ protected:
   Common::CallbackManager<> update_callback_manager_;
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                              const std::string& version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   virtual std::vector<std::string> getDataSourceFilenames() PURE;
@@ -92,7 +92,7 @@ protected:
   Api::Api& api_;
 
 private:
-  void validateUpdateSize(int num_resources);
+  absl::Status validateUpdateSize(int num_resources);
   void initialize();
   FileContentMap loadFiles();
   uint64_t getHashForFiles(const FileContentMap& files);
@@ -107,7 +107,7 @@ private:
   Config::SubscriptionPtr subscription_;
   const std::string sds_config_name_;
 
-  uint64_t secret_hash_;
+  uint64_t secret_hash_{0};
   uint64_t files_hash_;
   Cleanup clean_up_;
   Config::SubscriptionFactory& subscription_factory_;

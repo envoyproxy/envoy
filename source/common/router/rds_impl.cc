@@ -157,13 +157,16 @@ RdsRouteConfigSubscription& RdsRouteConfigProviderImpl::subscription() {
   return static_cast<RdsRouteConfigSubscription&>(base_.subscription());
 }
 
-void RdsRouteConfigProviderImpl::onConfigUpdate() {
-  base_.onConfigUpdate();
+absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
+  auto status = base_.onConfigUpdate();
+  if (!status.ok()) {
+    return status;
+  }
 
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
   if (aliases.empty()) {
-    return;
+    return absl::OkStatus();
   }
 
   const auto config =
@@ -189,6 +192,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
       it++;
     }
   }
+  return absl::OkStatus();
 }
 
 ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() const {

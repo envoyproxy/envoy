@@ -16,7 +16,7 @@ public:
   struct IoHandleMatcher {
     explicit IoHandleMatcher(Network::Socket::Type type) : socket_type_(type) {}
 
-    Network::IoSocketError* returnOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
+    Api::IoErrorPtr returnOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
       absl::MutexLock lock(&mutex_);
       if (socket_type_ == io_handle->getSocketType() && error_ &&
           (io_handle->localAddress()->ip()->port() == src_port_ ||
@@ -24,19 +24,21 @@ public:
         ASSERT(matched_iohandle_ == nullptr || matched_iohandle_ == io_handle,
                "Matched multiple io_handles, expected at most one to match.");
         matched_iohandle_ = io_handle;
-        return error_;
+        return (error_->getSystemErrorCode() == EAGAIN)
+                   ? Envoy::Network::IoSocketError::getIoSocketEagainError()
+                   : Envoy::Network::IoSocketError::create(error_->getSystemErrorCode());
       }
-      return nullptr;
+      return Api::IoError::none();
     }
 
-    Network::IoSocketError* returnConnectOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
+    Api::IoErrorPtr returnConnectOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
       absl::MutexLock lock(&mutex_);
       if (block_connect_ && socket_type_ == io_handle->getSocketType() &&
           (io_handle->localAddress()->ip()->port() == src_port_ ||
            (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
-        return Network::IoSocketError::getIoSocketEagainInstance();
+        return Network::IoSocketError::getIoSocketEagainError();
       }
-      return nullptr;
+      return Api::IoError::none();
     }
 
     // Source port to match. The port specified should be associated with a listener.
@@ -54,14 +56,14 @@ public:
     }
 
     void setWriteReturnsEgain() {
-      setWriteOverride(Network::IoSocketError::getIoSocketEagainInstance());
+      setWriteOverride(Network::IoSocketError::getIoSocketEagainError());
     }
 
     // The caller is responsible for memory management.
-    void setWriteOverride(Network::IoSocketError* error) {
+    void setWriteOverride(Api::IoErrorPtr error) {
       absl::WriterMutexLock lock(&mutex_);
       ASSERT(src_port_ != 0 || dst_port_ != 0);
-      error_ = error;
+      error_ = std::move(error);
     }
 
     void setConnectBlock(bool block) {
@@ -76,7 +78,7 @@ public:
     mutable absl::Mutex mutex_;
     uint32_t src_port_ ABSL_GUARDED_BY(mutex_) = 0;
     uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    Network::IoSocketError* error_ ABSL_GUARDED_BY(mutex_) = nullptr;
+    Api::IoErrorPtr error_ ABSL_GUARDED_BY(mutex_) = Api::IoError::none();
     Network::TestIoSocketHandle* matched_iohandle_{};
     Network::Socket::Type socket_type_;
     bool block_connect_ ABSL_GUARDED_BY(mutex_) = false;

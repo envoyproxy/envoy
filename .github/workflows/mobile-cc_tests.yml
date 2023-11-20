@@ -19,7 +19,7 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
+      pull-requests: read
 
   cctests:
     if: ${{ needs.env.outputs.mobile_cc_tests == 'true' }}
@@ -33,7 +33,7 @@ jobs:
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - env:

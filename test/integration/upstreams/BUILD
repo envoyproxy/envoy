@@ -10,7 +10,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "per_host_upstream_config",
-    srcs = [
+    hdrs = [
         "per_host_upstream_config.h",
     ],
     deps = [

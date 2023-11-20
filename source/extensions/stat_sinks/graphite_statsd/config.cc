@@ -40,7 +40,7 @@ GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
       STATSD_SPECIFIER_NOT_SET:
     break;
   }
-  throw EnvoyException("unexpected statsd specifier enum");
+  PANIC("unexpected statsd specifier enum");
 }
 
 ProtobufTypes::MessagePtr GraphiteStatsdSinkFactory::createEmptyConfigProto() {

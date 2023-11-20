@@ -122,6 +122,9 @@ protected:
       }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
+      Network::DetectedCloseType detectedCloseType() const override {
+        return Network::DetectedCloseType::Normal;
+      };
       Event::Dispatcher& dispatcher() const override { return dispatcher_; }
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}

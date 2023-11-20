@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "source/common/grpc/common.h"
@@ -50,17 +52,21 @@ public:
     // Note, we need to set it through `MockFactoryContext` rather than `MockAsyncClientManager`
     // directly because the rate limit client object below requires context argument as the input.
     if (external_inited_) {
-      EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+      EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
                   getOrCreateRawAsyncClient(_, _, _))
           .Times(2)
           .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
     } else {
-      EXPECT_CALL(context.cluster_manager_.async_client_manager_,
-                  getOrCreateRawAsyncClient(_, _, _))
+      EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
+                  getOrCreateRawAsyncClientWithHashKey(_, _, _))
           .WillOnce(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
     }
 
-    client_ = createRateLimitClient(context, grpc_service, &callbacks_, bucket_cache_, domain_);
+    Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+        Grpc::GrpcServiceConfigWithHashKey(grpc_service);
+
+    client_ =
+        createRateLimitClient(context, &callbacks_, bucket_cache_, domain_, config_with_hash_key);
   }
 
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {

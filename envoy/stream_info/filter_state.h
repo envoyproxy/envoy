@@ -105,6 +105,21 @@ public:
   };
 
   /**
+   * Generic reflection support for the filter state objects.
+   */
+  class ObjectReflection {
+  public:
+    virtual ~ObjectReflection() = default;
+
+    using FieldType = absl::variant<absl::monostate, absl::string_view, int64_t>;
+
+    /**
+     * @return FieldType a field value for a field name.
+     */
+    virtual FieldType getField(absl::string_view) const PURE;
+  };
+
+  /**
    * Generic factory for filter state objects. The factory registry uses the
    * object data name as the index for the object factory. This factory should be used by the
    * dynamic extensions that cannot use the object constructors directly.
@@ -119,6 +134,12 @@ public:
      * is malformed.
      */
     virtual std::unique_ptr<Object> createFromBytes(absl::string_view data) const PURE;
+
+    /**
+     * @return std::unique_ptr<ObjectReflection> for the runtime object
+     * Note that the reflection object is a view and should not outlive the object.
+     */
+    virtual std::unique_ptr<ObjectReflection> reflect(const Object*) const { return nullptr; }
   };
 
   struct FilterObject {

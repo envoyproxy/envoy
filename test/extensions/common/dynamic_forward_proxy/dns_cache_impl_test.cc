@@ -18,7 +18,10 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+
+#include "absl/strings/str_cat.h"
 
 using testing::AtLeast;
 using testing::DoAll;
@@ -37,15 +40,17 @@ static const absl::optional<std::chrono::seconds> kNoTtl = absl::nullopt;
 class DnsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   DnsCacheImplTest() : registered_dns_factory_(dns_resolver_factory_) {}
-  void initialize(std::vector<std::string> preresolve_hostnames = {}, uint32_t max_hosts = 1024) {
+  void initialize(
+      std::vector<std::pair<std::string /*host*/, uint32_t /*port*/>> preresolve_hostnames = {},
+      uint32_t max_hosts = 1024) {
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
     config_.mutable_max_hosts()->set_value(max_hosts);
     if (!preresolve_hostnames.empty()) {
-      for (const auto& hostname : preresolve_hostnames) {
+      for (const auto& [host, port] : preresolve_hostnames) {
         envoy::config::core::v3::SocketAddress* address = config_.add_preresolve_hostnames();
-        address->set_address(hostname);
-        address->set_port_value(443);
+        address->set_address(host);
+        address->set_port_value(port);
       }
     }
 
@@ -53,13 +58,17 @@ public:
 
     EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
         .WillRepeatedly(Return(resolver_));
-    dns_cache_ = std::make_unique<DnsCacheImpl>(context_, config_);
+    auto status_or_cache = DnsCacheImpl::createDnsCacheImpl(context_, config_);
+    THROW_IF_STATUS_NOT_OK(status_or_cache, throw);
+    dns_cache_ = status_or_cache.value();
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
 
   ~DnsCacheImplTest() override {
-    dns_cache_.reset();
-    EXPECT_EQ(0, TestUtility::findGauge(context_.store_, "dns_cache.foo.num_hosts")->value());
+    if (dns_cache_.get()) {
+      dns_cache_.reset();
+      EXPECT_EQ(0, TestUtility::findGauge(context_.store_, "dns_cache.foo.num_hosts")->value());
+    }
   }
 
   void checkStats(uint64_t query_attempt, uint64_t query_success, uint64_t query_failure,
@@ -81,7 +90,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
-  std::unique_ptr<DnsCache> dns_cache_;
+  std::shared_ptr<DnsCache> dns_cache_;
   MockUpdateCallbacks update_callbacks_;
   DnsCache::AddUpdateCallbacksHandlePtr update_callbacks_handle_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
@@ -123,20 +132,35 @@ void verifyCaresDnsConfigAndUnpack(
   typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 }
 
-TEST_F(DnsCacheImplTest, PreresolveSuccess) {
+class DnsCacheImplPreresolveTest : public DnsCacheImplTest,
+                                   public testing::WithParamInterface<bool> {
+public:
+  bool normalizeDfpHost() { return GetParam(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(DnsCachePreresolveNormalizedDfpHost, DnsCacheImplPreresolveTest,
+                         testing::Bool());
+
+TEST_P(DnsCacheImplPreresolveTest, PreresolveSuccess) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns",
+                               absl::StrCat(normalizeDfpHost())}});
+
   Network::DnsResolver::ResolveCb resolve_cb;
-  std::string hostname = "bar.baz.com:443";
-  EXPECT_CALL(*resolver_, resolve("bar.baz.com", _, _))
-      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  std::string host = "bar.baz.com";
+  uint32_t port = 443;
+  std::string authority = absl::StrCat(host, ":", port);
+  EXPECT_CALL(*resolver_, resolve(host, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  EXPECT_CALL(
+      update_callbacks_,
+      onDnsHostAddOrUpdate(authority, DnsHostInfoEquals("10.0.0.1:443", "bar.baz.com", false)));
   EXPECT_CALL(update_callbacks_,
-              onDnsHostAddOrUpdate("bar.baz.com:443",
-                                   DnsHostInfoEquals("10.0.0.1:443", "bar.baz.com", false)));
-  EXPECT_CALL(update_callbacks_,
-              onDnsResolutionComplete("bar.baz.com:443",
+              onDnsResolutionComplete(authority,
                                       DnsHostInfoEquals("10.0.0.1:443", "bar.baz.com", false),
                                       Network::DnsResolver::ResolutionStatus::Success));
 
-  initialize({"bar.baz.com:443"} /* preresolve_hostnames */);
+  initialize({{normalizeDfpHost() ? host : authority, port}} /* preresolve_hostnames */);
 
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
              TestUtility::makeDnsResponse({"10.0.0.1"}));
@@ -144,15 +168,24 @@ TEST_F(DnsCacheImplTest, PreresolveSuccess) {
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   MockLoadDnsCacheEntryCallbacks callbacks;
-  auto result = dns_cache_->loadDnsCacheEntry("bar.baz.com", 443, false, callbacks);
+  if (normalizeDfpHost()) {
+    // Retrieve with the hostname and port in the "host".
+    auto result = dns_cache_->loadDnsCacheEntry(authority, port, false, callbacks);
+    EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+    EXPECT_EQ(result.handle_, nullptr);
+    EXPECT_NE(absl::nullopt, result.host_info_);
+  }
+  // Retrieve with the hostname only in the "host".
+  auto result = dns_cache_->loadDnsCacheEntry(host, port, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_NE(absl::nullopt, result.host_info_);
 }
 
-TEST_F(DnsCacheImplTest, PreresolveFailure) {
+TEST_P(DnsCacheImplPreresolveTest, PreresolveFailure) {
   EXPECT_THROW_WITH_MESSAGE(
-      initialize({"bar.baz.com"} /* preresolve_hostnames */, 0 /* max_hosts */), EnvoyException,
+      initialize({{"bar.baz.com", 443}} /* preresolve_hostnames */, 0 /* max_hosts */),
+      EnvoyException,
       "DNS Cache [foo] configured with preresolve_hostnames=1 larger than max_hosts=0");
 }
 
@@ -1066,7 +1099,8 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSetDeprecatedField) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
-  DnsCacheImpl dns_cache_(context_, config_);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context_, config_).value();
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `true` here means dns_resolver_options.use_tcp_for_dns_lookups is set to true.
@@ -1081,7 +1115,8 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSet) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
-  DnsCacheImpl dns_cache_(context_, config_);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context_, config_).value();
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `true` here means dns_resolver_options.use_tcp_for_dns_lookups is set to true.
@@ -1096,7 +1131,8 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionSet) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
-  DnsCacheImpl dns_cache_(context_, config_);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context_, config_).value();
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `true` here means dns_resolver_options.no_default_search_domain is set to true.
@@ -1108,7 +1144,8 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionUnSet) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
-  DnsCacheImpl dns_cache_(context_, config_);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context_, config_).value();
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `false` here means dns_resolver_options.use_tcp_for_dns_lookups is set to false.
@@ -1120,7 +1157,8 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionUnSet) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
-  DnsCacheImpl dns_cache_(context_, config_);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context_, config_).value();
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `false` here means dns_resolver_options.no_default_search_domain is set to false.
@@ -1185,7 +1223,8 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   EXPECT_CALL(dns_resolver_factory,
               createDnsResolver(_, _, ProtoEq(empty_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
-  DnsCacheImpl dns_cache_(context, config);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context, config).value();
 }
 
 // Test dns_resolution_config is in place, use it.
@@ -1207,7 +1246,8 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
   EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
-  DnsCacheImpl dns_cache_(context, config);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context, config).value();
 }
 
 // Test dns_resolution_config is in place, use it and overriding use_tcp_for_dns_lookups.
@@ -1244,7 +1284,8 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
   EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
-  DnsCacheImpl dns_cache_(context, config);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context, config).value();
 }
 
 // Test the case that the typed_dns_resolver_config is specified, and it overrides all
@@ -1288,7 +1329,8 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   EXPECT_CALL(dns_resolver_factory,
               createDnsResolver(_, _, ProtoEq(expected_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
-  DnsCacheImpl dns_cache_(context, config);
+  std::shared_ptr<DnsCacheImpl> dns_cache =
+      DnsCacheImpl::createDnsCacheImpl(context, config).value();
 }
 
 // Note: this test is done here, rather than a TYPED_TEST_SUITE in

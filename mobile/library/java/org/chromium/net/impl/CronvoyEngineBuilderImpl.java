@@ -50,6 +50,7 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   // See setters below for verbose descriptions.
   private final Context mApplicationContext;
   private final Map<String, Integer> mQuicHints = new HashMap<>();
+  private final List<String> mQuicCanonicalSuffixes = new LinkedList<>();
   private final List<Pkp> mPkps = new LinkedList<>();
   private boolean mPublicKeyPinningBypassForLocalTrustAnchorsEnabled;
   private String mUserAgent;
@@ -65,7 +66,6 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   private String mExperimentalOptions;
   private boolean mNetworkQualityEstimatorEnabled;
   private int mThreadPriority = INVALID_THREAD_PRIORITY;
-  private String mLogLevel = "info";
 
   /**
    * Default config enables SPDY and QUIC, disables SDCH and HTTP cache.
@@ -228,6 +228,13 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
 
   Map<String, Integer> quicHints() { return mQuicHints; }
 
+  public CronvoyEngineBuilderImpl addQuicCanonicalSuffix(String suffix) {
+    mQuicCanonicalSuffixes.add(suffix);
+    return this;
+  }
+
+  List<String> quicCanonicalSuffixes() { return mQuicCanonicalSuffixes; }
+
   @Override
   public CronvoyEngineBuilderImpl addPublicKeyPins(String hostName, Set<byte[]> pinsSha256,
                                                    boolean includeSubdomains, Date expirationDate) {
@@ -343,13 +350,6 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   int threadPriority(int defaultThreadPriority) {
     return mThreadPriority == INVALID_THREAD_PRIORITY ? defaultThreadPriority : mThreadPriority;
   }
-
-  public CronvoyEngineBuilderImpl setLogLevel(String logLevel) {
-    mLogLevel = logLevel;
-    return this;
-  }
-
-  public String getLogLevel() { return mLogLevel; }
 
   /**
    * Returns {@link Context} for builder.

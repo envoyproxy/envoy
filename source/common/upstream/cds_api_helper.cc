@@ -42,7 +42,9 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
       cluster = dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
-        throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
+        exception_msgs.push_back(
+            fmt::format("{}: duplicate cluster {} found", cluster.name(), cluster.name()));
+        continue;
       }
       if (cm_.addOrUpdateCluster(cluster, resource.get().version())) {
         any_applied = true;

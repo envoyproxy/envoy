@@ -213,11 +213,26 @@ again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s 
 Limiting Active Connections
 ---------------------------
 
-Currently, the only supported way to limit the total number of active connections allowed across all
-listeners is via specifying an integer through the runtime key
-``overload.global_downstream_max_connections``. The connection limit is recommended to be less than
+To limit the total number of active downstream connections allowed across all
+listeners configure :ref:`downstream connections monitor <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` in Overload Manager:
+
+.. code-block:: yaml
+
+   resource_monitors:
+     - name: "envoy.resource_monitors.global_downstream_max_connections"
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
+         max_active_downstream_connections: 1000
+
+:ref:`Downstream connections monitor <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` does not
+support runtime updates for the configured value of :ref:`max_active_downstream_connections
+<envoy_v3_api_field_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig.max_active_downstream_connections>`
+One could also set this limit via specifying an integer through the runtime key
+``overload.global_downstream_max_connections``, though this key is deprecated and will be removed in future.
+The connection limit is recommended to be less than
 half of the system's file descriptor limit, to account for upstream connections, files, and other
 usage of file descriptors.
+
 If the value is unspecified, there is no global limit on the number of active downstream connections
 and Envoy will emit a warning indicating this at startup. To disable the warning without setting a
 limit on the number of active downstream connections, the runtime value may be set to a very large

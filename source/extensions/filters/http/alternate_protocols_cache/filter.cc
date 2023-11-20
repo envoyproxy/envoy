@@ -8,6 +8,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,15 +36,26 @@ FilterConfig::getAlternateProtocolCache(Event::Dispatcher& dispatcher) {
 void Filter::onDestroy() {}
 
 Filter::Filter(const FilterConfigSharedPtr& config, Event::Dispatcher& dispatcher)
-    : cache_(config->getAlternateProtocolCache(dispatcher)), time_source_(config->timeSource()) {}
+    : config_(config), dispatcher_(dispatcher) {}
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-
-  if (!cache_) {
-    return Http::FilterHeadersStatus::Continue;
-  }
   const auto alt_svc = headers.get(Http::CustomHeaders::get().AltSvc);
   if (alt_svc.empty()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  const bool use_cluster_cache = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter");
+  Http::HttpServerPropertiesCacheSharedPtr cache;
+  if (use_cluster_cache) {
+    auto info = encoder_callbacks_->streamInfo().upstreamClusterInfo();
+    if (info && (*info)->alternateProtocolsCacheOptions()) {
+      cache = config_->alternateProtocolCacheManager()->getCache(
+          *((*info)->alternateProtocolsCacheOptions()), dispatcher_);
+    }
+  } else {
+    cache = config_->getAlternateProtocolCache(dispatcher_);
+  }
+  if (!cache) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -51,7 +63,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   for (size_t i = 0; i < alt_svc.size(); ++i) {
     std::vector<Http::HttpServerPropertiesCache::AlternateProtocol> advertised_protocols =
         Http::HttpServerPropertiesCacheImpl::alternateProtocolsFromString(
-            alt_svc[i]->value().getStringView(), time_source_, false);
+            alt_svc[i]->value().getStringView(), config_->timeSource(), false);
     if (advertised_protocols.empty()) {
       ENVOY_LOG(trace, "Invalid Alt-Svc header received: '{}'",
                 alt_svc[i]->value().getStringView());
@@ -77,7 +89,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   const uint32_t port = host->address()->ip()->port();
   Http::HttpServerPropertiesCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,
                                                  port);
-  cache_->setAlternatives(origin, protocols);
+  cache->setAlternatives(origin, protocols);
   return Http::FilterHeadersStatus::Continue;
 }
 

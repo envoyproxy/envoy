@@ -133,17 +133,9 @@ uint64_t fractionalPercentDenominatorToInt(
 
 namespace Envoy {
 
-/**
- * Exception class for rejecting a deprecated major version.
- */
-class DeprecatedMajorVersionException : public EnvoyException {
-public:
-  DeprecatedMajorVersionException(const std::string& message) : EnvoyException(message) {}
-};
-
 class MissingFieldException : public EnvoyException {
 public:
-  MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
+  MissingFieldException(const std::string& message);
 };
 
 class TypeUtil {
@@ -213,7 +205,7 @@ public:
 
 class ProtoValidationException : public EnvoyException {
 public:
-  ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
+  ProtoValidationException(const std::string& message);
 };
 
 /**

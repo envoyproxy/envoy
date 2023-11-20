@@ -28,6 +28,7 @@ public:
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
                                     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+                                    const Upstream::ClusterManager& cluster_manager,
                                     Buffer::Instance& response, const StatsParams& params,
                                     const Stats::CustomStatNamespaces& custom_namespaces);
   /**

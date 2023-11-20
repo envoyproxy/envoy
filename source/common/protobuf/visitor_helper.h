@@ -24,7 +24,7 @@ convertTypedStruct(const Protobuf::Message& message) {
     MessageUtil::jsonConvert(typed_struct->value(), ProtobufMessage::getNullValidationVisitor(),
                              *inner_message);
 #else
-    throw EnvoyException("JSON and YAML support compiled out.");
+    throwEnvoyExceptionOrPanic("JSON and YAML support compiled out.");
 #endif
   }
   return {std::move(inner_message), target_type_url};

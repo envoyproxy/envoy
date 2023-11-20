@@ -46,7 +46,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
     WrapperCallbacks& parent, PoolIterator it)
-    : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
+    : parent_(parent), pool_it_(it) {}
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttemptCallbacks() {
   if (cancellable_ != nullptr) {

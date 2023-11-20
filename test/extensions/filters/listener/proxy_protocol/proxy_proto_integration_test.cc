@@ -238,7 +238,7 @@ TEST_P(ProxyProtoTcpIntegrationTest, AccessLog) {
   std::string log_result;
   // Access logs only get flushed to disk periodically, so poll until the log is non-empty
   do {
-    log_result = api_->fileSystem().fileReadToEnd(access_log_path);
+    log_result = api_->fileSystem().fileReadToEnd(access_log_path).value();
   } while (log_result.empty());
 
   EXPECT_EQ(log_result, "remote=1.2.3.4:12345 local=254.254.254.254:1234");

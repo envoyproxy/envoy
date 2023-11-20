@@ -14,11 +14,7 @@ const std::string& RequestHeaders::authority() const { return (*this)[":authorit
 const std::string& RequestHeaders::path() const { return (*this)[":path"][0]; }
 
 absl::optional<RetryPolicy> RequestHeaders::retryPolicy() const {
-  try {
-    return absl::optional<RetryPolicy>(RetryPolicy::fromRawHeaderMap(allHeaders()));
-  } catch (const std::exception&) {
-    return absl::optional<RetryPolicy>();
-  }
+  return absl::optional<RetryPolicy>(RetryPolicy::fromRawHeaderMap(allHeaders()));
 }
 
 RequestHeadersBuilder RequestHeaders::toRequestHeadersBuilder() const {

@@ -143,6 +143,24 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
 }
 
+// Test extracting JWT as Bearer token from the default header location: "Authorization" -
+// using an actual (correctly-formatted) JWT but token is invalid, like: GoodToken +
+// chars_after_space expected to get all token include characters after the space:
+TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWTEndedWithSpaceAndMoreCharachters) {
+  std::string chars_after_space = "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj";
+  std::string concatenated = std::string(GoodToken) + " ." + chars_after_space;
+  const char* valid_token_with_space_and_chars = concatenated.c_str();
+
+  auto headers = TestRequestHeaderMapImpl{
+      {absl::StrCat("Authorization"), absl::StrCat("Bearer ", valid_token_with_space_and_chars)}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  // Only the issue1 is using default header location.
+  EXPECT_EQ(tokens[0]->token(), valid_token_with_space_and_chars);
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+}
+
 // Test extracting token from the default query parameter: "access_token"
 TEST_F(ExtractorTest, TestDefaultParamLocation) {
   auto headers = TestRequestHeaderMapImpl{{":path", "/path?access_token=jwt_token"}};
@@ -231,7 +249,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch1) {
 
   // Match issuer 7 with map key as: prefix-header + 'CCCDDD'
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+  EXPECT_EQ(tokens[0]->token(), "jwt_token,extra=more");
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
@@ -242,7 +260,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
 
   // Match issuer 7 with map key as: prefix-header + AAA
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu");
+  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu\",comment=\"fish tag\"");
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
@@ -253,11 +271,11 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
 
   // Match issuer 8 with map key as: prefix-header + '"CCCDDD"'
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer8"));
-  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu");
+  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu\"}");
 
   // Match issuer 7 with map key as: prefix-header + 'CCCDDD'
   EXPECT_TRUE(tokens[1]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[1]->token(), "and0X3Rva2Vu");
+  EXPECT_EQ(tokens[1]->token(), "and0X3Rva2Vu\"}");
 }
 
 // Test extracting token from the custom query parameter: "token_param"

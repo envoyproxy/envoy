@@ -18,7 +18,6 @@
 
 #include "quiche/common/masque/connect_udp_datagram_payload.h"
 #include "quiche/common/simple_buffer_allocator.h"
-#include "quiche/quic/core/http/quic_spdy_stream.h"
 
 namespace Envoy {
 namespace Extensions {

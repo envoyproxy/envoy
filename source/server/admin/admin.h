@@ -14,7 +14,6 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/server/overload/overload_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -48,6 +47,7 @@
 #include "source/server/admin/server_cmd_handler.h"
 #include "source/server/admin/server_info_handler.h"
 #include "source/server/admin/stats_handler.h"
+#include "source/server/null_overload_manager.h"
 
 #include "absl/strings/string_view.h"
 
@@ -110,6 +110,7 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
                                     Network::UdpReadFilterCallbacks&) override {}
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
   bool createFilterChain(Http::FilterChainManager& manager, bool,
@@ -221,15 +222,27 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::ServerHeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
-    // TODO(yanavlasov): admin interface should use the default validator
+  Http::ServerHeaderValidatorPtr
+  makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
+#ifdef ENVOY_ENABLE_UHV
+    ENVOY_BUG(header_validator_factory_ != nullptr,
+              "Admin HCM config can not have null UHV factory.");
+    return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
+                                           protocol, getHeaderValidatorStats(protocol))
+                                     : nullptr;
+#else
     return nullptr;
+#endif
   }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
 
 private:
   friend class AdminTestingPeer;
+
+#ifdef ENVOY_ENABLE_UHV
+  ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
+#endif
 
   /**
    * Creates a Request from the request in the admin stream.
@@ -275,7 +288,7 @@ private:
     Rds::ConfigConstSharedPtr config() const override { return config_; }
     const absl::optional<ConfigInfo>& configInfo() const override { return config_info_; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-    void onConfigUpdate() override {}
+    absl::Status onConfigUpdate() override { return absl::OkStatus(); }
     Router::ConfigConstSharedPtr configCast() const override { return config_; }
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
@@ -315,46 +328,6 @@ private:
     ~NullScopeKeyBuilder() override = default;
 
     Router::ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const override { return nullptr; };
-  };
-
-  /**
-   * Implementation of OverloadManager that is never overloaded. Using this instead of the real
-   * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
-   */
-  struct NullOverloadManager : public OverloadManager {
-    struct OverloadState : public ThreadLocalOverloadState {
-      OverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-      const OverloadActionState& getState(const std::string&) override { return inactive_; }
-      bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
-      bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
-      bool isResourceMonitorEnabled(OverloadProactiveResourceName) override { return false; }
-      Event::Dispatcher& dispatcher_;
-      const OverloadActionState inactive_ = OverloadActionState::inactive();
-    };
-
-    NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
-        : tls_(slot_allocator.allocateSlot()) {}
-
-    void start() override {
-      tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<OverloadState>(dispatcher);
-      });
-    }
-
-    ThreadLocalOverloadState& getThreadLocalOverloadState() override {
-      return tls_->getTyped<OverloadState>();
-    }
-    LoadShedPoint* getLoadShedPoint(absl::string_view) override { return nullptr; }
-
-    Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
-
-    bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
-      // This method shouldn't be called by the admin listener
-      IS_ENVOY_BUG("Unexpected function call");
-      return false;
-    }
-
-    ThreadLocal::SlotPtr tls_;
   };
 
   std::vector<const UrlHandler*> sortedHandlers() const;
@@ -524,6 +497,7 @@ private:
   const absl::optional<std::string> scheme_{};
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
+  const Http::HeaderValidatorFactoryPtr header_validator_factory_;
 };
 
 } // namespace Server

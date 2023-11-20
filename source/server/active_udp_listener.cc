@@ -4,6 +4,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/utility.h"
 
 #include "spdlog/spdlog.h"
@@ -74,8 +75,8 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
     : ActiveRawUdpListener(worker_index, concurrency, parent, listen_socket,
-                           dispatcher.createUdpListener(
-                               listen_socket_ptr, *this,
+                           std::make_unique<Network::UdpListenerImpl>(
+                               dispatcher, listen_socket_ptr, *this, dispatcher.timeSource(),
                                config.udpListenerConfig()->config().downstream_socket_config()),
                            config) {}
 

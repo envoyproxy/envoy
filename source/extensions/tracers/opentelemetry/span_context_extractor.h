@@ -5,8 +5,7 @@
 
 #include "source/common/common/statusor.h"
 #include "source/common/http/header_map_impl.h"
-
-#include "span_context.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
 
 namespace Envoy {
 namespace Extensions {

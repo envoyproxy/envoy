@@ -1,3 +1,5 @@
+#pragma once
+
 #import <Foundation/Foundation.h>
 
 /// Represents a response from the server or an error.

@@ -44,7 +44,7 @@ public:
   ~DynamicFilterConfigProviderImplBase() override;
   const Init::Target& initTarget() const { return init_target_; }
 
-  void validateTypeUrl(const std::string& type_url) const;
+  absl::Status validateTypeUrl(const std::string& type_url) const;
   virtual void validateMessage(const std::string& config_name, const Protobuf::Message& message,
                                const std::string& factory_name) const PURE;
 
@@ -108,10 +108,11 @@ public:
   }
 
   // Config::DynamicExtensionConfigProviderBase
-  void onConfigUpdate(const Protobuf::Message& message, const std::string&,
-                      Config::ConfigAppliedCb applied_on_all_threads) override {
+  absl::Status onConfigUpdate(const Protobuf::Message& message, const std::string&,
+                              Config::ConfigAppliedCb applied_on_all_threads) override {
     const FactoryCb config = instantiateFilterFactory(message);
     update(config, applied_on_all_threads);
+    return absl::OkStatus();
   }
 
   void onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
@@ -124,7 +125,10 @@ public:
 
   void applyDefaultConfiguration() override {
     if (default_configuration_) {
-      onConfigUpdate(*default_configuration_, "", nullptr);
+      auto status = onConfigUpdate(*default_configuration_, "", nullptr);
+      if (!status.ok()) {
+        throwEnvoyExceptionOrPanic(std::string(status.message()));
+      }
     }
   }
   const Network::ListenerFilterMatcherSharedPtr& getListenerFilterMatcher() override {
@@ -215,8 +219,13 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return {factory->name(),
-            factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_)};
+    absl::StatusOr<Http::FilterFactoryCb> error_or_factory =
+        factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
+    if (!error_or_factory.status().ok()) {
+      throwEnvoyExceptionOrPanic(std::string(error_or_factory.status().message()));
+    }
+
+    return {factory->name(), error_or_factory.value()};
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -343,6 +352,22 @@ private:
   }
 };
 
+class QuicListenerDynamicFilterConfigProviderImpl
+    : public ListenerDynamicFilterConfigProviderImpl<Network::QuicListenerFilterFactoryCb> {
+public:
+  using ListenerDynamicFilterConfigProviderImpl::ListenerDynamicFilterConfigProviderImpl;
+
+private:
+  Network::QuicListenerFilterFactoryCb
+  instantiateFilterFactory(const Protobuf::Message& message) const override {
+    auto* factory =
+        Registry::FactoryRegistry<Server::Configuration::NamedQuicListenerFilterConfigFactory>::
+            getFactoryByType(message.GetTypeName());
+    return factory->createListenerFilterFactoryFromProto(message, listener_filter_matcher_,
+                                                         factory_context_);
+  }
+};
+
 /**
  * All extension config discovery stats. @see stats_macros.h
  */
@@ -406,11 +431,11 @@ private:
   void start();
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string&) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                              const std::string& version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string&) override;
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
   void updateComplete();
@@ -750,6 +775,19 @@ public:
 
 protected:
   const std::string getConfigDumpType() const override { return "ecds_filter_udp_listener"; }
+};
+
+// QUIC listener filter
+class QuicListenerFilterConfigProviderManagerImpl
+    : public FilterConfigProviderManagerImpl<
+          Server::Configuration::NamedQuicListenerFilterConfigFactory,
+          Network::QuicListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
+          QuicListenerDynamicFilterConfigProviderImpl> {
+public:
+  absl::string_view statPrefix() const override { return "quic_listener_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_quic_listener"; }
 };
 
 } // namespace Filter

@@ -1,3 +1,5 @@
+#pragma once
+
 #import <Foundation/Foundation.h>
 
 #import "library/objective-c/EMODirectResponse.h"
@@ -74,11 +76,6 @@ NS_ASSUME_NONNULL_BEGIN
  @return A status indicating if the action was successful.
  */
 - (int)recordCounterInc:(NSString *)elements tags:(EnvoyTags *)tags count:(NSUInteger)count;
-
-/**
- Attempt to trigger a stat flush.
- */
-- (void)flushStats;
 
 /**
  Retrieve the value of all active stats. Note that this function may block for some time.

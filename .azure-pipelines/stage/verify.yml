@@ -12,20 +12,21 @@ jobs:
   displayName: Debs (x64)
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
   timeoutInMinutes: 120
-  pool:
-    vmImage: $(agentUbuntu)
+  pool: envoy-x64-small
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.distribution"
-      itemPattern: "bazel.distribution/x64/packages.x64.tar.gz"
+      artifactName: "distribution"
+      itemPattern: "distribution/x64/packages.x64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: verify_distro
+      cacheName: verify_distro
       publishTestResults: false
+      tmpfsDockerDisabled: true
       env:
         ENVOY_DOCKER_IN_DOCKER: 1
 
@@ -38,14 +39,15 @@ jobs:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.distribution"
-      itemPattern: "bazel.distribution/arm64/packages.arm64.tar.gz"
+      artifactName: "distribution"
+      itemPattern: "distribution/arm64/packages.arm64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       managedAgent: false
       ciTarget: verify_distro
+      cacheName: verify_distro
       rbe: false
       artifactSuffix: ".arm64"
       publishTestResults: false

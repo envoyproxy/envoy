@@ -146,7 +146,7 @@ public:
       EXPECT_CALL(*dispatcher, createTimer_(_)).Times(0);
     }
 
-    EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, options_))
+    EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_conn.connection_));
     EXPECT_CALL(*test_conn.connection_, addReadFilter(_))
         .WillOnce(Invoke(
@@ -242,7 +242,7 @@ public:
   }
 
   void initialize() {
-    ON_CALL(*cluster_->upstream_local_address_selector_, getUpstreamLocalAddress(_, _))
+    ON_CALL(*cluster_->upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
         .WillByDefault(
             Return(Upstream::UpstreamLocalAddress({cluster_->source_address_, options_})));
     conn_pool_ = std::make_unique<ConnPoolBase>(dispatcher_, host_, upstream_ready_cb_, options_,

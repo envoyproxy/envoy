@@ -43,8 +43,8 @@ private:
    * @param params supplies the incoming endpoint query or post params.
    */
   absl::Status changeLogLevel(Http::Utility::QueryParams& params);
-  absl::Status
-  changeLogLevels(const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes);
+  absl::Status changeLogLevelsForComponentLoggers(
+      const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes);
 
   inline absl::StatusOr<spdlog::level::level_enum> parseLogLevel(absl::string_view level_string) {
     auto level_it = log_levels_.find(level_string);

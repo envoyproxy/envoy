@@ -4,8 +4,8 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load("//bazel:repositories.bzl", "NO_HTTP3_SKIP_TARGETS", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 
 licenses(["notice"])  # Apache 2
 
@@ -55,15 +55,16 @@ envoy_cc_test_library(
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:instance_mocks",
-        "//test/mocks/server:worker_factory_mocks",
         "//test/mocks/server:listener_component_factory_mocks",
+        "//test/mocks/server:worker_factory_mocks",
         "//test/mocks/server:worker_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:disable_http3": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )

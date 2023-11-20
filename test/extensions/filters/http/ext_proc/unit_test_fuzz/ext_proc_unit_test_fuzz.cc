@@ -87,7 +87,7 @@ DEFINE_PROTO_FUZZER(
   EXPECT_CALL(*client, start(_, _, _))
       .WillRepeatedly(Invoke(
           [&](ExternalProcessing::ExternalProcessorCallbacks&,
-              const envoy::config::core::v3::GrpcService&,
+              const Grpc::GrpcServiceConfigWithHashKey&,
               const StreamInfo::StreamInfo&) -> ExternalProcessing::ExternalProcessorStreamPtr {
             auto stream = std::make_unique<MockStream>();
             EXPECT_CALL(*stream, send(_, _))

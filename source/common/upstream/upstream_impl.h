@@ -71,42 +71,26 @@
 namespace Envoy {
 namespace Upstream {
 
+using ClusterProto = envoy::config::cluster::v3::Cluster;
+
 using UpstreamNetworkFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
 
-/**
- * An implementation of UpstreamLocalAddressSelector.
- */
-class UpstreamLocalAddressSelectorImpl : public UpstreamLocalAddressSelector {
+class LegacyLbPolicyConfigHelper {
 public:
-  UpstreamLocalAddressSelectorImpl(
-      const envoy::config::cluster::v3::Cluster& config,
-      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config);
+  struct Result {
+    TypedLoadBalancerFactory* factory;
+    LoadBalancerConfigPtr config;
+  };
 
-  // UpstreamLocalAddressSelector
-  UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address,
-      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const override;
+  static absl::StatusOr<Result>
+  getTypedLbConfigFromLegacyProtoWithoutSubset(const ClusterProto& cluster,
+                                               ProtobufMessage::ValidationVisitor& visitor);
 
-private:
-  const Network::ConnectionSocket::OptionsSharedPtr
-  buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                         const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
-  const Network::ConnectionSocket::OptionsSharedPtr
-  buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                            const envoy::config::core::v3::BindConfig bind_config);
-  void parseBindConfig(const std::string cluster_name,
-                       const envoy::config::core::v3::BindConfig& bind_config,
-                       const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
-                       const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
-  Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
-      const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
-      const Network::ConnectionSocket::OptionsSharedPtr& options) const;
-
-  Network::ConnectionSocket::OptionsSharedPtr base_socket_options_;
-  Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
-  std::vector<UpstreamLocalAddress> upstream_local_addresses_;
+  static absl::StatusOr<Result>
+  getTypedLbConfigFromLegacyProto(const ClusterProto& cluster,
+                                  ProtobufMessage::ValidationVisitor& visitor);
 };
 
 /**
@@ -912,22 +896,42 @@ public:
   }
   OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
   lbRoundRobinConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbRoundRobinConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbLeastRequestConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
   lbRingHashConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbRingHashConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
   lbMaglevConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbMaglevConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbOriginalDstConfig();
   }
   OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const override {
@@ -976,7 +980,9 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  std::shared_ptr<UpstreamLocalAddressSelector> getUpstreamLocalAddressSelector() const override {
+  bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
+
+  UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override {
@@ -1038,7 +1044,7 @@ public:
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
-    // Upgrade filter chains not yet supported for upstream filters.
+    // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
 
@@ -1109,8 +1115,8 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
-  const std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
+  UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
+  std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
@@ -1128,7 +1134,6 @@ private:
   std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
   std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
       network_filter_config_provider_manager_;
-  const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   Filter::NetworkFilterFactoriesList filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
@@ -1149,6 +1154,7 @@ private:
   const bool added_via_api_ : 1;
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
+  const bool per_endpoint_stats_ : 1;
 };
 
 /**
@@ -1266,6 +1272,8 @@ protected:
       const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
 
 private:
+  static const absl::string_view DoNotValidateAlpnRuntimeKey;
+
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 

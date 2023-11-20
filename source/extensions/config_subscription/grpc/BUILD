@@ -149,13 +149,9 @@ envoy_cc_library(
     name = "delta_subscription_state_lib",
     srcs = [
         "delta_subscription_state.cc",
-        "new_delta_subscription_state.cc",
-        "old_delta_subscription_state.cc",
     ],
     hdrs = [
         "delta_subscription_state.h",
-        "new_delta_subscription_state.h",
-        "old_delta_subscription_state.h",
     ],
     deps = [
         ":pausable_ack_queue_lib",

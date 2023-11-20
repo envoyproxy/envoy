@@ -182,7 +182,7 @@ private:
   ThreadLocal::SlotAllocator& tls_;
 
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
-  uint64_t specifier_hash_;
+  uint64_t specifier_hash_{0};
 
   std::vector<std::string> clusters_;
   std::vector<HdsClusterPtr> hds_clusters_;

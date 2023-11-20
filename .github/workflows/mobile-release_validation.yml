@@ -19,7 +19,7 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
+      pull-requests: read
 
   validate_swiftpm_example:
     if: ${{ needs.env.outputs.mobile_release_validation == 'true' }}
@@ -31,7 +31,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: |
         cd mobile
         ./ci/mac_ci_setup.sh

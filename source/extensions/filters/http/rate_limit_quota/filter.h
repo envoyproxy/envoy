@@ -3,6 +3,7 @@
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
@@ -44,18 +45,20 @@ enum class RateLimitStatus {
 
 class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public RateLimitQuotaCallbacks,
-                             public Logger::Loggable<Logger::Id::filter> {
+                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
-                       BucketsCache& quota_buckets, ThreadLocalClient& client)
-      : config_(std::move(config)), factory_context_(factory_context),
-        quota_buckets_(quota_buckets), client_(client),
-        time_source_(factory_context.mainThreadDispatcher().timeSource()) {
+                       BucketsCache& quota_buckets, ThreadLocalClient& client,
+                       Grpc::GrpcServiceConfigWithHashKey config_with_hash_key)
+      : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
+        factory_context_(factory_context), quota_buckets_(quota_buckets), client_(client),
+        time_source_(
+            factory_context.getServerFactoryContext().mainThreadDispatcher().timeSource()) {
     createMatcher();
   }
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
@@ -90,7 +93,9 @@ private:
   Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
 
+  Http::FilterHeadersStatus processCachedBucket(size_t bucket_id);
   FilterConfigConstSharedPtr config_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};

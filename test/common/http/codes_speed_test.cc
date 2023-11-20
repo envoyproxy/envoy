@@ -98,6 +98,7 @@ static void BM_AddResponsesRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.addResponses();
   }
 }
@@ -108,6 +109,7 @@ static void BM_ResponseTimingRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.responseTiming();
   }
 }

@@ -86,7 +86,8 @@ protected:
   std::unique_ptr<quic::QuicSession> CreateQuicSession(
       quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
-      const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
+      const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo,
+      quic::ConnectionIdGeneratorInterface& connection_id_generator) override;
 
   // quic::QuicDispatcher
   // Sets current_packet_dispatch_success_ to false for processPacket's return value,

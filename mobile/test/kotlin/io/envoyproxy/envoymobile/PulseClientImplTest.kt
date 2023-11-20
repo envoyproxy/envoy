@@ -14,11 +14,9 @@ import org.mockito.MockitoAnnotations
 class PulseClientImplTest {
   private var envoyEngine: EnvoyEngine = mock(EnvoyEngine::class.java)
 
-  @Captor
-  private lateinit var elementsCaptor: ArgumentCaptor<String>
+  @Captor private lateinit var elementsCaptor: ArgumentCaptor<String>
 
-  @Captor
-  private lateinit var tagsCaptor: ArgumentCaptor<MutableMap<String, String>>
+  @Captor private lateinit var tagsCaptor: ArgumentCaptor<MutableMap<String, String>>
 
   @Before
   fun setup() {
@@ -31,9 +29,8 @@ class PulseClientImplTest {
     val counter = pulseClient.counter(Element("test"), Element("stat"))
     counter.increment()
     val countCaptor = ArgumentCaptor.forClass(Int::class.java)
-    verify(envoyEngine).recordCounterInc(
-      elementsCaptor.capture(), tagsCaptor.capture(), countCaptor.capture()
-    )
+    verify(envoyEngine)
+      .recordCounterInc(elementsCaptor.capture(), tagsCaptor.capture(), countCaptor.capture())
     assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
     assertThat(countCaptor.getValue()).isEqualTo(1)
     assertThat(tagsCaptor.getValue().size).isEqualTo(0)
@@ -42,15 +39,16 @@ class PulseClientImplTest {
   @Test
   fun `counter delegates to engine with tags and count`() {
     val pulseClient = PulseClientImpl(envoyEngine)
-    val counter = pulseClient.counter(
-      Element("test"), Element("stat"),
-      tags = TagsBuilder().add("testKey1", "testValue1").add("testKey2", "testValue2").build()
-    )
+    val counter =
+      pulseClient.counter(
+        Element("test"),
+        Element("stat"),
+        tags = TagsBuilder().add("testKey1", "testValue1").add("testKey2", "testValue2").build()
+      )
     counter.increment(5)
     val countCaptor = ArgumentCaptor.forClass(Int::class.java)
-    verify(envoyEngine).recordCounterInc(
-      elementsCaptor.capture(), tagsCaptor.capture(), countCaptor.capture()
-    )
+    verify(envoyEngine)
+      .recordCounterInc(elementsCaptor.capture(), tagsCaptor.capture(), countCaptor.capture())
     assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
     assertThat(countCaptor.getValue()).isEqualTo(5)
 

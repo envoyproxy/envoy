@@ -5,6 +5,7 @@
 #include "source/common/http/codec_client.h"
 #include "source/common/http/exception.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -30,7 +31,7 @@
 
 using testing::_;
 using testing::AtMost;
-using testing::ByMove;
+using testing::ByMove; // NOLINT(misc-unused-using-decls)
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -496,8 +497,11 @@ public:
         socket->connectionInfoProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), nullptr, nullptr);
     NiceMock<Network::MockListenerConfig> listener_config;
-    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_,
-                                                     runtime_, listener_config);
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    upstream_listener_ = std::make_unique<Network::TcpListenerImpl>(
+        *dispatcher_, api_->randomGenerator(), runtime_, std::move(socket), listener_callbacks_,
+        listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 

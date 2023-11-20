@@ -16,7 +16,7 @@ class TestRequest : public Request {
 public:
   explicit TestRequest(int& data)
       : Request(RequestType::Read, mock_io_uring_socket_), data_(data) {}
-  ~TestRequest() { data_ = -1; }
+  ~TestRequest() override { data_ = -1; }
 
   int& data_;
   MockIoUringSocket mock_io_uring_socket_;

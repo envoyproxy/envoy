@@ -157,7 +157,14 @@ public:
     do_end_stream_ = true;
   }
 
-  void log() { state_ = FilterState::Log; }
+  void enterLog() {
+    prev_state_ = state_;
+    state_ = FilterState::Log;
+  }
+  void leaveLog() {
+    state_ = prev_state_;
+    prev_state_ = FilterState::Log;
+  }
 
   bool handleHeaderGolangStatus(const GolangStatus status);
   bool handleDataGolangStatus(const GolangStatus status);
@@ -185,6 +192,7 @@ protected:
   bool watermark_requested_{false};
   Buffer::InstancePtr data_buffer_{nullptr};
   FilterState state_{FilterState::WaitingHeader};
+  FilterState prev_state_{FilterState::Done};
   bool end_stream_{false};
   bool do_end_stream_{false};
   bool seen_trailers_{false};

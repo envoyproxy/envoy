@@ -34,54 +34,6 @@ public:
     std::string current_token;
     std::vector<FormatterProviderBasePtr<FormatterContext>> formatters;
 
-    // The following regex is used to check validity of the formatter command and to
-    // extract groups.
-    // The formatter command has the following format:
-    //    % COMMAND(SUBCOMMAND):LENGTH%
-    // % signs at the beginning and end are used by parser to find next COMMAND.
-    // COMMAND must always be present and must consist of characters: "A-Z", "0-9" or "_".
-    // SUBCOMMAND presence depends on the COMMAND. Format is flexible but cannot contain ")".:
-    // - for some commands SUBCOMMAND is not allowed (for example %PROTOCOL%)
-    // - for some commands SUBCOMMAND is required (for example %REQ(:AUTHORITY)%, just %REQ% will
-    // cause error)
-    // - for some commands SUBCOMMAND is optional (for example %START_TIME% and
-    // %START_TIME(%f.%1f.%2f.%3f)% are both correct).
-    // LENGTH presence depends on the command. Some
-    // commands allow LENGTH to be specified, so not. Regex is used to validate the syntax and also
-    // to extract values for COMMAND, SUBCOMMAND and LENGTH.
-    //
-    // Below is explanation of capturing and non-capturing groups. Non-capturing groups are used
-    // to specify that certain part of the formatter command is optional and should contain specific
-    // characters. Capturing groups are used to extract the values when regex is matched against
-    // formatter command string.
-    //
-    // clang-format off
-    // Non-capturing group specifying optional :LENGTH -------------------------------------
-    //                                                                                      |
-    // Non-capturing group specifying optional (SUBCOMMAND)------------------               |
-    //                                                                       |              |
-    // Non-capturing group specifying mandatory COMMAND                      |              |
-    //  which uses only A-Z, 0-9 and _ characters     -----                  |              |
-    //  Group is used only to specify allowed characters.  |                 |              |
-    //                                                     |                 |              |
-    //                                                     |                 |              |
-    //                                             _________________  _______________  _____________
-    //                                             |               |  |             |  |           |
-    const std::regex command_w_args_regex(R"EOF(^%((?:[A-Z]|[0-9]|_)+)(?:\(([^\)]*)\))?(?::([0-9]+))?%)EOF");
-    //                                            |__________________|     |______|        |______|
-    //                                                     |                   |              |
-    // Capturing group specifying COMMAND -----------------                    |              |
-    // The index of this group is 1.                                           |              |
-    //                                                                         |              |
-    // Capturing group for SUBCOMMAND. If present, it will --------------------               |
-    // contain SUBCOMMAND without "(" and ")". The index                                      |
-    // of SUBCOMMAND group is 2.                                                              |
-    //                                                                                        |
-    // Capturing group for LENGTH. If present, it will ----------------------------------------
-    // contain just number without ":". The index of
-    // LENGTH group is 3.
-    // clang-format on
-
     for (size_t pos = 0; pos < format.size(); ++pos) {
       if (format[pos] != '%') {
         current_token += format[pos];
@@ -105,8 +57,8 @@ public:
 
       std::smatch m;
       const std::string search_space = std::string(format.substr(pos));
-      if (!std::regex_search(search_space, m, command_w_args_regex)) {
-        throw EnvoyException(
+      if (!std::regex_search(search_space, m, commandWithArgsRegex())) {
+        throwEnvoyExceptionOrPanic(
             fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
                         format, pos));
       }
@@ -121,7 +73,7 @@ public:
       if (m.str(3).length() != 0) {
         size_t length_value;
         if (!absl::SimpleAtoi(m.str(3), &length_value)) {
-          throw EnvoyException(absl::StrCat("Length must be an integer, given: ", m.str(3)));
+          throwEnvoyExceptionOrPanic(absl::StrCat("Length must be an integer, given: ", m.str(3)));
         }
         max_length = length_value;
       }
@@ -171,6 +123,9 @@ public:
 
     return formatters;
   }
+
+private:
+  static const std::regex& commandWithArgsRegex();
 };
 
 inline constexpr absl::string_view DefaultUnspecifiedValueStringView = "-";
@@ -181,7 +136,7 @@ inline constexpr absl::string_view DefaultUnspecifiedValueStringView = "-";
 template <class FormatterContext>
 class CommonFormatterBaseImpl : public FormatterBase<FormatterContext> {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
   CommonFormatterBaseImpl(const std::string& format, bool omit_empty_values = false)
       : empty_value_string_(omit_empty_values ? absl::string_view{}
@@ -230,9 +185,9 @@ template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVis
  */
 template <class FormatterContext> class StructFormatterBase {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
-  using PlainNumber = PlainNumberFormatter;
-  using PlainString = PlainStringFormatter;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
+  using PlainNumber = PlainNumberFormatterBase<FormatterContext>;
+  using PlainString = PlainStringFormatterBase<FormatterContext>;
 
   StructFormatterBase(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                       bool omit_empty_values, const CommandParsers& commands = {})
@@ -317,7 +272,7 @@ private:
           output->emplace(pair.first, toFormatNumberValue(pair.second.number_value()));
           break;
         default:
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -346,7 +301,7 @@ private:
           break;
 
         default:
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -429,7 +384,7 @@ using StructFormatterBasePtr = std::unique_ptr<StructFormatterBase<FormatterCont
 template <class FormatterContext>
 class CommonJsonFormatterBaseImpl : public FormatterBase<FormatterContext> {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
   CommonJsonFormatterBaseImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                               bool omit_empty_values, bool sort_properties,
@@ -467,64 +422,8 @@ public:
   using CommonJsonFormatterBaseImpl<FormatterContext>::CommonJsonFormatterBaseImpl;
 };
 
-/**
- * Wrapper for StructFormatterBase that uses HttpFormatterContext.
- */
-class StructFormatter : public StructFormatterBase<HttpFormatterContext> {
-public:
-  using StructFormatterBase::StructFormatterBase;
-
-  ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& response_headers,
-                             const Http::ResponseTrailerMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info,
-                             absl::string_view local_reply_body,
-                             AccessLog::AccessLogType access_log_type) const {
-    HttpFormatterContext context(&request_headers, &response_headers, &response_trailers,
-                                 local_reply_body, access_log_type);
-    return StructFormatterBase::formatWithContext(context, stream_info);
-  }
-};
-
-template <class Base> class HttpFormatterSpecializationHelper : public Base {
-public:
-  using Base::Base;
-
-  // Formatter
-  std::string format(const Http::RequestHeaderMap& request_headers,
-                     const Http::ResponseHeaderMap& response_headers,
-                     const Http::ResponseTrailerMap& response_trailers,
-                     const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-                     AccessLog::AccessLogType access_log_type) const override {
-    HttpFormatterContext context(&request_headers, &response_headers, &response_trailers,
-                                 local_reply_body, access_log_type);
-    return Base::formatWithContext(context, stream_info);
-  }
-};
-
-/**
- * Specialization of FormatterBaseImpl for HttpFormatterContext. This will implement
- * additional format() method for backwards compatibility.
- */
-template <>
-class FormatterBaseImpl<HttpFormatterContext>
-    : public HttpFormatterSpecializationHelper<CommonFormatterBaseImpl<HttpFormatterContext>> {
-public:
-  using HttpFormatterSpecializationHelper::HttpFormatterSpecializationHelper;
-};
-
+using StructFormatter = StructFormatterBase<HttpFormatterContext>;
 using StructFormatterPtr = std::unique_ptr<StructFormatter>;
-
-/**
- * Specialization of JsonFormatterBaseImpl for HttpFormatterContext. This will implement
- * additional format() method for backwards compatibility.
- */
-template <>
-class JsonFormatterBaseImpl<HttpFormatterContext>
-    : public HttpFormatterSpecializationHelper<CommonJsonFormatterBaseImpl<HttpFormatterContext>> {
-public:
-  using HttpFormatterSpecializationHelper::HttpFormatterSpecializationHelper;
-};
 
 // Aliases for backwards compatibility.
 using FormatterImpl = FormatterBaseImpl<HttpFormatterContext>;

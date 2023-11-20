@@ -20,7 +20,7 @@ envoy_proto_library(
 
 envoy_extension_cc_test_library(
     name = "config_test_base",
-    srcs = ["config_test_base.h"],
+    hdrs = ["config_test_base.h"],
     extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",

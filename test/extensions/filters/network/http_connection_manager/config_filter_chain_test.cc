@@ -10,7 +10,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Eq;
 using testing::Return;
 
 namespace Envoy {
@@ -54,6 +53,72 @@ TEST_F(FilterChainTest, CreateFilterChain) {
   EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
   EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
   config.createFilterChain(manager);
+}
+
+TEST_F(FilterChainTest, CreateFilterChainWithDisabledFilter) {
+  const std::string config_yaml = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: encoder-decoder-buffer-filter
+  disabled: true
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(basic_config_), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  NiceMock<Http::MockFilterChainManager> manager;
+  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
+  config.createFilterChain(manager);
+}
+
+TEST_F(FilterChainTest, CreateFilterChainWithDisabledTerminalFilter) {
+  const std::string config_yaml = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: encoder-decoder-buffer-filter
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  disabled: true
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(config_yaml), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException,
+      "Error: the last (terminal) filter (envoy.filters.http.router) in the chain cannot be "
+      "disabled by default.");
 }
 
 TEST_F(FilterChainTest, CreateDynamicFilterChain) {

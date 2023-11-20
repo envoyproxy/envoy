@@ -33,6 +33,7 @@ public:
                        absl::string_view destination_address = "");
 
   void close();
+  void close(Network::ConnectionCloseType close_type);
   void waitForData(const std::string& data, bool exact_match = true);
   // wait for at least `length` bytes to be received
   ABSL_MUST_USE_RESULT AssertionResult
@@ -48,6 +49,7 @@ public:
   bool connected() const { return !disconnected_; }
   // clear up to the `count` number of bytes of received data
   void clearData(size_t count = std::string::npos) { payload_reader_->clearData(count); }
+  Network::Connection* connection() const { return connection_.get(); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {

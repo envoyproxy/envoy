@@ -53,6 +53,11 @@ public:
   virtual void close(Network::ConnectionCloseType type) PURE;
 
   /**
+   * @return the detected close type from socket.
+   */
+  virtual Network::DetectedCloseType detectedCloseType() const PURE;
+
+  /**
    * Write data through the client.
    * @param data the bufferred data.
    * @param end_stream indicates if this is the end of the stream, half close
@@ -82,6 +87,11 @@ public:
    * @return if the client connects to a peer host.
    */
   virtual bool connected() PURE;
+
+  /**
+   * @return the streamInfo of the current connection if there is any.
+   */
+  virtual OptRef<StreamInfo::StreamInfo> getStreamInfo() PURE;
 };
 
 using AsyncTcpClientPtr = std::unique_ptr<AsyncTcpClient>;

@@ -234,7 +234,7 @@ typed_config:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["envoy.filters.http.grpc_json_transcoder"].PackFrom(per_route_config);
+          (*config)["grpc_json_transcoder"].PackFrom(per_route_config);
         };
 
     config_helper_.addConfigModifier(modifier);
@@ -351,9 +351,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
       },
       R"({"id":"20","theme":"Children"})");
 
-#ifndef ENVOY_ENABLE_UHV
-  // TODO(#23291) - UHV validate JSON-encoded gRPC query parameters
-  // json_name = "search[decoded]", "search[decoded]" should work
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/shelf?shelf.search[decoded]=Google"},
@@ -365,7 +362,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
           {"content-type", "application/json"},
       },
       R"({"id":"20","theme":"Children"})");
-#endif
 
   // json_name = "search%5Bencoded%5D", "search[encode]" should fail.
   // It is tested in test case "DecodedQueryParameterWithEncodedJsonName"

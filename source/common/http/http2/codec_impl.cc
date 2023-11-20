@@ -1782,6 +1782,7 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_list_bytes = max_headers_kb * 1024;
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
+  og_options_.allow_different_host_and_authority = true;
 
 #ifdef ENVOY_ENABLE_UHV
   // UHV - disable header validations in oghttp2
@@ -1832,6 +1833,8 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb)
     : Http2Options(http2_options, max_headers_kb) {
   og_options_.perspective = http2::adapter::Perspective::kClient;
+  og_options_.remote_max_concurrent_streams =
+      ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS;
   // Temporarily disable initial max streams limit/protection, since we might want to create
   // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
   //

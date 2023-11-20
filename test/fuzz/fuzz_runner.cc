@@ -1,5 +1,7 @@
 #include "test/fuzz/fuzz_runner.h"
 
+#include <cstdlib>
+
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/event/libevent.h"
@@ -56,6 +58,27 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   }
 }
 
+using Hooks = std::vector<std::function<void()>>;
+static Hooks* cleanup_hooks = nullptr;
+
+void addCleanupHook(std::function<void()> cleanup) {
+  if (cleanup_hooks == nullptr) {
+    cleanup_hooks = new Hooks;
+  }
+  cleanup_hooks->push_back(cleanup);
+}
+
+void runCleanupHooks() {
+  if (cleanup_hooks != nullptr) {
+    // Run hooks in reverse order from how they were added.
+    for (auto iter = cleanup_hooks->rbegin(), end = cleanup_hooks->rend(); iter != end; ++iter) {
+      (*iter)();
+    }
+    delete cleanup_hooks;
+    cleanup_hooks = nullptr;
+  }
+}
+
 } // namespace Fuzz
 } // namespace Envoy
 
@@ -67,5 +90,6 @@ extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv) {
   testing::GMOCK_FLAG(verbose) = "error";
   testing::InitGoogleMock(argc, *argv);
   Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::critical);
+  atexit(Envoy::Fuzz::runCleanupHooks);
   return 0;
 }

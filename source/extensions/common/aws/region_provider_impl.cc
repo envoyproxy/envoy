@@ -9,9 +9,7 @@ static const char AWS_REGION[] = "AWS_REGION";
 
 StaticRegionProvider::StaticRegionProvider(const std::string& region) : region_(region) {}
 
-absl::optional<std::string> StaticRegionProvider::getRegion() {
-  return absl::optional<std::string>(region_);
-}
+absl::optional<std::string> StaticRegionProvider::getRegion() { return {region_}; }
 
 absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
   const auto region = std::getenv(AWS_REGION);
@@ -19,7 +17,7 @@ absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
     return absl::nullopt;
   }
   ENVOY_LOG(debug, "Found environment region {}={}", AWS_REGION, region);
-  return absl::optional<std::string>(region);
+  return {region};
 }
 
 } // namespace Aws

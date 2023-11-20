@@ -207,6 +207,7 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
       self_address == connection()->sent_server_preferred_address()) {
     connection_stats_.num_packets_rx_on_preferred_address_.inc();
   }
+  maybeApplyDelayedClose();
 }
 
 } // namespace Quic

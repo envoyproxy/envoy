@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "envoy/matcher/matcher.h"
@@ -151,7 +150,7 @@ public:
     if (supported_input_types.find(data_input_->dataInputType()) == supported_input_types.end()) {
       std::string supported_types =
           absl::StrJoin(supported_input_types.begin(), supported_input_types.end(), ", ");
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           absl::StrCat("Unsupported data input type: ", data_input_->dataInputType(),
                        ". The matcher supports input type: ", supported_types));
     }

@@ -79,14 +79,24 @@ type StreamFilter interface {
 	StreamDecoderFilter
 	// response stream
 	StreamEncoderFilter
-	// log when the request is finished
+
+	// log
 	OnLog()
+	OnLogDownstreamStart()
+	OnLogDownstreamPeriodic()
+
 	// destroy filter
 	OnDestroy(DestroyReason)
 	// TODO add more for stream complete
 }
 
 func (*PassThroughStreamFilter) OnLog() {
+}
+
+func (*PassThroughStreamFilter) OnLogDownstreamStart() {
+}
+
+func (*PassThroughStreamFilter) OnLogDownstreamPeriodic() {
 }
 
 func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
@@ -129,6 +139,9 @@ type StreamInfo interface {
 	FilterState() FilterState
 	// VirtualClusterName returns the name of the virtual cluster which got matched
 	VirtualClusterName() (string, bool)
+
+	// Some fields in stream info can be fetched via GetProperty
+	// For example, startTime() is equal to GetProperty("request.time")
 }
 
 type StreamFilterCallbacks interface {
@@ -144,6 +157,17 @@ type FilterCallbacks interface {
 	RecoverPanic()
 	Log(level LogType, msg string)
 	LogLevel() LogType
+	// GetProperty fetch Envoy attribute and return the value as a string.
+	// The list of attributes can be found in https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.
+	// If the fetch succeeded, a string will be returned.
+	// If the value is a timestamp, it is returned as a timestamp string like "2023-07-31T07:21:40.695646+00:00".
+	// If the fetch failed (including the value is not found), an error will be returned.
+	//
+	// The error can be one of:
+	// * ErrInternalFailure
+	// * ErrSerializationFailure (Currently, fetching attributes in List/Map type are unsupported)
+	// * ErrValueNotFound
+	GetProperty(key string) (string, error)
 	// TODO add more for filter callbacks
 }
 

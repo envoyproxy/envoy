@@ -16,11 +16,11 @@ namespace Utility {
 envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
                                                 bool health_check_failed);
 
-void assertExclusiveLogFormatMethod(
+absl::Status assertExclusiveLogFormatMethod(
     const Options& options,
     const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config);
 
-void maybeSetApplicationLogFormat(
+absl::Status maybeSetApplicationLogFormat(
     const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config);
 
 } // namespace Utility

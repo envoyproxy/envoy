@@ -88,12 +88,13 @@ getAlternateProtocolsCacheOptions(
     Server::Configuration::ServerFactoryContext& server_context) {
   if (options.has_auto_config() && options.auto_config().has_http3_protocol_options()) {
     if (!options.auto_config().has_alternate_protocols_cache_options()) {
-      throw EnvoyException(fmt::format("alternate protocols cache must be configured when HTTP/3 "
-                                       "is enabled with auto_config"));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("alternate protocols cache must be configured when HTTP/3 "
+                      "is enabled with auto_config"));
     }
     auto cache_options = options.auto_config().alternate_protocols_cache_options();
     if (cache_options.has_key_value_store_config() && server_context.options().concurrency() != 1) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("options has key value store but Envoy has concurrency = {} : {}",
                       server_context.options().concurrency(), cache_options.DebugString()));
     }
@@ -109,6 +110,11 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
   Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
+    // This will cause codecs to use legacy header validation and path normalization
+    return nullptr;
+  }
   ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
   if (!options.has_header_validation_config()) {
     // If header validator is not configured ensure that the defaults match Envoy's original
@@ -128,21 +134,27 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   auto* factory = Envoy::Config::Utility::getFactory<Envoy::Http::HeaderValidatorFactoryConfig>(
       header_validator_config);
   if (!factory) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Header validator extension not found: '{}'", header_validator_config.name()));
   }
 
   header_validator_factory =
       factory->createFromProto(header_validator_config.typed_config(), server_context);
   if (!header_validator_factory) {
-    throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
-                                     header_validator_config.name()));
+    throwEnvoyExceptionOrPanic(fmt::format("Header validator extension could not be created: '{}'",
+                                           header_validator_config.name()));
   }
 #else
   if (options.has_header_validation_config()) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("This Envoy binary does not support header validator extensions: '{}'",
                     options.header_validation_config().name()));
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
+    throwEnvoyExceptionOrPanic(
+        "Header validator can not be enabled since this Envoy binary does not support it.");
   }
 #endif
   return header_validator_factory;

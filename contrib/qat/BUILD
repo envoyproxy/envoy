@@ -1,5 +1,5 @@
-load("//bazel:envoy_build_system.bzl", "envoy_contrib_package")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
+load("//bazel:envoy_build_system.bzl", "envoy_contrib_package")
 load(
     "//contrib:all_contrib_extensions.bzl",
     "envoy_contrib_linux_x86_64_constraints",

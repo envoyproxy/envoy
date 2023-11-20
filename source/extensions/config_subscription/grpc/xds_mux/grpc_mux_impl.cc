@@ -222,6 +222,11 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
 }
 
 template <class S, class F, class RQ, class RS> void GrpcMuxImpl<S, F, RQ, RS>::start() {
+  ASSERT(!started_);
+  if (started_) {
+    return;
+  }
+  started_ = true;
   ENVOY_LOG(debug, "GrpcMuxImpl now trying to establish a stream");
   grpc_stream_.establishNewStream();
 }

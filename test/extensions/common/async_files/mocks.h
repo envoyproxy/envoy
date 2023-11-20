@@ -1,3 +1,5 @@
+#pragma once
+
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/common/async_files/async_file_manager_factory.h"

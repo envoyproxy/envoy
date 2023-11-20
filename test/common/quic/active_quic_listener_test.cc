@@ -192,7 +192,10 @@ protected:
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Return(filter_chain_));
-    EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);
+    EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count * 2);
+    EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+        .Times(connection_count)
+        .WillRepeatedly(Return(true));
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Invoke([](Network::Connection& connection,

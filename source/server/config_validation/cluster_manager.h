@@ -52,6 +52,9 @@ public:
     // any calling code creating real outbound networking during validation.
     return nullptr;
   }
+
+  // Gives access to the protected constructor.
+  friend ValidationClusterManagerFactory;
 };
 
 } // namespace Upstream

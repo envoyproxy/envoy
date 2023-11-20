@@ -127,6 +127,7 @@ public:
   Event::Dispatcher& dispatcher() const override;
   void close(ConnectionCloseType type) override { close(type, ""); }
   void close(ConnectionCloseType type, absl::string_view details) override;
+  DetectedCloseType detectedCloseType() const override;
   bool readEnabled() const override;
   bool aboveHighWatermark() const override;
   void hashKey(std::vector<uint8_t>& hash_key) const override;

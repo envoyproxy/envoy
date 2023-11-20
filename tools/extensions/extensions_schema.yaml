@@ -27,6 +27,7 @@ builtin:
 - envoy.matching.inputs.subject
 - envoy.regex_engines.google_re2
 - envoy.filters.http.upstream_codec
+- envoy.upstream.local_address_selector.default_local_address_selector
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -72,6 +73,8 @@ categories:
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
+- envoy.filters.udp.session
+- envoy.filters.quic_listener
 - envoy.formatter
 - envoy.geoip_providers
 - envoy.grpc_credentials
@@ -107,6 +110,7 @@ categories:
 - envoy.transport_sockets.upstream
 - envoy.tls.cert_validator
 - envoy.upstreams
+- envoy.upstream.local_address_selector
 - envoy.udp_packet_writer
 - envoy.wasm.runtime
 - envoy.xds_delegates
@@ -117,6 +121,7 @@ categories:
 - envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
+- envoy.injected_credentials
 - envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers
@@ -132,6 +137,8 @@ categories:
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
 - envoy.router.cluster_specifier_plugin
+- envoy.tracers.opentelemetry.resource_detectors
+- envoy.tracers.opentelemetry.samplers
 
 status_values:
 - name: stable

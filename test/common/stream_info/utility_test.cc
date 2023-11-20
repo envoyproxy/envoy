@@ -4,6 +4,7 @@
 #include "source/common/stream_info/utility.h"
 
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -315,11 +316,14 @@ TEST(ProxyStatusErrorToString, TestAll) {
 }
 
 TEST(ProxyStatusFromStreamInfo, TestAll) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   for (const auto& [response_flag, proxy_status_error] :
        std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
            {ResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
            {ResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
-           {ResponseFlag::UpstreamRequestTimeout, ProxyStatusError::ConnectionTimeout},
+           {ResponseFlag::UpstreamRequestTimeout, ProxyStatusError::HttpResponseTimeout},
            {ResponseFlag::LocalReset, ProxyStatusError::ConnectionTimeout},
            {ResponseFlag::UpstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
            {ResponseFlag::UpstreamConnectionFailure, ProxyStatusError::ConnectionRefused},
@@ -341,6 +345,16 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
     ON_CALL(stream_info, hasResponseFlag(response_flag)).WillByDefault(Return(true));
     EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), proxy_status_error);
   }
+}
+
+TEST(ProxyStatusFromStreamInfo, TestUpstreamRequestTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "false"}});
+  NiceMock<MockStreamInfo> stream_info;
+  ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+      .WillByDefault(Return(true));
+  EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), ProxyStatusError::ConnectionTimeout);
 }
 
 } // namespace

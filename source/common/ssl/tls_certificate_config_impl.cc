@@ -17,7 +17,7 @@ std::vector<uint8_t> readOcspStaple(const envoy::config::core::v3::DataSource& s
   std::string staple = Config::DataSource::read(source, true, api);
   if (source.specifier_case() ==
       envoy::config::core::v3::DataSource::SpecifierCase::kInlineString) {
-    throw EnvoyException("OCSP staple cannot be provided via inline_string");
+    throwEnvoyExceptionOrPanic("OCSP staple cannot be provided via inline_string");
   }
 
   return {staple.begin(), staple.end()};
@@ -46,21 +46,17 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       ocsp_staple_path_(Config::DataSource::getPath(config.ocsp_staple())
                             .value_or(ocsp_staple_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_method_(nullptr) {
-  if (config.has_private_key_provider() && config.has_private_key()) {
-    throw EnvoyException(fmt::format(
-        "Certificate configuration can't have both private_key and private_key_provider"));
-  }
   if (config.has_pkcs12()) {
     if (config.has_private_key()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Certificate configuration can't have both pkcs12 and private_key"));
     }
     if (config.has_certificate_chain()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Certificate configuration can't have both pkcs12 and certificate_chain"));
     }
     if (config.has_private_key_provider()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Certificate configuration can't have both pkcs12 and private_key_provider"));
     }
   } else {
@@ -69,20 +65,25 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
           factory_context.sslContextManager()
               .privateKeyMethodManager()
               .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context);
+      if (private_key_method_ == nullptr ||
+          (!private_key_method_->isAvailable() && !config.private_key_provider().fallback())) {
+        throwEnvoyExceptionOrPanic(fmt::format("Failed to load private key provider: {}",
+                                               config.private_key_provider().provider_name()));
+      }
+
+      if (!private_key_method_->isAvailable()) {
+        private_key_method_ = nullptr;
+      }
     }
     if (certificate_chain_.empty()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Failed to load incomplete certificate from {}: certificate chain not set",
                       certificate_chain_path_));
     }
+
     if (private_key_.empty() && private_key_method_ == nullptr) {
-      if (config.has_private_key_provider()) {
-        throw EnvoyException(fmt::format("Failed to load private key provider: {}",
-                                         config.private_key_provider().provider_name()));
-      } else {
-        throw EnvoyException(
-            fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
-      }
+      throwEnvoyExceptionOrPanic(
+          fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
     }
   }
 }

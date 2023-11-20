@@ -34,12 +34,12 @@ public:
   virtual GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) PURE;
   virtual GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                                       GoUint64 p3) PURE;
-  virtual void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) PURE;
+  virtual void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0, GoInt p1) PURE;
   virtual GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                              GoUint64 p3) PURE;
   virtual GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                            GoUint64 p3) PURE;
-  virtual void envoyGoFilterOnHttpLog(httpRequest* p0) PURE;
+  virtual void envoyGoFilterOnHttpLog(httpRequest* p0, int p1) PURE;
   virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
   virtual void envoyGoRequestSemaDec(httpRequest* p0) PURE;
 };
@@ -52,11 +52,11 @@ public:
   GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) override;
   GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                               GoUint64 p3) override;
-  void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) override;
+  void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0, GoInt p1) override;
   GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                      GoUint64 p3) override;
   GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;
-  void envoyGoFilterOnHttpLog(httpRequest* p0) override;
+  void envoyGoFilterOnHttpLog(httpRequest* p0, int p1) override;
   void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) override;
   void envoyGoRequestSemaDec(httpRequest* p0) override;
 
@@ -64,12 +64,12 @@ private:
   GoUint64 (*envoy_go_filter_new_http_plugin_config_)(httpConfig* p0) = {nullptr};
   GoUint64 (*envoy_go_filter_merge_http_plugin_config_)(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                                         GoUint64 p3) = {nullptr};
-  void (*envoy_go_filter_destroy_http_plugin_config_)(GoUint64 p0) = {nullptr};
+  void (*envoy_go_filter_destroy_http_plugin_config_)(GoUint64 p0, GoInt p1) = {nullptr};
   GoUint64 (*envoy_go_filter_on_http_header_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                               GoUint64 p3) = {nullptr};
   GoUint64 (*envoy_go_filter_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                             GoUint64 p3) = {nullptr};
-  void (*envoy_go_filter_on_http_log_)(httpRequest* p0) = {nullptr};
+  void (*envoy_go_filter_on_http_log_)(httpRequest* p0, GoUint64 p1) = {nullptr};
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
   void (*envoy_go_filter_go_request_sema_dec_)(httpRequest* p0) = {nullptr};
 };
@@ -123,9 +123,9 @@ public:
   virtual GoUint64 envoyGoFilterOnDownstreamWrite(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                                   GoInt slice_num, GoInt end_of_stream) PURE;
 
-  virtual void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 connID) PURE;
+  virtual void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 conn_id) PURE;
   virtual void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason,
-                                                        GoUint64 connID) PURE;
+                                                        GoUint64 conn_id) PURE;
   virtual void envoyGoFilterOnUpstreamData(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                            GoInt slice_num, GoInt end_of_stream) PURE;
   virtual void envoyGoFilterOnUpstreamEvent(void* w, GoInt event) PURE;
@@ -149,8 +149,8 @@ public:
   GoUint64 envoyGoFilterOnDownstreamWrite(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                           GoInt slice_num, GoInt end_of_stream) override;
 
-  void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 connID) override;
-  void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason, GoUint64 connID) override;
+  void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 conn_id) override;
+  void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason, GoUint64 conn_id) override;
   void envoyGoFilterOnUpstreamData(void* w, GoUint64 data_size, GoUint64 data_ptr, GoInt slice_num,
                                    GoInt end_of_stream) override;
   void envoyGoFilterOnUpstreamEvent(void* w, GoInt event) override;
@@ -172,9 +172,9 @@ private:
                                                    GoInt slice_num,
                                                    GoInt end_of_stream) = {nullptr};
 
-  void (*envoy_go_filter_on_upstream_connection_ready_)(void* w, GoUint64 connID) = {nullptr};
+  void (*envoy_go_filter_on_upstream_connection_ready_)(void* w, GoUint64 conn_id) = {nullptr};
   void (*envoy_go_filter_on_upstream_connection_failure_)(void* w, GoInt reason,
-                                                          GoUint64 connID) = {nullptr};
+                                                          GoUint64 conn_id) = {nullptr};
   void (*envoy_go_filter_on_upstream_data_)(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                             GoInt slice_num, GoInt end_of_stream) = {nullptr};
   void (*envoy_go_filter_on_upstream_event_)(void* w, GoInt event) = {nullptr};

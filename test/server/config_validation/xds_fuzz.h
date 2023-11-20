@@ -76,7 +76,7 @@ private:
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
   std::vector<envoy::config::listener::v3::Listener> listeners_;
 
-  uint64_t version_;
+  uint64_t version_{1};
 
   Network::Address::IpVersion ip_version_;
 

@@ -10,6 +10,8 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -18,6 +20,36 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
+
+namespace {
+constexpr absl::string_view DynamicHostFilterStateKey = "envoy.upstream.dynamic_host";
+constexpr absl::string_view DynamicPortFilterStateKey = "envoy.upstream.dynamic_port";
+
+class DynamicHostObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(DynamicHostFilterStateKey); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+class DynamicPortObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(DynamicPortFilterStateKey); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    uint32_t port = 0;
+    if (absl::SimpleAtoi(data, &port)) {
+      return std::make_unique<StreamInfo::UInt32AccessorImpl>(port);
+    }
+    return nullptr;
+  }
+};
+
+} // namespace
+
+REGISTER_FACTORY(DynamicHostObjectFactory, StreamInfo::FilterState::ObjectFactory);
+REGISTER_FACTORY(DynamicPortObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 Cluster::Cluster(
     const envoy::config::cluster::v3::Cluster& cluster,
@@ -311,12 +343,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   const Router::StringAccessor* dynamic_host_filter_state = nullptr;
-  if (context->downstreamConnection()) {
+  if (context->requestStreamInfo()) {
     dynamic_host_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
+        context->requestStreamInfo()->filterState().getDataReadOnly<Router::StringAccessor>(
+            DynamicHostFilterStateKey);
   }
 
   absl::string_view raw_host;
@@ -338,12 +368,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                              .resolve(nullptr)
                              .factory_.implementsSecureTransport();
   uint32_t port = is_secure ? 443 : 80;
-  if (context->downstreamConnection()) {
+  if (context->requestStreamInfo()) {
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
+        context->requestStreamInfo()->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+            DynamicPortFilterStateKey);
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
       port = dynamic_port_filter_state->value();

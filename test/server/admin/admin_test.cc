@@ -57,6 +57,13 @@ TEST_P(AdminInstanceTest, Getters) {
             envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED);
   EXPECT_NE(nullptr, admin_.scopedRouteConfigProvider());
+#ifdef ENVOY_ENABLE_UHV
+  // In UHV mode there is always UHV factory
+  EXPECT_NE(nullptr, admin_.makeHeaderValidator(Http::Protocol::Http11));
+#else
+  // In non UHV mode, header validator can not be created
+  EXPECT_EQ(nullptr, admin_.makeHeaderValidator(Http::Protocol::Http11));
+#endif
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
@@ -144,6 +151,7 @@ TEST_P(AdminInstanceTest, Help) {
       enable: enables the CPU profiler; One of (y, n)
   /drain_listeners (POST): drain listeners
       graceful: When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI
+      skip_exit: When draining listeners, do not exit after the drain period. This must be used with graceful
       inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.
   /healthcheck/fail (POST): cause the server to fail health checks
   /healthcheck/ok (POST): cause the server to pass health checks
@@ -294,8 +302,8 @@ public:
   AdminImpl::NullScopedRouteConfigProvider& scopedRouteConfigProvider() {
     return scoped_route_config_provider_;
   }
-  AdminImpl::NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
-  AdminImpl::NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
+  NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
+  NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
   AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
   AdminImpl::AdminListener& listener() { return listener_; }
 
@@ -304,7 +312,7 @@ private:
   Server::Instance& server_;
   AdminImpl::NullRouteConfigProvider route_config_provider_{server_.timeSource()};
   AdminImpl::NullScopedRouteConfigProvider scoped_route_config_provider_{server_.timeSource()};
-  AdminImpl::NullOverloadManager::OverloadState overload_state_{server_.dispatcher()};
+  NullOverloadManager::OverloadState overload_state_{server_.dispatcher(), false};
   AdminImpl::AdminListenSocketFactory socket_factory_{nullptr};
   Stats::ScopeSharedPtr listener_scope_;
   AdminImpl::AdminListener listener_{admin_, std::move(listener_scope_)};
@@ -323,7 +331,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.routeConfigProvider().config();
   peer.routeConfigProvider().configInfo();
   peer.routeConfigProvider().lastUpdated();
-  peer.routeConfigProvider().onConfigUpdate();
+  ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
 
   peer.scopedRouteConfigProvider().lastUpdated();
   peer.scopedRouteConfigProvider().getConfigProto();
@@ -336,6 +344,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.overloadState().tryAllocateResource(overload_name, 0);
   peer.overloadState().tryDeallocateResource(overload_name, 0);
   peer.overloadState().isResourceMonitorEnabled(overload_name);
+  peer.overloadState().getProactiveResourceMonitorForTest(overload_name);
 
   peer.overloadManager().scaledTimerFactory();
 

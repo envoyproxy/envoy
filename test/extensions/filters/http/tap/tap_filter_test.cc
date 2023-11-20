@@ -55,8 +55,9 @@ public:
 
     if (has_config) {
       EXPECT_CALL(callbacks_, streamId());
+      EXPECT_CALL(callbacks_, connection());
       http_per_request_tapper_ = new MockHttpPerRequestTapper();
-      EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_, _))
+      EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_, _, _))
           .WillOnce(Return(http_per_request_tapper_));
     }
 
@@ -93,8 +94,7 @@ TEST_F(TapFilterTest, NoConfig) {
   Http::MetadataMap metadata;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata));
 
-  filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter_->log({&request_headers, &response_headers, &response_trailers}, stream_info_);
 }
 
 // Verify filter functionality when there is a tap config.
@@ -124,8 +124,7 @@ TEST_F(TapFilterTest, Config) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 
   EXPECT_CALL(*http_per_request_tapper_, onDestroyLog()).WillOnce(Return(true));
-  filter_->log(&request_headers, &response_headers, &response_trailers, stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter_->log({&request_headers, &response_headers, &response_trailers}, stream_info_);
   EXPECT_EQ(1UL, filter_config_->stats_.rq_tapped_.value());
 
   // Workaround InSequence/shared_ptr mock leak.
@@ -149,7 +148,7 @@ TEST(TapFilterConfigTest, InvalidProto) {
   TestUtility::loadFromYaml(filter_config, config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   TapFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context).value(),
                             EnvoyException,
                             "Error: Specifying admin streaming output without configuring admin.");
 }
@@ -171,7 +170,7 @@ TEST(TapFilterConfigTest, NeitherMatchNorMatchConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   TapFilterFactory factory;
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context).value(),
                             EnvoyException,
                             fmt::format("Neither match nor match_config is set in TapConfig: {}",
                                         config.common_config().static_config().DebugString()));

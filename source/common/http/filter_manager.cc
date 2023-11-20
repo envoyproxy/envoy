@@ -284,9 +284,25 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
 
   auto* result = current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 
-  if (result == nullptr && filter_context_.filter_name != filter_context_.config_name) {
-    // Fallback to use filter name.
+  /**
+   * If:
+   * 1. no per filter config is found for the filter config name.
+   * 2. filter config name is different from the filter canonical name.
+   * 3. downgrade feature is not disabled.
+   * we fallback to use the filter canonical name.
+   */
+  if (result == nullptr && !parent_.no_downgrade_to_canonical_name_ &&
+      filter_context_.filter_name != filter_context_.config_name) {
+    // Fallback to use filter canonical name.
     result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
+
+    if (result != nullptr) {
+      ENVOY_LOG_FIRST_N(warn, 10,
+                        "No per filter config is found by filter config name and fallback to use "
+                        "filter canonical name. This is deprecated and will be forbidden very "
+                        "soon. Please use the filter config name to index per filter config. See "
+                        "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+    }
   }
   return result;
 }
@@ -306,11 +322,20 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
         cb(config);
       });
 
-  if (handled || filter_context_.filter_name == filter_context_.config_name) {
+  if (handled || parent_.no_downgrade_to_canonical_name_ ||
+      filter_context_.filter_name == filter_context_.config_name) {
     return;
   }
 
-  current_route->traversePerFilterConfig(filter_context_.filter_name, cb);
+  current_route->traversePerFilterConfig(
+      filter_context_.filter_name, [&cb](const Router::RouteSpecificFilterConfig& config) {
+        ENVOY_LOG_FIRST_N(warn, 10,
+                          "No per filter config is found by filter config name and fallback to use "
+                          "filter canonical name. This is deprecated and will be forbidden very "
+                          "soon. Please use the filter config name to index per filter config. See "
+                          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+        cb(config);
+      });
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOptions() {
@@ -325,6 +350,37 @@ OptRef<DownstreamStreamFilterCallbacks> ActiveStreamFilterBase::downstreamCallba
 
 OptRef<UpstreamStreamFilterCallbacks> ActiveStreamFilterBase::upstreamCallbacks() {
   return parent_.filter_manager_callbacks_.upstreamCallbacks();
+}
+
+RequestHeaderMapOptRef ActiveStreamFilterBase::requestHeaders() {
+  return parent_.filter_manager_callbacks_.requestHeaders();
+}
+RequestTrailerMapOptRef ActiveStreamFilterBase::requestTrailers() {
+  return parent_.filter_manager_callbacks_.requestTrailers();
+}
+ResponseHeaderMapOptRef ActiveStreamFilterBase::informationalHeaders() {
+  return parent_.filter_manager_callbacks_.informationalHeaders();
+}
+ResponseHeaderMapOptRef ActiveStreamFilterBase::responseHeaders() {
+  return parent_.filter_manager_callbacks_.responseHeaders();
+}
+ResponseTrailerMapOptRef ActiveStreamFilterBase::responseTrailers() {
+  return parent_.filter_manager_callbacks_.responseTrailers();
+}
+
+void ActiveStreamFilterBase::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  if (!streamInfo().filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey)) {
+    streamInfo().filterState()->setData(
+        LocalReplyFilterStateKey,
+        std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 bool ActiveStreamDecoderFilter::canContinue() {
@@ -382,6 +438,14 @@ void ActiveStreamDecoderFilter::drainSavedRequestMetadata() {
 }
 
 void ActiveStreamDecoderFilter::handleMetadataAfterHeadersCallback() {
+  if (parent_.state_.decoder_filter_chain_aborted_ &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.stop_decode_metadata_on_local_reply")) {
+    // The decoder filter chain has been aborted, possibly due to a local reply. In this case,
+    // there's no reason to decode saved metadata.
+    getSavedRequestMetadata()->clear();
+    return;
+  }
   // If we drain accumulated metadata, the iteration must start with the current filter.
   const bool saved_state = iterate_from_current_filter_;
   iterate_from_current_filter_ = true;
@@ -431,7 +495,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+  ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
@@ -444,19 +508,11 @@ void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers)
   }
 }
 
-ResponseHeaderMapOptRef ActiveStreamDecoderFilter::informationalHeaders() const {
-  return parent_.filter_manager_callbacks_.informationalHeaders();
-}
-
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
   parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
-}
-
-ResponseHeaderMapOptRef ActiveStreamDecoderFilter::responseHeaders() const {
-  return parent_.filter_manager_callbacks_.responseHeaders();
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -467,10 +523,6 @@ void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stre
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
-}
-
-ResponseTrailerMapOptRef ActiveStreamDecoderFilter::responseTrailers() const {
-  return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
 void ActiveStreamDecoderFilter::encodeMetadata(MetadataMapPtr&& metadata_map_ptr) {
@@ -806,7 +858,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
     if (state_.decoder_filter_chain_aborted_) {
       // If the decoder filter chain has been aborted, then either:
       // 1. This filter has sent a local reply from decode metadata.
-      // 2. This filter is the terminal http filter, and an upstream filter has sent a local reply.
+      // 2. This filter is the terminal http filter, and an upstream HTTP filter has sent a local
+      // reply.
       ASSERT((status == FilterMetadataStatus::StopIterationForLocalReply) ||
              (std::next(entry) == decoder_filters_.end()));
       executeLocalReplyIfPrepared();
@@ -1498,8 +1551,8 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  // This filter chain options is only used for the downstream filter chains for now. So, try to
-  // set valid initial route only when the downstream callbacks is available.
+  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
+  // to set valid initial route only when the downstream callbacks is available.
   FilterChainOptionsImpl options(
       filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
   filter_chain_factory_.createFilterChain(*this, false, options);
@@ -1685,7 +1738,8 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+
+  ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {

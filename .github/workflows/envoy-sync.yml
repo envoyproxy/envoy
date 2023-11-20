@@ -26,8 +26,9 @@ jobs:
         - go-control-plane
         - envoy-filter-example
         - data-plane-api
+        - mobile-website
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.17
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.8
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main

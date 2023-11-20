@@ -9,6 +9,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -26,7 +27,8 @@ using Headers = std::vector<std::pair<const std::string, const std::string>>;
 class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
-  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+  ExtAuthzGrpcIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, ExtAuthzGrpcIntegrationTest::ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -182,6 +184,7 @@ public:
     attributes->clear_source();
     attributes->clear_destination();
     attributes->clear_metadata_context();
+    attributes->clear_route_metadata_context();
     attributes->mutable_request()->clear_time();
     http_request->clear_id();
     http_request->clear_headers();
@@ -501,7 +504,8 @@ public:
                                        {"not-allowed", "nope"},
                                        {"authorization", "legit"},
                                        {"regex-food", "food"},
-                                       {"regex-fool", "fool"}};
+                                       {"regex-fool", "fool"},
+                                       {"x-forwarded-for", "1.2.3.4"}};
     if (client_request_body_.empty()) {
       response_ = codec_client_->makeHeaderOnlyRequest(headers);
     } else {
@@ -692,6 +696,7 @@ public:
     - prefix: allowed-prefix
     - safe_regex:
         regex: regex-foo.?
+    - exact: x-forwarded-for
 
   http_service:
     server_uri:
@@ -984,6 +989,26 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
   setup(false);
   const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_TRUE(header_entry.empty());
+}
+
+// Verifies that "X-Forwarded-For" header is unmodified.
+TEST_P(ExtAuthzHttpIntegrationTest, UnmodifiedForwardedForHeader) {
+  setup(false);
+  EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("x-forwarded-for", "1.2.3.4"));
+}
+
+// Verifies that local address is appended to "X-Forwarded-For" header
+// if "envoy.reloadable_features.ext_authz_http_send_original_xff" runtime guard is disabled.
+TEST_P(ExtAuthzHttpIntegrationTest, LegacyAppendLocalAddressToForwardedForHeader) {
+  TestScopedRuntime scoped_runtime_;
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_authz_http_send_original_xff", "false"}});
+
+  setup(false);
+
+  const auto local_address = test_server_->server().localInfo().address()->ip()->addressAsString();
+  EXPECT_THAT(ext_authz_request_->headers(),
+              Http::HeaderValueOf("x-forwarded-for", absl::StrCat("1.2.3.4", ",", local_address)));
 }
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher

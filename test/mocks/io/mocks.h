@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/common/io/io_uring.h"
 
 #include "gmock/gmock.h"

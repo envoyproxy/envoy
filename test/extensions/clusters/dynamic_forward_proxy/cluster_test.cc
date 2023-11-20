@@ -64,6 +64,7 @@ public:
 
     ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(&downstream_headers_));
     ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(lb_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
     ON_CALL(lb_context_, downstreamConnection()).WillByDefault(Return(&connection_));
 
     member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
@@ -118,8 +119,8 @@ public:
   }
 
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
-    StreamInfo::FilterState& filter_state = const_cast<StreamInfo::FilterState&>(
-        lb_context_.downstreamConnection()->streamInfo().filterState());
+    StreamInfo::FilterState& filter_state =
+        const_cast<StreamInfo::FilterState&>(lb_context_.requestStreamInfo()->filterState());
 
     filter_state.setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
@@ -720,6 +721,31 @@ cluster_type:
 )EOF";
 
   EXPECT_THROW(createCluster(yaml_config), EnvoyException);
+}
+
+TEST(ObjectFactory, DynamicHost) {
+  const std::string name = "envoy.upstream.dynamic_host";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string host = "site.com";
+  auto object = factory->createFromBytes(host);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(host, object->serializeAsString());
+}
+
+TEST(ObjectFactory, DynamicPort) {
+  const std::string name = "envoy.upstream.dynamic_port";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string port = "8080";
+  auto object = factory->createFromBytes(port);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(port, object->serializeAsString());
+  ASSERT_EQ(nullptr, factory->createFromBytes("blah"));
 }
 
 } // namespace DynamicForwardProxy

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"

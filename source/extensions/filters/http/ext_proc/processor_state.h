@@ -27,9 +27,7 @@ class QueuedChunk {
 public:
   // True if this represents the last chunk in the stream
   bool end_stream = false;
-  // True if the chunk was actually sent to the gRPC stream
-  bool delivered = false;
-  Buffer::OwnedImpl data;
+  uint32_t length = 0;
 };
 using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
@@ -40,18 +38,17 @@ public:
   ChunkQueue& operator=(const ChunkQueue&) = delete;
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
-  void push(Buffer::Instance& data, bool end_stream, bool delivered);
-  absl::optional<QueuedChunkPtr> pop(bool undelivered_only);
-  const QueuedChunk& consolidate(bool delivered);
+  void push(Buffer::Instance& data, bool end_stream);
+  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
+  const QueuedChunk& consolidate();
+  Buffer::OwnedImpl& receivedData() { return received_data_; }
 
 private:
-  // If we are in either streaming mode, store chunks that we received here,
-  // and use the "delivered" flag to keep track of which ones were pushed
-  // to the external processor. When matching responses come back for these
-  // chunks, then they will be removed.
   std::deque<QueuedChunkPtr> queue_;
   // The total size of chunks in the queue.
   uint32_t bytes_enqueued_{};
+  // The received data that had not been sent to downstream/upstream.
+  Buffer::OwnedImpl received_data_;
 };
 
 class ProcessorState : public Logger::Loggable<Logger::Id::ext_proc> {
@@ -69,10 +66,6 @@ public:
     BufferedBodyCallback,
     // Waiting for a "body" response in streaming mode.
     StreamedBodyCallback,
-    // Waiting for a "body" response in streaming mode in the special case
-    // in which the processing mode was changed while there were outstanding
-    // messages sent to the processor.
-    StreamedBodyCallbackFinishing,
     // Waiting for a body callback in "buffered partial" mode.
     BufferedPartialBodyCallback,
     // Waiting for a "trailers" response.
@@ -139,18 +132,32 @@ public:
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
   virtual uint32_t bufferLimit() const PURE;
 
+  ChunkQueue& chunkQueue() { return chunk_queue_; }
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
-  void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream, bool delivered);
+  void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream);
   // If the queue has chunks, return the head of the queue.
-  absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only) {
-    return chunk_queue_.pop(undelivered_only);
+  QueuedChunkPtr dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
+    return chunk_queue_.pop(out_data);
   }
   // Consolidate all the chunks on the queue into a single one and return a reference.
-  const QueuedChunk& consolidateStreamedChunks(bool delivered) {
-    return chunk_queue_.consolidate(delivered);
-  }
+  const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
+  bool shouldRemoveContentLength() const {
+    // Always remove the content length in 3 cases below:
+    // 1) STREAMED BodySendMode
+    // 2) BUFFERED_PARTIAL BodySendMode
+    // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
+    // In these modes, ext_proc filter can not guarantee to set the content length correctly if
+    // body is mutated by external processor later.
+    // In http1 codec, removing content length will enable chunked encoding whenever feasible.
+    return (
+        body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED ||
+        body_mode_ ==
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED_PARTIAL ||
+        (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED &&
+         !send_headers_));
+  }
 
   virtual Http::HeaderMap* addTrailers() PURE;
 

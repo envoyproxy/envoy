@@ -25,7 +25,7 @@ public:
   ConfigConstSharedPtr config() const override { return config_; }
   const absl::optional<ConfigInfo>& configInfo() const override { return config_info_; }
   SystemTime lastUpdated() const override { return last_updated_; }
-  void onConfigUpdate() override {}
+  absl::Status onConfigUpdate() override { return absl::OkStatus(); }
 
 private:
   ProtobufTypes::MessagePtr route_config_proto_;

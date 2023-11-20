@@ -18,7 +18,7 @@ static void deathTestWorker() {
 }
 
 TEST(SingletonManagerImplDeathTest, NotRegistered) {
-  EXPECT_DEATH(deathTestWorker(), "invalid singleton name 'foo'. Make sure it is registered.");
+  EXPECT_ENVOY_BUG(deathTestWorker(), "invalid singleton name 'foo'. Make sure it is registered.");
 }
 
 SINGLETON_MANAGER_REGISTRATION(test);
@@ -29,6 +29,13 @@ public:
 
   MOCK_METHOD(void, onDestroy, ());
 };
+
+TEST(SingletonRegistration, category) {
+  auto* factory =
+      Registry::FactoryRegistry<Envoy::Singleton::Registration>::getFactory(test_singleton_name);
+  EXPECT_TRUE(factory != nullptr);
+  EXPECT_EQ("envoy.singleton", factory->category());
+}
 
 TEST(SingletonManagerImplTest, Basic) {
   ManagerImpl manager(Thread::threadFactoryForTest());

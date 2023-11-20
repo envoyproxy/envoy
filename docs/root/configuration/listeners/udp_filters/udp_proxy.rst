@@ -74,6 +74,44 @@ remaining datagrams to different clusters according to their source ports.
    :lines: 14-53
    :caption: :download:`udp-proxy-router.yaml <_include/udp-proxy-router.yaml>`
 
+.. _config_udp_listener_filters_udp_proxy_session_filters:
+
+Session filters
+---------------
+
+The UDP proxy is able to apply :ref:`session filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>`.
+These kinds of filters run seprately on each upstream UDP session and support a more granular API that allows running operations only
+at the start of an upstream UDP session, when a UDP datagram is received from the downstream and when a UDP datagram is received from the
+upstream, similar to network filters.
+
+.. note::
+  When using session filters, choosing the upstream host only happens after completing the ``onNewSession()`` iteration for all
+  the filters in the chain. This allows choosing the host based on decisions made in one of the session filters, and prevents the
+  creation of upstream sockets in cases where one of the filters stopped the filter chain.
+  Additionally, since :ref:`per packet load balancing <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing>` require
+  choosing the upstream host for each received datagram, session filters can't be used when this option is enabled.
+
+Envoy has the following builtin UDP session filters.
+
+.. toctree::
+  :maxdepth: 2
+
+  session_filters/http_capsule
+  session_filters/dynamic_forward_proxy
+
+.. _config_udp_listener_filters_udp_proxy_tunneling_over_http:
+
+UDP Tunneling over HTTP
+-----------------------
+
+The UDP proxy filter can be used to tunnel raw UDP over HTTP requests. Refer to :ref:`HTTP upgrades <tunneling-udp-over-http>` for more information.
+
+UDP tunneling configuration can be used by setting :ref:`tunneling_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.tunneling_config>`
+
+.. note::
+  Since :ref:`per packet load balancing <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing>` require
+  choosing the upstream host for each received datagram, tunneling can't be used when this option is enabled.
+
 Example configuration
 ---------------------
 
@@ -134,3 +172,6 @@ The UDP proxy filter also emits custom upstream cluster stats prefixed with
   sess_rx_errors, Counter, Number of datagram receive errors
   sess_tx_datagrams, Counter, Number of datagrams transmitted
   sess_tx_errors, Counter, Number of datagrams transmitted
+  sess_tunnel_success, Counter, Number of successfully established UDP tunnels
+  sess_tunnel_failure, Counter, Number of UDP tunnels failed to establish
+  sess_tunnel_buffer_overflow, Counter, Number of datagrams dropped due to full tunnel buffer

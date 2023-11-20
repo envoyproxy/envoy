@@ -113,6 +113,14 @@ void DubboRequest::setByKey(absl::string_view key, absl::string_view val) {
   typed_request->mutableAttachment()->insert(key, val);
 }
 
+void DubboRequest::removeByKey(absl::string_view key) {
+  auto* typed_request =
+      dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
+  ASSERT(typed_request != nullptr);
+
+  typed_request->mutableAttachment()->remove(key);
+}
+
 void DubboResponse::refreshGenericStatus() {
   ASSERT(inner_metadata_ != nullptr);
   ASSERT(inner_metadata_->hasResponse() && inner_metadata_->hasResponseStatus());
@@ -139,7 +147,8 @@ void DubboResponse::refreshGenericStatus() {
 
 DubboCodecBase::DubboCodecBase(Common::Dubbo::DubboCodecPtr codec) : codec_(std::move(codec)) {}
 
-ResponsePtr DubboMessageCreator::response(Status status, const Request& origin_request) {
+ResponsePtr DubboServerCodec::respond(Status status, absl::string_view,
+                                      const Request& origin_request) {
   const auto* typed_request = dynamic_cast<const DubboRequest*>(&origin_request);
   ASSERT(typed_request != nullptr);
 

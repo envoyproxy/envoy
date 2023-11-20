@@ -1,3 +1,5 @@
+#pragma once
+
 // A simple test utility to easily allow for runtime feature overloads in unit tests.
 //
 // As long as this class is in scope one can do runtime feature overrides:

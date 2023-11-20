@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -15,6 +16,7 @@
 #include "source/common/network/filter_impl.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -30,6 +32,8 @@ public:
   ~AsyncTcpClientImpl() override;
 
   void close(Network::ConnectionCloseType type) override;
+
+  Network::DetectedCloseType detectedCloseType() const override { return detected_close_; }
 
   /**
    * @return true means a host is successfully picked from a Cluster.
@@ -55,6 +59,14 @@ public:
   bool connected() override { return !disconnected_; }
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+  OptRef<StreamInfo::StreamInfo> getStreamInfo() override {
+    if (connection_) {
+      return connection_->streamInfo();
+    } else {
+      return absl::nullopt;
+    }
+  }
 
 private:
   struct NetworkReadFilter : public Network::ReadFilterBaseImpl {
@@ -95,6 +107,7 @@ private:
   Stats::TimespanPtr conn_length_ms_;
   Event::TimerPtr connect_timer_;
   AsyncTcpClientCallbacks* callbacks_{};
+  Network::DetectedCloseType detected_close_{Network::DetectedCloseType::Normal};
   bool disconnected_{true};
   bool enable_half_close_{false};
 };

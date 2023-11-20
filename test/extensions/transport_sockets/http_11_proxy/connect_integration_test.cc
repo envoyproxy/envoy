@@ -77,7 +77,7 @@ typed_config:
       if (inner_socket.name().empty()) {
         inner_socket.set_name("envoy.transport_sockets.raw_buffer");
       }
-      transport_socket->set_name("envoy.transport_sockets.upstream_http_11_proxy");
+      transport_socket->set_name("envoy.transport_sockets.http_11_proxy");
       envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
           transport;
       transport.mutable_transport_socket()->MergeFrom(inner_socket);

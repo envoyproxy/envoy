@@ -43,7 +43,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                   .api_config_source()
                                   .api_type();
   if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+    throwEnvoyExceptionOrPanic("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
   const auto resource_name = getResourceName();
   Envoy::Config::SubscriptionOptions options;
@@ -66,7 +66,7 @@ void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
   init_target_.ready();
 }
 
-void VhdsSubscription::onConfigUpdate(
+absl::Status VhdsSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
@@ -91,11 +91,12 @@ void VhdsSubscription::onConfigUpdate(
               config_update_info_->protobufConfigurationCast().name(),
               config_update_info_->configHash());
     if (route_config_provider_ != nullptr) {
-      route_config_provider_->onConfigUpdate();
+      THROW_IF_NOT_OK(route_config_provider_->onConfigUpdate());
     }
   }
 
   init_target_.ready();
+  return absl::OkStatus();
 }
 
 } // namespace Router

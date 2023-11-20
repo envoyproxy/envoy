@@ -29,20 +29,23 @@ function install {
 }
 
 function retry () {
-    local returns=1 i=1
-    while ((i<=HOMEBREW_RETRY_ATTEMPTS)); do
+    local returns=1 i=1 attempts
+    attempts="${1}"
+    interval="${2}"
+    shift 2
+    while ((i<=attempts)); do
         if "$@"; then
             returns=0
             break
         else
-            sleep "$HOMEBREW_RETRY_INTERVAL";
+            sleep "$interval";
             ((i++))
         fi
     done
     return "$returns"
 }
 
-if ! retry brew update; then
+if ! retry "$HOMEBREW_RETRY_ATTEMPTS" "$HOMEBREW_RETRY_INTERVAL" brew update; then
   # Do not exit early if update fails.
   echo "Failed to update homebrew"
 fi
@@ -53,4 +56,4 @@ do
     is_installed "${DEP}" || install "${DEP}"
 done
 
-bazel version
+retry 5 2 bazel version

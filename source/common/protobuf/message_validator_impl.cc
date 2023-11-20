@@ -20,7 +20,8 @@ void onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecatio
   if (soft_deprecation) {
     ENVOY_LOG_MISC(warn, "Deprecated field: {}", absl::StrCat(description, deprecation_error));
   } else {
-    throw DeprecatedProtoFieldException(absl::StrCat(description, deprecation_error));
+    throwExceptionOrPanic(DeprecatedProtoFieldException,
+                          absl::StrCat(description, deprecation_error));
   }
 }
 } // namespace
@@ -75,8 +76,8 @@ void WarningValidationVisitorImpl::onWorkInProgress(absl::string_view descriptio
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
-  throw UnknownProtoFieldException(
-      absl::StrCat("Protobuf message (", description, ") has unknown fields"));
+  throwExceptionOrPanic(UnknownProtoFieldException,
+                        absl::StrCat("Protobuf message (", description, ") has unknown fields"));
 }
 
 void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,

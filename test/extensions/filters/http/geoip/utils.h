@@ -1,3 +1,5 @@
+#pragma once
+
 #include "source/extensions/filters/http/geoip/geoip_filter.h"
 
 namespace Envoy {

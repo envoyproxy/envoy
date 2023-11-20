@@ -39,7 +39,7 @@ public:
   MockRoute(ConnPool::InstanceSharedPtr);
   ~MockRoute() override;
 
-  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
+  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (const std::string&), (const));
   MOCK_METHOD(const MirrorPolicies&, mirrorPolicies, (), (const));
   ConnPool::InstanceSharedPtr conn_pool_;
   MirrorPolicies policies_;
