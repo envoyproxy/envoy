@@ -1843,6 +1843,7 @@ public:
     header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add);
     config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
     stream_info_.downstream_connection_info_provider_->setConnectionID(0);
+    session_access_logs_ = std::make_unique<std::vector<AccessLog::InstanceSharedPtr>>();
     pool_ = std::make_unique<TunnelingConnectionPoolImpl>(
         cluster_, &context_, *config_, callbacks_, stream_info_, false, *session_access_logs_);
   }
