@@ -115,74 +115,74 @@ typed_config:
 
           if (route_level.test(RouteLevel::PerRoute)) {
             {
-            // Per route header mutation for downstream.
-            PerRouteProtoConfig header_mutation;
-            auto response_mutation =
-                header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
-            response_mutation->mutable_append()->mutable_header()->set_key(
-                "downstream-per-route-flag-header");
-            response_mutation->mutable_append()->mutable_header()->set_value(
-                "downstream-per-route-flag-header-value");
-            response_mutation->mutable_append()->set_append_action(
-                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+              // Per route header mutation for downstream.
+              PerRouteProtoConfig header_mutation;
+              auto response_mutation =
+                  header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
+              response_mutation->mutable_append()->mutable_header()->set_key(
+                  "downstream-per-route-flag-header");
+              response_mutation->mutable_append()->mutable_header()->set_value(
+                  "downstream-per-route-flag-header-value");
+              response_mutation->mutable_append()->set_append_action(
+                  envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-            auto request_mutation =
-                header_mutation.mutable_mutations()->mutable_request_mutations()->Add();
-            request_mutation->mutable_append()->mutable_header()->set_key(
-                "downstream-request-per-route-flag-header");
-            request_mutation->mutable_append()->mutable_header()->set_value(
-                "downstream-request-per-route-flag-header-value");
-            request_mutation->mutable_append()->set_append_action(
-                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+              auto request_mutation =
+                  header_mutation.mutable_mutations()->mutable_request_mutations()->Add();
+              request_mutation->mutable_append()->mutable_header()->set_key(
+                  "downstream-request-per-route-flag-header");
+              request_mutation->mutable_append()->mutable_header()->set_value(
+                  "downstream-request-per-route-flag-header-value");
+              request_mutation->mutable_append()->set_append_action(
+                  envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-            ProtobufWkt::Any per_route_config;
-            per_route_config.PackFrom(header_mutation);
-            route->mutable_typed_per_filter_config()->insert(
-                {"donwstream-header-mutation", per_route_config});
+              ProtobufWkt::Any per_route_config;
+              per_route_config.PackFrom(header_mutation);
+              route->mutable_typed_per_filter_config()->insert(
+                  {"donwstream-header-mutation", per_route_config});
+            }
+
+            {
+              // Per route header mutation for upstream.
+              PerRouteProtoConfig header_mutation;
+              auto response_mutation =
+                  header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
+              response_mutation->mutable_append()->mutable_header()->set_key(
+                  "upstream-per-route-flag-header");
+              response_mutation->mutable_append()->mutable_header()->set_value(
+                  "upstream-per-route-flag-header-value");
+              response_mutation->mutable_append()->set_append_action(
+                  envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+              ProtobufWkt::Any per_route_config;
+              per_route_config.PackFrom(header_mutation);
+              route->mutable_typed_per_filter_config()->insert(
+                  {"upstream-header-mutation", per_route_config});
+            }
+
+            {
+              // Per route enable the filter that is disabled by default.
+              envoy::config::route::v3::FilterConfig filter_config;
+              filter_config.mutable_config()->PackFrom(PerRouteProtoConfig());
+              filter_config.set_disabled(false);
+              ProtobufWkt::Any per_route_config;
+              per_route_config.PackFrom(filter_config);
+              // Try enable the filter that is disabled by default.
+              route->mutable_typed_per_filter_config()->insert(
+                  {"downstream-header-mutation-disabled-by-default", per_route_config});
+            }
+
+            {
+              // Per route disable downstream header mutation.
+              envoy::config::route::v3::FilterConfig filter_config;
+              filter_config.set_disabled(true);
+              ProtobufWkt::Any per_route_config;
+              per_route_config.PackFrom(filter_config);
+              another_route->mutable_typed_per_filter_config()->insert(
+                  {"donwstream-header-mutation", per_route_config});
+              // Try disable upstream header mutation but this is not supported and should not work.
+              another_route->mutable_typed_per_filter_config()->insert(
+                  {"upstream-header-mutation", per_route_config});
+            }
           }
-
-          {
-            // Per route header mutation for upstream.
-            PerRouteProtoConfig header_mutation;
-            auto response_mutation =
-                header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
-            response_mutation->mutable_append()->mutable_header()->set_key(
-                "upstream-per-route-flag-header");
-            response_mutation->mutable_append()->mutable_header()->set_value(
-                "upstream-per-route-flag-header-value");
-            response_mutation->mutable_append()->set_append_action(
-                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
-            ProtobufWkt::Any per_route_config;
-            per_route_config.PackFrom(header_mutation);
-            route->mutable_typed_per_filter_config()->insert(
-                {"upstream-header-mutation", per_route_config});
-          }
-
-          {
-            // Per route enable the filter that is disabled by default.
-            envoy::config::route::v3::FilterConfig filter_config;
-            filter_config.mutable_config()->PackFrom(PerRouteProtoConfig());
-            filter_config.set_disabled(false);
-            ProtobufWkt::Any per_route_config;
-            per_route_config.PackFrom(filter_config);
-            // Try enable the filter that is disabled by default.
-            route->mutable_typed_per_filter_config()->insert(
-                {"downstream-header-mutation-disabled-by-default", per_route_config});
-          }
-
-          {
-            // Per route disable downstream header mutation.
-            envoy::config::route::v3::FilterConfig filter_config;
-            filter_config.set_disabled(true);
-            ProtobufWkt::Any per_route_config;
-            per_route_config.PackFrom(filter_config);
-            another_route->mutable_typed_per_filter_config()->insert(
-                {"donwstream-header-mutation", per_route_config});
-            // Try disable upstream header mutation but this is not supported and should not work.
-            another_route->mutable_typed_per_filter_config()->insert(
-                {"upstream-header-mutation", per_route_config});
-          }
-        }
 
           if (route_level.test(RouteLevel::VirtualHost)) {
             // Per virtual host header mutation for downstream.
