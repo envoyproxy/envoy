@@ -19,14 +19,13 @@ public:
   Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap&) const override {
     return nullptr;
   }
-
-  bool isStrict() const override { return false; }
 };
 
 } // namespace
 
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
-                                             Server::Configuration::CommonFactoryContext& context) {
+                                             Server::Configuration::CommonFactoryContext& context)
+    : strict_(config.strict()) {
   if (!config.has_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
     return;

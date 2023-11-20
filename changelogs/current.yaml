@@ -94,9 +94,11 @@ new_features:
     Added support for configuring resource detectors on the OpenTelemetry tracer.
 - area: stateful_session
   change: |
-    Added :ref:`strict mode <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.strict>` to header-based
-    stateful session. If a destination encoded in :ref:`specified header
-    <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.name>`
+    Added :ref:`strict mode <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.strict>`
+    to cookie and header based stateful session. If a destination encoded in :ref:`cookie
+    <envoy_v3_api_msg_extensions.http.stateful_session.cookie.v3.CookieBasedSessionState>`
+    or in :ref:`specified header
+    <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.name>` respectively
     is not available, Envoy will return ``503`` instead of selecting another destination from the cluster.
 
 deprecated:

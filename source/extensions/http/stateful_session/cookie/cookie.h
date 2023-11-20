@@ -50,9 +50,6 @@ public:
     return std::make_unique<SessionStateImpl>(parseAddress(headers), *this, time_source_);
   }
 
-  // Cookie based stateful sessions do not enforce strict routing to upstream host.
-  bool isStrict() const override { return false; }
-
   bool requestPathMatch(absl::string_view request_path) const {
     ASSERT(path_matcher_ != nullptr);
     return path_matcher_(request_path);

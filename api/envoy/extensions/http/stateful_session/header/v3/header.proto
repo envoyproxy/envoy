@@ -39,8 +39,4 @@ message HeaderBasedSessionState {
   // The name that will be used to obtain header value from downstream HTTP request or generate
   // new header for downstream.
   string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // If set to True, the HTTP request must be routed to the requested destination.
-  // If the requested destination is not available, Envoy returns 503. Defaults to False.
-  bool strict = 2;
 }

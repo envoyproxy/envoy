@@ -42,8 +42,6 @@ public:
     return std::make_unique<SessionStateImpl>(parseAddress(headers), *this);
   }
 
-  bool isStrict() const override { return strict_; }
-
 private:
   absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
     auto hdr = headers.get(Envoy::Http::LowerCaseString(name_));
@@ -59,7 +57,6 @@ private:
   const Envoy::Http::LowerCaseString& getHeaderName() const { return name_; }
 
   const Envoy::Http::LowerCaseString name_;
-  bool strict_ = false;
 };
 
 } // namespace Header
