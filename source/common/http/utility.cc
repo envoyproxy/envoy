@@ -856,7 +856,7 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   }
 
   absl::string_view xff_string(xff_header->value().getStringView());
-  static const std::string separator(",");
+  static constexpr absl::string_view separator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
     const std::string::size_type last_comma = xff_string.rfind(separator);
@@ -889,8 +889,8 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
 }
 
 bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
-  static const size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
-  static const size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
+  static constexpr size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
+  static constexpr size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
 
   // Remove any headers nominated by the Connection header. The TE header
   // is sanitized and removed only if it's empty after removing unsupported values
