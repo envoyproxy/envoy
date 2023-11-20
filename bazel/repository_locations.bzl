@@ -823,6 +823,23 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "MIT",
         license_url = "https://github.com/ncopa/su-exec/blob/{version}/LICENSE",
     ),
+    com_github_zeux_pugixml = dict(
+        project_name = "pugixml",
+        project_desc = "Light-weight, simple and fast XML parser for C++ with XPath support.",
+        project_url = "https://github.com/zeux/pugixml",
+        version = "1.14",
+        sha256 = "610f98375424b5614754a6f34a491adbddaaec074e9044577d965160ec103d2e",
+        strip_prefix = "pugixml-{version}",
+        urls = ["https://github.com/zeux/pugixml/archive/v{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = [
+            "envoy.filters.http.aws_lambda",
+            "envoy.filters.http.aws_request_signing",
+            "envoy.grpc_credentials.aws_iam",
+        ],
+        release_date = "2023-10-01",
+        cpe = "cpe:2.3:a:pugixml_project:pugixml:*",
+    ),
     com_google_googletest = dict(
         project_name = "Google Test",
         project_desc = "Google's C++ test framework",

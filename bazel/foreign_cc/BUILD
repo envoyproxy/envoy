@@ -603,3 +603,12 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
 )
+
+envoy_cmake(
+    name = "pugixml",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+    },
+    lib_source = "@com_github_zeux_pugixml//:all",
+    out_static_libs = ["libpugixml.a"],
+)
