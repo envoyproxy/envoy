@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Credentials {
+namespace InjectedCredentials {
 namespace Generic {
 
 Common::CredentialInjectorSharedPtr
@@ -34,10 +34,11 @@ GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
  * Static registration for the basic auth credential injector. @see
  * NamedCredentialInjectorConfigFactory.
  */
-REGISTER_FACTORY(GenericCredentialInjectorFactory,
-                 Envoy::Extensions::Credentials::Common::NamedCredentialInjectorConfigFactory);
+REGISTER_FACTORY(
+    GenericCredentialInjectorFactory,
+    Envoy::Extensions::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory);
 
 } // namespace Generic
-} // namespace Credentials
+} // namespace InjectedCredentials
 } // namespace Extensions
 } // namespace Envoy

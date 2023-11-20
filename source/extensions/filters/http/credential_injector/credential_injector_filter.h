@@ -16,7 +16,8 @@ namespace CredentialInjector {
  */
 #define ALL_credential_injector_STATS(COUNTER)                                                     \
   COUNTER(injected)                                                                                \
-  COUNTER(failed)
+  COUNTER(failed)                                                                                  \
+  COUNTER(already_exists)
 
 /**
  * Struct definition for Credential Injector stats. @see stats_macros.h
@@ -25,8 +26,8 @@ struct CredentialInjectorStats {
   ALL_credential_injector_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using Envoy::Extensions::Credentials::Common::CredentialInjector;
-using Envoy::Extensions::Credentials::Common::CredentialInjectorSharedPtr;
+using Envoy::Extensions::InjectedCredentials::Common::CredentialInjector;
+using Envoy::Extensions::InjectedCredentials::Common::CredentialInjectorSharedPtr;
 
 /**
  * Configuration for the Credential Injector filter.
@@ -47,6 +48,8 @@ public:
   }
 
   bool allowRequestWithoutCredential() const { return allow_request_without_credential_; }
+
+  bool overwrite() const { return overwrite_; }
 
 private:
   static CredentialInjectorStats generateStats(const std::string& prefix, Stats::Scope& scope) {

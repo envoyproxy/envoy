@@ -5,7 +5,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Credentials {
+namespace InjectedCredentials {
 namespace Common {
 
 /**
@@ -68,6 +68,6 @@ public:
 using CredentialInjectorSharedPtr = std::shared_ptr<CredentialInjector>;
 
 } // namespace Common
-} // namespace Credentials
+} // namespace InjectedCredentials
 } // namespace Extensions
 } // namespace Envoy

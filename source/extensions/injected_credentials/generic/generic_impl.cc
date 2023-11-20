@@ -2,7 +2,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Credentials {
+namespace InjectedCredentials {
 namespace Generic {
 
 absl::Status GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, bool overwrite) {
@@ -19,6 +19,6 @@ absl::Status GenericCredentialInjector::inject(Http::RequestHeaderMap& headers, 
 }
 
 } // namespace Generic
-} // namespace Credentials
+} // namespace InjectedCredentials
 } // namespace Extensions
 } // namespace Envoy

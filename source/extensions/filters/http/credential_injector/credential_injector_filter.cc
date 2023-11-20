@@ -33,6 +33,14 @@ void CredentialInjectorFilter::onSuccess() {
   decoder_callbacks_->dispatcher().post([this]() {
     absl::Status status = config_->injectCredential(*request_headers_);
 
+    // credential already exists in the header and overwrite is false
+    if (absl::IsAlreadyExists(status) && !config_->overwrite()) {
+      ENVOY_LOG(debug, "Credential already exists in the header");
+      config_->stats().already_exists_.inc();
+      decoder_callbacks_->continueDecoding();
+      return;
+    }
+
     // failed to inject the credential
     if (!status.ok()) {
       ENVOY_LOG(warn, "Failed to inject credential: {}", status.message());

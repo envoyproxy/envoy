@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CredentialInjector {
 
-using Envoy::Extensions::Credentials::Common::NamedCredentialInjectorConfigFactory;
+using Envoy::Extensions::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory;
 
 Http::FilterFactoryCb CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&

@@ -7,7 +7,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Credentials {
+namespace InjectedCredentials {
 namespace Common {
 
 inline Secret::GenericSecretConfigProviderSharedPtr
@@ -62,6 +62,6 @@ private:
 };
 
 } // namespace Common
-} // namespace Credentials
+} // namespace InjectedCredentials
 } // namespace Extensions
 } // namespace Envoy

@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Credentials {
+namespace InjectedCredentials {
 namespace Generic {
 
 /**
@@ -31,6 +31,6 @@ private:
 };
 
 } // namespace Generic
-} // namespace Credentials
+} // namespace InjectedCredentials
 } // namespace Extensions
 } // namespace Envoy

@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Credentials {
+namespace InjectedCredentials {
 namespace Generic {
 
 using envoy::extensions::injected_credentials::generic::v3::Generic;
@@ -29,6 +29,6 @@ private:
 DECLARE_FACTORY(GenericCredentialInjectorFactory);
 
 } // namespace Generic
-} // namespace Credentials
+} // namespace InjectedCredentials
 } // namespace Extensions
 } // namespace Envoy

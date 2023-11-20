@@ -7,7 +7,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Credentials {
+namespace InjectedCredentials {
 namespace Common {
 
 template <class ConfigProto>
@@ -40,6 +40,6 @@ private:
 };
 
 } // namespace Common
-} // namespace Credentials
+} // namespace InjectedCredentials
 } // namespace Extensions
 } // namespace Envoy
