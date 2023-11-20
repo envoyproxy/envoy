@@ -673,13 +673,17 @@ typed_config:
     auto encoder_decoder = codec_client_->startRequest(request_headers, true);
     auto response = std::move(encoder_decoder.second);
 
-    waitForNextUpstreamRequest();
+    if (query.find("encodeHeadersRet") != std::string::npos) {
+      waitForNextUpstreamRequest();
 
-    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-    upstream_request_->encodeHeaders(response_headers, true);
+      Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+      upstream_request_->encodeHeaders(response_headers, true);
+    }
 
     ASSERT_TRUE(response->waitForEndStream());
-    codec_client_->close();
+    EXPECT_EQ("500", response->headers().getStatusValue());
+
+    EXPECT_EQ(1, test_server_->counter("http.config_test.golang.panic_error")->value());
 
     cleanup();
   }
