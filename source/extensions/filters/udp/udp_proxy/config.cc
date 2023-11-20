@@ -143,6 +143,8 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
           config.access_log_options().access_log_flush_interval());
       access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
     }
+  } else {
+    flush_access_log_on_tunnel_connected_ = false;
   }
 
   for (const auto& filter : config.session_filters()) {
