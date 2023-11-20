@@ -114,10 +114,11 @@ typed_config:
           another_route->mutable_match()->set_path("/disable/filter/route");
 
           if (route_level.test(RouteLevel::PerRoute)) {
+            {
             // Per route header mutation for downstream.
-            PerRouteProtoConfig header_mutation_1;
+            PerRouteProtoConfig header_mutation;
             auto response_mutation =
-                header_mutation_1.mutable_mutations()->mutable_response_mutations()->Add();
+                header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
             response_mutation->mutable_append()->mutable_header()->set_key(
                 "downstream-per-route-flag-header");
             response_mutation->mutable_append()->mutable_header()->set_value(
@@ -126,7 +127,7 @@ typed_config:
                 envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
             auto request_mutation =
-                header_mutation_1.mutable_mutations()->mutable_request_mutations()->Add();
+                header_mutation.mutable_mutations()->mutable_request_mutations()->Add();
             request_mutation->mutable_append()->mutable_header()->set_key(
                 "downstream-request-per-route-flag-header");
             request_mutation->mutable_append()->mutable_header()->set_value(
@@ -134,29 +135,54 @@ typed_config:
             request_mutation->mutable_append()->set_append_action(
                 envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-            ProtobufWkt::Any per_route_config_1;
-            per_route_config_1.PackFrom(header_mutation_1);
-
+            ProtobufWkt::Any per_route_config;
+            per_route_config.PackFrom(header_mutation);
             route->mutable_typed_per_filter_config()->insert(
-                {"donwstream-header-mutation", per_route_config_1});
-
-            // Per route header mutation for upstream.
-            PerRouteProtoConfig header_mutation_2;
-            auto response_mutation_2 =
-                header_mutation_2.mutable_mutations()->mutable_response_mutations()->Add();
-            response_mutation_2->mutable_append()->mutable_header()->set_key(
-                "upstream-per-route-flag-header");
-            response_mutation_2->mutable_append()->mutable_header()->set_value(
-                "upstream-per-route-flag-header-value");
-            response_mutation_2->mutable_append()->set_append_action(
-                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
-
-            ProtobufWkt::Any per_route_config_2;
-            per_route_config_2.PackFrom(header_mutation_2);
-
-            route->mutable_typed_per_filter_config()->insert(
-                {"upstream-header-mutation", per_route_config_2});
+                {"donwstream-header-mutation", per_route_config});
           }
+
+          {
+            // Per route header mutation for upstream.
+            PerRouteProtoConfig header_mutation;
+            auto response_mutation =
+                header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
+            response_mutation->mutable_append()->mutable_header()->set_key(
+                "upstream-per-route-flag-header");
+            response_mutation->mutable_append()->mutable_header()->set_value(
+                "upstream-per-route-flag-header-value");
+            response_mutation->mutable_append()->set_append_action(
+                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+            ProtobufWkt::Any per_route_config;
+            per_route_config.PackFrom(header_mutation);
+            route->mutable_typed_per_filter_config()->insert(
+                {"upstream-header-mutation", per_route_config});
+          }
+
+          {
+            // Per route enable the filter that is disabled by default.
+            envoy::config::route::v3::FilterConfig filter_config;
+            filter_config.mutable_config()->PackFrom(PerRouteProtoConfig());
+            filter_config.set_disabled(false);
+            ProtobufWkt::Any per_route_config;
+            per_route_config.PackFrom(filter_config);
+            // Try enable the filter that is disabled by default.
+            route->mutable_typed_per_filter_config()->insert(
+                {"downstream-header-mutation-disabled-by-default", per_route_config});
+          }
+
+          {
+            // Per route disable downstream header mutation.
+            envoy::config::route::v3::FilterConfig filter_config;
+            filter_config.set_disabled(true);
+            ProtobufWkt::Any per_route_config;
+            per_route_config.PackFrom(filter_config);
+            another_route->mutable_typed_per_filter_config()->insert(
+                {"donwstream-header-mutation", per_route_config});
+            // Try disable upstream header mutation but this is not supported and should not work.
+            another_route->mutable_typed_per_filter_config()->insert(
+                {"upstream-header-mutation", per_route_config});
+          }
+        }
 
           if (route_level.test(RouteLevel::VirtualHost)) {
             // Per virtual host header mutation for downstream.
@@ -333,6 +359,13 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
                 ->value()
                 .getStringView());
 
+  EXPECT_EQ("downstream-request-global-flag-header-value-disabled-by-default",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString(
+                    "downstream-request-global-flag-header-disabled-by-default"))[0]
+                ->value()
+                .getStringView());
+
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
                 .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
@@ -347,6 +380,12 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
   EXPECT_EQ("downstream-global-flag-header-value",
             response->headers()
                 .get(Http::LowerCaseString("downstream-global-flag-header"))[0]
+                ->value()
+                .getStringView());
+
+  EXPECT_EQ("downstream-global-flag-header-value-disabled-by-default",
+            response->headers()
+                .get(Http::LowerCaseString("downstream-global-flag-header-disabled-by-default"))[0]
                 ->value()
                 .getStringView());
 
@@ -515,6 +554,7 @@ TEST_P(HeaderMutationIntegrationTest, TestDisableDownstreamHeaderMutation) {
   EXPECT_EQ(0, upstream_request_->headers()
                    .get(Http::LowerCaseString("downstream-request-global-flag-header"))
                    .size());
+
   EXPECT_EQ(0, upstream_request_->headers()
                    .get(Http::LowerCaseString("downstream-request-global-flag-header-disabled-by-"
                                               "default"))

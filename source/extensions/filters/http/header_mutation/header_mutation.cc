@@ -55,9 +55,9 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
         Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(encoder_callbacks_);
   }
 
-  if (route_config_ != nullptr) {
-    route_config_->mutations().mutateResponseHeaders(request_headers, headers,
-                                                     encoder_callbacks_->streamInfo());
+  for (const auto* route_config : route_configs_) {
+    ASSERT(route_config != nullptr);
+    route_config->mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());
   }
 
   return Http::FilterHeadersStatus::Continue;
