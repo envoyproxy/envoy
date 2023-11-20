@@ -1168,9 +1168,10 @@ TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeTrailersWithContinu
   codec_client_->sendData(*request_encoder, 1024, false);
 
   if (std::get<0>(GetParam()).http2_implementation == Http2Impl::Oghttp2) {
-    EXPECT_LOG_CONTAINS("error", "DataFrameSource will send fin, preventing trailers",
-                        codec_client_->sendTrailers(*request_encoder,
-                                                    Http::TestRequestTrailerMapImpl{{"some", "trailer"}}));
+    EXPECT_LOG_CONTAINS(
+        "error", "DataFrameSource will send fin, preventing trailers",
+        codec_client_->sendTrailers(*request_encoder,
+                                    Http::TestRequestTrailerMapImpl{{"some", "trailer"}}));
   } else {
     codec_client_->sendTrailers(*request_encoder,
                                 Http::TestRequestTrailerMapImpl{{"some", "trailer"}});
