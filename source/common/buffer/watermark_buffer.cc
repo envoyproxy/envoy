@@ -210,7 +210,7 @@ uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
       std::floor(pressure * BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) + 1, 8);
 
   uint32_t last_bucket_to_clear = BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_to_clear;
-  bool need_message = false;
+  bool need_message = true;
 
   // Clear buckets, prioritizing the buckets with larger streams.
   uint32_t num_streams_reset = 0;
