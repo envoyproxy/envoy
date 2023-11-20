@@ -221,6 +221,7 @@ uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
         size_class_account_sets_[bucket_to_clear];
     if (bucket.empty()) {
       // Don't print a message if there is nothing to clear.
+      ENVOY_LOG_EVERY_NTH_MISC(warn, 200, "Skipping empty bucket (warning printed every 200)");
       continue;
     }
     if (need_message) {
