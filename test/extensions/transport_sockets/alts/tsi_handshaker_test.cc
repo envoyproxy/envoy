@@ -3,12 +3,16 @@
 #include <thread>
 #include <utility>
 
+#include "envoy/network/address.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/transport_sockets/alts/alts_proxy.h"
 #include "source/extensions/transport_sockets/alts/alts_tsi_handshaker.h"
 #include "source/extensions/transport_sockets/alts/tsi_handshaker.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -141,10 +145,11 @@ public:
   }
 };
 
-class AltsTsiHandshakerTest : public Test {
+class AltsTsiHandshakerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
+  AltsTsiHandshakerTest() : version_(GetParam()){};
   void startFakeHandshakerService() {
-    server_address_ = absl::StrCat("[::1]:", 0);
+    server_address_ = absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     absl::Notification notification;
     server_thread_ = std::make_unique<std::thread>([this, &notification]() {
       FakeHandshakerService fake_handshaker_service;
@@ -156,7 +161,8 @@ protected:
       server_ = server_builder.BuildAndStart();
       EXPECT_THAT(server_, NotNull());
       EXPECT_NE(listening_port, -1);
-      server_address_ = absl::StrCat("[::1]:", listening_port);
+      server_address_ =
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":", listening_port);
       notification.Notify();
       server_->Wait();
     });
@@ -164,7 +170,7 @@ protected:
   }
 
   void startErrorHandshakerService() {
-    server_address_ = absl::StrCat("[::1]:", 0);
+    server_address_ = absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     absl::Notification notification;
     server_thread_ = std::make_unique<std::thread>([this, &notification]() {
       ErrorHandshakerService error_handshaker_service;
@@ -176,7 +182,8 @@ protected:
       server_ = server_builder.BuildAndStart();
       EXPECT_THAT(server_, NotNull());
       EXPECT_NE(listening_port, -1);
-      server_address_ = absl::StrCat("[::1]:", listening_port);
+      server_address_ =
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":", listening_port);
       notification.Notify();
       server_->Wait();
     });
@@ -199,9 +206,14 @@ private:
   std::string server_address_;
   std::unique_ptr<grpc::Server> server_;
   std::unique_ptr<std::thread> server_thread_;
+  Network::Address::IpVersion version_;
 };
 
-TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsTsiHandshakerTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(AltsTsiHandshakerTest, ClientSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
@@ -244,7 +256,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
   }
 }
 
-TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
+TEST_P(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
@@ -287,7 +299,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   }
 }
 
-TEST_F(AltsTsiHandshakerTest, ClientSideError) {
+TEST_P(AltsTsiHandshakerTest, ClientSideError) {
   // Setup.
   startErrorHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
@@ -310,7 +322,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideError) {
   }
 }
 
-TEST_F(AltsTsiHandshakerTest, ServerSideError) {
+TEST_P(AltsTsiHandshakerTest, ServerSideError) {
   // Setup.
   startErrorHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForServer(getChannel());

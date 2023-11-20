@@ -60,11 +60,6 @@ XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
   return *this;
 }
 
-XdsBuilder& XdsBuilder::setSni(std::string sni) {
-  sni_ = std::move(sni);
-  return *this;
-}
-
 XdsBuilder& XdsBuilder::addRuntimeDiscoveryService(std::string resource_name,
                                                    const int timeout_in_seconds) {
   rtds_resource_name_ = std::move(resource_name);
