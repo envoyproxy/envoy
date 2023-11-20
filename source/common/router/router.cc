@@ -1838,12 +1838,15 @@ bool Filter::convertRequestHeadersForInternalRedirect(
     return false;
   }
   // Copy the old values, so they can be restored if the redirect fails.
-  const std::string original_host(downstream_headers.getHostValue());
-  const std::string original_path(downstream_headers.getPathValue());
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
 
   auto saved_headers = Http::RequestHeaderMapImpl::create();
-  std::vector<Http::LowerCaseString> headers_to_clear;
+  downstream_headers.iterate(
+      [&saved_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+        saved_headers->addCopy(Http::LowerCaseString(header.key().getStringView()),
+                               Http::LowerCaseString(header.value().getStringView()));
+        return Http::HeaderMap::Iterate::Continue;
+      });
 
   for (const auto& header : route_entry_->internalRedirectPolicy().responseHeadersToCopy()) {
     auto result = upstream_headers.get(header);
@@ -1853,18 +1856,10 @@ bool Filter::convertRequestHeadersForInternalRedirect(
       if (downstream_result.empty()) {
         continue;
       }
-      for (size_t idx = 0; idx < downstream_result.size(); idx++) {
-        saved_headers->addCopy(header, downstream_result[idx]->value().getStringView());
-      }
       downstream_headers.remove(header);
     } else {
       // The header exists in the response, copy into the downstream headers
-      if (downstream_result.empty()) {
-        headers_to_clear.emplace_back(header);
-      } else {
-        for (size_t idx = 0; idx < downstream_result.size(); idx++) {
-          saved_headers->addCopy(header, downstream_result[idx]->value().getStringView());
-        }
+      if (!downstream_result.empty()) {
         downstream_headers.remove(header);
       }
       for (size_t idx = 0; idx < result.size(); idx++) {
@@ -1873,27 +1868,21 @@ bool Filter::convertRequestHeadersForInternalRedirect(
     }
   }
 
-  Cleanup restore_original_headers([&downstream_headers, original_host, original_path,
-                                    scheme_is_set, scheme_is_http, &saved_headers,
-                                    headers_to_clear]() {
-    downstream_headers.setHost(original_host);
-    downstream_headers.setPath(original_path);
-    if (scheme_is_set) {
-      downstream_headers.setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
-                                                  : Http::Headers::get().SchemeValues.Https);
-    }
+  Cleanup restore_original_headers(
+      [&downstream_headers, scheme_is_set, scheme_is_http, &saved_headers]() {
+        downstream_headers.clear();
+        if (scheme_is_set) {
+          downstream_headers.setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
+                                                      : Http::Headers::get().SchemeValues.Https);
+        }
 
-    saved_headers->iterate(
-        [&downstream_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-          downstream_headers.setCopy(Http::LowerCaseString(header.key().getStringView()),
-                                     Http::LowerCaseString(header.value().getStringView()));
-          return Http::HeaderMap::Iterate::Continue;
-        });
-
-    for (const auto& h : headers_to_clear) {
-      downstream_headers.remove(h);
-    }
-  });
+        saved_headers->iterate(
+            [&downstream_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+              downstream_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
+                                         Http::LowerCaseString(header.value().getStringView()));
+              return Http::HeaderMap::Iterate::Continue;
+            });
+      });
 
   // Replace the original host, scheme and path.
   downstream_headers.setScheme(absolute_url.scheme());
@@ -1947,10 +1936,10 @@ bool Filter::convertRequestHeadersForInternalRedirect(
   num_internal_redirect->increment();
   restore_original_headers.cancel();
   // Preserve the original request URL for the second pass.
-  downstream_headers.setEnvoyOriginalUrl(absl::StrCat(scheme_is_http
-                                                          ? Http::Headers::get().SchemeValues.Http
-                                                          : Http::Headers::get().SchemeValues.Https,
-                                                      "://", original_host, original_path));
+  downstream_headers.setEnvoyOriginalUrl(
+      absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
+                                  : Http::Headers::get().SchemeValues.Https,
+                   "://", saved_headers->getHostValue(), saved_headers->getPathValue()));
   return true;
 }
 
