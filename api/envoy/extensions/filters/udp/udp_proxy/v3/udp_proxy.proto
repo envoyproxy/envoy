@@ -171,8 +171,8 @@ message UdpProxyConfig {
   }
 
   message UdpAccessLogOptions {
-    // The interval to flush access log. The UDP proxy will flush only one access log when the connection
-    // is closed by default. If this field is set, the UDP proxy will flush access log periodically with
+    // The interval to flush access log. The UDP proxy will flush only one access log when the session
+    // is ended by default. If this field is set, the UDP proxy will flush access log periodically with
     // the specified interval.
     // The interval must be at least 1ms.
     google.protobuf.Duration access_log_flush_interval = 1
