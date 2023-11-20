@@ -867,7 +867,7 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   }
   // The text after the last remaining comma, or the entirety of the string if there
   // is no comma, is the requested IP address.
-  const std::string::size_type last_comma = xff_string.rfind(separator);
+  const absl::string_view::size_type last_comma = xff_string.rfind(separator);
   if (last_comma != std::string::npos && last_comma + separator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + separator.size());
   }
