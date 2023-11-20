@@ -117,7 +117,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   cb_.recordConnectionsAcceptedOnSocketEvent(connections_accepted_from_kernel_count);
 }
 
-TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
+TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                  Runtime::Loader& runtime, SocketSharedPtr socket,
                                  TcpListenerCallbacks& cb, bool bind_to_port,
                                  bool ignore_global_conn_limit,

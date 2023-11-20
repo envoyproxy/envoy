@@ -21,6 +21,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: golang
+  change: |
+    Remove Protocol method from RequestHeaderMap.
+    To get the protocol, please use GetProperty("request.protocol") instead.
 - area: aws
   change: |
     uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
@@ -196,5 +200,8 @@ new_features:
     response trailers in :ref:`UdpTunnelingConfig
     <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.propagate_response_trailers>` to
     the downstream info filter state.
+- area: tracing
+  change: |
+    Provide initial span attributes to a sampler used in the OpenTelemetry tracer.
 
 deprecated:

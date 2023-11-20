@@ -25,16 +25,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `specifying stats domain overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addGrpcStatsDomain("stats.envoyproxy.io")
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.grpcStatsDomain).isEqualTo("stats.envoyproxy.io")
-  }
-
-  @Test
   fun `enabling interface binding overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
@@ -143,16 +133,6 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.maxConnectionsPerHost).isEqualTo(1234)
-  }
-
-  @Test
-  fun `specifying stats flush overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addStatsFlushSeconds(1234)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.statsFlushSeconds).isEqualTo(1234)
   }
 
   @Test

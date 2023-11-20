@@ -33,8 +33,8 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    auto tls =
-        ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(context_.threadLocal());
+    auto tls = ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(
+        context_.server_factory_context_.threadLocal());
     auto evaluator = std::make_unique<SuccessCriteriaEvaluator>(proto.success_criteria());
     return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, random_, scope_,
                                                           std::move(tls), std::move(evaluator));

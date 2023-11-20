@@ -1,6 +1,9 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("//bazel:apple.bzl", "envoy_objc_library")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 exports_files([
     "EnvoyEngine.h",

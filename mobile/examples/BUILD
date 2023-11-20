@@ -3,8 +3,11 @@ load(
     "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:defs.bzl",
     "xcode_provisioning_profile",
 )
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 # Change to your Apple Developer Team ID as shown in
 # https://developer.apple.com/account/#!/membership

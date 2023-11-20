@@ -191,12 +191,15 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   Api::Api& api() override { return server_.api(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
+  OverloadManager& overloadManager() override { return server_.overloadManager(); }
+  bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }

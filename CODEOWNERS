@@ -32,7 +32,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
-/*/extensions/transport_sockets/alts @adisuissa @yangminzhu
+/*/extensions/transport_sockets/alts @adisuissa @matthewstevenson88
 # tcp_stats transport socket extension
 /*/extensions/transport_sockets/tcp_stats @ggreenway @mattklein123
 # tls transport socket extension
