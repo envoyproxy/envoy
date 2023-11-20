@@ -685,7 +685,9 @@ google-apitools==0.5.32 \
 google-auth[aiohttp]==2.23.3 \
     --hash=sha256:6864247895eea5d13b9c57c9e03abb49cb94ce2dc7c58e91cba3248c7477c9e3 \
     --hash=sha256:a8f4608e65c244ead9e0538f181a96c6e11199ec114d41f1d7b1bffa96937bda
-    # via gsutil
+    # via
+    #   google-auth
+    #   gsutil
 google-reauth==0.1.1 \
     --hash=sha256:cb39074488d74c8853074dde47368bbf8f739d4a4338b89aab696c895b6d8368 \
     --hash=sha256:f9f6852a55c2c5453d581cd01f3d1278e86147c03d008409800390a834235892
@@ -1031,6 +1033,7 @@ pyjwt[crypto]==2.8.0 \
     # via
     #   gidgethub
     #   pygithub
+    #   pyjwt
 pylsqpack==0.3.17 \
     --hash=sha256:016cfc9dc2dea9c0b06b7aba64da89315b4c96c309c69f5ea548f4e994429781 \
     --hash=sha256:0b1ed55872f8f984f655a4c853ad749b834a1fcd4c7e5a962c6f17d4d27687a2 \
@@ -1189,7 +1192,6 @@ requests==2.31.0 \
     --hash=sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f \
     --hash=sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1
     # via
-    #   -r requirements.in
     #   google-auth
     #   pygithub
     #   sphinx
@@ -1595,7 +1597,7 @@ zstandard==0.21.0 \
     # via envoy-base-utils
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==68.2.2 \
-    --hash=sha256:4ac1475276d2f1c48684874089fefcd83bd7162ddaafb81fac866ba0db282a87 \
-    --hash=sha256:b454a35605876da60632df1a60f736524eb73cc47bbc9f3f1ef1b644de74fd2a
+setuptools==69.0.0 \
+    --hash=sha256:4c65d4f7891e5b046e9146913b87098144de2ca2128fbc10135b8556a6ddd946 \
+    --hash=sha256:eb03b43f23910c5fd0909cb677ad017cd9531f493d27f8b3f5316ff1fb07390e
     # via -r requirements.in
