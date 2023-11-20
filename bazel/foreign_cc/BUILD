@@ -610,5 +610,8 @@ envoy_cmake(
         "CMAKE_BUILD_TYPE": "Release",
     },
     lib_source = "@com_github_zeux_pugixml//:all",
-    out_static_libs = ["libpugixml.a"],
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["pugixml.lib"],
+        "//conditions:default": ["libpugixml.a"],
+    }),
 )
