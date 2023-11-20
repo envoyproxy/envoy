@@ -268,7 +268,8 @@ typed_config:
 
   virtual void checkClientSecretInRequest(absl::string_view token_secret) {
     std::string request_body = oauth2_request_->body().toString();
-    const auto query_parameters = Http::Utility::parseFromBody(request_body);
+    const auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
     auto it = query_parameters.find("client_secret");
 
     ASSERT_TRUE(it != query_parameters.end());
