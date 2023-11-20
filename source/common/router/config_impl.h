@@ -592,6 +592,9 @@ private:
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
   std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
       predicate_factories_;
+  // Vector of header names (as a lower case string to simplify use
+  // later on), to copy from the response that triggers the redirect
+  // into the following request.
   std::vector<Http::LowerCaseString> response_headers_to_copy_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_internal_redirects_{1};
