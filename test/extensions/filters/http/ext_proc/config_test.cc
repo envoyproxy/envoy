@@ -21,8 +21,12 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
       target_uri: ext_proc_server
       stat_prefix: google
   failure_mode_allow: true
-  request_attributes: 'Foo, Bar, Baz'
-  response_attributes: More
+  request_attributes:
+  - 'Foo'
+  - 'Bar'
+  - 'Baz'
+  response_attributes:
+  - 'More'
   processing_mode:
     request_header_mode: send
     response_header_mode: skip
@@ -40,7 +44,8 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -53,8 +58,12 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
       target_uri: ext_proc_server
       stat_prefix: google
   failure_mode_allow: true
-  request_attributes: 'Foo, Bar, Baz'
-  response_attributes: More
+  request_attributes:
+  - 'Foo'
+  - 'Bar'
+  - 'Baz'
+  response_attributes:
+  - 'More'
   processing_mode:
     request_header_mode: send
     response_header_mode: skip

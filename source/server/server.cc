@@ -60,6 +60,7 @@
 
 namespace Envoy {
 namespace Server {
+
 namespace {
 std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
 
@@ -606,9 +607,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, *stats_store_.rootScope(), thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options_);
+  overload_manager_ = createOverloadManager();
 
   maybeCreateHeapShrinker();
 

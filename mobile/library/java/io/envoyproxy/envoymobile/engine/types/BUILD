@@ -1,6 +1,9 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@rules_java//java:defs.bzl", "java_library")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 java_library(
     name = "envoy_c_types_lib",

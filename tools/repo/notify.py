@@ -59,10 +59,11 @@ MAINTAINERS = {
 # notifications but not result in a PR not getting assigned a
 # maintainer owner.
 FIRST_PASS = {
-    'dmitri-d': 'UB1883Q5S',
-    'tonya11en': 'U989BG2CW',
-    'esmet': 'U01BCGBUUAE',
-    'mathetake': 'UG9TD2FSB',
+    'silverstar194': 'U03LNPC8JN9',
+    'nezdolik': 'UDYUWRL13',
+    'daixiang0': 'U020CJG6UU8',
+    'botengyao': 'U037YUAK147',
+    'tyxia': 'U023U1ZN9SP',
 }
 
 # Only notify API reviewers who aren't maintainers.

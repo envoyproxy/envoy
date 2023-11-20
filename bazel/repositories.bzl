@@ -285,6 +285,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
+    _com_github_rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_intel_ipp_crypto_crypto_mb_fips()
@@ -368,10 +369,8 @@ def envoy_dependencies(skip_targets = []):
         name = "com_google_googleapis_imports",
         cc = True,
         go = True,
+        python = True,
         grpc = True,
-        rules_override = {
-            "py_proto_library": ["@envoy_api//bazel:api_build_system.bzl", ""],
-        },
     )
     native.bind(
         name = "bazel_runfiles",
@@ -884,6 +883,10 @@ def _com_google_absl():
         name = "abseil_stacktrace",
         actual = "@com_google_absl//absl/debugging:stacktrace",
     )
+    native.bind(
+        name = "abseil_statusor",
+        actual = "@com_google_absl//absl/status:statusor",
+    )
 
     # Require abseil_time as an indirect dependency as it is needed by the
     # direct dependency jwt_verify_lib.
@@ -1185,6 +1188,9 @@ def _com_github_grpc_grpc():
         name = "upb_generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
         actual = "@upb//:generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
     )
+
+def _com_github_rules_proto_grpc():
+    external_http_archive("com_github_rules_proto_grpc")
 
 def _re2():
     external_http_archive("com_googlesource_code_re2")

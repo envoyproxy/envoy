@@ -302,8 +302,8 @@ public:
   AdminImpl::NullScopedRouteConfigProvider& scopedRouteConfigProvider() {
     return scoped_route_config_provider_;
   }
-  AdminImpl::NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
-  AdminImpl::NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
+  NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
+  NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
   AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
   AdminImpl::AdminListener& listener() { return listener_; }
 
@@ -312,7 +312,7 @@ private:
   Server::Instance& server_;
   AdminImpl::NullRouteConfigProvider route_config_provider_{server_.timeSource()};
   AdminImpl::NullScopedRouteConfigProvider scoped_route_config_provider_{server_.timeSource()};
-  AdminImpl::NullOverloadManager::OverloadState overload_state_{server_.dispatcher()};
+  NullOverloadManager::OverloadState overload_state_{server_.dispatcher(), false};
   AdminImpl::AdminListenSocketFactory socket_factory_{nullptr};
   Stats::ScopeSharedPtr listener_scope_;
   AdminImpl::AdminListener listener_{admin_, std::move(listener_scope_)};

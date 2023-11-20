@@ -8,7 +8,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/config:95.3"
 "source/common/crypto:95.5"
-"source/common/event:95.1" # Emulated edge events guards don't report LCOV
+"source/common/event:95.0" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.2"
 "source/common/json:94.6"
@@ -35,7 +35,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/grpc_json_transcoder:93.8" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
-"source/extensions/filters/http/wasm:1.9"
+"source/extensions/filters/http/wasm:1.8"
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/common:96.4"
 "source/extensions/filters/network/mongo_proxy:96.0"
@@ -62,7 +62,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/listener_managers/validation_listener_manager:70.5"
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:91.0" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/config_validation:89.3"
+"source/server/config_validation:89.2"
 "source/extensions/health_checkers:96.0"
 "source/extensions/health_checkers/http:93.9"
 "source/extensions/health_checkers/grpc:92.0"

@@ -1,7 +1,10 @@
-load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 objc_library(
     name = "appmain",

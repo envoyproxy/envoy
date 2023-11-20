@@ -8,6 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/event/deferred_task.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/listener_managers/listener_manager/active_tcp_listener.h"
@@ -35,7 +36,8 @@ void ConnectionHandlerImpl::decNumConnections() {
 }
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                                        Network::ListenerConfig& config, Runtime::Loader& runtime) {
+                                        Network::ListenerConfig& config, Runtime::Loader& runtime,
+                                        Random::RandomGenerator& random) {
   if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
@@ -82,7 +84,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       details->addActiveListener(
           config, address, listener_reject_fraction_, disable_listeners_,
           std::make_unique<ActiveTcpListener>(
-              *this, config, runtime,
+              *this, config, runtime, random,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
               address, config.connectionBalancer(*address),
               overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
@@ -347,6 +349,16 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
     return active_listener->get().tcpListener().value().get();
   }
   return absl::nullopt;
+}
+
+Network::ListenerPtr ConnectionHandlerImpl::createListener(
+    Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, const Network::ListenerConfig& config,
+    Server::ThreadLocalOverloadStateOptRef overload_state) {
+  return std::make_unique<Network::TcpListenerImpl>(
+      dispatcher(), random, runtime, std::move(socket), cb, config.bindToPort(),
+      config.ignoreGlobalConnLimit(), config.maxConnectionsToAcceptPerSocketEvent(),
+      overload_state);
 }
 
 Network::BalancedConnectionHandlerOptRef

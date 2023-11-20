@@ -52,12 +52,12 @@ public:
     // Note, we need to set it through `MockFactoryContext` rather than `MockAsyncClientManager`
     // directly because the rate limit client object below requires context argument as the input.
     if (external_inited_) {
-      EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+      EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
                   getOrCreateRawAsyncClient(_, _, _))
           .Times(2)
           .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
     } else {
-      EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+      EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
                   getOrCreateRawAsyncClientWithHashKey(_, _, _))
           .WillOnce(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
     }
