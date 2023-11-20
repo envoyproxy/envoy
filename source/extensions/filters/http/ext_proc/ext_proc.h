@@ -141,15 +141,15 @@ public:
         disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
         builder_(builder), request_expr_(initExpressions(config.request_attributes())),
         response_expr_(initExpressions(config.response_attributes())),
-  untyped_forwarding_namespaces_(
-      config.metadata_options().forwarding_namespaces().untyped().begin(),
-      config.metadata_options().forwarding_namespaces().untyped().end()),
-    typed_forwarding_namespaces_(
-        config.metadata_options().forwarding_namespaces().typed().begin(),
-        config.metadata_options().forwarding_namespaces().typed().end()),
-    untyped_receiving_namespaces_(
-        config.metadata_options().receiving_namespaces().untyped().begin(),
-        config.metadata_options().receiving_namespaces().untyped().end()) {}
+        untyped_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().untyped().begin(),
+            config.metadata_options().forwarding_namespaces().untyped().end()),
+        typed_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().typed().begin(),
+            config.metadata_options().forwarding_namespaces().typed().end()),
+        untyped_receiving_namespaces_(
+            config.metadata_options().receiving_namespaces().untyped().begin(),
+            config.metadata_options().receiving_namespaces().untyped().end()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 

@@ -344,8 +344,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   if (decoding_state_.sendHeaders()) {
     absl::optional<Envoy::ProtobufWkt::Struct> proto;
     if (!config_->requestExpr().empty()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
-                                                                    &headers, nullptr, nullptr);
+      auto activation_ptr = Filters::Common::Expr::createActivation(
+          decoding_state_.callbacks()->streamInfo(), &headers, nullptr, nullptr);
       proto = evaluateAttributes(std::move(activation_ptr), config_->requestExpr());
     }
 
@@ -629,8 +629,8 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
     absl::optional<Envoy::ProtobufWkt::Struct> proto;
     if (!config_->responseExpr().empty()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
-                                                                    nullptr, &headers, nullptr);
+      auto activation_ptr = Filters::Common::Expr::createActivation(
+          encoding_state_.callbacks()->streamInfo(), nullptr, &headers, nullptr);
       proto = evaluateAttributes(std::move(activation_ptr), config_->responseExpr());
     }
 
