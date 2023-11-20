@@ -13,7 +13,7 @@ TEST(CurlTest, BuiltWithExpectedFeatures) {
   // developer or os elections for DEBUG, CURL DEBUG and LARGE FILE
   EXPECT_NE(0, info->features & CURL_VERSION_IPV6);
   EXPECT_EQ(0, info->features & CURL_VERSION_KERBEROS4);
-  EXPECT_EQ(0, info->features & CURL_VERSION_SSL);
+  EXPECT_NE(0, info->features & CURL_VERSION_SSL);
   EXPECT_NE(0, info->features & CURL_VERSION_LIBZ);
   EXPECT_EQ(0, info->features & CURL_VERSION_GSSNEGOTIATE);
   EXPECT_NE(0, info->features & CURL_VERSION_ASYNCHDNS);
@@ -28,7 +28,7 @@ TEST(CurlTest, BuiltWithExpectedFeatures) {
   EXPECT_EQ(0, info->features & CURL_VERSION_KERBEROS5);
   EXPECT_NE(0, info->features & CURL_VERSION_UNIX_SOCKETS);
   EXPECT_EQ(0, info->features & CURL_VERSION_PSL);
-  EXPECT_EQ(0, info->features & CURL_VERSION_HTTPS_PROXY);
+  EXPECT_NE(0, info->features & CURL_VERSION_HTTPS_PROXY);
   EXPECT_EQ(0, info->features & CURL_VERSION_MULTI_SSL);
   EXPECT_EQ(0, info->features & CURL_VERSION_BROTLI);
   EXPECT_NE(0, info->features & CURL_VERSION_ALTSVC);
