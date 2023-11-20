@@ -145,8 +145,9 @@ public:
   }
 };
 
-class AltsTsiHandshakerTest : public Test {
+class AltsTsiHandshakerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
+  AltsTsiHandshakerTest() : version_(GetParam()) {};
   void startFakeHandshakerService() {
     server_address_ = absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     absl::Notification notification;
@@ -205,6 +206,7 @@ private:
   std::string server_address_;
   std::unique_ptr<grpc::Server> server_;
   std::unique_ptr<std::thread> server_thread_;
+  Network::Address::IpVersion version_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AltsTsiHandshakerTest,
