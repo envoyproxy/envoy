@@ -234,7 +234,8 @@ TEST_F(UdpConnPoolTest, ApplySocketOptionsFailure) {
   NiceMock<Envoy::Api::MockOsSysCalls> mock_os_sys_calls;
   Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_sys_calls(
       &mock_os_sys_calls);
-  EXPECT_CALL(mock_os_sys_calls, setsockopt_).WillOnce(Return(-1));
+  // Use ON_CALL since the applyOptions call fail without calling the setsockopt_ in Windows.
+  ON_CALL(mock_os_sys_calls, setsockopt_).WillByDefault(Return(-1));
   udp_conn_pool_->newStream(&mock_callback_);
 }
 
