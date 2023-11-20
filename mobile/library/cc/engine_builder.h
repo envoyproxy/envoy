@@ -67,11 +67,6 @@ public:
   // connection. If no root certs are specified, the operating system defaults are used.
   XdsBuilder& setSslRootCerts(std::string root_certs);
 
-  // Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake
-  // and the authority HTTP header. If not set, the SNI is set by default to the xDS server address
-  // and the authority HTTP header is not set.
-  XdsBuilder& setSni(std::string sni);
-
   // Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
   // to retrieve dynamic runtime configuration via the xDS management server.
   //
@@ -114,7 +109,6 @@ private:
   uint32_t xds_server_port_;
   std::vector<envoy::config::core::v3::HeaderValue> xds_initial_grpc_metadata_;
   std::string ssl_root_certs_;
-  std::string sni_;
   std::string rtds_resource_name_;
   int rtds_timeout_in_seconds_ = DefaultXdsTimeout;
   bool enable_cds_ = false;
