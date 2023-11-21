@@ -5,6 +5,7 @@ Other features
   :maxdepth: 2
 
   dlb
+  hyperscan
   internal_listener
   rate_limit
   vcl

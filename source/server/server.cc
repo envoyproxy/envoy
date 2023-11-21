@@ -693,8 +693,6 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_ = component_factory.createRuntime(*this, initial_config);
-
-  initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
 
   if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
@@ -705,13 +703,17 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   if (initial_config.admin().address()) {
-    if (!admin_) {
-      throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
-    }
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
-                              initial_config.admin().address(),
-                              initial_config.admin().socketOptions(),
-                              stats_store_.createScope("listener.admin."));
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+    // Admin instance always be created if admin support is not compiled out.
+    RELEASE_ASSERT(admin_ != nullptr, "Admin instance should be created but actually not.");
+    auto typed_admin = dynamic_cast<AdminImpl*>(admin_.get());
+    RELEASE_ASSERT(typed_admin != nullptr, "Admin implementation is not an AdminImpl.");
+    initial_config.initAdminAccessLog(bootstrap_, typed_admin->factoryContext());
+    admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
+                              initial_config.admin().socketOptions());
+#else
+    throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
+#endif
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }

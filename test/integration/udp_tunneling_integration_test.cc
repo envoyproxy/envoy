@@ -668,8 +668,30 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
-  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
-                    BufferOptions{1, 30}, absl::nullopt};
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config};
   setup(config);
 
   // Initial datagram will create a session and a tunnel request.
@@ -686,6 +708,8 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("1 UF,URX"));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
@@ -700,7 +724,7 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
       path: {}
       log_format:
         text_format_source:
-          inline_string: "%UPSTREAM_REQUEST_ATTEMPT_COUNT%\n"
+          inline_string: "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n"
 )EOF",
                                                             access_log_filename);
 
@@ -741,7 +765,7 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   sendCapsuleDownstream("response", true);
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 
-  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("2"));
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("2 UF"));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, PropagateValidResponseHeaders) {
