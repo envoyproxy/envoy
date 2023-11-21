@@ -70,7 +70,7 @@ TEST(IoUringWorkerImplTest, SubmitRequestsFailed) {
       .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  worker.submitReadRequest(io_uring_socket);
+  delete worker.submitReadRequest(io_uring_socket);
 
   Buffer::OwnedImpl buf;
   auto slices = buf.getRawSlices();
@@ -82,7 +82,7 @@ TEST(IoUringWorkerImplTest, SubmitRequestsFailed) {
       .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  worker.submitWriteRequest(io_uring_socket, slices);
+  delete worker.submitWriteRequest(io_uring_socket, slices);
 
   EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
       .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
@@ -92,7 +92,7 @@ TEST(IoUringWorkerImplTest, SubmitRequestsFailed) {
       .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  worker.submitCancelRequest(io_uring_socket, nullptr);
+  delete worker.submitCancelRequest(io_uring_socket, nullptr);
 
   EXPECT_CALL(mock_io_uring, prepareClose(fd, _))
       .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
@@ -102,7 +102,7 @@ TEST(IoUringWorkerImplTest, SubmitRequestsFailed) {
       .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  worker.submitCloseRequest(io_uring_socket);
+  delete worker.submitCloseRequest(io_uring_socket);
 
   EXPECT_CALL(mock_io_uring, prepareShutdown(fd, _, _))
       .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
@@ -112,7 +112,7 @@ TEST(IoUringWorkerImplTest, SubmitRequestsFailed) {
       .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  worker.submitShutdownRequest(io_uring_socket, SHUT_WR);
+  delete worker.submitShutdownRequest(io_uring_socket, SHUT_WR);
 
   EXPECT_EQ(fd, io_uring_socket.fd());
   EXPECT_EQ(1, worker.getSockets().size());
