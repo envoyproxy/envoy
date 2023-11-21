@@ -450,6 +450,41 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
   cleanup();
 }
 
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteError) {
+  initialize();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      -1,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Write);
+        EXPECT_NE(absl::nullopt, socket->getWriteParam());
+        result = socket->getWriteParam()->result_;
+        socket->close(false);
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  socket->disableRead();
+  // Waiting for the server socket sending the data.
+  std::string write_data = "hello world";
+  struct Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+  socket->write(&slice, 1);
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(result.value(), -EBADF);
+
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteTimeout) {
   initialize();
   createServerListenerAndClientSocket();
