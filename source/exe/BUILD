@@ -96,16 +96,15 @@ envoy_cc_library(
     name = "main_common_lib",
     srcs = [
         "main_common.cc",
-        "stripped_main_base.cc",
     ],
     hdrs = [
         "main_common.h",
-        "stripped_main_base.h",
     ],
     deps = [
         ":envoy_common_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
+        ":stripped_main_base_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",

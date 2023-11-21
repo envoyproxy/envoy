@@ -21,7 +21,6 @@ envoy_cc_test_binary(
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
-        "//source/server:options_lib",
         "//source/server/admin:admin_html_util",
     ],
 )
