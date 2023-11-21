@@ -22,6 +22,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -154,9 +157,9 @@ public:
   const bool keep_stream_alive_;
 };
 
-class TsiSocketTest : public testing::Test {
+class TsiSocketTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  TsiSocketTest() {
+  TsiSocketTest() : version_(GetParam()) {
     server_.handshaker_factory_ = [this](Event::Dispatcher& dispatcher,
                                          const Network::Address::InstanceConstSharedPtr&,
                                          const Network::Address::InstanceConstSharedPtr&) {
@@ -185,7 +188,8 @@ protected:
   }
 
   void startFakeHandshakerService() {
-    handshaker_server_address_ = absl::StrCat("[::1]:", 0);
+    handshaker_server_address_ =
+        absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     absl::Notification notification;
     handshaker_server_thread_ = std::make_unique<std::thread>([this, &notification]() {
       FakeHandshakerService fake_handshaker_service;
@@ -197,7 +201,8 @@ protected:
       handshaker_server_ = server_builder.BuildAndStart();
       EXPECT_THAT(handshaker_server_, NotNull());
       EXPECT_NE(listening_port, -1);
-      handshaker_server_address_ = absl::StrCat("[::1]:", listening_port);
+      handshaker_server_address_ =
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":", listening_port);
       notification.Notify();
       handshaker_server_->Wait();
     });
@@ -205,7 +210,8 @@ protected:
   }
 
   void startErrorHandshakerService(bool keep_stream_alive) {
-    handshaker_server_address_ = absl::StrCat("[::1]:", 0);
+    handshaker_server_address_ =
+        absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     absl::Notification notification;
     handshaker_server_thread_ =
         std::make_unique<std::thread>([this, keep_stream_alive, &notification]() {
@@ -218,7 +224,8 @@ protected:
           handshaker_server_ = server_builder.BuildAndStart();
           EXPECT_THAT(handshaker_server_, NotNull());
           EXPECT_NE(listening_port, -1);
-          handshaker_server_address_ = absl::StrCat("[::1]:", listening_port);
+          handshaker_server_address_ = absl::StrCat(
+              Network::Test::getLoopbackAddressUrlString(version_), ":", listening_port);
           notification.Notify();
           handshaker_server_->Wait();
         });
@@ -364,6 +371,8 @@ protected:
     Buffer::OwnedImpl write_buffer_;
   };
 
+  Network::Address::IpVersion version_;
+
   SocketForTest client_;
   SocketForTest server_;
 
@@ -377,29 +386,33 @@ protected:
   std::unique_ptr<std::thread> handshaker_server_thread_;
 };
 
-TEST_F(TsiSocketTest, ConfigureInitialCongestionWindowIsNoOp) {
+INSTANTIATE_TEST_SUITE_P(IpVersions, TsiSocketTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(TsiSocketTest, ConfigureInitialCongestionWindowIsNoOp) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   client_.tsi_socket_->configureInitialCongestionWindow(0, std::chrono::milliseconds(0));
 }
 
-TEST_F(TsiSocketTest, DoesNotStartSecureTransport) {
+TEST_P(TsiSocketTest, DoesNotStartSecureTransport) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   EXPECT_FALSE(client_.tsi_socket_->startSecureTransport());
 }
 
-TEST_F(TsiSocketTest, DoesNotHaveSsl) {
+TEST_P(TsiSocketTest, DoesNotHaveSsl) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   EXPECT_EQ(client_.tsi_socket_->ssl(), nullptr);
   EXPECT_FALSE(client_.tsi_socket_->canFlushClose());
   EXPECT_EQ(client_.tsi_socket_->ssl(), nullptr);
 }
 
-TEST_F(TsiSocketTest, EmptyFailureReason) {
+TEST_P(TsiSocketTest, EmptyFailureReason) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   EXPECT_EQ(client_.tsi_socket_->failureReason(), "");
 }
 
-TEST_F(TsiSocketTest, UpstreamHandshakeFactoryFailure) {
+TEST_P(TsiSocketTest, UpstreamHandshakeFactoryFailure) {
   auto raw_socket = new Network::MockTransportSocket();
   auto tsi_socket = std::make_unique<TsiSocket>(
       [](Event::Dispatcher&, const Network::Address::InstanceConstSharedPtr&,
@@ -414,7 +427,7 @@ TEST_F(TsiSocketTest, UpstreamHandshakeFactoryFailure) {
                  "While writing ClientInit.");
 }
 
-TEST_F(TsiSocketTest, DownstreamHandshakeFactoryFailure) {
+TEST_P(TsiSocketTest, DownstreamHandshakeFactoryFailure) {
   auto raw_socket = new Network::MockTransportSocket();
   auto tsi_socket = std::make_unique<TsiSocket>(
       [](Event::Dispatcher&, const Network::Address::InstanceConstSharedPtr&,
@@ -429,14 +442,14 @@ TEST_F(TsiSocketTest, DownstreamHandshakeFactoryFailure) {
                  "While writing ClientInit.");
 }
 
-TEST_F(TsiSocketTest, HandshakeSuccessAndTransferData) {
+TEST_P(TsiSocketTest, HandshakeSuccessAndTransferData) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   doHandshakeAndExpectSuccess();
   expectTransferDataFromClientToServer(ApplicationData);
 }
 
-TEST_F(TsiSocketTest, HandshakeSuccessAndTransferLargeData) {
+TEST_P(TsiSocketTest, HandshakeSuccessAndTransferLargeData) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   doHandshakeAndExpectSuccess();
@@ -444,7 +457,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndTransferLargeData) {
   expectTransferDataFromClientToServer(large_application_data);
 }
 
-TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithShortWrite) {
+TEST_P(TsiSocketTest, HandshakeSuccessAndTransferDataWithShortWrite) {
   startFakeHandshakerService();
 
   // Initialize the sockets but do not provide a default action for
@@ -545,7 +558,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithShortWrite) {
   EXPECT_EQ(client_to_server_.length(), AltsFrameOverhead + ApplicationData.length() - 1);
 }
 
-TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidation) {
+TEST_P(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidation) {
   startFakeHandshakerService();
   auto validator = [](TsiInfo&, std::string&) { return true; };
   initializeSockets(validator, validator);
@@ -553,7 +566,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidation) {
   expectTransferDataFromClientToServer(ApplicationData);
 }
 
-TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidationFailure) {
+TEST_P(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidationFailure) {
   startFakeHandshakerService();
   auto validator = [](TsiInfo&, std::string&) { return false; };
   initializeSockets(validator, validator);
@@ -583,7 +596,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidationFailure) {
   EXPECT_EQ(client_to_server_.toString(), "");
 }
 
-TEST_F(TsiSocketTest, HandshakeSuccessAndFailToUnprotect) {
+TEST_P(TsiSocketTest, HandshakeSuccessAndFailToUnprotect) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   doHandshakeAndExpectSuccess();
@@ -611,7 +624,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndFailToUnprotect) {
   EXPECT_EQ(server_.read_buffer_.toString(), "");
 }
 
-TEST_F(TsiSocketTest, HandshakeSuccessWithUnusedData) {
+TEST_P(TsiSocketTest, HandshakeSuccessWithUnusedData) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr,
                     /*have_client_raw_socket_write_default=*/false);
@@ -676,7 +689,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessWithUnusedData) {
   EXPECT_EQ(server_.read_buffer_.toString(), ApplicationData);
 }
 
-TEST_F(TsiSocketTest, HandshakeSuccessWithUnusedDataAndShortWrite) {
+TEST_P(TsiSocketTest, HandshakeSuccessWithUnusedDataAndShortWrite) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr,
                     /*have_client_raw_socket_write_default=*/false);
@@ -740,7 +753,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessWithUnusedDataAndShortWrite) {
   EXPECT_EQ(server_.read_buffer_.toString(), ApplicationData);
 }
 
-TEST_F(TsiSocketTest, HandshakeErrorButStreamIsKeptAlive) {
+TEST_P(TsiSocketTest, HandshakeErrorButStreamIsKeptAlive) {
   startErrorHandshakerService(/*keep_stream_alive=*/true);
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   client_.tsi_socket_->onConnected();
@@ -750,7 +763,7 @@ TEST_F(TsiSocketTest, HandshakeErrorButStreamIsKeptAlive) {
   EXPECT_EQ(client_to_server_.toString(), "");
 }
 
-TEST_F(TsiSocketTest, HandshakeErrorButStreamIsNotKeptAlive) {
+TEST_P(TsiSocketTest, HandshakeErrorButStreamIsNotKeptAlive) {
   startErrorHandshakerService(/*keep_stream_alive=*/false);
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   client_.tsi_socket_->onConnected();
@@ -760,7 +773,7 @@ TEST_F(TsiSocketTest, HandshakeErrorButStreamIsNotKeptAlive) {
   EXPECT_EQ(client_to_server_.toString(), "");
 }
 
-TEST_F(TsiSocketTest, HandshakeWithImmediateReadError) {
+TEST_P(TsiSocketTest, HandshakeWithImmediateReadError) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
 
   EXPECT_CALL(*client_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -776,7 +789,7 @@ TEST_F(TsiSocketTest, HandshakeWithImmediateReadError) {
   EXPECT_EQ(client_.read_buffer_.length(), 0L);
 }
 
-TEST_F(TsiSocketTest, DoReadEndOfStream) {
+TEST_P(TsiSocketTest, DoReadEndOfStream) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
 
@@ -800,7 +813,7 @@ TEST_F(TsiSocketTest, DoReadEndOfStream) {
   EXPECT_EQ(server_.read_buffer_.toString(), ApplicationData);
 }
 
-TEST_F(TsiSocketTest, DoReadOnceError) {
+TEST_P(TsiSocketTest, DoReadOnceError) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
 
@@ -825,7 +838,7 @@ TEST_F(TsiSocketTest, DoReadOnceError) {
   EXPECT_EQ(server_.read_buffer_.toString(), ApplicationData);
 }
 
-TEST_F(TsiSocketTest, DoReadDrainBuffer) {
+TEST_P(TsiSocketTest, DoReadDrainBuffer) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
 

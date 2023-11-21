@@ -48,6 +48,8 @@ routing PRs, questions, etc. to the right place.
   * Caches, file filters, and file I/O.
 * Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
   * Listeners, iouring, data plane.
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
+  * Load balancing, GeoIP, overload manager, security.
 
 # Envoy mobile maintainers
 

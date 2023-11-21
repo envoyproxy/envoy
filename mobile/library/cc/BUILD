@@ -1,8 +1,13 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_envoy_mobile_request_compression", "envoy_select_google_grpc")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_mobile_package",
+    "envoy_select_envoy_mobile_request_compression",
+)
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "engine_builder_lib",
@@ -48,15 +53,6 @@ envoy_cc_library(
             "@envoy_api//envoy/extensions/compression/gzip/compressor/v3:pkg_cc_proto",
             "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
             "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
-        ],
-        "@envoy",
-    ) + envoy_select_google_grpc(
-        [
-            "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
-            "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
-            "@envoy//source/extensions/clusters/static:static_cluster_lib",
-            "@envoy//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
-            "@envoy//source/extensions/health_checkers/http:health_checker_lib",
         ],
         "@envoy",
     ),

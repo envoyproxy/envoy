@@ -39,7 +39,6 @@
 #include "source/extensions/transport_sockets/tls/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
 #include "source/extensions/load_balancing_policies/cluster_provided/config.h"
-#include "source/extensions/load_balancing_policies/round_robin/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
@@ -66,6 +65,14 @@
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
+
+#ifdef ENVOY_MOBILE_XDS
+#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#endif
 
 namespace Envoy {
 
@@ -177,9 +184,8 @@ void ExtensionRegistry::registerFactories() {
   // This is required for the default upstream local address selector.
   Upstream::forceRegisterDefaultUpstreamLocalAddressSelectorFactory();
 
-  // This is required for load balancers of upstreams.
+  // This is required for load balancers of upstream clusters `base` and `base_clear`.
   Envoy::Extensions::LoadBalancingPolices::ClusterProvided::forceRegisterFactory();
-  Envoy::Extensions::LoadBalancingPolices::RoundRobin::forceRegisterFactory();
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with
@@ -213,6 +219,18 @@ void ExtensionRegistry::registerFactories() {
   Extensions::HttpFilters::Composite::forceRegisterCompositeFilterFactory();
   Extensions::HttpFilters::Composite::forceRegisterExecuteFilterActionFactory();
   Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
+#endif
+
+#ifdef ENVOY_MOBILE_XDS
+  // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile
+  // supports for xDS.
+  Config::forceRegisterAdsConfigSubscriptionFactory();
+  Config::forceRegisterGrpcConfigSubscriptionFactory();
+  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
+  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
+  Config::forceRegisterGrpcMuxFactory();
+  Config::forceRegisterNewGrpcMuxFactory();
+  Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
 #endif
 }
 

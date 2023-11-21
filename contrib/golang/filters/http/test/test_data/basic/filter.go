@@ -16,7 +16,6 @@ type filter struct {
 	callbacks       api.FilterCallbackHandler
 	req_body_length uint64
 	query_params    url.Values
-	protocol        string
 	scheme          string
 	method          string
 	path            string
@@ -55,7 +54,6 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 	f.req_body_length = 0
 
-	f.protocol = header.Protocol()
 	f.scheme = header.Scheme()
 	f.method = header.Method()
 	f.path = header.Path()
@@ -82,6 +80,7 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
 	body := fmt.Sprintf(msg, a...)
+	f.callbacks.Log(api.Error, fmt.Sprintf("test failed: %s", body))
 	f.callbacks.SendLocalReply(500, body, nil, 0, "")
 	return api.LocalReply
 }
@@ -187,6 +186,30 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
 
+	if found {
+		upperCase, _ := header.Get("X-Test-Header-0")
+		if upperCase != origin {
+			return f.fail("Get should be case-insensitive")
+		}
+		upperCaseHdrs := header.Values("X-Test-Header-0")
+		if hdrs[0] != upperCaseHdrs[0] {
+			return f.fail("Values should be case-insensitive")
+		}
+	}
+
+	header.Add("UpperCase", "header")
+	if hdr, _ := header.Get("uppercase"); hdr != "header" {
+		return f.fail("Add should be case-insensitive")
+	}
+	header.Set("UpperCase", "header")
+	if hdr, _ := header.Get("uppercase"); hdr != "header" {
+		return f.fail("Set should be case-insensitive")
+	}
+	header.Del("UpperCase")
+	if hdr, _ := header.Get("uppercase"); hdr != "" {
+		return f.fail("Del should be case-insensitive")
+	}
+
 	header.Add("existed-header", "bar")
 	header.Add("newly-added-header", "foo")
 	header.Add("newly-added-header", "bar")
@@ -254,6 +277,28 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 
 	if trailers.GetRaw("existed-trailer") == "foo" {
 		trailers.Add("x-test-trailer-2", "bar")
+	}
+
+	upperCase, _ := trailers.Get("X-Test-Trailer-0")
+	if upperCase != "bar" {
+		return f.fail("Get should be case-insensitive")
+	}
+	upperCaseHdrs := trailers.Values("X-Test-Trailer-0")
+	if upperCaseHdrs[0] != "bar" {
+		return f.fail("Values should be case-insensitive")
+	}
+
+	trailers.Add("UpperCase", "trailers")
+	if hdr, _ := trailers.Get("uppercase"); hdr != "trailers" {
+		return f.fail("Add should be case-insensitive")
+	}
+	trailers.Set("UpperCase", "trailers")
+	if hdr, _ := trailers.Get("uppercase"); hdr != "trailers" {
+		return f.fail("Set should be case-insensitive")
+	}
+	trailers.Del("UpperCase")
+	if hdr, _ := trailers.Get("uppercase"); hdr != "" {
+		return f.fail("Del should be case-insensitive")
 	}
 
 	if f.panic == "decode-trailer" {

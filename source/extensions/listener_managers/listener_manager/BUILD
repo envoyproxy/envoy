@@ -210,6 +210,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
+        "//source/common/network:listener_lib",
         "//source/common/stats:timespan_lib",
         "//source/server:active_listener_base",
     ],

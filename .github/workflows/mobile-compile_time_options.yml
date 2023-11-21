@@ -74,6 +74,7 @@ jobs:
              --copt=-fno-unwind-tables \
              --copt=-fno-exceptions \
              --define=google_grpc=disabled \
+             --define=envoy_mobile_xds=disabled \
              //test/performance:test_binary_size //library/cc/...
 
   cc_test:
@@ -102,6 +103,7 @@ jobs:
             --define=signal_trace=disabled \
             --define=envoy_mobile_request_compression=disabled \
             --define=google_grpc=disabled \
+            --define=envoy_mobile_xds=disabled \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             $TARGETS
 
@@ -134,6 +136,7 @@ jobs:
             --define=envoy_mobile_stats_reporting=disabled \
             --define=envoy_mobile_swift_cxx_interop=disabled \
             --define=google_grpc=disabled \
+            --define=envoy_mobile_xds=disabled \
             --@envoy//bazel:http3=False \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //library/swift:ios_framework
@@ -171,6 +174,7 @@ jobs:
             --define=envoy_mobile_request_compression=disabled \
             --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
+            --define=envoy_mobile_xds=disabled \
             --define=envoy_yaml=disabled \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //:android_dist

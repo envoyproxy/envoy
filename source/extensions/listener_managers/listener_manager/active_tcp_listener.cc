@@ -14,14 +14,15 @@ namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config, Runtime::Loader& runtime,
+                                     Random::RandomGenerator& random,
                                      Network::SocketSharedPtr&& socket,
                                      Network::Address::InstanceConstSharedPtr& listen_address,
                                      Network::ConnectionBalancer& connection_balancer,
                                      ThreadLocalOverloadStateOptRef overload_state)
-    : OwnedActiveStreamListenerBase(parent, parent.dispatcher(),
-                                    parent.dispatcher().createListener(
-                                        std::move(socket), *this, runtime, config, overload_state),
-                                    config),
+    : OwnedActiveStreamListenerBase(
+          parent, parent.dispatcher(),
+          parent.createListener(std::move(socket), *this, runtime, random, config, overload_state),
+          config),
       tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
       listen_address_(listen_address) {
   connection_balancer_.registerHandler(*this);

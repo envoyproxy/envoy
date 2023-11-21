@@ -9,6 +9,7 @@
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "re2/re2.h"
@@ -23,6 +24,19 @@ using Internal::ParsedPathPattern;
 // Silence warnings about missing initializers for members of LazyRE2.
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
+
+std::ostream& operator<<(std::ostream& os, const ParsedSegment& parsed_segment) {
+  os << "{kind = ";
+  switch (parsed_segment.kind_) {
+  case RewriteStringKind::Variable:
+    os << "Variable";
+    break;
+  case RewriteStringKind::Literal:
+    os << "Literal";
+    break;
+  }
+  return os << ", value = \"" << absl::CEscape(parsed_segment.value_) << "\"}";
+}
 
 absl::StatusOr<std::string> convertPathPatternSyntaxToRegex(absl::string_view path_pattern) {
   absl::StatusOr<ParsedPathPattern> status = Internal::parsePathPatternSyntax(path_pattern);

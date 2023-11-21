@@ -47,7 +47,7 @@ bool BufferList::checkExisting(Buffer::Instance* data) {
 };
 
 // headers_ should set to nullptr when return true.
-bool ProcessorState::handleHeaderGolangStatus(const GolangStatus status) {
+bool ProcessorState::handleHeaderGolangStatus(GolangStatus status) {
   ENVOY_LOG(debug, "golang filter handle header status, state: {}, phase: {}, status: {}",
             stateStr(), phaseStr(), int(status));
 

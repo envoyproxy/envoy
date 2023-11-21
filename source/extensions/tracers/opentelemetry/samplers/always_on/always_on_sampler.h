@@ -24,8 +24,8 @@ public:
                            Server::Configuration::TracerFactoryContext& /*context*/) {}
   SamplingResult shouldSample(const absl::optional<SpanContext> parent_context,
                               const std::string& trace_id, const std::string& name,
-                              ::opentelemetry::proto::trace::v1::Span::SpanKind spankind,
-                              const std::map<std::string, std::string>& attributes,
+                              OTelSpanKind spankind,
+                              OptRef<const Tracing::TraceContext> trace_context,
                               const std::vector<SpanContext>& links) override;
   std::string getDescription() const override;
 
