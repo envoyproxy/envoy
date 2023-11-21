@@ -787,6 +787,69 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteWithClientRST) {
   cleanup();
 }
 
+TEST_F(IoUringWorkerIntegrationTest, AddServerSocketWithBuffer) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  std::string data = "hello";
+  Buffer::OwnedImpl buffer;
+  buffer.add(data);
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_, buffer,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        result = socket->getReadParam()->result_;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(result.value(), data.length());
+
+  socket->close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFDOpen) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  bool is_closed = false;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&socket, &is_closed](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(socket->getReadParam(), absl::nullopt);
+        EXPECT_EQ(socket->getReadParam()->result_, 0);
+        is_closed = true;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  socket->close(true);
+
+  while (io_uring_worker_->getSockets().size() != 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Ensure the server socket is still open.
+  std::string write_data = "hello world";
+  auto rc =
+      Api::OsSysCallsSingleton::get().write(server_socket_, write_data.data(), write_data.size());
+  EXPECT_EQ(rc.return_value_, write_data.length());
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
