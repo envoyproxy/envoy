@@ -172,9 +172,9 @@ protected:
   bool enable_close_event_{false};
   // The callback will be invoked when close request is done.
   IoUringSocketOnClosedCb on_closed_cb_{nullptr};
-  // This object store the data get from read request.
+  // This object stores the data get from read request.
   OptRef<ReadParam> read_param_;
-  // This object store the data get from write request.
+  // This object stores the data get from write request.
   OptRef<WriteParam> write_param_;
 
   Event::FileReadyCb cb_;

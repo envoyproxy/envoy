@@ -452,7 +452,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     return;
   }
 
-  // If the socket is enabled and there is bytes to read, notify the handler.
+  // If the socket is enabled and there are bytes to read, notify the handler.
   if (status_ == ReadEnabled) {
     if (read_buf_.length() > 0) {
       ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, read_buf_.length());
