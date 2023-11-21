@@ -835,12 +835,14 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFDOpen) {
       false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
-  socket->close(true);
+  bool on_closed = false;
+  socket->close(true, [&on_closed](){ on_closed = true; });
 
   while (io_uring_worker_->getSockets().size() != 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  EXPECT_TRUE(on_closed);
   // Ensure the server socket is still open.
   std::string write_data = "hello world";
   auto rc =
