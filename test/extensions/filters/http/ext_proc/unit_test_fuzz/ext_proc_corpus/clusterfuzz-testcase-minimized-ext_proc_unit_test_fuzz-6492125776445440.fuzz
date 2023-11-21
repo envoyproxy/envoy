@@ -1,0 +1,17 @@
+config {
+  grpc_service {
+    envoy_grpc {
+      cluster_name: "2"
+    }
+  }
+  async_mode: true
+  request_attributes: "type.googleapis.com/test.fuzz.ProtoBody"
+  stat_prefix: "t.  \"t.e...\n  rewpo...1.e.pc0&...2..6..*..econ\"p\"\n}\nree.key: hod&\n          }\n  voy.t\331\236pe.m.v3.nree.\\00ree.\000{\000\000\000\"t.\n.e . .respo\\210\\252\\270\\354\\254\\254S....\\316\\254....\\3...........       }\\\\n  voy.tchtype.m.v3.nre.e.p\\\"p\\z\\n}\\nree.key: \\\":method\\\"\\n     e.\\\\\\\\00ree.\\\\000{\\\\000\\\\000\\\\000\\\\\\\"t.e... \"t.  \\\"t.e...\\n  respo... \\\\\\\"t.espo...1.e.p\\\\\\\"p..ze. st.type.m.\\326\\261.Vee.ree\316\261.Vee.ree.M0..p^.I{.....z.nan.......\\\\\\\\31efixext_proc>/.[ethod\\\\x-envo..[.r..*.6..g.g&...r!..,..:p.-.`.s`.strevo3.ValueMpat3\\\\\\\\254ersle_f//////...............\\\\\\\\177\\\\\\\\177\\\\X177\\\\\\\\177\\\\\\\\177\\\\\\\\177\\\\\\\\177?.........Trve+......................envoy.reloazable_features.runtim........m\\177\\177\\177\\177\\177\\177H0\\\\\\\\\\\\\\\\000\\\\\\\\\\\\\\\\010.p\\\\\\\\\\\\\\\"\\\\\\\"\n  stat_prefix: \"t.  \\\"t.e...\\.M0e.p^.{...ze{.3.zep\"\n}\nrequest {\n}\nresponse {\n  reqthod\"\n       \322\202Hw\001  voy.tme.y.pv3.Va\\35;\\3eqn}entchervo3.ValueMatcher\"ValueMatcher\"\n       \322\202H\\\":methodX\"\\n       \\322\\202\\310\\215\\001  voy.type.m.v3.Va\\\\35;\\S\003e...........Q..........-A...........\316\247\322\234\002Q\002r\002P\001P\330\222\002P\001P\001t\302\277\002V\334\234\001\332\271\336\254\302\225\001P\001N\001q\335\201\002S\001|t\002r\302\203\002P\001N\327\202\302\240\001z~\330\265\332\275.......\\316\\205.................}.......nan.......\\\\316e: \"#\"\n    }\n  }\n  processing_mode {\n    response_header_mode: SEND\n    request_trailer_mode: SEND\n  n    }\\n  voy.type.m.4v.n1.\\\\n.\\\"e\\\"\\n}\\n    }\\n  voy.type.m.3v.nree.\\\\00re..ze. ste.\\000{\\000tat_prefix: }\\n  voy.type.m.3v.nree.\\\\\\000tat_prefix: \\\"t. \\\\\\\"t\\003.e\\343\\220\\220QK.1.e.p\\\\\\\"p..ze. st.typVe..3m.vee.r.ee.M0e.p^.I{.....z.nan.../.\\\\1.63.\\\\\\\\\\\\256.......\\\\\\\\006.\\\\\\\\020\\\\\\\\001.........-.......7......{.Q.nfig {\\\\\\\\ngoogle.protobuf.Any   ore.v...1.e.p\\\\\\\\\\\\\\\"p..ze. st.type.m.\\\\326\\\\261.Vee.ree.M0..p^.I{z#tatus\\\\\\\\n  Bore.oy.configkcore.v.@....)....[.....c.ro.y.....or.y.config.c0.e.p\\\\010.\\\\\\\\\\\\..........\\\\316\\\\233....spo...   }\\\\n       xext_proc./.[r.....[*.6..g.g&...r!..,..:p.-.`.strevo3.ValueMp4\\000\\000E\\003~\\177\\177\\177\\000\\000\\000\\000v........>...equest_body {\\n  }\\n}\\nonse_trailer_...NmQ............@/.\\\\..00\\356\\222\\274.p\\\\\\\"\\\\n}\\\\nre000\\\\\\\\@000te.p\\\\\\\"\\\\n}Z\\361\\265\\276\\245Q\\\\000{\\\\rb&..ec0&...2.-6..*..econC\302\207\001fig.core.v3.Back\\\\177\\\\177.n..7e.p2\\n}\\nrequest {nre/.\\\\\\\\000{\\\\000tat_prefix: \\\\\\\"t. \\\\\\\\\\\\\\\"t@003.e\\\\343\\\\220X220Q.\\\\\\\\n   ore.body {\\n  }\\n}\\nonse_.voy.type.m.3v.nree.\\\\00re..z\\\\\\\\\\\\\\\"t.e.....\\\\Ln     }\\\\n       .ype.m.v3.Va\\\\\\\\^S35;\\\\\\\\\\\\\\\\3     value: \\\\\\\"envmy.ytpe.matcher.veqn}entchervo3.Va].[cPpL0\\\\PS\\\\PL0].[c=z=z\\\\SVPL0].[.[c=z=z\\\\SVP\\\\3     value: \\\"envoy.type.matcher.veqn}entchervo6.Vaesponse {\n  response_body {\n  }w\\001   {\n  response_bodyvoy.type.m.v3.Va\\\\35;\\\\3   ...................%.matche {\nr.veqn}ge_timeout {entchervo3.Value\n    nMpatcanos: 102341  0176\n  }\n}}\n}\n\n"
+  disable_immediate_response: true
+}
+request {
+}
+response {
+  request_body {
+  }
+}
