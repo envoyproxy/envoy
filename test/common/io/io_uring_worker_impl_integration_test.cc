@@ -646,6 +646,35 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithoutEnableCloseEvent) {
   cleanup();
 }
 
+// This tests the case the socket is disabled, and the close event isn't listened. Then
+// a remote close happened, then deliver the remote close by write event.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithoutEnableCloseEvent) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  bool is_closed = false;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&socket, &is_closed](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Write);
+        EXPECT_NE(socket->getWriteParam(), absl::nullopt);
+        EXPECT_EQ(socket->getWriteParam()->result_, 0);
+        is_closed = true;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  socket->disableRead();
+
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  while (!is_closed) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  cleanup();
+}
+
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
   initialize();
   createServerListenerAndClientSocket();
