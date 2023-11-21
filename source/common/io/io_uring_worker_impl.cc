@@ -377,12 +377,8 @@ uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num
 
 void IoUringServerSocket::shutdown(int how) {
   ENVOY_LOG(trace, "shutdown the socket, fd = {}, how = {}", fd_, how);
-  if (how != SHUT_WR) {
-    PANIC("only the SHUT_WR implemented");
-  }
-
+  ASSERT(how == SHUT_WR);
   shutdown_ = false;
-
   submitWriteOrShutdownRequest();
 }
 
