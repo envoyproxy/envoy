@@ -231,7 +231,7 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
 
   auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
-  std::shared_ptr<Server::Configuration::DownstreamFilterConfigProviderManager>
+  Server::Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
       filter_config_provider_manager =
           context.getServerFactoryContext().downstreamFilterConfigProviderManager();
 

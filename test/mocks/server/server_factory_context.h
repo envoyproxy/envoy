@@ -82,13 +82,7 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
-  HttpExtensionConfigProviderSharedPtr
-  createHttpDynamicFilterConfigProvider(Configuration::FactoryContext&,
-                                        const envoy::config::core::v3::ExtensionConfigSource&,
-                                        const std::string&, bool) override {
-    return nullptr;
-  }
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
@@ -116,7 +110,7 @@ public:
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   testing::NiceMock<MockOptions> options_;
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
       std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()};
 };
 
@@ -154,17 +148,11 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
-  HttpExtensionConfigProviderSharedPtr
-  createHttpDynamicFilterConfigProvider(Configuration::FactoryContext&,
-                                        const envoy::config::core::v3::ExtensionConfigSource&,
-                                        const std::string&, bool) override {
-    return nullptr;
-  }
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
-  Configuration::DownstreamFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
       std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()};
 };
 

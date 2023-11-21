@@ -153,11 +153,11 @@ public:
 
 class FactoryContext;
 
-using DownstreamFilterConfigProviderManager =
+using DownstreamHTTPFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
-using DownstreamFilterConfigProviderManagerSharedPtr =
-    std::shared_ptr<DownstreamFilterConfigProviderManager>;
+using DownstreamHTTPFilterConfigProviderManagerSharedPtr =
+    std::shared_ptr<DownstreamHTTPFilterConfigProviderManager>;
 
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
@@ -209,27 +209,11 @@ public:
   virtual bool healthCheckFailed() const PURE;
 
   /**
-   * Create an FilterConfigProviderPtr for a filter config. The config providers may share
-   * the underlying subscriptions to the filter config discovery service.
-   * @param factory_context supplies the factory context.
-   * @param config_source supplies the extension configuration source for the filter configs.
-   * @param filter_config_name the filter config resource name.
-   * @param last_filter_in_filter_chain indicates whether this filter is the last filter in the
-   * configured chain
-   *
-   * @return HttpExtensionConfigProviderSharedPtr
-   */
-  virtual Configuration::HttpExtensionConfigProviderSharedPtr createHttpDynamicFilterConfigProvider(
-      Configuration::FactoryContext& factory_context,
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, bool last_filter_in_filter_chain) PURE;
-
-  /**
    * Returns the downstream filter config provider manager.
    *
-   * @return DownstreamFilterConfigProviderManagerSharedPtr
+   * @return DownstreamHTTPFilterConfigProviderManagerSharedPtr
    */
-  virtual DownstreamFilterConfigProviderManagerSharedPtr
+  virtual DownstreamHTTPFilterConfigProviderManagerSharedPtr
   downstreamFilterConfigProviderManager() PURE;
 };
 
