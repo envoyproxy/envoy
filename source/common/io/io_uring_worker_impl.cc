@@ -40,12 +40,6 @@ void IoUringSocketEntry::injectCompletion(Request::RequestType type) {
   parent_.injectCompletion(*this, type, -EAGAIN);
 }
 
-void IoUringSocketEntry::onAcceptCompleted() {
-  ENVOY_LOG(trace, "before on accept socket");
-  cb_(Event::FileReadyType::Read);
-  ENVOY_LOG(trace, "after on accept socket");
-}
-
 void IoUringSocketEntry::onReadCompleted() {
   ENVOY_LOG(trace,
             "calling event callback since pending read buf has {} size data, data = {}, "
