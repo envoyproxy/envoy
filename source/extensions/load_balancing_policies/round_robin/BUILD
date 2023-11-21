@@ -12,6 +12,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # previously considered core code and used by mobile.
+    visibility = ["//visibility:public"],
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/upstream:load_balancer_lib",

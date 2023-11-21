@@ -114,7 +114,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           server_.api().randomGenerator())),
       profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
                                        "http.admin.", *server_.stats().rootScope())),
-      null_overload_manager_(server_.threadLocal()),
+      null_overload_manager_(server_.threadLocal(), false),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.",
                                                                        *no_op_store_.rootScope())),
       route_config_provider_(server.timeSource()),
@@ -201,6 +201,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                 "When draining listeners, enter a graceful drain period prior to closing "
                 "listeners. This behaviour and duration is configurable via server options "
                 "or CLI"},
+               {ParamDescriptor::Type::Boolean, "skip_exit",
+                "When draining listeners, do not exit after the drain period. "
+                "This must be used with graceful"},
                {ParamDescriptor::Type::Boolean, "inboundonly",
                 "Drains all inbound listeners. traffic_direction field in "
                 "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
@@ -296,7 +299,6 @@ bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool,
 }
 
 namespace {
-
 // Implements a chunked request for static text.
 class StaticTextRequest : public Admin::Request {
 public:
@@ -513,7 +515,8 @@ void AdminImpl::closeSocket() {
 
 void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
-    handler->addListener(absl::nullopt, *listener_, server_.runtime());
+    handler->addListener(absl::nullopt, *listener_, server_.runtime(),
+                         server_.api().randomGenerator());
   }
 }
 

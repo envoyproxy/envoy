@@ -15,6 +15,7 @@ namespace SessionFilters {
 MockReadFilterCallbacks::MockReadFilterCallbacks() {
   ON_CALL(*this, sessionId()).WillByDefault(Return(session_id_));
   ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  ON_CALL(*this, continueFilterChain()).WillByDefault(Return(true));
 }
 MockReadFilterCallbacks::~MockReadFilterCallbacks() = default;
 

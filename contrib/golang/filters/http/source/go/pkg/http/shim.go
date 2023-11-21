@@ -169,6 +169,11 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 		}
 		status = f.EncodeTrailers(header)
 	}
+
+	if endStream == 1 && (status == api.StopAndBuffer || status == api.StopAndBufferWatermark) {
+		panic("received wait data status when there is no data, please fix the returned status")
+	}
+
 	return uint64(status)
 }
 
@@ -241,6 +246,11 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 
 	f := req.httpFilter
 	f.OnDestroy(v)
+
+	// Break circular references between httpRequest and StreamFilter,
+	// since Finalizers don't work with circular references,
+	// otherwise, it will leads to memory leaking.
+	req.httpFilter = nil
 
 	Requests.DeleteReq(r)
 }

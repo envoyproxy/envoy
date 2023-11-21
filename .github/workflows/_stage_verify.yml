@@ -9,7 +9,7 @@ on:
       trusted:
         type: boolean
         default: false
-      repo_ref:
+      repo-ref:
         type: string
       given_ref:
         type: string
@@ -21,33 +21,55 @@ concurrency:
 jobs:
   verify:
     name: ${{ matrix.name || matrix.target }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - target: verify_examples
-          name: examples
-          rbe: false
-          managed: true
-          cache_build_image: ""
-          command_prefix: ""
-          diskspace_hack: true
-          run_pre: ./.github/actions/verify/examples/setup
-          run_pre_with: |
-            bucket: envoy-${{ inputs.trusted && 'postsubmit' || 'pr' }}
-            ref: ${{ inputs.given_ref }}
-          env: |
-            export NO_BUILD_SETUP=1
     uses: ./.github/workflows/_ci.yml
     with:
       target: ${{ matrix.target }}
       rbe: ${{ matrix.rbe }}
-      managed: ${{ matrix.managed }}
-      cache_build_image: ${{ matrix.cache_build_image }}
-      diskspace_hack: ${{ matrix.diskspace_hack }}
-      command_prefix: ${{ matrix.command_prefix }}
-      run_pre: ${{ matrix.run_pre }}
-      run_pre_with: ${{ matrix.run_pre_with }}
-      env: ${{ matrix.env }}
+      cache-build-image:
+      command-prefix:
+      source: ${{ matrix.source }}
       trusted: ${{ inputs.trusted }}
-      repo_ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
+      repo-ref: ${{ inputs.repo-ref }}
+      runs-on: envoy-x64-small
+      steps-pre: ${{ matrix.steps-pre }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: examples
+          target: verify_examples
+          source: |
+            export NO_BUILD_SETUP=1
+          rbe: false
+          steps-pre: |
+            - id: short_name
+              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.7
+              with:
+                length: 7
+                string: ${{ inputs.repo-ref }}
+            - id: gcp
+              run: |
+                PREFIX=https://storage.googleapis.com/envoy-
+                BUCKET=${{ inputs.trusted && 'postsubmit' || 'pr' }}
+                NAME=%{{ steps.short_name.outputs.string }}
+                echo "url=${PREFIX}${BUCKET}/${NAME}" >> $GITHUB_OUTPUT
+              shell: bash
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
+              with:
+                url: %{{ steps.gcp.outputs.url }}/docker/envoy.tar
+                variant: dev
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
+              with:
+                url: %{{ steps.gcp.outputs.url }}/docker/envoy-contrib.tar
+                variant: contrib-dev
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
+              with:
+                url: %{{ steps.gcp.outputs.url }}/docker/envoy-google-vrp.tar
+                variant: google-vrp-dev
+            - run: docker images | grep envoy
+              shell: bash
+            - run: |
+                export DEBIAN_FRONTEND=noninteractive
+                sudo apt-get -qq update -y
+                sudo apt-get -qq install -y --no-install-recommends expect
+              shell: bash

@@ -46,7 +46,10 @@ public:
   void TearDown();
 
 protected:
-  envoy_engine_t& rawEngine() { return engine_->engine_; }
+  envoy_engine_t& rawEngine() {
+    absl::MutexLock l(&engine_lock_);
+    return engine_->engine_;
+  }
   virtual void initialize() override;
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
@@ -72,7 +75,8 @@ protected:
   Event::DispatcherPtr full_dispatcher_;
   Platform::StreamPrototypeSharedPtr stream_prototype_;
   Platform::StreamSharedPtr stream_;
-  Platform::EngineSharedPtr engine_;
+  absl::Mutex engine_lock_;
+  Platform::EngineSharedPtr engine_ ABSL_GUARDED_BY(engine_lock_);
   Thread::ThreadPtr envoy_thread_;
   bool explicit_flow_control_ = false;
   uint64_t min_delivery_size_ = 10;

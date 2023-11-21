@@ -1,10 +1,12 @@
 #include "source/common/quic/http_datagram_handler.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 
 #include "absl/strings/string_view.h"
-#include "quiche/common/simple_buffer_allocator.h"
+#include "quiche/common/capsule.h"
+#include "quiche/common/quiche_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_stream.h"
 
 namespace Envoy {

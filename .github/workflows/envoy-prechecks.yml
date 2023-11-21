@@ -8,43 +8,40 @@ on:
     branches:
     - main
     - release/v*
-  pull_request:
+  pull_request_target:
     paths:
     - '**/requirements*.txt'
     - '**/go.mod'
     - '**/*.bzl'
-    - 'WORKSPACE'
-    - '.github/workflows/envoy-prechecks.yml'
-    - '.github/workflows/_*.yml'
+    - tools/dependency/BUILD
+    - WORKSPACE
+    - .github/workflows/envoy-prechecks.yml
+    - .github/workflows/_*.yml
 
 concurrency:
-  group: ${{ github.event.inputs.head_ref || github.run_id }}-${{ github.workflow }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
   env:
     uses: ./.github/workflows/_env.yml
     with:
-      prime_build_image: true
-      check_mobile_run: false
+      prime-build-image: true
+      check-mobile-run: false
     permissions:
       contents: read
-      statuses: write
+      packages: read
+      pull-requests: read
 
-  prechecks:
+  deps:
     needs:
     - env
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - target: deps
-          rbe: false
-          managed: true
-    uses: ./.github/workflows/_ci.yml
-    name: CI ${{ matrix.target }}
+    uses: ./.github/workflows/_precheck_deps.yml
+    name: Precheck ${{ needs.env.outputs.repo-ref-title }}
     with:
-      target: ${{ matrix.target }}
-      rbe: ${{ matrix.rbe }}
-      managed: ${{ matrix.managed }}
-      cache_build_image: ${{ needs.env.outputs.build_image_ubuntu }}
+      build-image-ubuntu: ${{ needs.env.outputs.build_image_ubuntu }}
+      dependency-review: ${{ github.event_name == 'pull_request_target' && github.repository == 'envoyproxy/envoy' }}
+      repo-ref: ${{ needs.env.outputs.repo-ref }}
+    permissions:
+      contents: read
+      packages: read

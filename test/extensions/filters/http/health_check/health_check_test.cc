@@ -56,7 +56,7 @@ public:
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Event::MockTimer* cache_timer_{};
   Event::MockDispatcher dispatcher_;
   HealthCheckCacheManagerSharedPtr cache_manager_;

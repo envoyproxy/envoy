@@ -36,24 +36,39 @@ envoy_cc_library(
         "tracer.h",
     ],
     deps = [
-        ":grpc_trace_exporter",
+        ":trace_exporter",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers/common:factory_base_lib",
+        "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
+        "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@opentelemetry_proto//:trace_cc_proto",
     ],
 )
 
 envoy_cc_library(
-    name = "grpc_trace_exporter",
-    srcs = ["grpc_trace_exporter.cc"],
-    hdrs = ["grpc_trace_exporter.h"],
+    name = "trace_exporter",
+    srcs = [
+        "grpc_trace_exporter.cc",
+        "http_trace_exporter.cc",
+    ],
+    hdrs = [
+        "grpc_trace_exporter.h",
+        "http_trace_exporter.h",
+        "trace_exporter.h",
+    ],
     deps = [
         "//envoy/grpc:async_client_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
+        "//source/common/http:async_client_utility_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@opentelemetry_proto//:trace_cc_proto",
     ],
 )

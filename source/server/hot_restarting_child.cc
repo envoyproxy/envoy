@@ -1,6 +1,8 @@
 #include "source/server/hot_restarting_child.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -48,11 +50,54 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                        const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
+  std::string socket_path_udp = socket_path + "_udp";
+  udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
   if (restart_epoch_ != 0) {
     parent_address_ = main_rpc_stream_.createDomainSocketAddress(restart_epoch_ + -1, "parent",
                                                                  socket_path, socket_mode);
+    parent_address_udp_forwarding_ = udp_forwarding_rpc_stream_.createDomainSocketAddress(
+        restart_epoch_ + -1, "parent", socket_path_udp, socket_mode);
   }
   main_rpc_stream_.bindDomainSocket(restart_epoch_, "child", socket_path, socket_mode);
+  udp_forwarding_rpc_stream_.bindDomainSocket(restart_epoch_, "child", socket_path_udp,
+                                              socket_mode);
+}
+
+void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
+  socket_event_udp_forwarding_ = dispatcher.createFileEvent(
+      udp_forwarding_rpc_stream_.domain_socket_,
+      [this](uint32_t events) -> void {
+        ASSERT(events == Event::FileReadyType::Read);
+        onSocketEventUdpForwarding();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+}
+
+void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
+
+void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data) {
+  auto addr_and_listener =
+      udp_forwarding_context_.getListenerForDestination(*data.addresses_.local_);
+  if (addr_and_listener.has_value()) {
+    auto [addr, listener_config] = *addr_and_listener;
+    // We send to the worker index from the parent instance.
+    // In the case that the number of workers changes between instances,
+    // or the quic connection id generator changes how it selects worker
+    // ids, the hot restart packet transfer will fail.
+    //
+    // One option would be to dispatch an onData call to have the receiving
+    // worker forward the packet if the calculated destination differs from
+    // the parent instance worker index; however, this would require
+    // temporarily disabling kernel_worker_routing_ in each instance of
+    // ActiveQuicListener, and a much more convoluted pipeline to collect
+    // the set of destinations (listenerWorkerRouter doesn't currently
+    // expose the actual listeners.)
+    //
+    // Since the vast majority of hot restarts will change neither of these
+    // things, this implementation is "pretty good", and much better than no
+    // hot restart capability at all.
+    listener_config->listenerWorkerRouter(*addr).deliver(worker_index, std::move(data));
+  }
 }
 
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
@@ -170,6 +215,41 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
     }
   }
   stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics);
+}
+
+void HotRestartingChild::onSocketEventUdpForwarding() {
+  std::unique_ptr<HotRestartMessage> wrapped_request;
+  while ((wrapped_request =
+              udp_forwarding_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::No))) {
+    if (wrapped_request->requestreply_case() == HotRestartMessage::kReply) {
+      ENVOY_LOG_PERIODIC(
+          error, std::chrono::seconds(5),
+          "HotRestartMessage reply received on UdpForwarding (we want only requests); ignoring.");
+      continue;
+    }
+    switch (wrapped_request->request().request_case()) {
+    case HotRestartMessage::Request::kForwardedUdpPacket: {
+      const auto& req = wrapped_request->request().forwarded_udp_packet();
+      Network::UdpRecvData packet;
+      packet.addresses_.local_ = Network::Utility::resolveUrl(req.local_addr());
+      packet.addresses_.peer_ = Network::Utility::resolveUrl(req.peer_addr());
+      if (!packet.addresses_.local_ || !packet.addresses_.peer_) {
+        break;
+      }
+      packet.receive_time_ =
+          MonotonicTime(std::chrono::microseconds{req.receive_time_epoch_microseconds()});
+      packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(req.payload());
+      onForwardedUdpPacket(req.worker_index(), std::move(packet));
+      break;
+    }
+    default: {
+      ENVOY_LOG(
+          error,
+          "child sent a request other than ForwardedUdpPacket on udp forwarding socket; ignoring.");
+      break;
+    }
+    }
+  }
 }
 
 } // namespace Server

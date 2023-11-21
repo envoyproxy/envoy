@@ -127,7 +127,7 @@ public:
     if (default_configuration_) {
       auto status = onConfigUpdate(*default_configuration_, "", nullptr);
       if (!status.ok()) {
-        throw EnvoyException(std::string(status.message()));
+        throwEnvoyExceptionOrPanic(std::string(status.message()));
       }
     }
   }
@@ -219,8 +219,13 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return {factory->name(),
-            factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_)};
+    absl::StatusOr<Http::FilterFactoryCb> error_or_factory =
+        factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
+    if (!error_or_factory.status().ok()) {
+      throwEnvoyExceptionOrPanic(std::string(error_or_factory.status().message()));
+    }
+
+    return {factory->name(), error_or_factory.value()};
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;

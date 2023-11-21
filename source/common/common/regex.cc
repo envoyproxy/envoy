@@ -17,7 +17,7 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
                                                  bool do_program_size_check)
     : regex_(regex, re2::RE2::Quiet) {
   if (!regex_.ok()) {
-    throw EnvoyException(regex_.error());
+    throwEnvoyExceptionOrPanic(regex_.error());
   }
 
   if (do_program_size_check && Runtime::isRuntimeInitialized()) {
@@ -25,10 +25,11 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
     const uint32_t max_program_size_error_level =
         Runtime::getInteger("re2.max_program_size.error_level", 100);
     if (regex_program_size > max_program_size_error_level) {
-      throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                       "{} set for the error level threshold. Increase "
-                                       "configured max program size if necessary.",
-                                       regex, regex_program_size, max_program_size_error_level));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("regex '{}' RE2 program size of {} > max program size of "
+                      "{} set for the error level threshold. Increase "
+                      "configured max program size if necessary.",
+                      regex, regex_program_size, max_program_size_error_level));
     }
 
     const uint32_t max_program_size_warn_level =
@@ -52,9 +53,10 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
     const uint32_t max_program_size =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
     if (regex_program_size > max_program_size) {
-      throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                       "{}. Increase configured max program size if necessary.",
-                                       config.regex(), regex_program_size, max_program_size));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("regex '{}' RE2 program size of {} > max program size of "
+                      "{}. Increase configured max program size if necessary.",
+                      config.regex(), regex_program_size, max_program_size));
     }
   }
 }

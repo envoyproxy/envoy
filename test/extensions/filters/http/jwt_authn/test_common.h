@@ -97,6 +97,37 @@ providers:
       claim_name: "nested.nested-2.key-3"
     - header_name: "x-jwt-int-claim"
       claim_name: "nested.nested-2.key-4"
+    - header_name: "x-jwt-claim-object-key"
+      claim_name: "nested.nested-2.key-5"
+rules:
+- match:
+    path: "/"
+  requires:
+    provider_name: "example_provider"
+bypass_cors_preflight: true
+)";
+
+// Config with claim_to_headers and clear_route_cache.
+const char ClaimToHeadersConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    audiences:
+    - example_service
+    - http://example_service1
+    - https://example_service2/
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+      cache_duration:
+        seconds: 600
+    claim_to_headers:
+    - header_name: "x-jwt-claim-nested"
+      claim_name: "nested.key-1"
+    clear_route_cache: true
 rules:
 - match:
     path: "/"
@@ -148,6 +179,26 @@ const char GoodToken[] = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc
                          "h6nqKXcPNaRx9lOaRWg2PkE6ySNoyju7rNfunXYtVxPuUIkl0KMq3WXWRb_cb8a_Z"
                          "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
                          "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
+
+// Payload:
+// {
+//   "iss": "https://example.com",
+//   "sub": "test@example.com",
+//   "exp": 2001001001,
+//   "aud": "example_service",
+//   "scope": "read write",
+//   "test_string": "test_value",
+//   "test_num": 1337
+// }
+const char GoodTokenWithSpaces[] =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMS"
+    "wiYXVkIjoiZXhhbXBsZV9zZXJ2aWNlIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwidGVzdF9zdHJpbmciOiJ0ZXN0X3ZhbHVl"
+    "IiwidGVzdF9udW0iOjEzMzd9.cKTwWSJgS0TZ3Ajc9QrAA50Me7j1zVv9YzDT_"
+    "2UE5jlCs5vWkdWjUb2r7MYaqximXj3affDZdDsUxMaqqR7lWT2EbxOoEceBkCMmakgSs8tjZ210w0YTU0OyhrrxsyxUpsp"
+    "PeRzPIHQTUdN7zU_KkMcUU1yDSlnJxqlYXyTL9E-DhTnLwoOdgFGiQs-md_QJfdOFgXQqU71EZ-"
+    "Ofxen8EFl10wbzHubMHGLJqVfFzK-iuVr2P0OZ0ymWvPGwQdlVMojHx3P0Yb8MRbhdW04hCJq-_"
+    "fTE1RNb6ja1JBFQbyGcQTtWVSdkHZ_C8syd8s-aK4C8_VhwNEDviOVrHPbztw";
 
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","exp":null}
@@ -266,6 +317,19 @@ const char ExpectedPayloadJSON[] = R"(
   "sub":"test@example.com",
   "exp":2001001001,
   "aud":"example_service"
+}
+)";
+
+// Base64 decoded Payload with space-delimited claims JSON
+const char ExpectedPayloadJSONWithSpaces[] = R"(
+{
+  "iss":"https://example.com",
+  "sub":"test@example.com",
+  "exp":2001001001,
+  "aud":"example_service",
+  "scope":["read","write"],
+  "test_string":["test_value"],
+  "test_num":1337
 }
 )";
 

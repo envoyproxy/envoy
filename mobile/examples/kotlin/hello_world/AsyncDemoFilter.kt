@@ -30,9 +30,7 @@ class AsyncDemoFilter : AsyncResponseFilter {
   ): FilterHeadersStatus<ResponseHeaders> {
     // If this is the end of the stream, asynchronously resume response processing via callback.
     if (endStream) {
-      Timer("AsyncResume", false).schedule(100) {
-        callbacks.resumeResponse()
-      }
+      Timer("AsyncResume", false).schedule(100) { callbacks.resumeResponse() }
     }
     return FilterHeadersStatus.StopIteration()
   }
@@ -44,9 +42,7 @@ class AsyncDemoFilter : AsyncResponseFilter {
   ): FilterDataStatus<ResponseHeaders> {
     // If this is the end of the stream, asynchronously resume response processing via callback.
     if (endStream) {
-      Timer("AsyncResume", false).schedule(100) {
-        callbacks.resumeResponse()
-      }
+      Timer("AsyncResume", false).schedule(100) { callbacks.resumeResponse() }
     }
     return FilterDataStatus.StopIterationAndBuffer()
   }
@@ -56,9 +52,7 @@ class AsyncDemoFilter : AsyncResponseFilter {
     streamIntel: StreamIntel
   ): FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
     // Trailers imply end of stream, so asynchronously resume response processing via callbacka
-    Timer("AsyncResume", false).schedule(100) {
-      callbacks.resumeResponse()
-    }
+    Timer("AsyncResume", false).schedule(100) { callbacks.resumeResponse() }
     return FilterTrailersStatus.StopIteration()
   }
 
@@ -73,23 +67,14 @@ class AsyncDemoFilter : AsyncResponseFilter {
     endStream: Boolean,
     streamIntel: StreamIntel
   ): FilterResumeStatus<ResponseHeaders, ResponseTrailers> {
-    val builder = headers!!.toResponseHeadersBuilder()
-      .add("async-filter-demo", "1")
+    val builder = headers!!.toResponseHeadersBuilder().add("async-filter-demo", "1")
     return FilterResumeStatus.ResumeIteration(builder.build(), data, trailers)
   }
 
   @Suppress("EmptyFunctionBlock")
-  override fun onError(
-    error: EnvoyError,
-    finalStreamIntel: FinalStreamIntel
-  ) {
-  }
+  override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {}
 
-  @Suppress("EmptyFunctionBlock")
-  override fun onCancel(finalStreamIntel: FinalStreamIntel) {
-  }
+  @Suppress("EmptyFunctionBlock") override fun onCancel(finalStreamIntel: FinalStreamIntel) {}
 
-  @Suppress("EmptyFunctionBlock")
-  override fun onComplete(finalStreamIntel: FinalStreamIntel) {
-  }
+  @Suppress("EmptyFunctionBlock") override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 }

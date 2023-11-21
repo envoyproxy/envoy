@@ -29,7 +29,7 @@ withhold_grpc_frames: true
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Config config_factory;
   Http::FilterFactoryCb cb =
-      config_factory.createFilterFactoryFromProto(proto_config, "stats", context);
+      config_factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

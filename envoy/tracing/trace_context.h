@@ -93,6 +93,14 @@ public:
    * @param val The context value of string view type.
    */
   virtual void setByReference(absl::string_view key, absl::string_view val) PURE;
+
+  /**
+   * Removes the following key and its associated values from the tracing
+   * context.
+   *
+   * @param key The key to remove if it exists.
+   */
+  virtual void removeByKey(absl::string_view key) PURE;
 };
 
 } // namespace Tracing

@@ -25,7 +25,11 @@ namespace Envoy {
 
 class MainCommonBase : public StrippedMainBase {
 public:
-  using StrippedMainBase::StrippedMainBase;
+  MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
+                 ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
+                 std::unique_ptr<Server::Platform> platform_impl,
+                 std::unique_ptr<Random::RandomGenerator>&& random_generator,
+                 std::unique_ptr<ProcessContext> process_context);
 
   bool run();
 

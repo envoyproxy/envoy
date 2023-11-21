@@ -395,6 +395,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_h3_fuzz_proto_cc_proto",
+        "//source/common/common:assert_lib",
         "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ],
 )

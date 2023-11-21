@@ -86,7 +86,8 @@ StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& 
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
-    throw EnvoyException("Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+    throwEnvoyExceptionOrPanic(
+        "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
   }
 
   flush_interval_ =
@@ -131,7 +132,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     absl::StatusOr<bool> update_or_error =
         server.listenerManager().addOrUpdateListener(listeners[i], "", false);
     if (!update_or_error.status().ok()) {
-      throw EnvoyException(std::string(update_or_error.status().message()));
+      throwEnvoyExceptionOrPanic(std::string(update_or_error.status().message()));
     }
   }
   initializeWatchdogs(bootstrap, server);
@@ -183,7 +184,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
 void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                    Instance& server) {
   if (bootstrap.has_watchdog() && bootstrap.has_watchdogs()) {
-    throw EnvoyException("Only one of watchdog or watchdogs should be set!");
+    throwEnvoyExceptionOrPanic("Only one of watchdog or watchdogs should be set!");
   }
 
   if (bootstrap.has_watchdog()) {

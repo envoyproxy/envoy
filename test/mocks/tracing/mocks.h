@@ -62,14 +62,13 @@ public:
 
   SpanPtr startSpan(const Config& config, TraceContext& trace_context,
                     const StreamInfo::StreamInfo& stream_info,
-                    const Tracing::Decision tracing_decision) override {
+                    Tracing::Decision tracing_decision) override {
     return SpanPtr{startSpan_(config, trace_context, stream_info, tracing_decision)};
   }
 
   MOCK_METHOD(Span*, startSpan_,
               (const Config& config, TraceContext& trace_context,
-               const StreamInfo::StreamInfo& stream_info,
-               const Tracing::Decision tracing_decision));
+               const StreamInfo::StreamInfo& stream_info, Tracing::Decision tracing_decision));
 };
 
 class MockDriver : public Driver {
@@ -79,7 +78,7 @@ public:
 
   SpanPtr startSpan(const Config& config, TraceContext& trace_context,
                     const StreamInfo::StreamInfo& stream_info, const std::string& operation_name,
-                    const Tracing::Decision tracing_decision) override {
+                    Tracing::Decision tracing_decision) override {
     return SpanPtr{
         startSpan_(config, trace_context, stream_info, operation_name, tracing_decision)};
   }
@@ -87,7 +86,7 @@ public:
   MOCK_METHOD(Span*, startSpan_,
               (const Config& config, TraceContext& trace_context,
                const StreamInfo::StreamInfo& stream_info, const std::string& operation_name,
-               const Tracing::Decision tracing_decision));
+               Tracing::Decision tracing_decision));
 };
 
 class MockTracerManager : public TracerManager {

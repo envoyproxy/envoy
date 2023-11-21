@@ -11,6 +11,7 @@
 #include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/default_client_connection_factory.h"
+#include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/upstream/default_local_address_selector_factory.h"
@@ -37,6 +38,7 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
+#include "source/extensions/load_balancing_policies/cluster_provided/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
@@ -54,12 +56,6 @@
 #include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
-#include "source/extensions/stat_sinks/metrics_service/config.h"
-#include "source/extensions/stat_sinks/statsd/config.h"
-#endif
-
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/local_error/config.h"
@@ -69,6 +65,14 @@
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
+
+#ifdef ENVOY_MOBILE_XDS
+#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#endif
 
 namespace Envoy {
 
@@ -167,6 +171,8 @@ void ExtensionRegistry::registerFactories() {
   // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
 
+  Network::Address::forceRegisterIpResolver();
+
   // This is Envoy's lightweight listener manager which lets E-M avoid the 1M
   // hit of compiling in downstream code.
   Server::forceRegisterApiListenerManagerFactoryImpl();
@@ -178,12 +184,8 @@ void ExtensionRegistry::registerFactories() {
   // This is required for the default upstream local address selector.
   Upstream::forceRegisterDefaultUpstreamLocalAddressSelectorFactory();
 
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-  Network::Address::forceRegisterIpResolver();
-  Upstream::forceRegisterLogicalDnsClusterFactory();
-  Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
-  Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
-#endif
+  // This is required for load balancers of upstream clusters `base` and `base_clear`.
+  Envoy::Extensions::LoadBalancingPolices::ClusterProvided::forceRegisterFactory();
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with
@@ -202,6 +204,7 @@ void ExtensionRegistry::registerFactories() {
   Network::forceRegisterUdpDefaultWriterFactoryFactory();
   Server::forceRegisterConnectionHandlerFactoryImpl();
   Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
+  Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
   Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
   Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
@@ -216,6 +219,18 @@ void ExtensionRegistry::registerFactories() {
   Extensions::HttpFilters::Composite::forceRegisterCompositeFilterFactory();
   Extensions::HttpFilters::Composite::forceRegisterExecuteFilterActionFactory();
   Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
+#endif
+
+#ifdef ENVOY_MOBILE_XDS
+  // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile
+  // supports for xDS.
+  Config::forceRegisterAdsConfigSubscriptionFactory();
+  Config::forceRegisterGrpcConfigSubscriptionFactory();
+  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
+  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
+  Config::forceRegisterGrpcMuxFactory();
+  Config::forceRegisterNewGrpcMuxFactory();
+  Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
 #endif
 }
 

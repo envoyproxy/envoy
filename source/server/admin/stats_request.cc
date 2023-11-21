@@ -1,5 +1,7 @@
 #include "source/server/admin/stats_request.h"
 
+#include "source/common/upstream/host_utility.h"
+
 #ifdef ENVOY_ADMIN_HTML
 #include "source/server/admin/stats_html_render.h"
 #endif
@@ -8,8 +10,10 @@ namespace Envoy {
 namespace Server {
 
 StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
+                           const Upstream::ClusterManager& cluster_manager,
                            UrlHandlerFn url_handler_fn)
-    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {
+    : params_(params), stats_(stats), cluster_manager_(cluster_manager),
+      url_handler_fn_(url_handler_fn) {
   switch (params_.type_) {
   case StatsType::TextReadouts:
   case StatsType::All:
@@ -76,15 +80,27 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
   const uint64_t starting_response_length = response.length();
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
-      if (phase_stat_count_ == 0) {
-        render_->noStats(response, phase_string_);
-      } else {
-        phase_stat_count_ = 0;
-      }
       if (params_.type_ != StatsType::All) {
+        if (phase_ == Phase::CountersAndGauges) {
+          // In the case of filtering by type, we need to call this before checking for
+          // no stats in the phase, and then after that this function returns without the normal
+          // advancing to the next phase.
+          renderPerHostMetrics(response);
+        }
+
+        if (phase_stat_count_ == 0) {
+          render_->noStats(response, phase_string_);
+        }
+
         render_->finalize(response);
         return false;
       }
+
+      if (phase_stat_count_ == 0) {
+        render_->noStats(response, phase_string_);
+      }
+
+      phase_stat_count_ = 0;
       switch (phase_) {
       case Phase::TextReadouts:
         phase_ = Phase::CountersAndGauges;
@@ -92,6 +108,8 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
         startPhase();
         break;
       case Phase::CountersAndGauges:
+        renderPerHostMetrics(response);
+
         phase_ = Phase::Histograms;
         phase_string_ = "Histograms";
         startPhase();
@@ -179,15 +197,7 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
 
 template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-    if (params_.used_only_ && !stat->used()) {
-      return true;
-    }
-
-    if (params_.hidden_ == HiddenFlag::Exclude && stat->hidden()) {
-      return true;
-    }
-
-    if (params_.hidden_ == HiddenFlag::ShowOnly && !stat->hidden()) {
+    if (!params_.shouldShowMetricWithoutFilter(*stat)) {
       return true;
     }
 
@@ -196,7 +206,7 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     // stat->name() takes a symbol table lock and builds a string, so we only
     // want to call it once.
     //
-    // This duplicates logic in shouldShowMetric in prometheus_stats.cc, but
+    // This duplicates logic in shouldShowMetric in `StatsParams`, but
     // differs in that Prometheus only uses stat->name() for filtering, not
     // rendering, so it only grab the name if there's a filter.
     std::string name = stat->name();
@@ -209,6 +219,29 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
     scope->iterate(check_stat);
   }
+}
+
+void StatsRequest::renderPerHostMetrics(Buffer::Instance& response) {
+  // This code does not adhere to the streaming contract, but there isn't a good way to stream
+  // these. There isn't a shared pointer to hold, so there's no way to safely pause iteration here
+  // without copying all of the data somewhere. But copying all of the data would be more expensive
+  // than generating it all in one batch here.
+  Upstream::HostUtility::forEachHostMetric(
+      cluster_manager_,
+      [&](Stats::PrimitiveCounterSnapshot&& metric) {
+        if ((params_.type_ == StatsType::All || params_.type_ == StatsType::Counters) &&
+            params_.shouldShowMetric(metric)) {
+          ++phase_stat_count_;
+          render_->generate(response, metric.name(), metric.value());
+        }
+      },
+      [&](Stats::PrimitiveGaugeSnapshot&& metric) {
+        if ((params_.type_ == StatsType::All || params_.type_ == StatsType::Gauges) &&
+            params_.shouldShowMetric(metric)) {
+          ++phase_stat_count_;
+          render_->generate(response, metric.name(), metric.value());
+        }
+      });
 }
 
 template <class SharedStatType>

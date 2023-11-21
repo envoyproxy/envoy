@@ -127,7 +127,10 @@ TEST_F(DatadogTracerSpanTest, SetOperation) {
   ASSERT_NE(nullptr, data_ptr);
   const datadog::tracing::SpanData& data = *data_ptr;
 
-  EXPECT_EQ("gastric bypass", data.name);
+  // Setting the operation name actually sets the resource name, because Envoy's
+  // notion of operation name more closely matches Datadog's notion of resource
+  // name.
+  EXPECT_EQ("gastric bypass", data.resource);
 }
 
 TEST_F(DatadogTracerSpanTest, SetTag) {
@@ -135,6 +138,7 @@ TEST_F(DatadogTracerSpanTest, SetTag) {
   span.setTag("foo", "bar");
   span.setTag("boom", "bam");
   span.setTag("foo", "new");
+  span.setTag("resource.name", "vespene gas");
   span.finishSpan();
 
   ASSERT_EQ(1, collector_->chunks.size());
@@ -151,6 +155,12 @@ TEST_F(DatadogTracerSpanTest, SetTag) {
   found = data.tags.find("boom");
   ASSERT_NE(data.tags.end(), found);
   EXPECT_EQ("bam", found->second);
+
+  // The "resource.name" tag is special. It doesn't set a tag, but instead the
+  // span's resource name.
+  found = data.tags.find("resource.name");
+  ASSERT_EQ(data.tags.end(), found);
+  EXPECT_EQ("vespene gas", data.resource);
 }
 
 TEST_F(DatadogTracerSpanTest, InjectContext) {

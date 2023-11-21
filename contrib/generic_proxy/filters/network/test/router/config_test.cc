@@ -15,7 +15,7 @@ TEST(RouterFactoryTest, RouterFactoryTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   RouterFactory factory;
 
-  ProtobufWkt::Struct proto_config;
+  envoy::extensions::filters::network::generic_proxy::router::v3::Router proto_config;
 
   EXPECT_NO_THROW(factory.createFilterFactoryFromProto(proto_config, "test", factory_context));
 
@@ -27,6 +27,7 @@ TEST(RouterFactoryTest, RouterFactoryTest) {
   EXPECT_EQ("envoy.filters.generic.router", factory.name());
   EXPECT_EQ(true, factory.isTerminalFilter());
 
+  proto_config.set_bind_upstream_connection(true);
   auto fn = factory.createFilterFactoryFromProto(proto_config, "test", factory_context);
 
   NiceMock<MockFilterChainFactoryCallbacks> mock_cb;

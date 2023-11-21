@@ -298,9 +298,7 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
-      request_headers.removeEnvoyOriginalPath();
-    }
+    request_headers.removeEnvoyOriginalPath();
   }
 
   // Headers to be stripped from edge *and* intermediate-hop external requests.

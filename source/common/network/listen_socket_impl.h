@@ -170,14 +170,30 @@ public:
 class AcceptedSocketImpl : public ConnectionSocketImpl {
 public:
   AcceptedSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
-                     const Address::InstanceConstSharedPtr& remote_address)
-      : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {
-    ++global_accepted_socket_count_;
+                     const Address::InstanceConstSharedPtr& remote_address,
+                     Server::ThreadLocalOverloadStateOptRef overload_state,
+                     bool track_global_cx_limit_in_overload_manager)
+      : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address),
+        overload_state_(overload_state),
+        track_global_cx_limit_in_overload_manager_(track_global_cx_limit_in_overload_manager) {
+    // In case when tracking of global connection limit is enabled in the overload manager, the
+    // global connection limit usage will be incremented in
+    // TcpListenerImpl::rejectCxOverGlobalLimit() to avoid race conditions (between checking if it
+    // is possible to increment current usage in TcpListenerImpl::rejectCxOverGlobalLimit() and
+    // actually incrementing it in the current method).
+    if (!track_global_cx_limit_in_overload_manager_) {
+      ++global_accepted_socket_count_;
+    }
   }
 
   ~AcceptedSocketImpl() override {
-    ASSERT(global_accepted_socket_count_.load() > 0);
-    --global_accepted_socket_count_;
+    if (track_global_cx_limit_in_overload_manager_) {
+      overload_state_->tryDeallocateResource(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+    } else {
+      ASSERT(global_accepted_socket_count_.load() > 0);
+      --global_accepted_socket_count_;
+    }
   }
 
   // TODO (tonya11en): Global connection count tracking is temporarily performed via a static
@@ -186,6 +202,8 @@ public:
 
 private:
   static std::atomic<uint64_t> global_accepted_socket_count_;
+  Server::ThreadLocalOverloadStateOptRef overload_state_;
+  const bool track_global_cx_limit_in_overload_manager_;
 };
 
 } // namespace Network

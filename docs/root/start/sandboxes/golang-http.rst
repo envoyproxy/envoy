@@ -40,15 +40,6 @@ Step 2: Start all of our containers
 
 Start all the containers.
 
-.. warning::
-  The Envoy Golang filter is designed to be run with the ``GODEBUG=cgocheck=0`` environment variable set.
-
-  This disables the cgo pointer check.
-
-  Failure to set this environment variable will cause Envoy to crash!
-
-  Here, we have set this environment variable in :repo:`Dockerfile <examples/shared/envoy/Dockerfile>`
-
 .. code-block:: console
 
   $ docker compose pull

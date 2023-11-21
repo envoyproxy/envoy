@@ -194,15 +194,18 @@ public:
     if (!waitForData(client_dispatcher, 5, timeout)) {
       return testing::AssertionFailure() << "Timed out waiting for start of gRPC message.";
     }
+    int last_body_size = 0;
     {
       absl::MutexLock lock(&lock_);
+      last_body_size = body_.length();
       if (!grpc_decoder_.decode(body_, decoded_grpc_frames_)) {
         return testing::AssertionFailure()
                << "Couldn't decode gRPC data frame: " << body_.toString();
       }
     }
     if (decoded_grpc_frames_.empty()) {
-      if (!waitForData(client_dispatcher, grpc_decoder_.length(), bound.timeLeft())) {
+      if (!waitForData(client_dispatcher, grpc_decoder_.length() - last_body_size,
+                       bound.timeLeft())) {
         return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
       }
       {
@@ -942,6 +945,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is

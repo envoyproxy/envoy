@@ -155,7 +155,7 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
                                               Tracing::TraceContext& trace_context,
                                               const StreamInfo::StreamInfo& stream_info,
                                               const std::string& operation_name,
-                                              const Tracing::Decision tracing_decision) {
+                                              Tracing::Decision tracing_decision) {
   const PropagationMode propagation_mode = this->propagationMode();
   const opentracing::Tracer& tracer = this->tracer();
   std::unique_ptr<opentracing::Span> active_span;

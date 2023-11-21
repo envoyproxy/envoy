@@ -12,6 +12,9 @@
 namespace Envoy {
 namespace Quic {
 
+// Limits the max number of sockets created.
+constexpr uint8_t kMaxNumSocketSwitches = 5;
+
 class PacketsToReadDelegate {
 public:
   virtual ~PacketsToReadDelegate() = default;
@@ -143,6 +146,7 @@ private:
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
   bool migrate_port_on_path_degrading_{false};
+  uint8_t num_socket_switches_{0};
 };
 
 } // namespace Quic

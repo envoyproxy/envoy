@@ -11,6 +11,111 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 
+using TunnelingConfig =
+    envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig::UdpTunnelingConfig;
+
+/**
+ * Base class for both tunnel response headers and trailers.
+ */
+class TunnelResponseHeadersOrTrailers : public StreamInfo::FilterState::Object {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
+  virtual const Http::HeaderMap& value() const PURE;
+};
+
+/**
+ * Response headers for the tunneling connections.
+ */
+class TunnelResponseHeaders : public TunnelResponseHeadersOrTrailers {
+public:
+  TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
+      : response_headers_(std::move(response_headers)) {}
+  const Http::HeaderMap& value() const override { return *response_headers_; }
+  static const std::string& key();
+
+private:
+  const Http::ResponseHeaderMapPtr response_headers_;
+};
+
+/**
+ * Response trailers for the tunneling connections.
+ */
+class TunnelResponseTrailers : public TunnelResponseHeadersOrTrailers {
+public:
+  TunnelResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers)
+      : response_trailers_(std::move(response_trailers)) {}
+  const Http::HeaderMap& value() const override { return *response_trailers_; }
+  static const std::string& key();
+
+private:
+  const Http::ResponseTrailerMapPtr response_trailers_;
+};
+
+class TunnelingConfigImpl : public UdpTunnelingConfig {
+public:
+  TunnelingConfigImpl(const TunnelingConfig& config,
+                      Server::Configuration::FactoryContext& context);
+
+  const std::string proxyHost(const StreamInfo::StreamInfo& stream_info) const override {
+    return proxy_host_formatter_->formatWithContext({}, stream_info);
+  }
+
+  const std::string targetHost(const StreamInfo::StreamInfo& stream_info) const override {
+    return target_host_formatter_->formatWithContext({}, stream_info);
+  }
+
+  const absl::optional<uint32_t>& proxyPort() const override { return proxy_port_; };
+  uint32_t defaultTargetPort() const override { return target_port_; };
+  bool usePost() const override { return use_post_; };
+  const std::string& postPath() const override { return post_path_; }
+  Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; };
+  uint32_t maxConnectAttempts() const override { return max_connect_attempts_; };
+  bool bufferEnabled() const override { return buffer_enabled_; };
+  uint32_t maxBufferedDatagrams() const override { return max_buffered_datagrams_; };
+  uint64_t maxBufferedBytes() const override { return max_buffered_bytes_; };
+
+  void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const override {
+    if (!propagate_response_headers_) {
+      return;
+    }
+
+    filter_state->setData(TunnelResponseHeaders::key(),
+                          std::make_shared<TunnelResponseHeaders>(std::move(headers)),
+                          StreamInfo::FilterState::StateType::ReadOnly,
+                          StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const override {
+    if (!propagate_response_trailers_) {
+      return;
+    }
+
+    filter_state->setData(TunnelResponseTrailers::key(),
+                          std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
+                          StreamInfo::FilterState::StateType::ReadOnly,
+                          StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+private:
+  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  Formatter::FormatterPtr proxy_host_formatter_;
+  absl::optional<uint32_t> proxy_port_;
+  Formatter::FormatterPtr target_host_formatter_;
+  const uint32_t target_port_;
+  bool use_post_;
+  std::string post_path_;
+  const uint32_t max_connect_attempts_;
+  bool buffer_enabled_;
+  uint32_t max_buffered_datagrams_;
+  uint64_t max_buffered_bytes_;
+  bool propagate_response_headers_;
+  bool propagate_response_trailers_;
+};
+
 class UdpProxyFilterConfigImpl : public UdpProxyFilterConfig,
                                  public FilterChainFactory,
                                  Logger::Loggable<Logger::Id::config> {
@@ -34,7 +139,6 @@ public:
   const Udp::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const override { return stats_; }
   TimeSource& timeSource() const override { return time_source_; }
-  Random::RandomGenerator& randomGenerator() const override { return random_; }
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const override {
     return upstream_socket_config_;
   }
@@ -46,6 +150,8 @@ public:
   }
   const FilterChainFactory& sessionFilterFactory() const override { return *this; };
   bool hasSessionFilters() const override { return !filter_factories_.empty(); }
+  const UdpTunnelingConfigPtr& tunnelingConfig() const override { return tunneling_config_; };
+  Random::RandomGenerator& randomGenerator() const override { return random_generator_; }
 
   // FilterChainFactory
   void createFilterChain(FilterChainFactoryCallbacks& callbacks) const override {
@@ -73,8 +179,9 @@ private:
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
   std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
   std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
-  Random::RandomGenerator& random_;
+  UdpTunnelingConfigPtr tunneling_config_;
   std::list<SessionFilters::FilterFactoryCb> filter_factories_;
+  Random::RandomGenerator& random_generator_;
 };
 
 /**

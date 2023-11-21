@@ -140,14 +140,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message GrpcFieldExtractionConfig {
   // The proto descriptor set binary for the gRPC services.
   //
-  // It could be passed by a local file through `Datasource.filename` or embedded in the
-  // `Datasource.inline_bytes`.
+  // It could be passed by a local file through ``Datasource.filename`` or embedded in the
+  // ``Datasource.inline_bytes``.
   config.core.v3.DataSource descriptor_set = 1 [(validate.rules).message = {required: true}];
 
   // Specify the extraction info.
   // The key is the fully qualified gRPC method name.
-  // `${package}.${Service}.${Method}`, like
-  // `endpoints.examples.bookstore.BookStore.GetShelf`
+  // ``${package}.${Service}.${Method}``, like
+  // ``endpoints.examples.bookstore.BookStore.GetShelf``
   //
   // The value is the field extractions for individual gRPC method.
   map<string, FieldExtractions> extractions_by_method = 2;
@@ -158,8 +158,8 @@ message GrpcFieldExtractionConfig {
 message FieldExtractions {
   // The field extractions for requests.
   // The key is the field path within the grpc request.
-  // For example, we can define `foo.bar.name` if we want to extract
-  // Request.foo.bar.name.
+  // For example, we can define ``foo.bar.name`` if we want to extract
+  // ``Request.foo.bar.name``.
   //
   // .. code-block:: proto
   //

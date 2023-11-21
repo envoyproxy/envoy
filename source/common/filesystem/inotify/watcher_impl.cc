@@ -42,7 +42,7 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
   const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
   int watch_fd = inotify_add_watch(inotify_fd_, std::string(result.directory_).c_str(), watch_mask);
   if (watch_fd == -1) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("unable to add filesystem watch for file {}: {}", path, errorDetails(errno)));
   }
 

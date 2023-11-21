@@ -136,8 +136,13 @@ TEST_P(ConnectionLimitIntegrationTest, TestListenerLimit) {
   doTest(init_func, "downstream_cx_overflow");
 }
 
+// TODO (nezdolik) move this test to overload manager test suite, once runtime key is fully
+// deprecated.
 TEST_P(ConnectionLimitIntegrationTest, TestEmptyGlobalCxRuntimeLimit) {
-  const std::string log_line = "no configured limit to the number of allowed active connections.";
+  const std::string log_line =
+      "There is no configured limit to the number of allowed active downstream connections. "
+      "Configure a "
+      "limit in `envoy.resource_monitors.downstream_connections` resource monitor.";
   EXPECT_LOG_CONTAINS("warn", log_line, { initialize(); });
 }
 

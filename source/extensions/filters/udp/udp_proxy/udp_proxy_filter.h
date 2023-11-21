@@ -72,6 +72,9 @@ struct UdpProxyDownstreamStats {
   COUNTER(sess_rx_datagrams_dropped)                                                               \
   COUNTER(sess_rx_errors)                                                                          \
   COUNTER(sess_tx_datagrams)                                                                       \
+  COUNTER(sess_tunnel_success)                                                                     \
+  COUNTER(sess_tunnel_failure)                                                                     \
+  COUNTER(sess_tunnel_buffer_overflow)                                                             \
   COUNTER(sess_tx_errors)
 
 /**
@@ -95,6 +98,18 @@ public:
   virtual bool usePost() const PURE;
   virtual const std::string& postPath() const PURE;
   virtual Http::HeaderEvaluator& headerEvaluator() const PURE;
+  virtual uint32_t maxConnectAttempts() const PURE;
+  virtual bool bufferEnabled() const PURE;
+  virtual uint32_t maxBufferedDatagrams() const PURE;
+  virtual uint64_t maxBufferedBytes() const PURE;
+
+  virtual void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
+
+  virtual void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
 };
 
 using UdpTunnelingConfigPtr = std::unique_ptr<const UdpTunnelingConfig>;
@@ -113,12 +128,13 @@ public:
   virtual const Udp::HashPolicy* hashPolicy() const PURE;
   virtual UdpProxyDownstreamStats& stats() const PURE;
   virtual TimeSource& timeSource() const PURE;
-  virtual Random::RandomGenerator& randomGenerator() const PURE;
   virtual const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const PURE;
   virtual const FilterChainFactory& sessionFilterFactory() const PURE;
   virtual bool hasSessionFilters() const PURE;
+  virtual const UdpTunnelingConfigPtr& tunnelingConfig() const PURE;
+  virtual Random::RandomGenerator& randomGenerator() const PURE;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -129,16 +145,20 @@ using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig
 class UdpLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   UdpLoadBalancerContext(const Udp::HashPolicy* hash_policy,
-                         const Network::Address::InstanceConstSharedPtr& peer_address) {
+                         const Network::Address::InstanceConstSharedPtr& peer_address,
+                         const StreamInfo::StreamInfo* stream_info)
+      : stream_info_(stream_info) {
     if (hash_policy) {
       hash_ = hash_policy->generateHash(*peer_address);
     }
   }
 
   absl::optional<uint64_t> computeHashKey() override { return hash_; }
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_; }
 
 private:
   absl::optional<uint64_t> hash_;
+  const StreamInfo::StreamInfo* stream_info_;
 };
 
 /**
@@ -294,7 +314,16 @@ private:
     }
 
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
-      bool is_valid_response = Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers));
+      bool is_valid_response;
+      if (parent_.tunnel_config_.usePost()) {
+        auto status = Http::Utility::getResponseStatus(*headers);
+        is_valid_response = Http::CodeUtility::is2xx(status);
+      } else {
+        is_valid_response = Http::HeaderUtility::isConnectUdpResponse(*headers);
+      }
+
+      parent_.tunnel_config_.propagateResponseHeaders(std::move(headers),
+                                                      parent_.downstream_info_.filterState());
 
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
@@ -311,7 +340,9 @@ private:
       }
     }
 
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
+      parent_.tunnel_config_.propagateResponseTrailers(std::move(trailers),
+                                                       parent_.downstream_info_.filterState());
       parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
     }
 
@@ -440,7 +471,7 @@ private:
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
-    void continueFilterChain() override { parent_.onContinueFilterChain(this); }
+    bool continueFilterChain() override { return parent_.onContinueFilterChain(this); }
     void injectDatagramToFilterChain(Network::UdpRecvData& data) override {
       parent_.onInjectReadDatagramToFilterChain(this, data);
     }
@@ -492,12 +523,13 @@ private:
       return absl::nullopt;
     }
 
-    void onNewSession();
+    bool onNewSession();
     void onData(Network::UdpRecvData& data);
+    void processUpstreamDatagram(Network::UdpRecvData& data);
     void writeDownstream(Network::UdpRecvData& data);
     void resetIdleTimer();
 
-    virtual void createUpstream() PURE;
+    virtual bool createUpstream() PURE;
     virtual void writeUpstream(Network::UdpRecvData& data) PURE;
     virtual void onIdleTimer() PURE;
 
@@ -507,7 +539,7 @@ private:
 
     uint64_t sessionId() const { return session_id_; };
     StreamInfo::StreamInfo& streamInfo() { return udp_session_info_; };
-    void onContinueFilterChain(ActiveReadFilter* filter);
+    bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
 
@@ -577,7 +609,7 @@ private:
     ~UdpActiveSession() override = default;
 
     // ActiveSession
-    void createUpstream() override;
+    bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
 
@@ -610,6 +642,58 @@ private:
     // The socket has been connected to avoid port exhaustion.
     bool connected_{};
     const bool use_original_src_ip_;
+  };
+
+  /**
+   * This type of active session is used when tunneling is enabled by configuration.
+   * In this type of session, the upstream is HTTP stream, either a connect-udp request,
+   * or a POST request.
+   */
+  class TunnelingActiveSession : public ActiveSession,
+                                 public UpstreamTunnelCallbacks,
+                                 public HttpStreamCallbacks {
+  public:
+    TunnelingActiveSession(ClusterInfo& parent,
+                           Network::UdpRecvData::LocalPeerAddresses&& addresses);
+    ~TunnelingActiveSession() override = default;
+
+    // ActiveSession
+    bool createUpstream() override;
+    void writeUpstream(Network::UdpRecvData& data) override;
+    void onIdleTimer() override;
+
+    // UpstreamTunnelCallbacks
+    void onUpstreamEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
+    void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
+
+    // HttpStreamCallbacks
+    void onStreamReady(StreamInfo::StreamInfo*, std::unique_ptr<HttpUpstream>&&,
+                       Upstream::HostDescriptionConstSharedPtr&,
+                       const Network::ConnectionInfoProvider&,
+                       Ssl::ConnectionInfoConstSharedPtr) override;
+
+    void onStreamFailure(ConnectionPool::PoolFailureReason, absl::string_view,
+                         Upstream::HostDescriptionConstSharedPtr) override;
+
+  private:
+    using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
+
+    bool establishUpstreamConnection();
+    bool createConnectionPool();
+    void maybeBufferDatagram(Network::UdpRecvData& data);
+    void flushBuffer();
+
+    TunnelingConnectionPoolFactoryPtr conn_pool_factory_;
+    std::unique_ptr<UdpLoadBalancerContext> load_balancer_context_;
+    TunnelingConnectionPoolPtr conn_pool_;
+    std::unique_ptr<HttpUpstream> upstream_;
+    uint32_t connect_attempts_{};
+    bool connecting_{};
+    bool can_send_upstream_{};
+    uint64_t buffered_bytes_{};
+    std::queue<BufferedDatagramPtr> datagrams_buffer_;
   };
 
   struct LocalPeerHostAddresses {
@@ -695,7 +779,8 @@ private:
     }
 
     Upstream::HostConstSharedPtr
-    chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address) const;
+    chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address,
+               const StreamInfo::StreamInfo* stream_info) const;
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;
