@@ -23,7 +23,7 @@ void addAttributes(const std::string& content, Resource& resource) {
 
 Resource DynatraceResourceDetector::detect() {
   Resource resource;
-  resource.schemaUrl_ = "";
+  resource.schema_url_ = "";
   int failure_count = 0;
 
   for (const auto& file_name : DynatraceResourceDetector::dynatraceMetadataFiles()) {
