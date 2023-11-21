@@ -493,6 +493,51 @@ TEST(IoUringWorkerImplTest, NoOnWriteCallingBackInCloseAfterShutdownWriteSocketI
   delete close_req;
 }
 
+TEST(IoUringWorkerImplTest, CloseKeepFDOpenAndSaveData) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  // The read request submitted.
+  Request* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  auto& socket = worker.addServerSocket(
+      0, [](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, false);
+
+  // Close the socket, but keep the fd open.
+  Request* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  Buffer::OwnedImpl buffer;
+  bool is_closed = false;
+  socket.close(true, [&is_closed](Buffer::Instance& read_buffer) {
+    // Expect the data is saved.
+    EXPECT_EQ(1, read_buffer.length());
+    is_closed = true;
+  });
+
+  // consumes the cancel request.
+  socket.onCancel(cancel_req, 0, false);
+
+  // Consumes the read request.
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(0));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  socket.onRead(read_req, 1, false);
+  EXPECT_TRUE(is_closed);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete read_req;
+  delete cancel_req;
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy

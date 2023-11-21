@@ -823,33 +823,18 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFDOpen) {
   initialize();
   createServerListenerAndClientSocket();
 
-  bool is_closed = false;
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addServerSocket(
-      server_socket_,
-      [&socket, &is_closed](uint32_t events) {
-        ASSERT(events == Event::FileReadyType::Read);
-        EXPECT_NE(socket->getReadParam(), absl::nullopt);
-        EXPECT_EQ(socket->getReadParam()->result_, 0);
-        is_closed = true;
-      },
-      false);
+      server_socket_, [](uint32_t) {}, false);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
-  std::string write_data = "hello world";
-  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
 
-  bool on_closed = false;
-  socket->close(true, [&on_closed, &write_data](Buffer::Instance& buffer) {
-    on_closed = true;
-    EXPECT_EQ(buffer.length(), write_data.size());
-  });
-
+  socket->close(true);
   while (io_uring_worker_->getSockets().size() != 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  EXPECT_TRUE(on_closed);
   // Ensure the server socket is still open.
+  std::string write_data = "hello world";
   auto rc =
       Api::OsSysCallsSingleton::get().write(server_socket_, write_data.data(), write_data.size());
   EXPECT_EQ(rc.return_value_, write_data.length());
