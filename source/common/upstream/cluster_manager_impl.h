@@ -379,7 +379,9 @@ public:
    */
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
-    return common_lb_config_pool_->getObject(common_lb_config);
+    return common_lb_config_pool_->getObject(common_lb_config, [&common_lb_config]() {
+      return new envoy::config::cluster::v3::Cluster::CommonLbConfig(common_lb_config);
+    });
   }
 
   Config::EdsResourcesCacheOptRef edsResourcesCache() override;

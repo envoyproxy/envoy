@@ -1939,9 +1939,14 @@ void PriorityStateManager::registerHostForPriority(
     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source) {
-  auto metadata = lb_endpoint.has_metadata()
-                      ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
-                      : nullptr;
+  MetadataConstSharedPtr metadata;
+
+  if (lb_endpoint.has_metadata()) {
+    const auto& meta_ref = lb_endpoint.metadata();
+    metadata = parent_.constMetadataSharedPool()->getObject(
+        meta_ref, [&meta_ref]() { return new envoy::config::core::v3::Metadata(meta_ref); });
+  }
+
   const auto host = std::make_shared<HostImpl>(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),

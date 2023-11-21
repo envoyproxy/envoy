@@ -58,7 +58,7 @@ protected:
                                      std::shared_ptr<int>& o, int value) {
     absl::Notification go;
     dispatcher_->post([&pool, &o, &go, value]() {
-      o = pool->getObject(value);
+      o = pool->getObject(value, [value]() { return new int(value); });
       go.Notify();
     });
     go.WaitForNotification();
@@ -75,11 +75,11 @@ TEST_F(SharedPoolTest, Basic) {
   Event::MockDispatcher dispatcher;
   auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
   {
-    auto o = pool->getObject(4);
-    auto o1 = pool->getObject(4);
+    auto o = pool->getObject(4, []() { return new int(4); });
+    auto o1 = pool->getObject(4, []() { return new int(4); });
     ASSERT_EQ(1, pool->poolSize());
 
-    auto o2 = pool->getObject(5);
+    auto o2 = pool->getObject(5, []() { return new int(5); });
     ASSERT_EQ(o.get(), o1.get());
     ASSERT_EQ(2, pool->poolSize());
     ASSERT_TRUE(o.get() != o2.get());
@@ -91,7 +91,7 @@ TEST_F(SharedPoolTest, Basic) {
 TEST_F(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
   std::shared_ptr<ObjectSharedPool<int>> pool;
   createObjectSharedPool(pool);
-  EXPECT_DEBUG_DEATH(pool->getObject(4), ".*");
+  EXPECT_DEBUG_DEATH(pool->getObject(4, []() { return new int(4); }), ".*");
 }
 
 TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
@@ -195,8 +195,8 @@ TEST_F(SharedPoolTest, HashCollision) {
     static_assert(MyHash{}(12) == 1);
 
     // Instantiate objects that hash to the same value.
-    auto o = pool->getObject(4);
-    auto o1 = pool->getObject(3);
+    auto o = pool->getObject(4, []() { return new int(4); });
+    auto o1 = pool->getObject(3, []() { return new int(3); });
 
     // Verify that there are separate entries in the pool for objects with the
     // same hash value.
@@ -205,10 +205,10 @@ TEST_F(SharedPoolTest, HashCollision) {
     EXPECT_EQ(*o, 4);
     EXPECT_EQ(*o1, 3);
 
-    auto o2 = pool->getObject(15);
-    auto o3 = pool->getObject(12);
-    auto o4 = pool->getObject(3);
-    auto o5 = pool->getObject(1);
+    auto o2 = pool->getObject(15, []() { return new int(15); });
+    auto o3 = pool->getObject(12, []() { return new int(12); });
+    auto o4 = pool->getObject(3, []() { return new int(3); });
+    auto o5 = pool->getObject(1, []() { return new int(1); });
 
     EXPECT_EQ(o4.get(), o1.get());
     EXPECT_EQ(*o2, 15);

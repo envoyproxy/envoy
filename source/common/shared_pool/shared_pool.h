@@ -30,21 +30,25 @@ namespace SharedPool {
  * There is also a need to ensure that the thread where ObjectSharedPool's destructor is also in the
  * main thread, or that ObjectSharedPool destruct before the program exit
  */
-template <typename T, typename HashFunc = std::hash<T>, typename EqualFunc = std::equal_to<T>,
-          class = typename std::enable_if<std::is_copy_constructible<T>::value>::type>
+template <typename T, typename HashFunc = std::hash<T>, typename EqualFunc = std::equal_to<T>>
 class ObjectSharedPool
     : public Singleton::Instance,
       public std::enable_shared_from_this<ObjectSharedPool<T, HashFunc, EqualFunc>>,
       NonCopyable {
 public:
+  // Creator is a callable object that return a pointer to a new object. This pointer will be
+  // used to create a shared_ptr. So the pointer must be created with new and is not owned by
+  // any other smart pointer.
+  using Creator = std::function<T*()>;
+
   ObjectSharedPool(Event::Dispatcher& dispatcher)
       : thread_id_(std::this_thread::get_id()), dispatcher_(dispatcher) {}
 
-  std::shared_ptr<T> getObject(const T& obj) {
+  template <class K> std::shared_ptr<T> getObject(const K& k, const Creator& creator) {
     ASSERT(std::this_thread::get_id() == thread_id_);
 
     // Return from the object pool if we find the object there.
-    if (auto iter = object_pool_.find(&obj); iter != object_pool_.end()) {
+    if (auto iter = object_pool_.find(k); iter != object_pool_.end()) {
       if (auto lock_object = iter->lock(); static_cast<bool>(lock_object) == true) {
         return lock_object;
       } else {
@@ -56,7 +60,7 @@ public:
 
     // Create a shared_ptr and add the object to the object_pool.
     auto this_shared_ptr = this->shared_from_this();
-    std::shared_ptr<T> obj_shared(new T(obj), [this_shared_ptr](T* ptr) {
+    std::shared_ptr<T> obj_shared(creator(), [this_shared_ptr](T* ptr) {
       this_shared_ptr->sync().syncPoint(ObjectSharedPool<T>::ObjectDeleterEntry);
       this_shared_ptr->deleteObject(ptr);
     });
@@ -127,28 +131,25 @@ private:
 
     struct Hash {
       using is_transparent = void; // NOLINT(readability-identifier-naming)
-      constexpr size_t operator()(const T* ptr) const { return HashFunc{}(*ptr); }
-      constexpr size_t operator()(const Element& element) const {
+      template <class K> size_t operator()(const K& k) const { return HashFunc{}(k); }
+      template <> size_t operator()(const Element& element) const {
         return HashFunc{}(*element.ptr_);
       }
     };
     struct Compare {
       using is_transparent = void; // NOLINT(readability-identifier-naming)
-      bool operator()(const Element& a, const Element& b) const {
-        ASSERT(a.ptr_ != nullptr && b.ptr_ != nullptr);
-        return a.ptr_ == b.ptr_ ||
-               (a.ptr_ != nullptr && b.ptr_ != nullptr && EqualFunc{}(*a.ptr_, *b.ptr_));
+      template <class K> bool operator()(const Element& a, const K& k) const {
+        return EqualFunc{}(*a.ptr_, k);
       }
-      bool operator()(const Element& a, const T* ptr) const {
-        ASSERT(a.ptr_ != nullptr && ptr != nullptr);
-        return a.ptr_ == ptr || (a.ptr_ != nullptr && ptr != nullptr && EqualFunc{}(*a.ptr_, *ptr));
+      template <> bool operator()(const Element& a, const Element& b) const {
+        return a.ptr_ == b.ptr_ || (EqualFunc{}(*a.ptr_, *b.ptr_));
       }
     };
 
   private:
-    const T* const ptr_ = nullptr; ///< This is only used to speed up
-                                   ///< comparisons and should never be
-                                   ///< made available outside this class.
+    // This is only used to speed up comparisons and should never be made available
+    // outside this class. **This will never be nullptr**.
+    const T* const ptr_{};
     std::weak_ptr<T> weak_ptr_;
   };
 
@@ -160,12 +161,12 @@ private:
   Thread::ThreadSynchronizer sync_;
 };
 
-template <typename T, typename HashFunc, typename EqualFunc, class V>
-const char ObjectSharedPool<T, HashFunc, EqualFunc, V>::DeleteObjectOnMainThread[] =
+template <typename T, typename HashFunc, typename EqualFunc>
+const char ObjectSharedPool<T, HashFunc, EqualFunc>::DeleteObjectOnMainThread[] =
     "delete-object-on-main";
 
-template <typename T, typename HashFunc, typename EqualFunc, class V>
-const char ObjectSharedPool<T, HashFunc, EqualFunc, V>::ObjectDeleterEntry[] = "deleter-entry";
+template <typename T, typename HashFunc, typename EqualFunc>
+const char ObjectSharedPool<T, HashFunc, EqualFunc>::ObjectDeleterEntry[] = "deleter-entry";
 
 } // namespace SharedPool
 } // namespace Envoy
