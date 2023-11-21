@@ -230,7 +230,7 @@ public:
 
   /**
    * Close the socket.
-   * @param keep_fd_open is indicated the file descriptor of the socket will be closed or not in the
+   * @param keep_fd_open indicates the file descriptor of the socket will be closed or not in the
    * end. The value of `true` is used for destroy the IoUringSocket but keep the file descriptor
    * open. This is used for migrating the IoUringSocket between worker threads.
    * @param cb will be invoked when the close request is done. This is also used for migrating the
@@ -239,15 +239,15 @@ public:
   virtual void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) PURE;
 
   /**
-   * Enable the read on the socket. The socket will be begin to submit the read request and deliever
+   * Enable the read on the socket. The socket will be begin to submit the read request and deliver
    * read event when the request is done. This is used when the socket is listening on the file read
    * event.
    */
   virtual void enableRead() PURE;
 
   /**
-   * Disable the read on the socket. The socket stop to submit the read request, although the
-   * existing read request won't be canceled but no read event will be delivered. This is used when
+   * Disable the read on the socket. The socket stops to submit the read request, although the
+   * existing read request won't be canceled and no read event will be delivered. This is used when
    * the socket isn't listening on the file read event.
    */
   virtual void disableRead() PURE;
@@ -360,13 +360,13 @@ public:
 
   /**
    * Return the data get from the read request.
-   * @return Only return valid ReadParam when the callback being invoked with
+   * @return Only return valid ReadParam when the callback is invoked with
    * `Event::FileReadyType::Read`, otherwise `absl::nullopt` returned.
    */
   virtual const OptRef<ReadParam>& getReadParam() const PURE;
   /**
    * Return the data get from the write request.
-   * @return Only return valid WriteParam when the callback being invoked with
+   * @return Only return valid WriteParam when the callback is invoked with
    * `Event::FileReadyType::Write`, otherwise `absl::nullopt` returned.
    */
   virtual const OptRef<WriteParam>& getWriteParam() const PURE;
@@ -394,7 +394,7 @@ public:
                                          bool enable_close_event) PURE;
 
   /**
-   * Add an server socket through an existing socket from another thread.
+   * Add an server socket from an existing socket from another thread.
    */
   virtual IoUringSocket& addServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
                                          Event::FileReadyCb cb, bool enable_close_event) PURE;
