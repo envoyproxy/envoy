@@ -66,6 +66,10 @@ public:
 
   void cleanupForTest() { cleanup(); }
 
+  void write(Buffer::Instance&) override {}
+  uint64_t write(const Buffer::RawSlice*, uint64_t) override { return 0; }
+  void shutdown(int) override {}
+
   int32_t accept_result_{-1};
   bool is_accept_injected_completion_{false};
   int32_t connect_result_{-1};
@@ -839,6 +843,37 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFDOpen) {
       Api::OsSysCallsSingleton::get().write(server_socket_, write_data.data(), write_data.size());
   EXPECT_EQ(rc.return_value_, write_data.length());
 
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketUpdateFileEventCb) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) { EXPECT_TRUE(false); }, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  socket->setFileReadyCb([&socket, &result](uint32_t events) {
+    ASSERT(events == Event::FileReadyType::Read);
+    EXPECT_NE(absl::nullopt, socket->getReadParam());
+    result = socket->getReadParam()->result_;
+  });
+  // Write data through client socket.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(result.value(), write_data.length());
+
+  socket->close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
 

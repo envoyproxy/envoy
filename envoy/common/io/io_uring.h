@@ -259,12 +259,6 @@ public:
   virtual void enableCloseEvent(bool enable) PURE;
 
   /**
-   * Connect to an address.
-   * @param address the peer of address which is connected to.
-   */
-  virtual void connect(const Network::Address::InstanceConstSharedPtr& address) PURE;
-
-  /**
    * Write data to the socket.
    * @param data is going to write.
    */

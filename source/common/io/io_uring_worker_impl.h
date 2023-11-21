@@ -101,10 +101,10 @@ public:
   void enableRead() override { status_ = ReadEnabled; }
   void disableRead() override { status_ = ReadDisabled; }
   void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
-  void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
-  void write(Buffer::Instance&) override { PANIC("not implement"); }
-  uint64_t write(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
-  void shutdown(int) override { PANIC("not implement"); }
+  // void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not
+  // implement"); } void write(Buffer::Instance&) override { PANIC("not implement"); } uint64_t
+  // write(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); } void
+  // shutdown(int) override { PANIC("not implement"); }
 
   void onAccept(Request*, int32_t, bool injected) override {
     if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Accept))) {

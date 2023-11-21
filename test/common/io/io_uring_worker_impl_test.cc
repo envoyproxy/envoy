@@ -1,3 +1,5 @@
+#include <sys/socket.h>
+
 #include "source/common/io/io_uring_worker_impl.h"
 #include "source/common/network/address_impl.h"
 
@@ -24,6 +26,10 @@ public:
       : IoUringSocketEntry(
             fd, parent, [](uint32_t) {}, false) {}
   void cleanupForTest() { cleanup(); }
+
+  void write(Buffer::Instance&) override {}
+  uint64_t write(const Buffer::RawSlice*, uint64_t) override { return 0; }
+  void shutdown(int) override {}
 };
 
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
@@ -39,6 +45,83 @@ public:
 
   void submitForTest() { submit(); }
 };
+
+// TODO (soulxu): This is only for test coverage, we suppose to have correct
+// implementation to handle the request submit failed.
+TEST(IoUringWorkerImplTest, SubmitRequestsFailed) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  os_fd_t fd;
+  SET_SOCKET_INVALID(fd);
+  auto& io_uring_socket = worker.addTestSocket(fd);
+
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  worker.submitReadRequest(io_uring_socket);
+
+  Buffer::OwnedImpl buf;
+  auto slices = buf.getRawSlices();
+  EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  worker.submitWriteRequest(io_uring_socket, slices);
+
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  worker.submitCancelRequest(io_uring_socket, nullptr);
+
+  EXPECT_CALL(mock_io_uring, prepareClose(fd, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareClose(fd, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  worker.submitCloseRequest(io_uring_socket);
+
+  EXPECT_CALL(mock_io_uring, prepareShutdown(fd, _, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareShutdown(fd, _, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  worker.submitShutdownRequest(io_uring_socket, SHUT_WR);
+
+  EXPECT_EQ(fd, io_uring_socket.fd());
+  EXPECT_EQ(1, worker.getSockets().size());
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  dynamic_cast<IoUringSocketTestImpl*>(worker.getSockets().front().get())->cleanupForTest();
+  EXPECT_EQ(0, worker.getNumOfSockets());
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
 
 TEST(IoUringWorkerImplTest, CleanupSocket) {
   Event::MockDispatcher dispatcher;
