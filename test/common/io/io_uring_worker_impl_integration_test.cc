@@ -606,7 +606,8 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableClo
         ASSERT(events == Event::FileReadyType::Closed);
         is_closed = true;
       },
-      true);
+      false);
+  socket.enableCloseEvent(true);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
   // Waiting for the server socket sending the data.
   socket.disableRead();
