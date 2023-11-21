@@ -21,6 +21,7 @@ envoy_cc_test_binary(
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/server:options_lib",
         "//source/server/admin:admin_html_util",
     ],
 )
@@ -34,7 +35,6 @@ envoy_sh_test(
     cc_binary = [":test_server"],
     data = [
         ":test_server_files",
-        "//source/server:options_lib",
         "//source/server/admin/html:admin_web_files",
         "//test/integration:test_utility.sh",
     ],
