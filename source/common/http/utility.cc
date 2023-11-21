@@ -859,8 +859,8 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   static constexpr absl::string_view separator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
-    const std::string::size_type last_comma = xff_string.rfind(separator);
-    if (last_comma == std::string::npos) {
+    const absl::string_view::size_type last_comma = xff_string.rfind(separator);
+    if (last_comma == absl::string_view::npos) {
       return {nullptr, false};
     }
     xff_string = xff_string.substr(0, last_comma);
@@ -868,7 +868,7 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   // The text after the last remaining comma, or the entirety of the string if there
   // is no comma, is the requested IP address.
   const absl::string_view::size_type last_comma = xff_string.rfind(separator);
-  if (last_comma != std::string::npos && last_comma + separator.size() < xff_string.size()) {
+  if (last_comma != absl::string_view::npos && last_comma + separator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + separator.size());
   }
 
@@ -883,7 +883,7 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::parseInternetAddressNoThrow(std::string(xff_string));
   if (address != nullptr) {
-    return {address, last_comma == std::string::npos && num_to_skip == 0};
+    return {address, last_comma == absl::string_view::npos && num_to_skip == 0};
   }
   return {nullptr, false};
 }
