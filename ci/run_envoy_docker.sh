@@ -91,6 +91,10 @@ VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
     -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
 
+if ! is_windows; then
+    export BUILD_DIR="${BUILD_DIR_MOUNT_DEST}"
+fi
+
 if [[ -n "$ENVOY_DOCKER_IN_DOCKER" || -n "$ENVOY_SHARED_TMP_DIR" ]]; then
     # Create a "shared" directory that has the same path in/outside the container
     # This allows the host docker engine to see artefacts using a temporary path created inside the container,
@@ -111,6 +115,7 @@ fi
 docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
+       -e BUILD_DIR \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \

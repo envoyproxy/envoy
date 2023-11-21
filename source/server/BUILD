@@ -270,6 +270,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "null_overload_manager_lib",
+    hdrs = ["null_overload_manager.h"],
+    deps = [
+        "//envoy/server/overload:overload_manager_interface",
+        "//source/common/event:scaled_range_timer_manager_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "overload_manager_lib",
     srcs = ["overload_manager_impl.cc"],
     hdrs = ["overload_manager_impl.h"],
@@ -376,7 +385,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "server_lib",
+    name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
     external_deps = [
@@ -424,7 +433,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/init:manager_lib",
         "//source/common/local_info:local_info_lib",
-        "//source/common/memory:heap_shrinker_lib",
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -437,10 +445,20 @@ envoy_cc_library(
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/common/version:version_lib",
-        "//source/server:overload_manager_lib",
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "server_lib",
+    srcs = ["instance_impl.cc"],
+    hdrs = ["instance_impl.h"],
+    deps = [
+        ":server_base_lib",
+        "//source/common/memory:heap_shrinker_lib",
+        "//source/server:overload_manager_lib",
     ],
 )
 

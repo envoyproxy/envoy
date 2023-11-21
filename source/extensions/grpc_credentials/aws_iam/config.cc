@@ -44,8 +44,14 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
+        // TODO(suniltheta): Due to the reasons explained in
+        // https://github.com/envoyproxy/envoy/issues/27586 this aws iam plugin is not able to
+        // utilize http async client to fetch AWS credentials. For time being this is still using
+        // libcurl to fetch the credentials. To fully get rid of curl, need to address the below
+        // usage of AWS credentials common utils. Until then we are setting nullopt for server
+        // factory context.
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            api, Common::Aws::Utility::fetchMetadata);
+            api, absl::nullopt /*Empty factory context*/, Common::Aws::Utility::fetchMetadata);
         auto signer = std::make_unique<Common::Aws::SignerImpl>(
             config.service_name(), getRegion(config), credentials_provider, api.timeSource(),
             // TODO: extend API to allow specifying header exclusion. ref:
@@ -101,7 +107,9 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
                                     absl::string_view(method_name.data(), method_name.length()));
 
   TRY_NEEDS_AUDIT { signer_->sign(message, false); }
-  END_TRY catch (const EnvoyException& e) { return {grpc::StatusCode::INTERNAL, e.what()}; }
+  END_TRY catch (const EnvoyException& e) {
+    return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
+  }
 
   signedHeadersToMetadata(message.headers(), *metadata);
 

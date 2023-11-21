@@ -16,6 +16,8 @@ public:
   const std::string Buffer = "envoy.filters.http.buffer";
   // Bandwidth limit filter
   const std::string BandwidthLimit = "envoy.filters.http.bandwidth_limit";
+  // Basic Auth filter
+  const std::string BasicAuth = "envoy.filters.http.basic_auth";
   // Cache filter
   const std::string Cache = "envoy.filters.http.cache";
   // CDN Loop filter

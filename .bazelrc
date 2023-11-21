@@ -443,7 +443,7 @@ build:windows --define hot_restart=disabled
 build:windows --define tcmalloc=disabled
 build:windows --define wasm=disabled
 build:windows --define manual_stamp=manual_stamp
-build:windows --cxxopt="/std:c++17"
+build:windows --cxxopt="/std:c++20"
 build:windows --output_groups=+pdb_file
 
 # TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
@@ -486,11 +486,12 @@ build:windows --features=static_link_msvcrt
 build:windows --dynamic_mode=off
 
 # RBE (Google)
-build:rbe-google --google_default_credentials=true
-build:rbe-google --remote_cache=grpcs://remotebuildexecution.googleapis.com
+build:cache-google --google_default_credentials=true
+build:cache-google --remote_cache=grpcs://remotebuildexecution.googleapis.com
+build:cache-google --remote_instance_name=projects/envoy-ci/instances/default_instance
+build:cache-google --remote_timeout=7200
 build:rbe-google --remote_executor=grpcs://remotebuildexecution.googleapis.com
-build:rbe-google --remote_timeout=7200
-build:rbe-google --remote_instance_name=projects/envoy-ci/instances/default_instance
+build:rbe-google --config=cache-google
 
 build:rbe-google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
 build:rbe-google-bes --bes_results_url=https://source.cloud.google.com/results/invocations/

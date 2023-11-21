@@ -243,12 +243,6 @@ Envoy::Buffer::OwnedImpl Engine::dumpStats() {
   return instance;
 }
 
-void Engine::flushStats() {
-  ASSERT(dispatcher_->isThreadSafe(), "flushStats must be called from the dispatcher's context");
-
-  server_->flushStats();
-}
-
 Upstream::ClusterManager& Engine::getClusterManager() {
   ASSERT(dispatcher_->isThreadSafe(),
          "getClusterManager must be called from the dispatcher's context");

@@ -3870,7 +3870,7 @@ envoy_quic_cc_library(
     hdrs = ["quiche/quic/core/quic_server_id.h"],
     deps = [
         ":quic_platform_base",
-        "@com_googlesource_googleurl//url",
+        ":quiche_common_platform_googleurl",
     ],
 )
 
@@ -4641,6 +4641,24 @@ envoy_quiche_platform_impl_cc_test_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_platform_googleurl",
+    hdrs = ["quiche/common/platform/api/quiche_googleurl.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [":quiche_common_platform_default_quiche_platform_impl_googleurl_impl_lib"],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_default_quiche_platform_impl_googleurl_impl_lib",
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_googleurl_impl.h",
+    ],
+    deps = [
+        "@com_googlesource_googleurl//url",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform_iovec",
     hdrs = [
         "quiche/common/platform/api/quiche_iovec.h",
@@ -4780,8 +4798,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
+        ":quiche_common_platform_googleurl",
         ":quiche_common_platform_logging",
-        "@com_googlesource_googleurl//url",
     ],
 )
 
@@ -5069,9 +5087,9 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform",
+        ":quiche_common_platform_googleurl",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
-        "@com_googlesource_googleurl//url",
         "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
         "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],

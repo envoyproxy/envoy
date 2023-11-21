@@ -13,3 +13,4 @@ HTTP tracers
 
   v3/*
   opentelemetry/resource_detectors
+  opentelemetry/samplers

@@ -1,7 +1,7 @@
+#include "envoy/access_log/access_log_config.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/access_log_config.h"
 #include "envoy/stats/scope.h"
 
 #include "source/extensions/access_loggers/grpc/tcp_grpc_access_log_impl.h"
@@ -23,9 +23,8 @@ namespace {
 class TcpGrpcAccessLogConfigTest : public testing::Test {
 public:
   void SetUp() override {
-    factory_ =
-        Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-            "envoy.access_loggers.tcp_grpc");
+    factory_ = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+        "envoy.access_loggers.tcp_grpc");
     ASSERT_NE(nullptr, factory_);
 
     message_ = factory_->createEmptyConfigProto();
@@ -61,7 +60,7 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig tcp_grpc_access_log_;
   ProtobufTypes::MessagePtr message_;
-  Server::Configuration::AccessLogInstanceFactory* factory_{};
+  AccessLog::AccessLogInstanceFactory* factory_{};
 };
 
 // Normal OK configuration.

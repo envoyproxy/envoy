@@ -83,6 +83,9 @@ protected:
   std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
   std::unique_ptr<Server::Instance> server_;
 
+  // Only used for validation mode
+  std::unique_ptr<ProcessContext> process_context_;
+
 private:
   void configureComponentLogLevels();
   void configureHotRestarter(Random::RandomGenerator& random_generator);

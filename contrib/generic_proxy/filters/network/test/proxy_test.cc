@@ -764,8 +764,6 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
   EXPECT_EQ(0, filter_->frameHandlersForTest().size());
 
-  std::cout << "OK decoding" << std::endl;
-
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
   EXPECT_CALL(
@@ -913,6 +911,8 @@ TEST_F(FilterTest, TestStats) {
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
   Buffer::OwnedImpl buffer;
   buffer.add("123");
+  // Mock response.
+  active_stream->onResponseStart(std::make_unique<FakeStreamCodecFactory::FakeResponse>());
   active_stream->onEncodingSuccess(buffer, true);
   EXPECT_EQ(1, filter_config_->stats().response_.value());
   EXPECT_EQ(0, filter_config_->stats().request_active_.value());

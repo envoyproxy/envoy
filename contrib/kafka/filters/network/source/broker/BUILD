@@ -27,11 +27,14 @@ envoy_cc_contrib_extension(
 
 envoy_cc_library(
     name = "filter_config_lib",
-    srcs = [],
+    srcs = [
+        "filter_config.cc",
+    ],
     hdrs = [
         "filter_config.h",
     ],
     deps = [
+        "//source/common/common:assert_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg_cc_proto",
     ],
 )
@@ -44,13 +47,27 @@ envoy_cc_library(
     ],
     deps = [
         ":filter_config_lib",
+        ":rewriter_lib",
         "//contrib/kafka/filters/network/source:kafka_metrics_lib",
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
         "//contrib/kafka/filters/network/source:kafka_response_codec_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
-        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "rewriter_lib",
+    srcs = ["rewriter.cc"],
+    hdrs = [
+        "rewriter.h",
+    ],
+    deps = [
+        ":filter_config_lib",
+        "//contrib/kafka/filters/network/source:kafka_response_codec_lib",
+        "//envoy/buffer:buffer_interface",
         "//source/common/common:minimal_logger_lib",
     ],
 )

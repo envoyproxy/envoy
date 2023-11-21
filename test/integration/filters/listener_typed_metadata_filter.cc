@@ -58,8 +58,8 @@ public:
   ListenerTypedMetadataFilterFactory() : EmptyHttpFilterConfig(std::string(kFilterName)) {}
 
 private:
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext& context) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext& context) override {
 
     // Main assertions to ensure the metadata from the listener was parsed correctly.
     const auto& typed_metadata = context.listenerTypedMetadata();

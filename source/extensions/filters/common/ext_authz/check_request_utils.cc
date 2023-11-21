@@ -192,6 +192,7 @@ void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::RequestHeaderMap& headers,
     Protobuf::Map<std::string, std::string>&& context_extensions,
     envoy::config::core::v3::Metadata&& metadata_context,
+    envoy::config::core::v3::Metadata&& route_metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
     bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
@@ -224,6 +225,7 @@ void CheckRequestUtils::createHttpCheck(
   // Fill in the context extensions and metadata context.
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);
   (*attrs->mutable_metadata_context()) = std::move(metadata_context);
+  (*attrs->mutable_route_metadata_context()) = std::move(route_metadata_context);
 }
 
 void CheckRequestUtils::createTcpCheck(

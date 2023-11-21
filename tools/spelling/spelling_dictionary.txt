@@ -262,6 +262,7 @@ integrations
 iouring
 jkl
 lang
+libcurl
 libsxg
 LLVM
 LPT
@@ -823,6 +824,7 @@ hostnames
 hostset
 hotrestart
 hrefs
+htpasswd
 huffman
 hystrix
 idempotency

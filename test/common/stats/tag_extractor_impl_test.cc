@@ -430,6 +430,13 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   redis_prefix.name_ = tag_names.REDIS_PREFIX;
   redis_prefix.value_ = "my_redis_prefix";
   regex_tester.testRegex("redis.my_redis_prefix.response", "redis.response", {redis_prefix});
+
+  // Dns Filter Prefix
+  Tag dns_filter_prefix;
+  dns_filter_prefix.name_ = tag_names.DNS_FILTER_PREFIX;
+  dns_filter_prefix.value_ = "my_dns_prefix";
+  regex_tester.testRegex("dns_filter.my_dns_prefix.local_a_record_answers",
+                         "dns_filter.local_a_record_answers", {dns_filter_prefix});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

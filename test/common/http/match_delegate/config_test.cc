@@ -21,7 +21,7 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
   }
-  Envoy::Http::FilterFactoryCb
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
     return [](auto& callbacks) {
@@ -96,7 +96,7 @@ xds_matcher:
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
       }));
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
-  cb(factory_callbacks);
+  cb.value()(factory_callbacks);
 }
 
 TEST(MatchWrapper, PerRouteConfig) {
@@ -180,7 +180,7 @@ matcher:
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
       }));
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
-  cb(factory_callbacks);
+  cb.value()(factory_callbacks);
 }
 
 TEST(MatchWrapper, QueryParamMatcherYaml) {
@@ -214,7 +214,7 @@ xds_matcher:
 
   MatchDelegateConfig match_delegate_config;
   auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
-  EXPECT_TRUE(cb);
+  EXPECT_TRUE(cb.value());
 }
 
 TEST(MatchWrapper, WithMatcherInvalidDataInput) {
@@ -248,7 +248,9 @@ xds_matcher:
 
   MatchDelegateConfig match_delegate_config;
   EXPECT_THROW_WITH_REGEX(
-      match_delegate_config.createFilterFactoryFromProto(config, "", factory_context),
+      match_delegate_config.createFilterFactoryFromProto(config, "", factory_context)
+          .status()
+          .IgnoreError(),
       EnvoyException,
       "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "
       "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput not permitted "

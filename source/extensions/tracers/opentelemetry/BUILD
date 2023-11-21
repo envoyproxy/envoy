@@ -42,6 +42,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
+        "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@opentelemetry_proto//:trace_cc_proto",
     ],

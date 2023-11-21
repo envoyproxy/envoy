@@ -29,7 +29,7 @@ public:
   }
 
   // Adds a mirror policy that routes to cluster_header or cluster_name, in that order. Additionally
-  // optionally registers an upstream filter on the cluster specified by
+  // optionally registers an upstream HTTP filter on the cluster specified by
   // cluster_with_custom_filter_.
   void initialConfigSetup(const std::string& cluster_name, const std::string& cluster_header) {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -510,6 +510,11 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = true;
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // With deferred processing, a local reply is triggered so the upstream
+    // stream will be incomplete.
+    autonomous_allow_incomplete_streams_ = true;
+  }
   cluster_with_custom_filter_ = 0;
   filter_name_ = "encoder-decoder-buffer-filter";
   initialConfigSetup("cluster_1", "");
@@ -537,7 +542,13 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // With deferred processing, the encoder-decoder-buffer-filter will
+    // buffer too much data triggering a local reply.
+    test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
+  } else {
+    test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
+  }
 }
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
@@ -783,7 +794,7 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithCluster) {
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
-// Test request mirroring / shadowing with upstream filters in the router.
+// Test request mirroring / shadowing with upstream HTTP filters in the router.
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithRouterUpstreamFilters) {
   initialConfigSetup("cluster_1", "");
   config_helper_.addConfigModifier(
@@ -811,7 +822,7 @@ TEST_P(ShadowPolicyIntegrationTest, ClusterFilterOverridesRouterFilter) {
   cluster_with_custom_filter_ = 0;
   filter_name_ = "add-body-filter";
 
-  // router filter upstream filter adds header:
+  // router filter upstream HTTP filter adds header:
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {

@@ -9,6 +9,7 @@ import io.envoyproxy.envoymobile.XdsBuilder
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.TestJni
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import org.junit.After
 import org.junit.Before
@@ -28,6 +29,8 @@ class XdsTest {
 
   @Before
   fun setUp() {
+    val upstreamCert: String =
+      File("../envoy/test/config/integration/certs/upstreamcacert.pem").readText()
     TestJni.initXdsTestServer()
     val latch = CountDownLatch(1)
     engine =
@@ -39,6 +42,7 @@ class XdsTest {
               TestJni.getXdsTestServerHost(),
               TestJni.getXdsTestServerPort(),
             )
+            .setSslRootCerts(upstreamCert)
             .addClusterDiscoveryService()
         )
         .build()

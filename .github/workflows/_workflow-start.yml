@@ -19,17 +19,18 @@ jobs:
   start:
     runs-on: ubuntu-22.04
     permissions:
+      contents: read
       statuses: write
     steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/env
       id: env
       with:
-        check_mobile_run: false
+        check-mobile-run: false
 
     - if: ${{ steps.env.outputs.trusted != 'true' }}
       name: Start status check
-      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.1.2
+      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.1.8
       with:
         authToken: ${{ secrets.GITHUB_TOKEN }}
         context: ${{ inputs.workflow_name }}
