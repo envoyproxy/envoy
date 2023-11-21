@@ -11,14 +11,11 @@ namespace {
 
 void addAttributes(const std::string& content, Resource& resource) {
   for (const auto& line : StringUtil::splitToken(content, "\n", false, true)) {
-    const auto keyValue = StringUtil::splitToken(line, "=");
-    if (keyValue.size() != 2) {
+    const auto key_value = StringUtil::splitToken(line, "=");
+    if (key_value.size() != 2) {
       continue;
     }
-
-    const std::string key = std::string(keyValue[0]);
-    const std::string value = std::string(keyValue[1]);
-    resource.attributes_[key] = value;
+    resource.attributes_[std::string(key_value[0])] = std::string(key_value[1]);
   }
 }
 
@@ -27,21 +24,21 @@ void addAttributes(const std::string& content, Resource& resource) {
 Resource DynatraceResourceDetector::detect() {
   Resource resource;
   resource.schemaUrl_ = "";
-  int failureCount = 0;
+  int failure_count = 0;
 
   for (const auto& file_name : DynatraceResourceDetector::dynatraceMetadataFiles()) {
     TRY_NEEDS_AUDIT {
       std::string content = dynatrace_file_reader_->readEnrichmentFile(file_name);
       if (content.empty()) {
-        failureCount++;
+        failure_count++;
       } else {
         addAttributes(content, resource);
       }
     }
-    END_TRY catch (const EnvoyException&) { failureCount++; }
+    END_TRY catch (const EnvoyException&) { failure_count++; }
   }
 
-  if (failureCount > 0) {
+  if (failure_count > 0) {
     ENVOY_LOG(
         warn,
         "Dynatrace OpenTelemetry resource detector is configured but could not detect attributes. "
