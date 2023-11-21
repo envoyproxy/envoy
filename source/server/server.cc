@@ -43,6 +43,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/thread_local_store.h"
@@ -902,7 +903,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
           Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
-      !instance.runtime().snapshot().get("overload.global_downstream_max_connections")) {
+      !instance.runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
                     "connections. Configure a "
                     "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
