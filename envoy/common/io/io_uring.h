@@ -194,7 +194,7 @@ enum IoUringSocketStatus {
 /**
  * A callback will be invoked when a close requested done on the socket.
  */
-using IoUringSocketOnClosedCb = std::function<void()>;
+using IoUringSocketOnClosedCb = std::function<void(Buffer::Instance& read_buffer)>;
 
 /**
  * The data returned from the read request.

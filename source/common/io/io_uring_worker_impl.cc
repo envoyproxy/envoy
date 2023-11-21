@@ -595,7 +595,7 @@ void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected
 void IoUringServerSocket::closeInternal() {
   if (keep_fd_open_) {
     if (on_closed_cb_) {
-      on_closed_cb_();
+      on_closed_cb_(read_buf_);
     }
     cleanup();
     return;
