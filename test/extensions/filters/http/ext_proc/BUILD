@@ -141,6 +141,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",

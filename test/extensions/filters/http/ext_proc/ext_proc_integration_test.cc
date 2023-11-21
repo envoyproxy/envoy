@@ -11,6 +11,7 @@
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
+#include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -48,6 +49,7 @@ struct ConfigOptions {
   bool valid_grpc_server = true;
   bool add_logging_filter = false;
   bool http1_codec = false;
+  bool add_metadata = false;
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -135,6 +137,33 @@ protected:
       config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                         deferredProcessing() ? "true" : "false");
     });
+    if (config_option.add_metadata) {
+      config_helper_.addConfigModifier(
+          [](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+            hcm) {
+        const std::string yaml = R"EOF(
+  filter_metadata:
+    receiving_ns_untyped:
+      data: request
+    forwarding_ns_untyped:
+      data: request
+  typed_filter_metadata:
+    forwarding_ns_typed:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: request_typed
+  )EOF";
+
+        envoy::config::core::v3::Metadata dynamic_metadata;
+        TestUtility::loadFromYaml(yaml, dynamic_metadata);
+        *(hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_metadata()) = dynamic_metadata;
+
+        std::cout << "added " << dynamic_metadata.DebugString() << std::endl;
+    });
+    }
 
     if (config_option.http1_codec) {
       setUpstreamProtocol(Http::CodecType::HTTP1);
@@ -251,7 +280,7 @@ protected:
 
   void processRequestHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&, const envoy::config::core::v3::Metadata&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -264,7 +293,7 @@ protected:
     }
     ProcessingResponse response;
     auto* headers = response.mutable_request_headers();
-    const bool sendReply = !cb || (*cb)(request.request_headers(), *headers);
+    const bool sendReply = !cb || (*cb)(request.request_headers(), *headers, request.metadata_context());
     if (sendReply) {
       processor_stream_->sendGrpcMessage(response);
     }
@@ -424,7 +453,7 @@ protected:
     auto response = sendDownstreamRequest(absl::nullopt);
 
     processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                                 [&](const HttpHeaders&, HeadersResponse&) {
+                                 [&](const HttpHeaders&, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                    serverSendNewTimeout(timeout_ms);
                                    // ext_proc server stays idle for 300ms before sending back the
                                    // response.
@@ -454,7 +483,7 @@ protected:
 
     auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
     processRequestHeadersMessage(
-        *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
           auto* content_length =
               headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
           content_length->mutable_header()->set_key("content-length");
@@ -588,7 +617,8 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithLogging) {
   verifyDownstreamResponse(*response, 500);
 }
 
-// Test the filter connecting to an invalid ext_proc server that will result in open stream failure.
+// Test the filter connecting to an invalid ext_proc server that will result in open stream
+// failure.
 TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidServer) {
   ConfigOptions config_option = {};
   config_option.valid_grpc_server = false;
@@ -719,7 +749,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         Http::TestRequestHeaderMapImpl expected_request_headers{
             {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
             {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
@@ -762,7 +792,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersWithLogging) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
@@ -802,7 +832,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
   });
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         Http::TestRequestHeaderMapImpl expected_request_headers{
             {":scheme", "http"},
             {":method", "GET"},
@@ -857,10 +887,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
   });
 
   // Verify the encoded non-utf8 character is received by the server as it is. Then send back a
-  // response with non-utf8 character in the header value, and verify it is received by Envoy as it
-  // is.
+  // response with non-utf8 character in the header value, and verify it is received by Envoy as
+  // it is.
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         Http::TestRequestHeaderMapImpl expected_request_headers{
             {":scheme", "http"},
             {":method", "GET"},
@@ -907,7 +937,7 @@ TEST_P(ExtProcIntegrationTest, BothValueAndValueBytesAreSetInHeaderValueWrong) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
@@ -928,7 +958,7 @@ TEST_P(ExtProcIntegrationTest, GetBufferedButNoBodies) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_TRUE(headers.end_of_stream());
                                  return true;
                                });
@@ -1087,7 +1117,7 @@ TEST_P(ExtProcIntegrationTest, MismatchedContentLengthAndBodyLength) {
   // The content_length set by ext_proc server doesn't match the length of mutated body.
   int set_content_length = modified_body.size() - 2;
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [&](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [&](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
@@ -1486,7 +1516,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBoth) {
   auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
@@ -1912,7 +1942,7 @@ TEST_P(ExtProcIntegrationTest, ConvertGetToPost) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         auto* header_mut = headers_resp.mutable_response()->mutable_header_mutation();
         auto* method = header_mut->add_set_headers();
         method->mutable_header()->set_key(":method");
@@ -1946,7 +1976,7 @@ TEST_P(ExtProcIntegrationTest, ReplaceCompleteRequest) {
   auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
         // This special status tells us to replace the whole request
         headers_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
@@ -1972,7 +2002,7 @@ TEST_P(ExtProcIntegrationTest, ReplaceCompleteRequestBuffered) {
   auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
         // This special status tells us to replace the whole request
         headers_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
@@ -2001,7 +2031,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [this](const HttpHeaders&, HeadersResponse&) {
+                               [this](const HttpHeaders&, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  // Travel forward 400 ms
                                  timeSystem().advanceTimeWaitImpl(400ms);
                                  return false;
@@ -2020,7 +2050,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [this](const HttpHeaders&, HeadersResponse&) {
+                               [this](const HttpHeaders&, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  // Travel forward 400 ms
                                  timeSystem().advanceTimeWaitImpl(400ms);
                                  return false;
@@ -2082,7 +2112,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutIgnoreError) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [this](const HttpHeaders&, HeadersResponse&) {
+                               [this](const HttpHeaders&, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  // Travel forward 400 ms
                                  timeSystem().advanceTimeWaitImpl(400ms);
                                  return false;
@@ -2150,7 +2180,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBody) {
   auto response = sendDownstreamRequestWithBody("", absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_FALSE(headers.end_of_stream());
                                  return true;
                                });
@@ -2195,7 +2225,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetWithEmptyResponseBody) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_TRUE(headers.end_of_stream());
                                  return true;
                                });
@@ -2228,7 +2258,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetWithNoResponseBody) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_TRUE(headers.end_of_stream());
                                  return true;
                                });
@@ -2254,7 +2284,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBodyStreamed) {
   auto response = sendDownstreamRequestWithBody("", absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_FALSE(headers.end_of_stream());
                                  return true;
                                });
@@ -2280,7 +2310,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBodyBufferedPartia
   auto response = sendDownstreamRequestWithBody("", absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_FALSE(headers.end_of_stream());
                                  return true;
                                });
@@ -2306,7 +2336,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBody) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_TRUE(headers.end_of_stream());
                                  return true;
                                });
@@ -2326,7 +2356,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBodyStreaming) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_TRUE(headers.end_of_stream());
                                  return true;
                                });
@@ -2346,7 +2376,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBodyBufferedPartial
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_TRUE(headers.end_of_stream());
                                  return true;
                                });
@@ -2365,7 +2395,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithRequestBody) {
   auto response = sendDownstreamRequestWithBody("Testing", absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_FALSE(headers.end_of_stream());
                                  return true;
                                });
@@ -2542,7 +2572,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
 
   // ext_proc server request processing.
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [this](const HttpHeaders& headers, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         Http::TestRequestHeaderMapImpl expected_request_headers{
             {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
             {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
@@ -2597,7 +2627,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNewTimeoutNoMutation) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [this](const HttpHeaders&, HeadersResponse&) {
+                               [this](const HttpHeaders&, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  // Sending the new timeout API to extend the timeout.
                                  serverSendNewTimeout(TestUtility::DefaultTimeout.count());
                                  // ext_proc server stays idle for 300ms before sending back the
@@ -2629,7 +2659,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [this](const HttpHeaders&, HeadersResponse&) {
+                               [this](const HttpHeaders&, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  // Sending the new big timeout API to extend the timeout.
                                  serverSendNewTimeout(TestUtility::DefaultTimeout.count());
                                  // Server wait for 100ms.
@@ -2756,7 +2786,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithAllowedHeader) {
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
         Http::TestRequestHeaderMapImpl expected_request_headers{{":method", "GET"},
                                                                 {":authority", "host"}};
         // Verify only allowed request headers is received by ext_proc server.
@@ -2814,7 +2844,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithDisallowedHeader) 
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
         Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
                                                                 {":path", "/"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
@@ -2879,7 +2909,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithBothAllowedAndDisa
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
         Http::TestRequestHeaderMapImpl expected_request_headers{{":authority", "host"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
         return true;
@@ -2916,7 +2946,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
 
   auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
@@ -3000,7 +3030,7 @@ TEST_P(ExtProcIntegrationTest, HeaderMutationCheckPassWithHcmSizeConfig) {
   Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& header_resp) {
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& header_resp, const envoy::config::core::v3::Metadata&) {
         addMutationSetHeaders(20, *header_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
@@ -3052,7 +3082,7 @@ TEST_P(ExtProcIntegrationTest, SetHeaderMutationFailWithRequestHeader) {
 
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse& headers_resp, const envoy::config::core::v3::Metadata&) {
         // The set header count 60 > HCM limit 50.
         addMutationSetHeaders(60, *headers_resp.mutable_response()->mutable_header_mutation());
         return true;
@@ -3060,7 +3090,8 @@ TEST_P(ExtProcIntegrationTest, SetHeaderMutationFailWithRequestHeader) {
   verifyDownstreamResponse(*response, 500);
 }
 
-// ext_proc server remove_header count exceeds the HCM limit when responding to the response header.
+// ext_proc server remove_header count exceeds the HCM limit when responding to the response
+// header.
 TEST_P(ExtProcIntegrationTest, RemoveHeaderMutationFailWithResponseHeader) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   initializeConfig();
@@ -3243,7 +3274,7 @@ TEST_P(ExtProcIntegrationTest, ClientNoTrailerProcessingModeSendTrailer) {
   codec_client_->sendData(*request_encoder_, 10, true);
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [](const HttpHeaders& headers, HeadersResponse&) {
+                               [](const HttpHeaders& headers, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
                                  EXPECT_FALSE(headers.end_of_stream());
                                  return true;
                                });
@@ -3326,7 +3357,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& req, HeadersResponse&) {
+      *grpc_upstreams_[0], true, [](const HttpHeaders& req, HeadersResponse&, const envoy::config::core::v3::Metadata&) {
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
         EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
@@ -3351,4 +3382,38 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
 }
 #endif
 
+TEST_P(ExtProcIntegrationTest, SendDynamicMetadata) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  auto* md_opts = proto_config_.mutable_metadata_options();
+  md_opts->mutable_forwarding_namespaces()->add_untyped("forwarding_ns_untyped");
+  md_opts->mutable_forwarding_namespaces()->add_typed("forwarding_ns_typed");
+  md_opts->mutable_receiving_namespaces()->add_untyped("receiving_ns_untyped");
+
+  ConfigOptions config_option = {};
+  config_option.add_metadata = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  std::cout << "envoy run with bootstrap:\n" << config_helper_.bootstrap().DebugString() << std::endl;
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& /*resp*/, const envoy::config::core::v3::Metadata& md) {
+        EXPECT_EQ(1, md.filter_metadata().size());
+        auto proto_struct = md.filter_metadata().at("forwarding_ns_untyped");
+        EXPECT_EQ("request", proto_struct.fields().at("data").string_value());
+
+        EXPECT_EQ(1, md.typed_filter_metadata().size());
+        helloworld::HelloRequest hello;
+        md.typed_filter_metadata().at("forwarding_ns_typed").UnpackTo(&hello);
+        EXPECT_EQ("request_typed", hello.name());
+
+        /* resp.dynamic_metadata */
+        return true;
+      });
+
+  handleUpstreamRequest();
+
+  verifyDownstreamResponse(*response, 200);
+}
 } // namespace Envoy
