@@ -102,9 +102,9 @@ public:
         Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig<FormatterContext>(
             sff_config, factory_context_);
 
-    return std::make_shared<FileAccessLog>(Filesystem::FilePathAndType{}, nullptr,
-                                           std::move(formatter),
-                                           factory_context_.accessLogManager());
+    return std::make_shared<FileAccessLog>(
+        Filesystem::FilePathAndType{}, nullptr, std::move(formatter),
+        factory_context_.server_factory_context_.accessLogManager());
   }
 
   std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_;
