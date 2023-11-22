@@ -593,6 +593,12 @@ bool WebIdentityCredentialsProvider::needsRefresh() {
 }
 
 void WebIdentityCredentialsProvider::refresh() {
+  // If http async client is not enabled then just set empty credentials and return.
+  if (!useHttpAsyncClient()) {
+    cached_credentials_ = Credentials();
+    return;
+  }
+
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
 
   const auto web_token_file_or_error = api_.fileSystem().fileReadToEnd(token_file_path_);
@@ -729,8 +735,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     ENVOY_LOG(debug, "Not using credential file credentials provider because it is not enabled");
   }
 
-  // WebIdentityCredentialsProvider can be used only if libcurl feature flag is disabled.
-  if (useHttpAsyncClient() && context) {
+  // WebIdentityCredentialsProvider can be used only if `context` is supplied which is required to
+  // use http async http client to make http calls to fetch the credentials.
+  if (context) {
     const auto web_token_path = absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE));
     const auto role_arn = absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN));
     if (!web_token_path.empty() && !role_arn.empty()) {

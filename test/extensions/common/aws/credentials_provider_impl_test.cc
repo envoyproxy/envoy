@@ -473,7 +473,6 @@ public:
         }));
   }
 
-  TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
@@ -1502,7 +1501,6 @@ public:
         }));
   }
 
-  TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
@@ -2058,7 +2056,7 @@ public:
         }));
   }
 
-  TestScopedRuntime scoped_runtime;
+  TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
@@ -2481,6 +2479,23 @@ TEST_F(WebIdentityCredentialsProviderTest, TimestampCredentialExpiration) {
   EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
   EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
   EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
+}
+
+TEST_F(WebIdentityCredentialsProviderTest, LibcurlEnabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials", "true"}});
+  setupProvider();
+  // Won't call fetch or cancel on metadata fetcher.
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+
+  // Below line is not testing anything, will just avoid asan failure with memory leak.
+  metadata_fetcher_.reset(raw_metadata_fetcher_);
 }
 
 class DefaultCredentialsProviderChainTest : public testing::Test {
