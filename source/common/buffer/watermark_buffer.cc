@@ -233,8 +233,10 @@ uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
       ++num_streams_reset;
     }
   }
-  ENVOY_LOG_MISC(warn, "resetting {} streams in {} buckets, {} empty buckets", num_streams_reset,
-                 num_buckets_reset, buckets_to_clear - num_buckets_reset);
+  if (num_buckets_reset > 0) {
+    ENVOY_LOG_MISC(warn, "resetting {} streams in {} buckets, {} empty buckets", num_streams_reset,
+                   num_buckets_reset, buckets_to_clear - num_buckets_reset);
+  }
   return num_streams_reset;
 }
 

@@ -528,6 +528,8 @@ TEST(WatermarkBufferFactoryTest, ShouldOnlyResetAllStreamsGreatThanOrEqualToProv
   // Should call resetStream on all streams in bucket >= 1.
   EXPECT_LOG_CONTAINS("warn", "resetting 2 streams in 2 buckets, 5 empty buckets",
                       EXPECT_EQ(factory.resetAccountsGivenPressure(0.85), 2));
+  EXPECT_LOG_NOT_CONTAINS("warn", "resetting",
+                          EXPECT_EQ(factory.resetAccountsGivenPressure(0.85), 0));
 
   account_to_not_reset->credit(kMinimumBalanceToTrack);
   account_to_not_reset->clearDownstream();
