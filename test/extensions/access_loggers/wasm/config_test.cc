@@ -11,6 +11,7 @@
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -33,7 +34,8 @@ protected:
   WasmAccessLogConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(context_, scope()).WillByDefault(ReturnRef(scope_));
-    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+    ON_CALL(context_, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
+    ON_CALL(listener_info_, metadata()).WillByDefault(ReturnRef(listener_metadata_));
     ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -52,6 +54,7 @@ protected:
     }));
   }
 
+  NiceMock<Network::MockListenerInfo> listener_info_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& scope_{*stats_store_.rootScope()};

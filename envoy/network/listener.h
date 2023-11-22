@@ -516,5 +516,38 @@ using UdpListenerWorkerRouterPtr = std::unique_ptr<UdpListenerWorkerRouter>;
  */
 class ListenerTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+/**
+ * Description of the listener.
+ */
+class ListenerInfo {
+public:
+  virtual ~ListenerInfo() = default;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
+   * listener.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this listener.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
+   * the local proxy.
+   */
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
+
+  /**
+   * @return whether the listener is a Quic listener.
+   */
+  virtual bool isQuic() const PURE;
+};
+
+using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;
+
 } // namespace Network
 } // namespace Envoy

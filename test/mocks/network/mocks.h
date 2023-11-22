@@ -728,5 +728,13 @@ public:
   const std::vector<Address::IpVersion> versions_;
 };
 
+class MockListenerInfo : public ListenerInfo {
+public:
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata,(), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata,(), (const));
+  MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction,(), (const));
+  MOCK_METHOD(bool, isQuic, (), (const));
+};
+
 } // namespace Network
 } // namespace Envoy

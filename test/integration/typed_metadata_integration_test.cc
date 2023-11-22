@@ -54,10 +54,10 @@ public:
       const Protobuf::Message&, AccessLog::FilterPtr&&,
       Server::Configuration::ListenerAccessLogFactoryContext& context) override {
     // Check that expected listener metadata is present
-    EXPECT_EQ(1, context.listenerMetadata().typed_filter_metadata().size());
+    EXPECT_EQ(1, context.listenerInfo().metadata().typed_filter_metadata().size());
     const auto iter =
-        context.listenerMetadata().typed_filter_metadata().find("test.listener.typed.metadata");
-    EXPECT_NE(iter, context.listenerMetadata().typed_filter_metadata().end());
+        context.listenerInfo().metadata().typed_filter_metadata().find("test.listener.typed.metadata");
+    EXPECT_NE(iter, context.listenerInfo().metadata().typed_filter_metadata().end());
     return std::make_shared<NiceMock<MockAccessLog>>();
   }
 

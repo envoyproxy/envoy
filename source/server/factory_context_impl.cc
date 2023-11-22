@@ -48,11 +48,7 @@ Configuration::TransportSocketFactoryContext&
 FactoryContextImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
-const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
-  return config_.metadata();
-}
-const Envoy::Config::TypedMetadata& FactoryContextImpl::listenerTypedMetadata() const {
-  // TODO(nareddyt): Needs an implementation for this context. Currently not used.
+const Network::ListenerInfo& FactoryContextImpl::listenerInfo() const {
   PANIC("not implemented");
 }
 envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const {

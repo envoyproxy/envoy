@@ -41,9 +41,8 @@ public:
   ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
+  const Network::ListenerInfo& listenerInfo() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;

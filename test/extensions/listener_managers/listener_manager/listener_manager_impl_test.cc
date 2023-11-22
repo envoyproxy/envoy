@@ -5680,7 +5680,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   ASSERT_NE(nullptr, listener_factory_context);
   EXPECT_EQ("test_value", Config::Metadata::metadataValue(
-                              &listener_factory_context->listenerMetadata(), "com.bar.foo", "baz")
+                              &listener_factory_context->listenerInfo().metadata(), "com.bar.foo", "baz")
                               .string_value());
   EXPECT_EQ(envoy::config::core::v3::INBOUND, listener_factory_context->direction());
 #endif
@@ -5781,8 +5781,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_EQ(&listener_factory_context->routerContext(), &parent_context.routerContext());
   EXPECT_EQ(&listener_factory_context->overloadManager(), &parent_context.overloadManager());
   EXPECT_EQ(listener_factory_context->admin().has_value(), parent_context.admin().has_value());
-  EXPECT_EQ(&listener_factory_context->listenerTypedMetadata(),
-            &parent_context.listenerTypedMetadata());
   EXPECT_EQ(listener_factory_context->processContext().has_value(),
             parent_context.processContext().has_value());
   EXPECT_EQ(&listener_factory_context->getTransportSocketFactoryContext(),

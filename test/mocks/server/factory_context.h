@@ -41,9 +41,8 @@ public:
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(bool, isQuicListener, (), (const));
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
-  MOCK_METHOD(const Envoy::Config::TypedMetadata&, listenerTypedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
+  MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
 
   MOCK_METHOD(const Network::ListenerConfig&, listenerConfig, (), (const));

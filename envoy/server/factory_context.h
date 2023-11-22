@@ -209,16 +209,15 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
-
-  /**
    * @return ProcessContextOptRef an optional reference to the
    * process context. Will be unset when running in validation mode.
    */
   virtual ProcessContextOptRef processContext() PURE;
+
+  /**
+   * @return ListenerInfoConstSharedPtr description of the listener.
+   */
+  virtual const Network::ListenerInfo& listenerInfo() const PURE;
 };
 
 /**
@@ -261,12 +260,6 @@ public:
    * @return bool if these filters are created under the scope of a Quic listener.
    */
   virtual bool isQuicListener() const PURE;
-
-  /**
-   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
-   * for this listener.
-   */
-  virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.
