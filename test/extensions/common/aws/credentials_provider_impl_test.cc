@@ -2619,7 +2619,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
-  time_system_.setSystemTime(std::chrono::nanoseconds(1234567890000000));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567890));
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_,
               createWebIdentityCredentialsProvider(

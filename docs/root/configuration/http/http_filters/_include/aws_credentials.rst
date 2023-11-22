@@ -16,7 +16,7 @@ secret access key (the session token is optional).
    variable and role arn read from ``AWS_ROLE_ARN`` environment variable. The credentials are extracted from the fields ``AccessKeyId``,
    ``SecretAccessKey``, and ``SessionToken`` are used, and credentials are cached for 1 hour or until they expire (according to the field
    ``Expiration``). This credentials provider will not be enabled if ``envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials`` is
-    set to ``true``.
+   set to ``true``.
 
 4. Either EC2 instance metadata or ECS task metadata. For EC2 instance metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and
    ``Token`` are used, and credentials are cached for 1 hour. For ECS task metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and
