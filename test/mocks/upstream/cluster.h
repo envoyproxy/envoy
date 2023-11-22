@@ -25,6 +25,8 @@ public:
   MOCK_METHOD(InitializePhase, initializePhase, (), (const));
   MOCK_METHOD(PrioritySet&, prioritySet, ());
   MOCK_METHOD(const PrioritySet&, prioritySet, (), (const));
+  MOCK_METHOD(UnitFloat, dropOverload, (), (const));
+  MOCK_METHOD(void, setDropOverload, (UnitFloat));
 
   std::shared_ptr<MockClusterInfo> info_{new ::testing::NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;

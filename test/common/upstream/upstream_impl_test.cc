@@ -211,6 +211,52 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
+
+TEST_P(StrictDnsParamTest, DropOverLoadConfigTest) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 10
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(Network::DnsResolver::ResolutionStatus::Success,
+           TestUtility::makeDnsResponse(std::get<2>(GetParam())));
+        return nullptr;
+      }));
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
+
+  cluster.initialize([&]() -> void { initialized.ready(); });
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0.1f, cluster.dropOverload().value());
+}
+
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
 protected:
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_ =

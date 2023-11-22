@@ -1179,11 +1179,6 @@ public:
   virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
-   * @return cluster drop_overload configuration in UnitFloat.
-   */
-  virtual UnitFloat dropOverload() const PURE;
-
-  /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
   virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
@@ -1345,6 +1340,16 @@ public:
    * @return the const PrioritySet for the cluster.
    */
   virtual const PrioritySet& prioritySet() const PURE;
+
+  /**
+   * @return the cluster drop_overload configuration.
+   */
+  virtual UnitFloat dropOverload() const PURE;
+
+  /**
+   * Set up the drop_overload value for the cluster.
+   */
+  virtual void setDropOverload(UnitFloat drop_overload) PURE;
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;

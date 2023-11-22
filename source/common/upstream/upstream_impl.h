@@ -982,8 +982,6 @@ public:
 
   bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
 
-  UnitFloat dropOverload() const override { return drop_overload_; }
-
   UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }
@@ -1157,7 +1155,6 @@ private:
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
-  UnitFloat drop_overload_{0};
 };
 
 /**
@@ -1222,6 +1219,8 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
+  UnitFloat dropOverload() const override { return drop_overload_; }
+  void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
 
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
@@ -1286,6 +1285,7 @@ private:
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
+  UnitFloat drop_overload_{0};
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

@@ -1085,13 +1085,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       added_via_api_(added_via_api), has_configured_http_filters_(false),
       per_endpoint_stats_(config.has_track_cluster_stats() &&
                           config.track_cluster_stats().per_endpoint_stats()) {
-  auto drop_overload = config.load_assignment().policy().drop_overloads();
-  if (drop_overload.size() > 0) {
-    // Only support the first drop_overload category configuration.
-    // The rest will be ignored.
-    auto drop_percentage = drop_overload[0].drop_percentage();
-    drop_overload_ = UnitFloat(drop_percentage.numerator() / drop_percentage.denominator());
-  }
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(
@@ -1528,6 +1521,37 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         info_->endpointStats().membership_degraded_.set(degraded_hosts);
         info_->endpointStats().membership_excluded_.set(excluded_hosts);
       });
+
+  if (cluster.load_assignment().has_policy()) {
+    auto policy = cluster.load_assignment().policy();
+    if (policy.drop_overloads().size() > 0) {
+      if (policy.drop_overloads().size() > 1) {
+        throwEnvoyExceptionOrPanic(
+            fmt::format("Only one drop_overload category configuration is supported. This cluster {} has {} configured",
+                      cluster.name(), policy.drop_overloads().size()));
+      } else {
+        auto drop_percentage = policy.drop_overloads(0).drop_percentage();
+        float denominator;
+        switch (drop_percentage.denominator()) {
+          case envoy::type::v3::FractionalPercent::HUNDRED:
+            denominator = 100;
+            break;
+          case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
+            denominator = 10000;
+            break;
+          case envoy::type::v3::FractionalPercent::MILLION:
+            denominator = 1000000;
+            break;
+          default:
+            throwEnvoyExceptionOrPanic(
+                fmt::format("DROP_OVERLOAD denominator config is missing in the cluster {}.",
+                            cluster.name()));
+            break;
+        }
+        drop_overload_ = UnitFloat(float(drop_percentage.numerator()) / (denominator));
+      }
+    }
+  }
 }
 
 namespace {

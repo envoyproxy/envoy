@@ -76,7 +76,8 @@ message ClusterLoadAssignment {
     //    actual_outgoing_load = 20% // remaining after applying all categories.
     //
     // There are issues to support multiple categories at same time. It is decided
-    // to only support the first category. The rest will be enforced.
+    // to only support one category at this moment. If there are more than one category
+    // configured, the configuration will be rejected.
     repeated DropOverload drop_overloads = 2;
 
     // Priority levels and localities are considered overprovisioned with this
