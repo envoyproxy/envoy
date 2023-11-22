@@ -46,7 +46,7 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), makeOptRef(context.getServerFactoryContext()),
+          context.api(), makeOptRef(context.getServerFactoryContext()), region,
           Extensions::Common::Aws::Utility::fetchMetadata);
 
   auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(

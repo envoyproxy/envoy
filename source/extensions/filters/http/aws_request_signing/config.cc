@@ -21,7 +21,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), makeOptRef(context.getServerFactoryContext()),
+          context.api(), makeOptRef(context.getServerFactoryContext()), config.region(),
           Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigV4HeaderExclusionVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
@@ -43,7 +43,8 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), makeOptRef(context), Extensions::Common::Aws::Utility::fetchMetadata);
+          context.api(), makeOptRef(context), per_route_config.aws_request_signing().region(),
+          Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigV4HeaderExclusionVector(
       per_route_config.aws_request_signing().match_excluded_headers().begin(),
       per_route_config.aws_request_signing().match_excluded_headers().end());
