@@ -767,7 +767,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
   EXPECT_CALL(
-      *factory_context_.access_log_manager_.file_,
+      *factory_context_.server_factory_context_.access_log_manager_.file_,
       write("host-value /path-value method-value protocol-value request-value response-value -"));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
