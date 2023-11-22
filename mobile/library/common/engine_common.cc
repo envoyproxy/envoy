@@ -2,6 +2,7 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/server/null_overload_manager.h"
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
 
@@ -54,6 +55,15 @@ void registerMobileProtoDescriptors() {
 
 namespace Envoy {
 
+class ServerLite : public Server::InstanceBase {
+public:
+  using Server::InstanceBase::InstanceBase;
+  void maybeCreateHeapShrinker() override {}
+  std::unique_ptr<Envoy::Server::OverloadManager> createOverloadManager() override {
+    return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
+  }
+};
+
 EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
     : options_(std::move(options)) {
 
@@ -69,9 +79,8 @@ EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
          ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
          Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
          Buffer::WatermarkFactorySharedPtr watermark_factory) {
-        // TODO(alyssawilk) use InstanceLite not InstanceImpl.
         auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
-        auto server = std::make_unique<Server::InstanceImpl>(
+        auto server = std::make_unique<ServerLite>(
             init_manager, options, time_system, hooks, restarter, store, access_log_lock,
             std::move(random_generator), tls, thread_factory, file_system,
             std::move(process_context), watermark_factory);

@@ -32,7 +32,6 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/init/manager_impl.h"
-#include "source/common/memory/heap_shrinker.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
@@ -45,7 +44,6 @@
 #endif
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/overload_manager_impl.h"
 #include "source/server/worker_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -149,7 +147,7 @@ public:
 };
 
 /**
- * This is a helper used by InstanceImpl::run() on the stack. It's broken out to make testing
+ * This is a helper used by InstanceBase::run() on the stack. It's broken out to make testing
  * easier.
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
@@ -193,12 +191,15 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   Api::Api& api() override { return server_.api(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
+  OverloadManager& overloadManager() override { return server_.overloadManager(); }
+  bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
@@ -223,16 +224,17 @@ private:
 };
 
 /**
- * This is the actual full standalone server which stitches together various common components.
+ * This is the base class for the standalone server which stitches together various common
+ * components. Some components are optional (so PURE) and can be created or not by subclasses.
  */
-class InstanceImpl final : Logger::Loggable<Logger::Id::main>,
-                           public Instance,
-                           public ServerLifecycleNotifier {
+class InstanceBase : Logger::Loggable<Logger::Id::main>,
+                     public Instance,
+                     public ServerLifecycleNotifier {
 public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
+  InstanceBase(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
                ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
@@ -243,7 +245,10 @@ public:
   // initialize the server. This must be called before run().
   void initialize(Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
-  ~InstanceImpl() override;
+  ~InstanceBase() override;
+
+  virtual void maybeCreateHeapShrinker() PURE;
+  virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
 
   void run() override;
 
@@ -389,14 +394,13 @@ private:
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
-  std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  std::unique_ptr<OverloadManager> overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
-  std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;

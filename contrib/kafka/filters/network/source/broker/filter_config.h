@@ -1,7 +1,8 @@
 #pragma once
 
-#include "source/common/common/assert.h"
+#include <utility>
 
+#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.h"
 #include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.validate.h"
 
@@ -13,26 +14,55 @@ namespace Broker {
 
 using KafkaBrokerProtoConfig = envoy::extensions::filters::network::kafka_broker::v3::KafkaBroker;
 
-// Minor helper structure that contains broker filter configuration.
-struct BrokerFilterConfig {
+using HostAndPort = std::pair<std::string, uint32_t>;
 
-  BrokerFilterConfig(const KafkaBrokerProtoConfig& proto_config)
-      : BrokerFilterConfig{proto_config.stat_prefix(), proto_config.force_response_rewrite()} {}
+// Represents a rule matching a broker with given id.
+struct RewriteRule {
+
+  uint32_t id_;
+
+  std::string host_;
+  uint32_t port_;
+
+  RewriteRule(const uint32_t id, const std::string host, const uint32_t port)
+      : id_{id}, host_{host}, port_{port} {};
+
+  bool matches(const uint32_t broker_id) const { return id_ == broker_id; }
+};
+
+// Minor helper object that contains broker filter configuration.
+class BrokerFilterConfig {
+public:
+  virtual ~BrokerFilterConfig() = default;
+
+  BrokerFilterConfig(const KafkaBrokerProtoConfig& proto_config);
 
   // Visible for testing.
-  BrokerFilterConfig(const std::string& stat_prefix, bool force_response_rewrite)
-      : stat_prefix_{stat_prefix}, force_response_rewrite_{force_response_rewrite} {
-    ASSERT(!stat_prefix_.empty());
-  };
+  BrokerFilterConfig(const std::string& stat_prefix, const bool force_response_rewrite,
+                     const std::vector<RewriteRule>& broker_address_rewrite_rules);
+
+  /**
+   * Returns the prefix for stats.
+   */
+  virtual const std::string& stat_prefix() const;
 
   /**
    * Whether this configuration means that rewrite should be happening.
    */
-  bool needsResponseRewrite() const { return force_response_rewrite_; }
+  virtual bool needsResponseRewrite() const;
 
+  /**
+   * Returns override address for a broker.
+   */
+  virtual absl::optional<HostAndPort> findBrokerAddressOverride(const uint32_t broker_id) const;
+
+private:
   std::string stat_prefix_;
   bool force_response_rewrite_;
+  std::vector<RewriteRule> broker_address_rewrite_rules_;
 };
+
+using BrokerFilterConfigSharedPtr = std::shared_ptr<BrokerFilterConfig>;
 
 } // namespace Broker
 } // namespace Kafka

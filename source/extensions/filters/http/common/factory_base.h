@@ -58,13 +58,14 @@ protected:
 
   const std::string name_;
 };
+
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
 class FactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
                     public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
   FactoryBase(const std::string& name) : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
-  Envoy::Http::FilterFactoryCb
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
@@ -96,6 +97,27 @@ public:
 };
 
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
+class ExceptionFreeFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                                 public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  ExceptionFreeFactoryBase(const std::string& name)
+      : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                                 proto_config, context.messageValidationVisitor()),
+                                             stats_prefix, context);
+  }
+  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                    const std::string& stats_prefix,
+                                    Server::Configuration::FactoryContext& context) PURE;
+};
+
+template <class ConfigProto, class RouteConfigProto = ConfigProto>
 class DualFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
                         public Server::Configuration::NamedHttpFilterConfigFactory,
                         public Server::Configuration::UpstreamHttpFilterConfigFactory {
@@ -112,7 +134,7 @@ public:
     Stats::Scope& scope;
   };
 
-  Envoy::Http::FilterFactoryCb
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
@@ -122,7 +144,7 @@ public:
                                              context.getServerFactoryContext());
   }
 
-  Envoy::Http::FilterFactoryCb
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::UpstreamFactoryContext& context) override {
@@ -132,7 +154,7 @@ public:
         stats_prefix, DualInfo(context), context.getServerFactoryContext());
   }
 
-  virtual Envoy::Http::FilterFactoryCb
+  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix, DualInfo info,
                                     Server::Configuration::ServerFactoryContext& context) PURE;

@@ -61,8 +61,8 @@ public:
   // Following functions are for Authenticator interface.
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens,
-              SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
-              AuthenticatorCallback callback) override;
+              SetExtractedJwtDataCallback set_extracted_jwt_data_cb, AuthenticatorCallback callback,
+              ClearRouteCacheCallback clear_route_cb) override;
   void onDestroy() override;
 
   TimeSource& timeSource() { return time_source_; }
@@ -87,8 +87,8 @@ private:
   // finds one to verify with key.
   void startVerify();
 
-  // Copy the JWT Claim to HTTP Header
-  void addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name);
+  // Copy the JWT Claim to HTTP Header. Returns true iff header is added.
+  bool addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name);
 
   // The jwks cache object.
   JwksCache& jwks_cache_;
@@ -117,6 +117,10 @@ private:
   SetExtractedJwtDataCallback set_extracted_jwt_data_cb_;
   // The on_done function.
   AuthenticatorCallback callback_;
+  // Clear route cache callback function.
+  ClearRouteCacheCallback clear_route_cb_;
+  // Set to true to clear the route cache.
+  bool clear_route_cache_{false};
   // check audience object.
   const CheckAudience* check_audience_;
   // specific provider or not when it is allow missing or failed.
@@ -143,13 +147,16 @@ std::string AuthenticatorImpl::name() const {
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
                                std::vector<JwtLocationConstPtr>&& tokens,
                                SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
-                               AuthenticatorCallback callback) {
+                               AuthenticatorCallback callback,
+                               ClearRouteCacheCallback clear_route_cb) {
   ASSERT(!callback_);
   headers_ = &headers;
   parent_span_ = &parent_span;
   tokens_ = std::move(tokens);
   set_extracted_jwt_data_cb_ = std::move(set_extracted_jwt_data_cb);
   callback_ = std::move(callback);
+  clear_route_cb_ = std::move(clear_route_cb);
+  clear_route_cache_ = false;
 
   ENVOY_LOG(debug, "{}: JWT authentication starts (allow_failed={}), tokens size={}", name(),
             is_allow_failed_, tokens_.size());
@@ -303,7 +310,7 @@ void AuthenticatorImpl::verifyKey() {
   handleGoodJwt(/*cache_hit=*/false);
 }
 
-void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
+bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
                                             const std::string& header_name) {
   StructUtils payload_getter(jwt_->payload_pb_);
   const ProtobufWkt::Value* claim_value;
@@ -342,8 +349,10 @@ void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
       headers_->addCopy(Http::LowerCaseString(header_name), str_claim_value);
       ENVOY_LOG(debug, "[jwt_auth] claim : {} with value : {} is added to the header : {}",
                 claim_name, str_claim_value, header_name);
+      return true;
     }
   }
+  return false;
 }
 
 void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
@@ -363,8 +372,13 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   }
 
   // Copy JWT claim to header
+  bool header_added = false;
   for (const auto& header_and_claim : provider.claim_to_headers()) {
-    addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
+    header_added |=
+        addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
+  }
+  if (provider.clear_route_cache() && header_added) {
+    clear_route_cache_ = true;
   }
 
   if (!provider.forward()) {
@@ -453,8 +467,13 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
     } else {
       callback_(status);
     }
-
     callback_ = nullptr;
+
+    if (clear_route_cache_ && clear_route_cb_) {
+      clear_route_cb_();
+    }
+    clear_route_cb_ = nullptr;
+
     return;
   }
 

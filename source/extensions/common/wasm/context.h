@@ -148,11 +148,8 @@ public:
                                      const std::shared_ptr<PluginBase>& plugin); // deprecated
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type) override;
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& info) override;
 
   uint32_t getLogLevel() override;
 
@@ -247,7 +244,7 @@ public:
   // HTTP
   WasmResult httpCall(std::string_view cluster, const Pairs& request_headers,
                       std::string_view request_body, const Pairs& request_trailers,
-                      int timeout_millisconds, uint32_t* token_ptr) override;
+                      int timeout_milliseconds, uint32_t* token_ptr) override;
 
   // Stats/Metrics
   WasmResult defineMetric(uint32_t type, std::string_view name, uint32_t* metric_id_ptr) override;

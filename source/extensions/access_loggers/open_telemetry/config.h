@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/server/access_log_config.h"
+#include "envoy/access_log/access_log_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,7 +12,7 @@ namespace OpenTelemetry {
 /**
  * Config registration for the OpenTelemetry (gRPC) access log. @see AccessLogInstanceFactory.
  */
-class AccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class AccessLogFactory : public Envoy::AccessLog::AccessLogInstanceFactory {
 public:
   ::Envoy::AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,

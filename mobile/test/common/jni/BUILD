@@ -1,9 +1,9 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 # Library which contains all the JNI related targets and test extensions
 cc_library(
@@ -21,7 +21,7 @@ cc_library(
     name = "server_envoy_jni_lib",
     testonly = True,
     srcs = [
-        "test_jni_interface.cc",
+        "test_jni_impl.cc",
     ],
     linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
@@ -101,5 +101,25 @@ cc_binary(
     linkshared = True,
     deps = [
         ":jni_helper_test_lib",
+    ],
+)
+
+cc_library(
+    name = "jni_utility_test_lib",
+    srcs = [
+        "jni_utility_test.cc",
+    ],
+    deps = [
+        "//library/common/jni:jni_utility_lib",
+    ],
+    alwayslink = True,
+)
+
+cc_binary(
+    name = "libenvoy_jni_utility_test.so",
+    testonly = True,
+    linkshared = True,
+    deps = [
+        ":jni_utility_test_lib",
     ],
 )

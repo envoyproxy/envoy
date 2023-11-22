@@ -354,7 +354,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
                                                                                  false);
   }
-  return local_address_selector_factory->createLocalAddressSelector(
+  auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       parseBindConfig(
           bind_config, cluster_name,
           buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
@@ -362,6 +362,8 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{}))),
       cluster_name);
+  THROW_IF_STATUS_NOT_OK(selector_or_error, throw);
+  return selector_or_error.value();
 }
 
 } // namespace
@@ -1231,14 +1233,14 @@ ClusterInfoImpl::ClusterInfoImpl(
   // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_->update_merge_window());
 
-  // Create upstream filter factories
+  // Create upstream network filter factories
   const auto& filters = config.filters();
   ASSERT(filter_factories_.empty());
   filter_factories_.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const bool is_terminal = i == filters.size() - 1;
-    ENVOY_LOG(debug, "  upstream filter #{}:", i);
+    ENVOY_LOG(debug, "  upstream network filter #{}:", i);
 
     if (proto_config.has_config_discovery()) {
       if (proto_config.has_typed_config()) {
@@ -1278,7 +1280,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
     if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
       throwEnvoyExceptionOrPanic(
-          fmt::format("The codec filter is the only valid terminal upstream filter"));
+          fmt::format("The codec filter is the only valid terminal upstream HTTP filter"));
     }
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());

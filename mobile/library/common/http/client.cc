@@ -1,6 +1,5 @@
 #include "library/common/http/client.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/http/codes.h"
@@ -14,8 +13,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
-#include "library/common/jni/android_jni_utility.h"
-#include "library/common/network/connectivity_manager.h"
 #include "library/common/stream_info/extra_stream_info.h"
 
 namespace Envoy {
@@ -514,7 +511,7 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
   RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
 
-  // This is largely a check for the android platform: is_cleartext_permitted
+  // This is largely a check for the android platform: isCleartextPermitted
   // is a no-op for other platforms.
   if (internal_headers->getSchemeValue() != "https" &&
       !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {

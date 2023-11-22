@@ -39,13 +39,11 @@ jobs:
     - name: 'Run swift library tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # runs with the listener enabled due to IdleTimeoutTest not setting up a test backend.
       run: |
         cd mobile
         ./bazelw test \
             --experimental_ui_max_stdouterr_bytes=10485760 \
             --config=ios \
-            --define envoy_mobile_listener=enabled \
             --build_tests_only \
             --config=mobile-remote-ci-macos \
             //test/swift/...
