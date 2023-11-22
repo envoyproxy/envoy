@@ -55,8 +55,6 @@ public:
   }
 
 private:
-  void setupStatTracking(const Http::RequestHeaderMap& headers);
-
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::ResponseHeaderMap* response_headers_{};
