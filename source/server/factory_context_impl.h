@@ -57,7 +57,6 @@ private:
   Stats::Scope& global_scope_;
   Stats::Scope& listener_scope_;
   bool is_quic_;
-  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_;
 };
 
 } // namespace Server
