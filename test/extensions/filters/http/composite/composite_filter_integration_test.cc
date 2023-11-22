@@ -179,8 +179,6 @@ resources:
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: set-response-code
     typed_config:
-    name: set-response-code
-    typed_config:
       "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
       code: 403)EOF",
                                               false);

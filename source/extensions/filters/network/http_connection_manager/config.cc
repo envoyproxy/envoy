@@ -233,7 +233,7 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
 
   Server::Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
       filter_config_provider_manager =
-          context.getServerFactoryContext().downstreamFilterConfigProviderManager();
+          context.getServerFactoryContext().downstreamHttpFilterConfigProviderManager();
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
           tracer_manager, filter_config_provider_manager};

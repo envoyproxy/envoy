@@ -209,12 +209,12 @@ public:
   virtual bool healthCheckFailed() const PURE;
 
   /**
-   * Returns the downstream filter config provider manager.
+   * Returns the downstream HTTP filter config provider manager.
    *
    * @return DownstreamHTTPFilterConfigProviderManagerSharedPtr
    */
   virtual DownstreamHTTPFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() PURE;
+  downstreamHttpFilterConfigProviderManager() PURE;
 };
 
 /**

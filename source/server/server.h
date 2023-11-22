@@ -203,7 +203,7 @@ public:
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
   Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override {
+  downstreamHttpFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
 

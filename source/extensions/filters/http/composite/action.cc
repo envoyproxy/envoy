@@ -21,13 +21,17 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   }
 
   if (composite_action.has_dynamic_config()) {
+    if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
+      throwEnvoyExceptionOrPanic(
+          fmt::format("Failed to get factory context or server factory context."));
+    }
     // Create a dynamic filter config provider and register it with the server factory context.
     auto config_discovery = composite_action.dynamic_config().config_discovery();
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
     Server::Configuration::ServerFactoryContext& server_factory_context =
         context.server_factory_context_.value();
     Server::Configuration::HttpExtensionConfigProviderSharedPtr provider =
-        server_factory_context.downstreamFilterConfigProviderManager()
+        server_factory_context.downstreamHttpFilterConfigProviderManager()
             ->createDynamicFilterConfigProvider(
                 config_discovery, composite_action.dynamic_config().name(), server_factory_context,
                 factory_context, server_factory_context.clusterManager(), false, "http", nullptr);

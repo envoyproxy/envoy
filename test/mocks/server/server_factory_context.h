@@ -83,7 +83,7 @@ public:
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
   Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override {
+  downstreamHttpFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
 
@@ -149,7 +149,7 @@ public:
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
   Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
-  downstreamFilterConfigProviderManager() override {
+  downstreamHttpFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
   Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
