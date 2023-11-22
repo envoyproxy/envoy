@@ -257,10 +257,11 @@ envoy_cmake(
         "ENABLE_ARES": "on",
         "CARES_LIBRARY": "$EXT_BUILD_DEPS/ares",
         "CARES_INCLUDE_DIR": "$EXT_BUILD_DEPS/ares/include",
+        # SSL (via Envoy's SSL dependency) is disabled, curl's CMake uses
+        # FindOpenSSL.cmake which fails at what looks like version parsing
+        # (the libraries are found ok).
         "CURL_CA_PATH": "none",
-        # Curl require SSL to do https calls to fetch WebIdentity Credentials
-        # via AWS STS. The usage of which is currently under deprecation.
-        "CURL_USE_OPENSSL": "on",
+        "CURL_USE_OPENSSL": "off",
         "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
         # Avoid libidn2
         "USE_LIBIDN2": "off",

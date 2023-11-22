@@ -613,32 +613,20 @@ void WebIdentityCredentialsProvider::refresh() {
   // Use the Accept header to ensure that AssumeRoleWithWebIdentityResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") ||
-      !context_) {
-    // Using curl to fetch the AWS credentials.
-    const auto credential_document = fetch_metadata_using_curl_(message);
-    if (!credential_document) {
-      ENVOY_LOG(error, "Could not load AWS credentials document from STS");
-      return;
-    }
-    extractCredentials(std::move(credential_document.value()));
-  } else {
-    // Stop any existing timer.
-    if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
-      cache_duration_timer_->disableTimer();
-    }
-    // Using Http async client to fetch the AWS credentials.
-    if (!metadata_fetcher_) {
-      metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
-    } else {
-      metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
-    }
-    on_async_fetch_cb_ = [this](const std::string&& arg) {
-      return this->extractCredentials(std::move(arg));
-    };
-    metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
+  // Stop any existing timer.
+  if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
+    cache_duration_timer_->disableTimer();
   }
+  // Using Http async client to fetch the AWS credentials.
+  if (!metadata_fetcher_) {
+    metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
+  } else {
+    metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
+  }
+  on_async_fetch_cb_ = [this](const std::string&& arg) {
+    return this->extractCredentials(std::move(arg));
+  };
+  metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
 }
 
 void WebIdentityCredentialsProvider::extractCredentials(
@@ -698,14 +686,8 @@ void WebIdentityCredentialsProvider::extractCredentials(
   }
 
   last_updated_ = api_.timeSource().systemTime();
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials") &&
-      context_) {
-    setCredentialsToAllThreads(
-        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-  } else {
-    cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
-  }
+  setCredentialsToAllThreads(
+      std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   handleFetchDone();
 }
 
@@ -747,28 +729,32 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     ENVOY_LOG(debug, "Not using credential file credentials provider because it is not enabled");
   }
 
-  const auto web_token_path = absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE));
-  const auto role_arn = absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN));
-  if (!web_token_path.empty() && !role_arn.empty()) {
-    const auto role_session_name = absl::NullSafeStringView(std::getenv(AWS_ROLE_SESSION_NAME));
-    std::string actual_session_name;
-    if (!role_session_name.empty()) {
-      actual_session_name = std::string(role_session_name);
-    } else {
-      // In practice, this value will be provided by the environment, so the placeholder value is
-      // not important. Some AWS SDKs use time in nanoseconds, so we'll just use that.
-      const auto now_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                 api.timeSource().systemTime().time_since_epoch())
-                                 .count();
-      actual_session_name = fmt::format("{}", now_nanos);
+  // WebIdentityCredentialsProvider can be used only if libcurl feature flag is disabled.
+  if (useHttpAsyncClient() && context) {
+    const auto web_token_path = absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE));
+    const auto role_arn = absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN));
+    if (!web_token_path.empty() && !role_arn.empty()) {
+      const auto role_session_name = absl::NullSafeStringView(std::getenv(AWS_ROLE_SESSION_NAME));
+      std::string actual_session_name;
+      if (!role_session_name.empty()) {
+        actual_session_name = std::string(role_session_name);
+      } else {
+        // In practice, this value will be provided by the environment, so the placeholder value is
+        // not important. Some AWS SDKs use time in nanoseconds, so we'll just use that.
+        const auto now_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                   api.timeSource().systemTime().time_since_epoch())
+                                   .count();
+        actual_session_name = fmt::format("{}", now_nanos);
+      }
+      const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+      ENVOY_LOG(
+          debug,
+          "Using web identity credentials provider with STS endpoint: {} and session name: {}",
+          sts_endpoint, actual_session_name);
+      add(factories.createWebIdentityCredentialsProvider(
+          api, context, fetch_metadata_using_curl, MetadataFetcher::create, STS_TOKEN_CLUSTER,
+          web_token_path, sts_endpoint, role_arn, actual_session_name));
     }
-    const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-    ENVOY_LOG(debug,
-              "Using web identity credentials provider with STS endpoint: {} and session name: {}",
-              sts_endpoint, actual_session_name);
-    add(factories.createWebIdentityCredentialsProvider(
-        api, context, fetch_metadata_using_curl, MetadataFetcher::create, STS_TOKEN_CLUSTER,
-        web_token_path, sts_endpoint, role_arn, actual_session_name));
   }
 
   // Even if WebIdentity is supported keep the fallback option open so that
