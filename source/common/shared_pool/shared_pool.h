@@ -116,7 +116,9 @@ private:
 
   class Element {
   public:
-    Element(const std::shared_ptr<T>& ptr) : ptr_{ptr.get()}, weak_ptr_{ptr} {}
+    Element(const std::shared_ptr<T>& ptr) : ptr_{ptr.get()}, weak_ptr_{ptr} {
+      ASSERT(ptr_ != nullptr);
+    }
 
     Element() = delete;
     Element(const Element&) = delete;
@@ -135,6 +137,8 @@ private:
       template <> size_t operator()(const Element& element) const {
         return HashFunc{}(*element.ptr_);
       }
+      // Only used for object deletion.
+      template <> size_t operator()(const T* ptr) { return HashFunc{}(*ptr); }
     };
     struct Compare {
       using is_transparent = void; // NOLINT(readability-identifier-naming)
@@ -143,6 +147,10 @@ private:
       }
       template <> bool operator()(const Element& a, const Element& b) const {
         return a.ptr_ == b.ptr_ || (EqualFunc{}(*a.ptr_, *b.ptr_));
+      }
+      // Only used for object deletion.
+      template <> bool operator()(const Element& a, const T* ptr) const {
+        return a.ptr_ == ptr || (EqualFunc{}(*a.ptr_, *ptr));
       }
     };
 
