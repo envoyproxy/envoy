@@ -2,7 +2,13 @@
 #include <string>
 #include <thread>
 
+#include "envoy/network/address.h"
+
 #include "source/extensions/transport_sockets/alts/alts_channel_pool.h"
+
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "grpcpp/client_context.h"
@@ -43,10 +49,11 @@ public:
   }
 };
 
-class AltsChannelPoolTest : public Test {
+class AltsChannelPoolTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
+  AltsChannelPoolTest() : version_(GetParam()){};
   void startFakeHandshakerService() {
-    server_address_ = absl::StrCat("[::1]:", 0);
+    server_address_ = absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     testing::internal::Notification notification;
     server_thread_ = std::make_unique<std::thread>([this, &notification]() {
       FakeHandshakerService fake_handshaker_service;
@@ -58,7 +65,8 @@ protected:
       server_ = server_builder.BuildAndStart();
       EXPECT_THAT(server_, NotNull());
       EXPECT_NE(listening_port, -1);
-      server_address_ = absl::StrCat("[::1]:", listening_port);
+      server_address_ =
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":", listening_port);
       (&notification)->Notify();
       server_->Wait();
     });
@@ -78,9 +86,14 @@ private:
   std::string server_address_;
   std::unique_ptr<grpc::Server> server_;
   std::unique_ptr<std::thread> server_thread_;
+  Network::Address::IpVersion version_;
 };
 
-TEST_F(AltsChannelPoolTest, SuccessWithDefaultChannels) {
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsChannelPoolTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(AltsChannelPoolTest, SuccessWithDefaultChannels) {
   startFakeHandshakerService();
 
   // Create a channel pool and check that it has the correct dimensions.

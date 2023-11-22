@@ -104,7 +104,7 @@ envoy_cc_library(
         "//source/server:overload_manager_lib",
         "//source/server:server_lib",
         "//source/server:utils_lib",
-        "//source/server/admin:admin_lib",
+        "//source/server/admin:admin_factory_context",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

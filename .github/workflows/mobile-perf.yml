@@ -30,7 +30,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Ensure files don't leak back into the main binary
-      run: rm source/extensions/listener_managers/listener_manager/listener_manager_impl.h source/server/overload_manager_impl.cc
+      run: rm source/extensions/listener_managers/listener_manager/listener_manager_impl.h source/server/overload_manager_impl.cc source/common/network/listen_socket_impl.h source/common/network/tcp_listener_impl.h
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Build test binary'
