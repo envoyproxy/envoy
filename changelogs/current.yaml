@@ -94,6 +94,9 @@ removed_config_or_runtime:
     runtime flag and legacy code path.
 
 new_features:
+- area: aws
+  change: |
+    Added support for AWS common utility to fetch metadata credentials from AWS STS by using ``WebIdentityToken``.
 - area: filters
   change: |
     Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to
