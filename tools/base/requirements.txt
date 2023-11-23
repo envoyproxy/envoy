@@ -685,7 +685,9 @@ google-apitools==0.5.32 \
 google-auth[aiohttp]==2.23.3 \
     --hash=sha256:6864247895eea5d13b9c57c9e03abb49cb94ce2dc7c58e91cba3248c7477c9e3 \
     --hash=sha256:a8f4608e65c244ead9e0538f181a96c6e11199ec114d41f1d7b1bffa96937bda
-    # via gsutil
+    # via
+    #   google-auth
+    #   gsutil
 google-reauth==0.1.1 \
     --hash=sha256:cb39074488d74c8853074dde47368bbf8f739d4a4338b89aab696c895b6d8368 \
     --hash=sha256:f9f6852a55c2c5453d581cd01f3d1278e86147c03d008409800390a834235892
@@ -1031,6 +1033,7 @@ pyjwt[crypto]==2.8.0 \
     # via
     #   gidgethub
     #   pygithub
+    #   pyjwt
 pylsqpack==0.3.17 \
     --hash=sha256:016cfc9dc2dea9c0b06b7aba64da89315b4c96c309c69f5ea548f4e994429781 \
     --hash=sha256:0b1ed55872f8f984f655a4c853ad749b834a1fcd4c7e5a962c6f17d4d27687a2 \
@@ -1189,7 +1192,6 @@ requests==2.31.0 \
     --hash=sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f \
     --hash=sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1
     # via
-    #   -r requirements.in
     #   google-auth
     #   pygithub
     #   sphinx
@@ -1217,9 +1219,9 @@ six==1.16.0 \
     #   pyu2f
     #   sphinxcontrib-httpdomain
     #   thrift
-slack-sdk==3.23.0 \
-    --hash=sha256:2a8513505cced20ceee22b5b49c11d9545caa6234b56bf0ad47133ea5b357d10 \
-    --hash=sha256:9d6ebc4ff74e7983e1b27dbdb0f2bb6fc3c2a2451694686eaa2be23bbb085a73
+slack-sdk==3.26.0 \
+    --hash=sha256:147946f388ce73b17c377b823759fcb39c0eca7444ca0a942dc12a3940a4f44f \
+    --hash=sha256:b84c2d93163166eb682e290c19334683c2d0f0cb4a5479c809706b44038fdda1
     # via -r requirements.in
 smmap==5.0.1 \
     --hash=sha256:dceeb6c0028fdb6734471eb07c0cd2aae706ccaecab45965ee83f11c8d3b1f62 \
