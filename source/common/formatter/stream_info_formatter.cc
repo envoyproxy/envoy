@@ -1428,6 +1428,26 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string& key, absl::optional<size_t> max_length) {
               return std::make_unique<EnvironmentFormatter>(key, max_length);
             }}},
+          {"UPSTREAM_CONNECTION_POOL_CALLBACK_DURATION",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, const absl::optional<size_t>&) {
+              return std::make_unique<StreamInfoDurationFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.upstreamInfo().has_value() &&
+                                   stream_info.upstreamInfo()
+                                       .value()
+                                       .get()
+                                       .upstreamTiming()
+                                       .connectionPoolCallbackLatency()
+                                       .has_value()
+                               ? stream_info.upstreamInfo()
+                                     .value()
+                                     .get()
+                                     .upstreamTiming()
+                                     .connectionPoolCallbackLatency()
+                               : absl::nullopt;
+                  });
+            }}},
       });
 }
 

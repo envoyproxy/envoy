@@ -448,6 +448,15 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%UPSTREAM_CONNECTION_POOL_CALLBACK_DURATION%
+  HTTP/TCP
+    Total duration in milliseconds from when the upstream request was created to when the connection pool callbacks.
+
+  UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 .. _config_access_log_format_response_flags:
 
 %RESPONSE_FLAGS% / %RESPONSE_FLAGS_LONG%
