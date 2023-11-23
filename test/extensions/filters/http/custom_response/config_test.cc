@@ -25,7 +25,7 @@ TEST(CustomResponseFilterConfigTest, CustomResponseFilter) {
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
   ::Envoy::Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(filter_config, "stats", context);
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
   ::Envoy::Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -40,10 +40,11 @@ TEST(CustomResponseFilterConfigTest, InvalidURI) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(filter_config, "stats", context),
-                            EnvoyException,
-                            "Invalid uri specified for redirection for custom response: "
-                            "%#?*s://foo.example/gateway_error");
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).IgnoreError(),
+      EnvoyException,
+      "Invalid uri specified for redirection for custom response: "
+      "%#?*s://foo.example/gateway_error");
 }
 
 // Specifying neither host nor path redirect is valid when the routing decision
@@ -66,7 +67,7 @@ TEST(CustomResponseFilterConfigTest, NoHostAndPathRedirect) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(filter_config, "stats", context));
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, "stats", context).ok());
 }
 
 TEST(CustomResponseFilterConfigTest, PrefixRewrite) {
@@ -88,8 +89,9 @@ TEST(CustomResponseFilterConfigTest, PrefixRewrite) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(filter_config, "stats", context),
-                            EnvoyException, "prefix_rewrite is not supported for Custom Response");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, "stats", context).ok()),
+      EnvoyException, "prefix_rewrite is not supported for Custom Response");
 }
 
 TEST(CustomResponseFilterConfigTest, RegexRewrite) {
@@ -114,8 +116,9 @@ TEST(CustomResponseFilterConfigTest, RegexRewrite) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(filter_config, "stats", context),
-                            EnvoyException, "regex_rewrite is not supported for Custom Response");
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).IgnoreError(),
+      EnvoyException, "regex_rewrite is not supported for Custom Response");
 }
 
 TEST(CustomResponseFilterConfigTest, HashFragmentUri) {
@@ -135,10 +138,11 @@ TEST(CustomResponseFilterConfigTest, HashFragmentUri) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(filter_config, "stats", context),
-                            EnvoyException,
-                            "Invalid uri specified for redirection for custom response: "
-                            "example.foo/abc/cde#ab");
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).IgnoreError(),
+      EnvoyException,
+      "Invalid uri specified for redirection for custom response: "
+      "example.foo/abc/cde#ab");
 }
 
 TEST(CustomResponseFilterConfigTest, HashFragmentPathRedirect) {
@@ -159,10 +163,11 @@ TEST(CustomResponseFilterConfigTest, HashFragmentPathRedirect) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(filter_config, "stats", context),
-                            EnvoyException,
-                            "#fragment is not supported for custom response. Specified "
-                            "path_redirect is /abc/cde#ab");
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(filter_config, "stats", context).IgnoreError(),
+      EnvoyException,
+      "#fragment is not supported for custom response. Specified "
+      "path_redirect is /abc/cde#ab");
 }
 
 } // namespace
