@@ -3,8 +3,6 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
-#include "source/common/filter/config_discovery_impl.h"
-
 namespace Envoy {
 namespace Server {
 

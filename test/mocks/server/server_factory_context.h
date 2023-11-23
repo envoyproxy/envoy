@@ -118,7 +118,7 @@ public:
 // threads. Global state in the MockServerFactoryContext causes thread safety issues in this case.
 class StatelessMockServerFactoryContext : public virtual ServerFactoryContext {
 public:
-  StatelessMockServerFactoryContext() = default;
+  StatelessMockServerFactoryContext();
   ~StatelessMockServerFactoryContext() override = default;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
@@ -152,8 +152,7 @@ public:
   downstreamHttpFilterConfigProviderManager() override {
     return filter_config_provider_manager_;
   }
-  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
-      std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()};
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_;
 };
 
 } // namespace Configuration

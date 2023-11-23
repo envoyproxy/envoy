@@ -227,8 +227,7 @@ public:
 private:
   Instance& server_;
   Stats::ScopeSharedPtr server_scope_;
-  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
-      filter_config_provider_manager_{};
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_;
 };
 
 /**
