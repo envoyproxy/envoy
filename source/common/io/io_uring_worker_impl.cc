@@ -397,6 +397,17 @@ void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) 
   }
 }
 
+void IoUringServerSocket::moveReadDataToBuffer(Request* req) {
+  ReadRequest* read_req = static_cast<ReadRequest*>(req);
+  Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+      read_req->buf_.release(), result,
+      [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+        delete[] reinterpret_cast<const uint8_t*>(data);
+        delete this_fragment;
+      });
+  read_buf_.addBufferFragment(*fragment);
+}
+
 // TODO(zhxie): concern submit multiple read requests or submit read request in advance to improve
 // performance in the next iteration.
 void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
@@ -411,14 +422,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
         write_or_shutdown_cancel_req_ == nullptr) {
       if (result > 0 && keep_fd_open_) {
-        ReadRequest* read_req = static_cast<ReadRequest*>(req);
-        Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
-            read_req->buf_.release(), result,
-            [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
-              delete[] reinterpret_cast<const uint8_t*>(data);
-              delete this_fragment;
-            });
-        read_buf_.addBufferFragment(*fragment);
+        moveReadDataToBuffer(req);
       }
       closeInternal();
       return;
@@ -427,14 +431,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 
   // Move read data from request to buffer or store the error.
   if (result > 0) {
-    ReadRequest* read_req = static_cast<ReadRequest*>(req);
-    Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
-        read_req->buf_.release(), result,
-        [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
-          delete[] reinterpret_cast<const uint8_t*>(data);
-          delete this_fragment;
-        });
-    read_buf_.addBufferFragment(*fragment);
+    moveReadDataToBuffer(req);
   } else {
     if (result != -ECANCELED) {
       read_error_ = result;
