@@ -147,15 +147,14 @@ public:
 
   void setFileReadyCb(Event::FileReadyCb cb) override { cb_ = std::move(cb); }
 
-  void onReadCompleted();
-  void onWriteCompleted();
-  void onRemoteClose();
-
 protected:
   /**
    * For the socket to remove itself from the IoUringWorker and defer deletion.
    */
   void cleanup();
+  void onReadCompleted();
+  void onWriteCompleted();
+  void onRemoteClose();
 
   os_fd_t fd_{INVALID_SOCKET};
   IoUringWorkerImpl& parent_;
