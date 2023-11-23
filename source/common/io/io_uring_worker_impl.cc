@@ -397,15 +397,24 @@ void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) 
   }
 }
 
-void IoUringServerSocket::moveReadDataToBuffer(Request* req) {
+void IoUringServerSocket::moveReadDataToBuffer(Request* req, size_t data_length) {
   ReadRequest* read_req = static_cast<ReadRequest*>(req);
   Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
-      read_req->buf_.release(), result,
+      read_req->buf_.release(), data_length,
       [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
         delete[] reinterpret_cast<const uint8_t*>(data);
         delete this_fragment;
       });
   read_buf_.addBufferFragment(*fragment);
+}
+
+void IoUringServerSocket::onReadCompleted(int32_t result) {
+  ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, result);
+  ReadParam param{read_buf_, result};
+  read_param_ = param;
+  IoUringSocketEntry::onReadCompleted();
+  read_param_ = absl::nullopt;
+  ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, read_buf_.length());
 }
 
 // TODO(zhxie): concern submit multiple read requests or submit read request in advance to improve
@@ -422,7 +431,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
         write_or_shutdown_cancel_req_ == nullptr) {
       if (result > 0 && keep_fd_open_) {
-        moveReadDataToBuffer(req);
+        moveReadDataToBuffer(req, result);
       }
       closeInternal();
       return;
@@ -431,7 +440,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 
   // Move read data from request to buffer or store the error.
   if (result > 0) {
-    moveReadDataToBuffer(req);
+    moveReadDataToBuffer(req, result);
   } else {
     if (result != -ECANCELED) {
       read_error_ = result;
@@ -446,18 +455,9 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   // If the socket is enabled and there are bytes to read, notify the handler.
   if (status_ == ReadEnabled) {
     if (read_buf_.length() > 0) {
-      ENVOY_LOG(trace, "read from socket, fd = {}, result = {}", fd_, read_buf_.length());
-      ReadParam param{read_buf_, static_cast<int32_t>(read_buf_.length())};
-      read_param_ = param;
-      onReadCompleted();
-      read_param_ = absl::nullopt;
-      ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, read_buf_.length());
+      onReadCompleted(static_cast<int32_t>(read_buf_.length()));
     } else if (read_error_.has_value() && read_error_ < 0) {
-      ENVOY_LOG(trace, "read error from socket, fd = {}, result = {}", fd_, read_error_.value());
-      ReadParam param{read_buf_, read_error_.value()};
-      read_param_ = param;
-      onReadCompleted();
-      read_param_ = absl::nullopt;
+      onReadCompleted(read_error_.value());
       read_error_.reset();
     }
     // Handle remote closed at last.
@@ -468,10 +468,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     // * ...else                 : Callback Write.
     if (read_error_.has_value() && read_error_ == 0 && !enable_close_event_) {
       ENVOY_LOG(trace, "read remote closed from socket, fd = {}", fd_);
-      ReadParam param{read_buf_, read_error_.value()};
-      read_param_ = param;
-      onReadCompleted();
-      read_param_ = absl::nullopt;
+      onReadCompleted(read_error_.value());
       read_error_.reset();
       return;
     }
