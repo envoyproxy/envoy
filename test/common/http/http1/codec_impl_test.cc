@@ -3044,8 +3044,8 @@ TEST_P(Http1ClientConnectionImplTest, PrematureUpgradeResponse) {
   initialize();
 
   // make sure upgradeAllowed doesn't cause crashes if run with no pending response.
-  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: "
-                             "upgrade\r\nUpgrade: websocket\r\n\r\n");
+  Buffer::OwnedImpl response(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
   auto status = codec_->dispatch(response);
   EXPECT_TRUE(isPrematureResponseError(status));
 }
@@ -3066,8 +3066,8 @@ TEST_P(Http1ClientConnectionImplTest, UpgradeResponse) {
 
   // Send upgrade headers
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
-  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: "
-                             "upgrade\r\nUpgrade: websocket\r\n\r\n");
+  Buffer::OwnedImpl response(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
   auto status = codec_->dispatch(response);
 
   // Send body payload
@@ -3267,8 +3267,7 @@ TEST_P(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true))
       .WillOnce(Invoke([&](ResponseHeaderMapPtr&, bool) {
-        // Fake a call for going below the low watermark. Make sure no stream callbacks get
-        // called.
+        // Fake a call for going below the low watermark. Make sure no stream callbacks get called.
         EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
         static_cast<ClientConnection*>(codec_.get())
             ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
@@ -3281,32 +3280,29 @@ TEST_P(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
 TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
-  testTrailersExceedLimit(
-      /*trailer_string*/ long_string,
-      /*error_message*/ "http/1.1 protocol error: trailers size exceeds limit",
-      /*enable_trailers*/ true,
-      /*expect_error*/ true);
+  testTrailersExceedLimit(/*trailer_string*/ long_string,
+                          /*error_message*/ "http/1.1 protocol error: trailers size exceeds limit",
+                          /*enable_trailers*/ true,
+                          /*expect_error*/ true);
 }
 
 // Test that long trailer fields are consistently rejected.
 TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
   // Construct partial headers with a long field name that exceeds the default limit of 60KiB.
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q');
-  testTrailersExceedLimit(
-      /*trailer_string*/ long_string,
-      /*error_message*/ "http/1.1 protocol error: trailers size exceeds limit",
-      /*enable_trailers*/ true,
-      /*expect_error*/ true);
+  testTrailersExceedLimit(/*trailer_string*/ long_string,
+                          /*error_message*/ "http/1.1 protocol error: trailers size exceeds limit",
+                          /*enable_trailers*/ true,
+                          /*expect_error*/ true);
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_P(Http1ServerConnectionImplTest, ManyTrailersRejected) {
   // Send a request with 101 headers.
-  testTrailersExceedLimit(
-      /*trailer_string*/ createHeaderOrTrailerFragment(101) + "\r\n\r\n",
-      /*error_message*/ "http/1.1 protocol error: trailers count exceeds limit",
-      /*enable_trailers*/ true,
-      /*expect_error*/ true);
+  testTrailersExceedLimit(/*trailer_string*/ createHeaderOrTrailerFragment(101) + "\r\n\r\n",
+                          /*error_message*/ "http/1.1 protocol error: trailers count exceeds limit",
+                          /*enable_trailers*/ true,
+                          /*expect_error*/ true);
 }
 
 // Test if trailers which should be rejected are ignored if trailers are disabled.
@@ -3315,32 +3311,29 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
   // Send overly long trailers. http_parser will allow this if trailers are
   // disabled, balsa will not.
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
-  testTrailersExceedLimit(
-      /*trailer_string*/ long_string,
-      /*error_message*/ "http/1.1 protocol error: trailers size exceeds limit",
-      /*enable_trailers*/ false,
-      /* expect_error */ parser_impl_ == Http1ParserImpl::BalsaParser);
+  testTrailersExceedLimit(/*trailer_string*/ long_string,
+                          /*error_message*/ "http/1.1 protocol error: trailers size exceeds limit",
+                          /*enable_trailers*/ false,
+                          /* expect_error */ parser_impl_ == Http1ParserImpl::BalsaParser);
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejectedIgnored) {
   // Send one overly long trailer. http_parser will allow this if trailers are
   // disabled, balsa will not.
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q') + ": value\r\n\r\n\r\n";
-  testTrailersExceedLimit(
-      /*trailer_string*/ long_string,
-      /*error_message*/ "http/1.1 protocol error: trailers size exceeds limit",
-      /*enable_trailers*/ false,
-      /* expect_error */ parser_impl_ == Http1ParserImpl::BalsaParser);
+  testTrailersExceedLimit(/*trailer_string*/ long_string,
+                          /*error_message*/ "http/1.1 protocol error: trailers size exceeds limit",
+                          /*enable_trailers*/ false,
+                          /* expect_error */ parser_impl_ == Http1ParserImpl::BalsaParser);
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_P(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
   // Send a request with 101 headers. Both balsa and http_parser ignore this
   // with trailers disabled.
-  testTrailersExceedLimit(
-      /*trailer_string*/ createHeaderOrTrailerFragment(101) + "\r\n\r\n",
-      /*error_message*/ "http/1.1 protocol error: trailers count exceeds limit",
-      /*enable_trailers*/ false, /* expect_error */ false);
+  testTrailersExceedLimit(/*trailer_string*/ createHeaderOrTrailerFragment(101) + "\r\n\r\n",
+                          /*error_message*/ "http/1.1 protocol error: trailers count exceeds limit",
+                          /*enable_trailers*/ false, /* expect_error */ false);
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
@@ -3532,8 +3525,8 @@ TEST_P(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
   }
 }
 
-// Tests the scenario where the client sends pipelined requests and the requests reach Envoy at
-// the same time.
+// Tests the scenario where the client sends pipelined requests and the requests reach Envoy at the
+// same time.
 TEST_P(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
   TestScopedRuntime scoped_runtime;
 
@@ -4453,8 +4446,8 @@ TEST_P(Http1ServerConnectionImplTest, NoContentLengthRequest) {
   EXPECT_EQ(kBody.length(), buffer.length());
 }
 
-// Regression test for #24557: A read of zero bytes can signal the end of response body if there
-// is no Content-Length header. A subsequent response should be properly parsed.
+// Regression test for #24557: A read of zero bytes can signal the end of response body if there is
+// no Content-Length header. A subsequent response should be properly parsed.
 TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
   initialize();
   InSequence s;
@@ -4489,8 +4482,8 @@ TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
       EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
     } else {
       // This is actually a bug in http-parser: even though it already called
-      // `Parser::onMessageComplete()`, it does not parse the next read as a new response but as
-      // if it was more body.
+      // `Parser::onMessageComplete()`, it does not parse the next read as a new response but as if
+      // it was more body.
       EXPECT_CALL(decoder, decodeData(BufferStringEqual(kResponseWithBody), false));
     }
     Buffer::OwnedImpl buffer(kResponseWithBody);
