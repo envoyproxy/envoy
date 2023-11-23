@@ -137,7 +137,7 @@ void Tracer::flushSpans() {
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
-  resource_span->set_schema_url(resource_->schemaUrl_);
+  resource_span->set_schema_url(resource_->schema_url_);
 
   // add resource attributes
   for (auto const& att : resource_->attributes_) {
