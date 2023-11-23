@@ -246,6 +246,7 @@ protected:
   void submitWriteOrShutdownRequest();
   void moveReadDataToBuffer(Request* req, size_t data_length);
   void onReadCompleted(int32_t result);
+  void onWriteCompleted(int32_t result);
 };
 
 } // namespace Io

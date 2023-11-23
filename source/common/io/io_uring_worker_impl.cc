@@ -498,10 +498,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
                 "{}, result = {}",
                 fd_, read_error_.value());
       status_ = RemoteClosed;
-      WriteParam param{0};
-      write_param_ = param;
-      IoUringSocketEntry::onWriteCompleted();
-      write_param_ = absl::nullopt;
+      onWriteCompleted(0);
       read_error_.reset();
       return;
     }
@@ -524,6 +521,13 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   }
 }
 
+void IoUringServerSocket::onWriteCompleted(int32_t result) {
+  WriteParam param{result};
+  write_param_ = param;
+  IoUringSocketEntry::onWriteCompleted();
+  write_param_ = absl::nullopt;
+}
+
 void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onWrite(req, result, injected);
 
@@ -540,10 +544,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     // There is case where write injection may come after shutdown or close which should be ignored
     // since the I/O handle or connection may be released after closing.
     if (!shutdown_.has_value() && status_ != Closed) {
-      WriteParam param{result};
-      write_param_ = param;
-      IoUringSocketEntry::onWriteCompleted();
-      write_param_ = absl::nullopt;
+      onWriteCompleted(result);
     }
     return;
   }
@@ -555,14 +556,11 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     // Drain all write buf since the write failed.
     write_buf_.drain(write_buf_.length());
     if (!shutdown_.has_value() && status_ != Closed) {
-      WriteParam param{result};
-      write_param_ = param;
       if (result == -EPIPE) {
         IoUringSocketEntry::onRemoteClose();
       } else {
-        IoUringSocketEntry::onWriteCompleted();
+        onWriteCompleted(result);
       }
-      write_param_ = absl::nullopt;
     }
   }
 
