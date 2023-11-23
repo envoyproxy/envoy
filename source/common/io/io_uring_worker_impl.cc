@@ -531,14 +531,7 @@ void IoUringServerSocket::write(Buffer::Instance& data) {
   // We need to reset the drain trackers, since the write and close is async in
   // the io-uring. When the write is actually finished the above layer may already
   // release the drain trackers.
-  // write_buf_.move(data, data.length(), true);
-
-  // We still can't use the move. Since we still have many places use the
-  // BufferFragment and release them by the drain tracker. This will lose
-  // a little performance, let us figure out a solution in the future.
-  write_buf_.add(data);
-  data.drain(data.length());
-
+  write_buf_.move(data, data.length(), true);
   submitWriteOrShutdownRequest();
 }
 
