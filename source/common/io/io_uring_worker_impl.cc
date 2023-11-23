@@ -556,6 +556,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     // Drain all write buf since the write failed.
     write_buf_.drain(write_buf_.length());
     if (!shutdown_.has_value() && status_ != Closed) {
+      status_ = RemoteClosed;
       if (result == -EPIPE) {
         IoUringSocketEntry::onRemoteClose();
       } else {
