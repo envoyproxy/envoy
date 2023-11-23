@@ -122,7 +122,6 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
   // Filter could return status == FilterStatus::StopIteration immediately, close the connection and
   // use callback to call this function.
   if (connection_.state() != Connection::State::Open) {
-    buffer_source.getWriteBuffer().buffer.drain(buffer_source.getWriteBuffer().buffer.length());
     return FilterStatus::StopIteration;
   }
 

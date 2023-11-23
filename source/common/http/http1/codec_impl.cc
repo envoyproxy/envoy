@@ -262,6 +262,9 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::flushOutput(bool end_encode) {
+  if (connection_.connection().state() != Network::Connection::State::Open) {
+    return;
+  }
   auto encoded_bytes = connection_.flushOutput(end_encode);
   bytes_meter_->addWireBytesSent(encoded_bytes);
 }
