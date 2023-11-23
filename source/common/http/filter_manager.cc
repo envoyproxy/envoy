@@ -577,8 +577,14 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+    }
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+    }
     if (state_.decoder_filter_chain_aborted_) {
       executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace,
@@ -1204,6 +1210,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == encoder_filters_.end());
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+    }
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace,
@@ -1217,6 +1226,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
            "encodeHeaders when end_stream is already false");
 
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+    }
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
