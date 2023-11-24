@@ -33,7 +33,7 @@ using Envoy::Extensions::Credentials::Common::CredentialInjectorSharedPtr;
  */
 class FilterConfig {
 public:
-  FilterConfig(CredentialInjectorSharedPtr, bool overwrite, bool fail_request,
+  FilterConfig(CredentialInjectorSharedPtr, bool overwrite, bool allow_request_without_credential,
                const std::string& stats_prefix, Stats::Scope& scope);
   CredentialInjectorStats& stats() { return stats_; }
 
@@ -46,7 +46,7 @@ public:
     return injector_->inject(headers, overwrite_);
   }
 
-  bool failRequest() const { return fail_request_; }
+  bool allowRequestWithoutCredential() const { return allow_request_without_credential_; }
 
 private:
   static CredentialInjectorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -56,7 +56,7 @@ private:
 
   CredentialInjectorSharedPtr injector_;
   bool overwrite_;
-  bool fail_request_;
+  bool allow_request_without_credential_;
   CredentialInjectorStats stats_;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

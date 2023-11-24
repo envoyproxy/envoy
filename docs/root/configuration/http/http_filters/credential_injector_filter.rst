@@ -28,7 +28,7 @@ Here is an example configuration with Generic credential, which injects an HTTP 
 .. code-block:: yaml
 
   overwrite: true
-  fail_request: true
+
   credential:
     name: generic_credential
     typed_config:
