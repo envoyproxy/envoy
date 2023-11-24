@@ -563,9 +563,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Support DROP_OVERLOAD config from control plane to drop certain percentage of traffic.
+  ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}\n",
+                     *callbacks_, cluster->dropOverload().value())
   if (cluster->dropOverload().value()) {
-    ENVOY_STREAM_LOG(debug, "Router filter: cluster has DROP_OVERLOAD configuration: {}\n",
-                     *callbacks_, cluster->dropOverload().value());
     if (config_.random_.bernoulli(cluster->dropOverload())) {
       ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD\n", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DropOverLoad);

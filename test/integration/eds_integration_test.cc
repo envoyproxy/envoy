@@ -204,6 +204,27 @@ public:
 
   void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, nullptr); }
 
+  void dropOverloadTest(uint32_t numerator, std::string status) {
+    autonomous_upstream_ = true;
+
+    initializeTest(false);
+    EndpointSettingOptions options;
+    options.total_endpoints = 2;
+    options.healthy_endpoints = 2;
+    options.drop_overload_numerator = numerator;
+    setEndpoints(options);
+
+    // Check deferred.
+    if (deferred_cluster_creation_) {
+      test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+    }
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(status, response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+  }
+
   envoy::type::v3::CodecClientType codec_client_type_{};
   const bool deferred_cluster_creation_{};
   EdsHelper eds_helper_;
@@ -905,26 +926,12 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
 }
 
 // Test EDS cluster DROP_OVERLOAD configuration.
-TEST_P(EdsIntegrationTest, DropOverloadTestForEdsCluster) {
-  autonomous_upstream_ = true;
+TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterNoDrop) {
+  dropOverloadTest(0, "200");
+}
 
-  initializeTest(false);
-  EndpointSettingOptions options;
-  options.total_endpoints = 2;
-  options.healthy_endpoints = 2;
-  options.drop_overload_numerator = 20;
-  setEndpoints(options);
-
-  // Check deferred.
-  if (deferred_cluster_creation_) {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
-  }
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  cleanupUpstreamAndDownstream();
-  test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
+TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterAllDrop) {
+  dropOverloadTest(100, "503");
 }
 
 } // namespace

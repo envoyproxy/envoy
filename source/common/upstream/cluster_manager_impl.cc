@@ -1271,12 +1271,13 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
         new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
                                                                       load_balancer_factory);
         cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
-        cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(
-            cm_cluster.cluster().dropOverload());
         cluster_manager->local_stats_.clusters_inflated_.set(
             cluster_manager->thread_local_clusters_.size());
       }
 
+      if (cluster_manager->thread_local_clusters_[info->name()]) {
+        cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(cm_cluster.cluster().dropOverload());
+      }
       for (const auto& per_priority : params.per_priority_update_params_) {
         cluster_manager->updateClusterMembership(
             info->name(), per_priority.priority_, per_priority.update_hosts_params_,
