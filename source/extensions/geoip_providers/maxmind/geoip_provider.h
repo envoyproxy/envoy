@@ -66,7 +66,7 @@ private:
   absl::optional<std::string> anon_tor_header_;
   absl::optional<std::string> anon_proxy_header_;
 
-  Stats::Scope& scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_hit_;

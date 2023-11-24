@@ -194,27 +194,9 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataNotPopulatedOnEmptyLookupResult) {
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
-  config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
+  config_helper_.prependFilter(TestEnvironment::substitute(DefaultConfig));
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"},
-                                                 {"x-forwarded-for", "81.2.69.142,9.10.11.12"},
-                                                 {"x-geo-city", "Berlin"},
-                                                 {"x-geo-country", "Germany"}};
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-  EXPECT_EQ("London", upstream_request_->headers()
-                          .get(Http::LowerCaseString("x-geo-city"))[0]
-                          ->value()
-                          .getStringView());
-  EXPECT_EQ("United Kingdom", upstream_request_->headers()
-                                  .get(Http::LowerCaseString("x-geo-country"))[0]
-                                  ->value()
-                                  .getStringView());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+
   // LDS update to modify the listener and corresponding drain.
   {
     ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
@@ -224,10 +206,28 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
           listener->mutable_listener_filters_timeout()->set_seconds(10);
         });
     new_config_helper.setLds("1");
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
     test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 1);
+    test_server_->waitForCounterEq("listener_manager.lds.update_success", 2);
+    test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
   }
-  response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_EQ("Boxford", upstream_request_->headers()
+                           .get(Http::LowerCaseString("x-geo-city"))[0]
+                           ->value()
+                           .getStringView());
+  EXPECT_EQ("England", upstream_request_->headers()
+                           .get(Http::LowerCaseString("x-geo-region"))[0]
+                           ->value()
+                           .getStringView());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  auto response2 = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace
