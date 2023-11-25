@@ -51,6 +51,7 @@ envoy_cmake(
         #        "BUILD_SVE2": "on",
         #        "BUILD_SVE": "on",
         "BUILD_EXAMPLES": "off",
+        "BUILD_SHARED_LIBS": "off",
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_LIBDIR": "lib",
         "FAT_RUNTIME": "off",
