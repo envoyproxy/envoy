@@ -55,6 +55,7 @@ envoy_cmake(
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_LIBDIR": "lib",
         "FAT_RUNTIME": "off",
+        "SQLITE_SKIP_CHECK": "on",
         "RAGEL": "$EXT_BUILD_DEPS/ragel/bin/ragel",
     },
     default_cache_entries = {},

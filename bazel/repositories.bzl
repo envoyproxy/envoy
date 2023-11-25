@@ -716,6 +716,8 @@ def _io_vectorscan():
         name = "io_vectorscan",
         build_file_content = BUILD_ALL_CONTENT,
         type = "tar.gz",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:vectorscan.patch"],
     )
 
 def _io_opentracing_cpp():
