@@ -25,7 +25,7 @@ using ResourceAttributes = std::map<std::string, std::string>;
  * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.26.0/specification/resource/sdk.md
  */
 struct Resource {
-  std::string schemaUrl_{""};
+  std::string schema_url_{""};
   ResourceAttributes attributes_{};
 
   virtual ~Resource() = default;

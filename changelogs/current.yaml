@@ -210,5 +210,8 @@ new_features:
     and
     :ref:`response_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.response_attributes>`
     config APIs to enable sending and receiving attributes from/to the external processing server.
+- area: tracing
+  change: |
+    Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.
 
 deprecated:
