@@ -35,9 +35,8 @@ void DirectoryIteratorImpl::openDirectory() {
   DIR* temp_dir = ::opendir(directory_path_.c_str());
   dir_ = temp_dir;
   if (!dir_) {
-    int e = errno;
-    status_ = absl::ErrnoToStatus(
-        e, fmt::format("unable to open directory {}: {}", directory_path_, errorDetails(e)));
+    status_ = absl::ErrnoToStatus(errno, fmt::format("unable to open directory {}: {}",
+                                                     directory_path_, errorDetails(errno)));
   }
 }
 
@@ -48,9 +47,8 @@ void DirectoryIteratorImpl::nextEntry() {
   if (entry == nullptr) {
     entry_ = {"", FileType::Other, absl::nullopt};
     if (errno != 0) {
-      int en = errno;
-      status_ = absl::ErrnoToStatus(
-          en, fmt::format("unable to iterate directory {}: {}", directory_path_, errorDetails(en)));
+      status_ = absl::ErrnoToStatus(errno, fmt::format("unable to iterate directory {}: {}",
+                                                       directory_path_, errorDetails(errno)));
     }
   } else {
     auto result = makeEntry(entry->d_name);

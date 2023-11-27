@@ -244,6 +244,20 @@ TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
+#ifndef WIN32
+// Test that removing a file while iterating continues to the next file.
+TEST_F(DirectoryTest, FileDeletedWhileIterating) {
+  addFiles({"file", "file2"});
+  DirectoryIteratorImpl dir_iterator(dir_path_);
+  EXPECT_THAT((*dir_iterator).name_, ".");
+  TestEnvironment::removePath(dir_path_ + "/file");
+  ++dir_iterator;
+  EXPECT_THAT((*dir_iterator).name_, "..");
+  ++dir_iterator;
+  EXPECT_THAT((*dir_iterator).name_, "file2");
+}
+#endif
+
 // Test that we can list an empty directory
 TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
   const EntrySet expected = {
