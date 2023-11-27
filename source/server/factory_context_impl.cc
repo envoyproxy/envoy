@@ -4,12 +4,12 @@ namespace Envoy {
 namespace Server {
 
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
-                                       const envoy::config::listener::v3::Listener& config,
+                                       const envoy::config::listener::v3::Listener&,
                                        Network::DrainDecision& drain_decision,
                                        Stats::Scope& global_scope, Stats::Scope& listener_scope,
                                        bool is_quic)
-    : server_(server), config_(config), drain_decision_(drain_decision),
-      global_scope_(global_scope), listener_scope_(listener_scope), is_quic_(is_quic) {}
+    : server_(server), drain_decision_(drain_decision), global_scope_(global_scope),
+      listener_scope_(listener_scope), is_quic_(is_quic) {}
 
 AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -48,12 +48,7 @@ Configuration::TransportSocketFactoryContext&
 FactoryContextImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
-const Network::ListenerInfo& FactoryContextImpl::listenerInfo() const {
-  PANIC("not implemented");
-}
-envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const {
-  return config_.traffic_direction();
-}
+const Network::ListenerInfo& FactoryContextImpl::listenerInfo() const { PANIC("not implemented"); }
 Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
 Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
 bool FactoryContextImpl::isQuicListener() const { return is_quic_; }

@@ -265,9 +265,6 @@ ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
   return server_.threadLocal();
 }
 OptRef<Admin> ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
-envoy::config::core::v3::TrafficDirection ListenerFactoryContextBaseImpl::direction() const {
-  return listener_info_->direction();
-};
 const Network::ListenerInfo& ListenerFactoryContextBaseImpl::listenerInfo() const {
   return *listener_info_;
 }
@@ -545,8 +542,8 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
          config.connection_balance_config().has_exact_balance()) ||
         config.enable_mptcp() ||
         config.has_enable_reuse_port() // internal listener doesn't use physical l4 port.
-        || (config.has_freebind() && config.freebind().value()) ||
-        config.has_tcp_backlog_size() || config.has_tcp_fast_open_queue_length() ||
+        || (config.has_freebind() && config.freebind().value()) || config.has_tcp_backlog_size() ||
+        config.has_tcp_fast_open_queue_length() ||
         (config.has_transparent() && config.transparent().value())) {
       throw EnvoyException(fmt::format(
           "error adding listener named '{}': has unsupported tcp listener feature", name_));
@@ -566,8 +563,7 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
     internal_listener_config_ =
         std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
   } else if (config.address().has_envoy_internal_address() ||
-             std::any_of(config.additional_addresses().begin(),
-                         config.additional_addresses().end(),
+             std::any_of(config.additional_addresses().begin(), config.additional_addresses().end(),
                          [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
                            return proto_address.address().has_envoy_internal_address();
                          })) {
@@ -591,7 +587,8 @@ bool ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance
   return true;
 }
 
-void ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config, uint32_t concurrency) {
+void ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
+                                           uint32_t concurrency) {
   if (socket_type_ != Network::Socket::Type::Datagram) {
     return;
   }
@@ -699,7 +696,8 @@ void ListenerImpl::buildListenSocketOptions(
   }
 }
 
-void ListenerImpl::createListenerFilterFactories(const envoy::config::listener::v3::Listener& config) {
+void ListenerImpl::createListenerFilterFactories(
+    const envoy::config::listener::v3::Listener& config) {
   if (!config.listener_filters().empty()) {
     switch (socket_type_) {
     case Network::Socket::Type::Datagram: {
@@ -762,7 +760,8 @@ void ListenerImpl::buildFilterChains(const envoy::config::listener::v3::Listener
       *filter_chain_manager_);
 }
 
-void ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listener& config, const Network::Address::Instance& address) {
+void ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
+                                           const Network::Address::Instance& address) {
   auto iter = connection_balancers_.find(address.asString());
   if (iter == connection_balancers_.end() && socket_type_ == Network::Socket::Type::Stream) {
 #ifdef WIN32
@@ -825,7 +824,8 @@ void ListenerImpl::buildSocketOptions(const envoy::config::listener::v3::Listene
   }
 }
 
-void ListenerImpl::buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config) {
+void ListenerImpl::buildOriginalDstListenerFilter(
+    const envoy::config::listener::v3::Listener& config) {
   // Add original dst listener filter if 'use_original_dst' flag is set.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
     auto& factory =
@@ -841,7 +841,8 @@ void ListenerImpl::buildOriginalDstListenerFilter(const envoy::config::listener:
   }
 }
 
-void ListenerImpl::buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config) {
+void ListenerImpl::buildProxyProtocolListenerFilter(
+    const envoy::config::listener::v3::Listener& config) {
   // Add proxy protocol listener filter if 'use_proxy_proto' flag is set.
   // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
   //                   is implemented, this needs to be run after the filter chain has been
@@ -860,14 +861,15 @@ void ListenerImpl::buildProxyProtocolListenerFilter(const envoy::config::listene
     listener_filter_factories_.push_back(std::move(filter_config_provider));
   }
 }
-PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
-                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                                const envoy::config::listener::v3::Listener& config_message,
-                                const Network::ListenerConfig* listener_config,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
-      : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-            server, validation_visitor, listener_impl.listenerInfo(), config_message, std::move(drain_manager))),
-        listener_config_(listener_config), listener_impl_(listener_impl) {}
+PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
+    Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
+    const envoy::config::listener::v3::Listener& config_message,
+    const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl,
+    DrainManagerPtr drain_manager)
+    : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
+          server, validation_visitor, listener_impl.listenerInfo(), config_message,
+          std::move(drain_manager))),
+      listener_config_(listener_config), listener_impl_(listener_impl) {}
 
 AccessLog::AccessLogManager& PerListenerFactoryContextImpl::accessLogManager() {
   return listener_factory_context_base_->accessLogManager();
@@ -915,11 +917,8 @@ ThreadLocal::Instance& PerListenerFactoryContextImpl::threadLocal() {
 OptRef<Admin> PerListenerFactoryContextImpl::admin() {
   return listener_factory_context_base_->admin();
 }
-envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
-  return listener_factory_context_base_->direction();
-};
 const Network::ListenerInfo& PerListenerFactoryContextImpl::listenerInfo() const {
-  return listener_factory_context_base_->listenerInfo(); 
+  return listener_factory_context_base_->listenerInfo();
 }
 TimeSource& PerListenerFactoryContextImpl::timeSource() { return api().timeSource(); }
 const Network::ListenerConfig& PerListenerFactoryContextImpl::listenerConfig() const {
@@ -1168,7 +1167,8 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   // Skip the duplicate address check if this is the case of a listener update with new socket
   // options.
-  if ((name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config(), other.config())) {
+  if ((name_ == other.name_) &&
+      !ListenerMessageUtil::socketOptionsEqual(config(), other.config())) {
     return false;
   }
 

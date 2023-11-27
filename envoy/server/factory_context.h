@@ -215,7 +215,7 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
-   * @return ListenerInfoConstSharedPtr description of the listener.
+   * @return ListenerInfo description of the listener.
    */
   virtual const Network::ListenerInfo& listenerInfo() const PURE;
 };
@@ -238,12 +238,6 @@ public:
    * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
    */
   virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
-
-  /**
-   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
-   * the local proxy.
-   */
-  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if

@@ -8,6 +8,24 @@
 namespace Envoy {
 namespace Server {
 
+class EmptyListenerInfo : public Network::ListenerInfo {
+public:
+  // Network::ListenerInfo
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return metadata_.proto_metadata_;
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return metadata_.typed_metadata_;
+  }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
+  }
+  bool isQuic() const override { return false; }
+
+private:
+  Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
+};
+
 class AdminFactoryContext final : public Configuration::FactoryContext {
 public:
   AdminFactoryContext(Envoy::Server::Instance& server)
@@ -46,15 +64,7 @@ public:
   Stats::Scope& scope() override { return *scope_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   bool isQuicListener() const override { return false; }
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override {
-    return metadata_.proto_metadata_;
-  }
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override {
-    return metadata_.typed_metadata_;
-  }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
-  }
+  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Always use the static validation visitor for the admin handler.
     return server_.messageValidationContext().staticValidationVisitor();
@@ -76,8 +86,7 @@ private:
   // Listener scope with the listener prefix.
   Stats::ScopeSharedPtr listener_scope_;
 
-  // Empty metadata for the admin handler.
-  Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
+  const EmptyListenerInfo listener_info_;
 };
 using AdminFactoryContextPtr = std::unique_ptr<AdminFactoryContext>;
 

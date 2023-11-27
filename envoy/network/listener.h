@@ -134,6 +134,39 @@ public:
 using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
 
 /**
+ * Description of the listener.
+ */
+class ListenerInfo {
+public:
+  virtual ~ListenerInfo() = default;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
+   * listener.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this listener.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
+   * the local proxy.
+   */
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
+
+  /**
+   * @return whether the listener is a Quic listener.
+   */
+  virtual bool isQuic() const PURE;
+};
+
+using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;
+
+/**
  * A configuration for an individual listener.
  */
 class ListenerConfig {
@@ -207,6 +240,11 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
+   * @return ListenerInfoConstSharedPtr description of the listener.
+   */
+  virtual const ListenerInfoConstSharedPtr listenerInfo() const PURE;
+
+  /**
    * @return the UDP configuration for the listener IFF it is a UDP listener.
    */
   virtual UdpListenerConfigOptRef udpListenerConfig() PURE;
@@ -215,11 +253,6 @@ public:
    * @return the internal configuration for the listener IFF it is an internal listener.
    */
   virtual InternalListenerConfigOptRef internalListenerConfig() PURE;
-
-  /**
-   * @return traffic direction of the listener.
-   */
-  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @param address is used for query the address specific connection balancer.
@@ -503,7 +536,7 @@ public:
   virtual void unregisterWorkerForListener(UdpListenerCallbacks& listener) PURE;
 
   /**
-   * Deliver ``data`` to the correct worker by calling ``onDataWorker()``
+   * deliver ``data`` to the correct worker by calling ``ondataworker()``
    * or ``post()`` on one of the registered workers.
    */
   virtual void deliver(uint32_t dest_worker_index, UdpRecvData&& data) PURE;
@@ -515,39 +548,6 @@ using UdpListenerWorkerRouterPtr = std::unique_ptr<UdpListenerWorkerRouter>;
  * Base class for all listener typed metadata factories.
  */
 class ListenerTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
-
-/**
- * Description of the listener.
- */
-class ListenerInfo {
-public:
-  virtual ~ListenerInfo() = default;
-
-  /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
-
-  /**
-   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
-   * for this listener.
-   */
-  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
-
-  /**
-   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
-   * the local proxy.
-   */
-  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
-
-  /**
-   * @return whether the listener is a Quic listener.
-   */
-  virtual bool isQuic() const PURE;
-};
-
-using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;
 
 } // namespace Network
 } // namespace Envoy

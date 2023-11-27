@@ -18,9 +18,9 @@ TEST(AdminFactoryContextTest, AdminFactoryContextTest) {
   context.scope();
   context.listenerScope();
   context.isQuicListener();
-  context.listenerMetadata();
-  context.listenerTypedMetadata();
-  context.direction();
+  context.listenerInfo().metadata();
+  context.listenerInfo().typedMetadata();
+  context.listenerInfo().direction();
   context.messageValidationVisitor();
   context.initManager();
   context.drainDecision();

@@ -55,8 +55,8 @@ public:
                           Server::Configuration::FactoryContext& context) override {
     // Check that expected listener metadata is present
     EXPECT_EQ(1, context.listenerInfo().metadata().typed_filter_metadata().size());
-    const auto iter =
-        context.listenerInfo().metadata().typed_filter_metadata().find("test.listener.typed.metadata");
+    const auto iter = context.listenerInfo().metadata().typed_filter_metadata().find(
+        "test.listener.typed.metadata");
     EXPECT_NE(iter, context.listenerInfo().metadata().typed_filter_metadata().end());
     return std::make_shared<NiceMock<MockAccessLog>>();
   }

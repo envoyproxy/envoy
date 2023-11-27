@@ -41,7 +41,6 @@ public:
   ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
   const Network::ListenerInfo& listenerInfo() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
@@ -49,7 +48,6 @@ public:
 
 private:
   Server::Instance& server_;
-  const envoy::config::listener::v3::Listener& config_;
   Network::DrainDecision& drain_decision_;
   Stats::Scope& global_scope_;
   Stats::Scope& listener_scope_;

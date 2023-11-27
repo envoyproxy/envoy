@@ -92,11 +92,9 @@ ThreadLocal::SlotAllocator& PerFilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
 }
 
-envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::direction() const {
-  return parent_context_.direction();
+const Network::ListenerInfo& PerFilterChainFactoryContextImpl::listenerInfo() const {
+  return parent_context_.listenerInfo();
 }
-
-const Network::ListenerInfo& PerFilterChainFactoryContextImpl::listenerInfo() const { return parent_context_.listenerInfo(); }
 
 ProtobufMessage::ValidationContext& PerFilterChainFactoryContextImpl::messageValidationContext() {
   return parent_context_.messageValidationContext();

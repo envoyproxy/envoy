@@ -559,8 +559,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_tracing()) {
     tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
-    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
-                                                                             config.tracing());
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
+        context.listenerInfo().direction(), config.tracing());
   }
 
   for (const auto& access_log : config.access_log()) {

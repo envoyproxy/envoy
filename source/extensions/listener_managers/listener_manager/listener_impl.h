@@ -148,7 +148,6 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   OptRef<Admin> admin() override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
   const Network::ListenerInfo& listenerInfo() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
@@ -218,7 +217,6 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   OptRef<Admin> admin() override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
   const Network::ListenerInfo& listenerInfo() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
@@ -246,27 +244,24 @@ private:
 
 class ListenerInfoImpl : public Network::ListenerInfo {
 public:
-  explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener config) : config_(config),
-    typed_metadata_(config_.metadata()),
-    is_quic_(config.udp_listener_config().has_quic_options()) {}
+  explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener config)
+      : config_(config), typed_metadata_(config_.metadata()),
+        is_quic_(config.udp_listener_config().has_quic_options()) {}
   // Allow access to the underlying protobuf as an internal detail.
   const envoy::config::listener::v3::Listener& config() const { return config_; }
   // Network::ListenerInfo
-  const envoy::config::core::v3::Metadata& metadata() const override {
-    return config_.metadata();
-  }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override {
-    return typed_metadata_;
-  }
+  const envoy::config::core::v3::Metadata& metadata() const override { return config_.metadata(); }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config_.traffic_direction();
   }
   bool isQuic() const override { return is_quic_; }
+
 private:
   const envoy::config::listener::v3::Listener config_;
   const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
       typed_metadata_;
-  bool is_quic_;
+  const bool is_quic_;
 };
 
 /**
@@ -399,12 +394,7 @@ public:
   }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return config().traffic_direction();
-  }
-  const Network::ListenerInfoConstSharedPtr listenerInfo() {
-    return listener_info_;
-  }
+  const Network::ListenerInfoConstSharedPtr listenerInfo() const override { return listener_info_; }
 
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {
@@ -475,13 +465,16 @@ private:
   void validateConfig();
   bool buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
-  void buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config, uint32_t concurrency);
-  void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config, std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
+  void buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
+                               uint32_t concurrency);
+  void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config,
+                                std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
                                     envoy::config::core::v3::SocketOption>>>& address_opts_list);
   void createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
   void validateFilterChains(const envoy::config::listener::v3::Listener& config);
   void buildFilterChains(const envoy::config::listener::v3::Listener& config);
-  void buildConnectionBalancer(const envoy::config::listener::v3::Listener& config, const Network::Address::Instance& address);
+  void buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
+                               const Network::Address::Instance& address);
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
   void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
   void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);

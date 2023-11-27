@@ -5679,10 +5679,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   ASSERT_NE(nullptr, listener_factory_context);
-  EXPECT_EQ("test_value", Config::Metadata::metadataValue(
-                              &listener_factory_context->listenerInfo().metadata(), "com.bar.foo", "baz")
-                              .string_value());
-  EXPECT_EQ(envoy::config::core::v3::INBOUND, listener_factory_context->direction());
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(&listener_factory_context->listenerInfo().metadata(),
+                                            "com.bar.foo", "baz")
+                .string_value());
+  EXPECT_EQ(envoy::config::core::v3::INBOUND, listener_factory_context->listenerInfo().direction());
 #endif
 }
 
@@ -5840,7 +5841,7 @@ public:
   createListenerFilterFactoryFromProto(const Protobuf::Message&,
                                        const Network::ListenerFilterMatcherSharedPtr&,
                                        Configuration::ListenerFactoryContext& context) override {
-    return [traffic_direction = context.listenerConfig().direction()](
+    return [traffic_direction = context.listenerInfo().direction()](
                Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(nullptr,
                                      std::make_unique<OriginalDstTestFilter>(traffic_direction));
@@ -6043,7 +6044,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     createListenerFilterFactoryFromProto(const Protobuf::Message&,
                                          const Network::ListenerFilterMatcherSharedPtr&,
                                          Configuration::ListenerFactoryContext& context) override {
-      return [traffic_direction = context.listenerConfig().direction()](
+      return [traffic_direction = context.listenerInfo().direction()](
                  Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(
             nullptr, std::make_unique<OriginalDstTestFilterIPv6>(traffic_direction));

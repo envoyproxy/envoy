@@ -76,7 +76,6 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
   OptRef<Admin> admin() override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
   const Network::ListenerInfo& listenerInfo() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
