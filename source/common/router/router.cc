@@ -1841,12 +1841,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
 
   auto saved_headers = Http::RequestHeaderMapImpl::create();
-  downstream_headers.iterate(
-      [&saved_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        saved_headers->addCopy(Http::LowerCaseString(header.key().getStringView()),
-                               Http::LowerCaseString(header.value().getStringView()));
-        return Http::HeaderMap::Iterate::Continue;
-      });
+  Http::RequestHeaderMapImpl::copyFrom(*saved_headers, downstream_headers);
 
   for (const auto& header : route_entry_->internalRedirectPolicy().responseHeadersToCopy()) {
     auto result = upstream_headers.get(header);
