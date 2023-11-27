@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.set_metadata.v3;
 
+import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
@@ -21,11 +22,24 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message Config {
   // The metadata namespace.
-  string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+  // TODO(jbohanon) deprecate
+  string metadata_namespace = 1;
 
   // The value to update the namespace with. See
   // :ref:`the filter documentation <config_http_filters_set_metadata>` for
   // more information on how this value is merged with potentially existing
   // ones.
+  // TODO(jbohanon) deprecate
   google.protobuf.Struct value = 2;
+
+  message UntypedMetadata {
+      google.protobuf.Struct value = 1;
+  }
+  message TypedMetadata {
+      google.protobuf.Any value = 1;
+  }
+  oneof metadata {
+      UntypedMetadata untyped_metadata = 3;
+      TypedMetadata typed_metadata = 4;
+  }
 }

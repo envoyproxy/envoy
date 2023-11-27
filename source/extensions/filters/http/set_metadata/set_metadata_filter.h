@@ -10,6 +10,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,11 +23,11 @@ public:
   Config(const envoy::extensions::filters::http::set_metadata::v3::Config& config);
 
   absl::string_view metadataNamespace() const { return namespace_; }
-  const ProtobufWkt::Struct& value() { return value_; }
+  const absl::variant<const ProtobufWkt::Struct, const ProtobufWkt::Any>& value() { return value_; }
 
 private:
-  std::string namespace_;
-  ProtobufWkt::Struct value_;
+  const std::string namespace_;
+  const absl::variant<const ProtobufWkt::Struct, const ProtobufWkt::Any> value_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
