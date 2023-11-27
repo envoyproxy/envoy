@@ -18,17 +18,10 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
-AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
-AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+AccessLog::InstanceSharedPtr
+HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                                  AccessLog::FilterPtr&& filter,
+                                                  Server::Configuration::FactoryContext& context) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
@@ -36,8 +29,8 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
       config, context.messageValidationVisitor());
 
   return std::make_shared<HttpGrpcAccessLog>(
-      std::move(filter), proto_config, context.threadLocal(),
-      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context));
+      std::move(filter), proto_config, context.getServerFactoryContext().threadLocal(),
+      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.getServerFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {

@@ -3,10 +3,15 @@
 #include <thread>
 #include <utility>
 
+#include "envoy/network/address.h"
+
 #include "source/extensions/transport_sockets/alts/alts_proxy.h"
 #include "source/extensions/transport_sockets/alts/alts_tsi_handshaker.h"
 
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
@@ -177,10 +182,11 @@ void onNextDoneImpl(absl::Status status, void* handshaker, const unsigned char* 
   capturing_handshaker->setAltsHandshakeResult(std::move(handshake_result));
 }
 
-class AltsTsiHandshakerTest : public ::testing::Test {
+class AltsTsiHandshakerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
+  AltsTsiHandshakerTest() : version_(GetParam()){};
   void startFakeHandshakerService() {
-    server_address_ = absl::StrCat("[::1]:", 0);
+    server_address_ = absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     absl::Notification notification;
     server_thread_ = std::make_unique<std::thread>([this, &notification]() {
       FakeHandshakerService fake_handshaker_service;
@@ -192,7 +198,8 @@ protected:
       server_ = server_builder.BuildAndStart();
       EXPECT_THAT(server_, NotNull());
       EXPECT_NE(listening_port, -1);
-      server_address_ = absl::StrCat("[::1]:", listening_port);
+      server_address_ =
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":", listening_port);
       notification.Notify();
       server_->Wait();
     });
@@ -215,11 +222,16 @@ private:
   std::string server_address_;
   std::unique_ptr<grpc::Server> server_;
   std::unique_ptr<std::thread> server_thread_;
+  Network::Address::IpVersion version_;
 };
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsTsiHandshakerTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Check that a client-side AltsTsiHandshaker can successfully complete a full
 // client-side ALTS handshake.
-TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
+TEST_P(AltsTsiHandshakerTest, ClientSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
@@ -260,7 +272,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
 
 // Check that several client-side handshaker can successfully complete concurrent, full
 // client-side ALTS handshakes over the same channel to the handshaker service.
-TEST_F(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {
+TEST_P(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {
   // Setup.
   startFakeHandshakerService();
 
@@ -306,7 +318,7 @@ TEST_F(AltsTsiHandshakerTest, ConcurrentClientSideFullHandshakes) {
 
 // Check that a client-side AltsTsiHandshaker can successfully complete a full
 // client-side ALTS handshake when there are unused bytes after the handshake.
-TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
+TEST_P(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
@@ -350,7 +362,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
 
 // Check that a server-side AltsTsiHandshaker can successfully complete a full
 // server-side ALTS handshake.
-TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
+TEST_P(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
@@ -391,7 +403,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
 
 // Check that several server-side handshaker can successfully complete concurrent, full
 // server-side ALTS handshakes over the same channel to the handshaker service.
-TEST_F(AltsTsiHandshakerTest, ConcurrentServerSideFullHandshakes) {
+TEST_P(AltsTsiHandshakerTest, ConcurrentServerSideFullHandshakes) {
   // Setup.
   startFakeHandshakerService();
 
@@ -437,7 +449,7 @@ TEST_F(AltsTsiHandshakerTest, ConcurrentServerSideFullHandshakes) {
 // Check that a server-side AltsTsiHandshaker can successfully complete a full
 // server-side ALTS handshake when there are unused bytes sent after the
 // handshake.
-TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
+TEST_P(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
@@ -482,7 +494,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
 
 // Check that a server-side AltsTsiHandshaker can successfully complete a full
 // server-side ALTS handshake when the initial bytes from the client are missing.
-TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) {
+TEST_P(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
@@ -536,7 +548,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) 
 // Check that a server-side AltsTsiHandshaker can successfully complete a full
 // server-side ALTS handshake when the ClientInit is split across 2 packets on
 // the wire.
-TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
+TEST_P(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
@@ -593,7 +605,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
 }
 
 // Check that AltsTsiHandshaker correctly handles invalid arguments.
-TEST_F(AltsTsiHandshakerTest, InvalidArgumentToNext) {
+TEST_P(AltsTsiHandshakerTest, InvalidArgumentToNext) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
@@ -615,7 +627,7 @@ TEST_F(AltsTsiHandshakerTest, InvalidArgumentToNext) {
 }
 
 // Check that the handshake result is correctly validated.
-TEST_F(AltsTsiHandshakerTest, InvalidHandshakeResult) {
+TEST_P(AltsTsiHandshakerTest, InvalidHandshakeResult) {
   // Setup.
   startFakeHandshakerService();
   auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
@@ -667,7 +679,7 @@ TEST_F(AltsTsiHandshakerTest, InvalidHandshakeResult) {
 }
 
 // Check that the max frame size is correctly computed.
-TEST_F(AltsTsiHandshakerTest, ComputeMaxFrameSize) {
+TEST_P(AltsTsiHandshakerTest, ComputeMaxFrameSize) {
   // Max frame size is not set.
   HandshakerResult result;
   EXPECT_EQ(AltsTsiHandshaker::computeMaxFrameSize(result), AltsMinFrameSize);

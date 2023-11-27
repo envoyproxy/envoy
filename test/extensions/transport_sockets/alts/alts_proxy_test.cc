@@ -3,8 +3,12 @@
 #include <thread>
 #include <vector>
 
+#include "envoy/network/address.h"
+
 #include "source/extensions/transport_sockets/alts/alts_proxy.h"
 
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -105,29 +109,31 @@ private:
   bool return_error_response_;
 };
 
-class AltsProxyTest : public testing::Test {
+class AltsProxyTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
+  AltsProxyTest() : version_(GetParam()){};
   void startFakeHandshakerService(const std::vector<HandshakerReq>& expected_requests,
                                   grpc::Status status_to_return,
                                   bool return_error_response = false) {
-    server_address_ = absl::StrCat("[::1]:", 0);
+    server_address_ = absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     absl::Notification notification;
-    server_thread_ = std::make_unique<std::thread>(
-        [this, &notification, expected_requests, status_to_return, return_error_response]() {
-          FakeHandshakerService fake_handshaker_service(expected_requests, status_to_return,
-                                                        return_error_response);
-          grpc::ServerBuilder server_builder;
-          int listening_port = -1;
-          server_builder.AddListeningPort(server_address_, grpc::InsecureServerCredentials(),
-                                          &listening_port);
-          server_builder.RegisterService(&fake_handshaker_service);
-          server_ = server_builder.BuildAndStart();
-          EXPECT_THAT(server_, ::testing::NotNull());
-          EXPECT_NE(listening_port, -1);
-          server_address_ = absl::StrCat("[::1]:", listening_port);
-          (&notification)->Notify();
-          server_->Wait();
-        });
+    server_thread_ = std::make_unique<std::thread>([this, &notification, expected_requests,
+                                                    status_to_return, return_error_response]() {
+      FakeHandshakerService fake_handshaker_service(expected_requests, status_to_return,
+                                                    return_error_response);
+      grpc::ServerBuilder server_builder;
+      int listening_port = -1;
+      server_builder.AddListeningPort(server_address_, grpc::InsecureServerCredentials(),
+                                      &listening_port);
+      server_builder.RegisterService(&fake_handshaker_service);
+      server_ = server_builder.BuildAndStart();
+      EXPECT_THAT(server_, ::testing::NotNull());
+      EXPECT_NE(listening_port, -1);
+      server_address_ =
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":", listening_port);
+      (&notification)->Notify();
+      server_->Wait();
+    });
     notification.WaitForNotification();
   }
 
@@ -147,11 +153,16 @@ private:
   std::string server_address_;
   std::unique_ptr<grpc::Server> server_;
   std::unique_ptr<std::thread> server_thread_;
+  Network::Address::IpVersion version_;
 };
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsProxyTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verify that a StartClientHandshakeReq can successfully be created, sent to
 // the handshaker service, and the correct response is received.
-TEST_F(AltsProxyTest, ClientStartSuccess) {
+TEST_P(AltsProxyTest, ClientStartSuccess) {
   HandshakerReq expected_request;
   StartClientHandshakeReq* expected_client_start = expected_request.mutable_client_start();
   expected_client_start->set_handshake_security_protocol(grpc::gcp::ALTS);
@@ -176,7 +187,7 @@ TEST_F(AltsProxyTest, ClientStartSuccess) {
 
 // Verify that a full client-side ALTS handshake can be performed when talking
 // to a fake handshaker service.
-TEST_F(AltsProxyTest, ClientFullHandshakeSuccess) {
+TEST_P(AltsProxyTest, ClientFullHandshakeSuccess) {
   HandshakerReq expected_request_1;
   StartClientHandshakeReq* expected_client_start = expected_request_1.mutable_client_start();
   expected_client_start->set_handshake_security_protocol(grpc::gcp::ALTS);
@@ -213,7 +224,7 @@ TEST_F(AltsProxyTest, ClientFullHandshakeSuccess) {
 
 // Verify that a StartServerHandshakeReq can successfully be created, sent to
 // the handshaker service, and the correct response is received.
-TEST_F(AltsProxyTest, ServerStartSuccess) {
+TEST_P(AltsProxyTest, ServerStartSuccess) {
   HandshakerReq expected_request;
   ServerHandshakeParameters server_parameters;
   server_parameters.add_record_protocols(RecordProtocol);
@@ -247,7 +258,7 @@ TEST_F(AltsProxyTest, ServerStartSuccess) {
 
 // Verify that a full server-side ALTS handshake can be performed when talking
 // to a fake handshaker service.
-TEST_F(AltsProxyTest, ServerFullHandshakeSuccess) {
+TEST_P(AltsProxyTest, ServerFullHandshakeSuccess) {
   HandshakerReq expected_request_1;
   ServerHandshakeParameters server_parameters;
   server_parameters.add_record_protocols(RecordProtocol);
@@ -289,14 +300,14 @@ TEST_F(AltsProxyTest, ServerFullHandshakeSuccess) {
 
 // Check that the AltsProxy cannot be created when the channel to the handshaker
 // service is nullptr.
-TEST_F(AltsProxyTest, CreateFailsDueToNullChannel) {
+TEST_P(AltsProxyTest, CreateFailsDueToNullChannel) {
   EXPECT_THAT(AltsProxy::create(/*handshaker_service_channel=*/nullptr),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 // Check that the AltsProxy correctly handles gRPC-level errors returned by the
 // handshaker service when sending a StartClientHandshakeReq.
-TEST_F(AltsProxyTest, ClientStartRpcLevelFailure) {
+TEST_P(AltsProxyTest, ClientStartRpcLevelFailure) {
   startFakeHandshakerService(
       /*expected_requests=*/{},
       grpc::Status(grpc::StatusCode::INTERNAL, "An RPC-level internal error occurred."));
@@ -308,7 +319,7 @@ TEST_F(AltsProxyTest, ClientStartRpcLevelFailure) {
 
 // Check that the AltsProxy correctly handles gRPC-level errors returned by the
 // handshaker service when sending a StartServerHandshakeReq.
-TEST_F(AltsProxyTest, ServerStartRpcLevelFailure) {
+TEST_P(AltsProxyTest, ServerStartRpcLevelFailure) {
   startFakeHandshakerService(
       /*expected_requests=*/{},
       grpc::Status(grpc::StatusCode::INTERNAL, "An RPC-level internal error occurred."));
@@ -324,7 +335,7 @@ TEST_F(AltsProxyTest, ServerStartRpcLevelFailure) {
 
 // Check that the AltsProxy correctly handles gRPC-level errors returned by the
 // handshaker service when sending a NextHandshakeReq.
-TEST_F(AltsProxyTest, NextRpcLevelFailure) {
+TEST_P(AltsProxyTest, NextRpcLevelFailure) {
   startFakeHandshakerService(
       /*expected_requests=*/{},
       grpc::Status(grpc::StatusCode::INTERNAL, "An RPC-level internal error occurred."));
@@ -340,7 +351,7 @@ TEST_F(AltsProxyTest, NextRpcLevelFailure) {
 
 // Check that the AltsProxy correctly handles a handshake-level error returned by the
 // handshaker service when sending a StartClientHandshakeReq.
-TEST_F(AltsProxyTest, ClientStartRequestLevelFailure) {
+TEST_P(AltsProxyTest, ClientStartRequestLevelFailure) {
   startFakeHandshakerService(
       /*expected_requests=*/{}, grpc::Status::OK,
       /*return_error_response=*/true);
@@ -352,7 +363,7 @@ TEST_F(AltsProxyTest, ClientStartRequestLevelFailure) {
 
 // Check that the AltsProxy correctly handles a handshake-level error returned by the
 // handshaker service when sending a StartServerHandshakeReq.
-TEST_F(AltsProxyTest, ServerStartRequestLevelFailure) {
+TEST_P(AltsProxyTest, ServerStartRequestLevelFailure) {
   startFakeHandshakerService(
       /*expected_requests=*/{}, grpc::Status::OK,
       /*return_error_response=*/true);
@@ -368,7 +379,7 @@ TEST_F(AltsProxyTest, ServerStartRequestLevelFailure) {
 
 // Check that the AltsProxy correctly handles a handshake-level error returned by the
 // handshaker service when sending a NextHandshakeReq.
-TEST_F(AltsProxyTest, NextRequestLevelFailure) {
+TEST_P(AltsProxyTest, NextRequestLevelFailure) {
   startFakeHandshakerService(
       /*expected_requests=*/{}, grpc::Status::OK,
       /*return_error_response=*/true);
@@ -384,7 +395,7 @@ TEST_F(AltsProxyTest, NextRequestLevelFailure) {
 
 // Check that the AltsProxy correctly handles an unreachable handshaker service
 // when sending a StartClientHandshakeReq.
-TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnClientStart) {
+TEST_P(AltsProxyTest, HandshakerServiceIsUnreacheableOnClientStart) {
   std::string unreacheable_address = absl::StrCat("[::1]:", "1001");
   auto channel = grpc::CreateChannel(unreacheable_address,
                                      grpc::InsecureChannelCredentials()); // NOLINT
@@ -396,7 +407,7 @@ TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnClientStart) {
 
 // Check that the AltsProxy correctly handles an unreachable handshaker service
 // when sending a StartServerHandshakeReq.
-TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnServerStart) {
+TEST_P(AltsProxyTest, HandshakerServiceIsUnreacheableOnServerStart) {
   std::string unreacheable_address = absl::StrCat("[::1]:", "1001");
   auto channel = grpc::CreateChannel(unreacheable_address,
                                      grpc::InsecureChannelCredentials()); // NOLINT
@@ -409,7 +420,7 @@ TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnServerStart) {
 
 // Check that the AltsProxy correctly handles an unreachable handshaker service
 // when sending a NextHandshakeReq.
-TEST_F(AltsProxyTest, HandshakerServiceIsUnreacheableOnNextRequest) {
+TEST_P(AltsProxyTest, HandshakerServiceIsUnreacheableOnNextRequest) {
   std::string unreacheable_address = absl::StrCat("[::1]:", "1001");
   auto channel = grpc::CreateChannel(unreacheable_address,
                                      grpc::InsecureChannelCredentials()); // NOLINT

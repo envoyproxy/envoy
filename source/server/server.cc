@@ -40,10 +40,10 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
-#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/thread_local_store.h"
@@ -693,8 +693,6 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_ = component_factory.createRuntime(*this, initial_config);
-
-  initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
 
   if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
@@ -705,13 +703,17 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   if (initial_config.admin().address()) {
-    if (!admin_) {
-      throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
-    }
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
-                              initial_config.admin().address(),
-                              initial_config.admin().socketOptions(),
-                              stats_store_.createScope("listener.admin."));
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+    // Admin instance always be created if admin support is not compiled out.
+    RELEASE_ASSERT(admin_ != nullptr, "Admin instance should be created but actually not.");
+    auto typed_admin = dynamic_cast<AdminImpl*>(admin_.get());
+    RELEASE_ASSERT(typed_admin != nullptr, "Admin implementation is not an AdminImpl.");
+    initial_config.initAdminAccessLog(bootstrap_, typed_admin->factoryContext());
+    admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
+                              initial_config.admin().socketOptions());
+#else
+    throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
+#endif
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
@@ -903,7 +905,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
           Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
-      !instance.runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
+      !instance.runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
                     "connections. Configure a "
                     "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");

@@ -15,9 +15,9 @@ Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromPro
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
-  const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, std::chrono::milliseconds(message_timeout_ms),
-                                     max_message_timeout_ms, context.scope(), stats_prefix);
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
+      context.scope(), stats_prefix, Envoy::Extensions::Filters::Common::Expr::getBuilder(context));
 
   return [filter_config, grpc_service = proto_config.grpc_service(),
           &context](Http::FilterChainFactoryCallbacks& callbacks) {
@@ -45,9 +45,10 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
-  const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, std::chrono::milliseconds(message_timeout_ms),
-                                     max_message_timeout_ms, server_context.scope(), stats_prefix);
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
+      server_context.scope(), stats_prefix,
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context));
 
   return [filter_config, grpc_service = proto_config.grpc_service(),
           &server_context](Http::FilterChainFactoryCallbacks& callbacks) {

@@ -115,7 +115,6 @@
                            xdsGrpcInitialMetadata:
                                (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
-                                           xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                         enableCds:(BOOL)enableCds
@@ -166,7 +165,6 @@
   self.xdsServerPort = xdsServerPort;
   self.xdsGrpcInitialMetadata = xdsGrpcInitialMetadata;
   self.xdsSslRootCerts = xdsSslRootCerts;
-  self.xdsSni = xdsSni;
   self.rtdsResourceName = rtdsResourceName;
   self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
   self.cdsResourcesLocator = cdsResourcesLocator;
@@ -258,9 +256,6 @@
     }
     if (self.xdsSslRootCerts != nil) {
       xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
-    }
-    if (self.xdsSni != nil) {
-      xdsBuilder.setSni([self.xdsSni toCXXString]);
     }
     if (self.rtdsResourceName != nil) {
       xdsBuilder.addRuntimeDiscoveryService([self.rtdsResourceName toCXXString],

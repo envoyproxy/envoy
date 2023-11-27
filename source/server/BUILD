@@ -437,6 +437,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:rds_lib",
+        "//source/common/runtime:runtime_keys_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/signal:fatal_error_handler_lib",
