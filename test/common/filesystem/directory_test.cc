@@ -249,12 +249,32 @@ TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
 TEST_F(DirectoryTest, FileDeletedWhileIterating) {
   addFiles({"file", "file2"});
   DirectoryIteratorImpl dir_iterator(dir_path_);
-  EXPECT_THAT((*dir_iterator).name_, ".");
+  EntrySet found;
   TestEnvironment::removePath(dir_path_ + "/file");
-  ++dir_iterator;
-  EXPECT_THAT((*dir_iterator).name_, "..");
-  ++dir_iterator;
-  EXPECT_THAT((*dir_iterator).name_, "file2");
+  TestEnvironment::removePath(dir_path_ + "/file2");
+  while (!(*dir_iterator).name_.empty()) {
+    found.insert(*dir_iterator);
+    ++dir_iterator;
+  }
+  // Test environment can potentially list files in any order, so if the
+  // first file was one of the temporary files it will still be in the
+  // set. The important thing is that at least one of them is *not* in
+  // the set, and we didn't crash.
+  EXPECT_THAT(found, testing::AnyOf(
+                         EntrySet{
+                             {".", FileType::Directory, absl::nullopt},
+                             {"..", FileType::Directory, absl::nullopt},
+                         },
+                         EntrySet{
+                             {".", FileType::Directory, absl::nullopt},
+                             {"..", FileType::Directory, absl::nullopt},
+                             {"file", FileType::Regular, 0},
+                         },
+                         EntrySet{
+                             {".", FileType::Directory, absl::nullopt},
+                             {"..", FileType::Directory, absl::nullopt},
+                             {"file1", FileType::Regular, 0},
+                         }));
 }
 #endif
 
