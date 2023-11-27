@@ -81,9 +81,6 @@ envoy_cc_library(
         [
             "-DENVOY_SSL_FIPS",
         ],
-        [
-            "-DENVOY_SSL_FIPS",
-        ],
     ),
     external_deps = ["curl"],
     deps = [

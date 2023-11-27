@@ -2106,6 +2106,7 @@ transport_socket:
   EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithAttribute(expected_cluster), _))
       .WillOnce(Return(true));
 
+  // Time 2018-01-02T03:05:00Z in unix_timestamp is 1514862300
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleWithWebIdentityResponse": {
@@ -2114,7 +2115,7 @@ transport_socket:
         "AccessKeyId": "akid",
         "SecretAccessKey": "secret",
         "SessionToken": "token",
-        "Expiration": "2018-01-02T03:05:00Z"
+        "Expiration": 1514862300
       }
     }
   }
@@ -2298,6 +2299,7 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyCredentials) {
 TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentials) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  // Time 2018-01-02T03:05:00Z in unix_timestamp is 1514862300
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleWithWebIdentityResponse": {
@@ -2306,7 +2308,7 @@ TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentials) {
         "AccessKeyId": "akid",
         "SecretAccessKey": "secret",
         "SessionToken": "token",
-        "Expiration": "2018-01-02T03:05:00Z"
+        "Expiration": 1514862300
       }
     }
   }
@@ -2347,10 +2349,48 @@ TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentials) {
   EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
+TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectDocument(200, std::move(R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "AssumeRoleWithWebIdentityResult": {
+      "Credentials": {
+        "AccessKeyId": 1,
+        "SecretAccessKey": 2,
+        "SessionToken": 3
+      }
+    }
+  }
+}
+)EOF"));
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Expect refresh timer to be started.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
 
+  // Cancel is called for fetching once again as previous attempt wasn't a success with updating
+  // expiration time.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  // Expect refresh timer to be stopped and started.
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsBadExpirationFormat) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  // Time 2018-01-02T03:04:05Z in unix_timestamp is 1514862245
+  // STS API call with "Accept: application/json" is expected to return Exception in `Integer` unix
+  // timestamp format. However, if non integer is returned for Expiration field, then the value will
+  // be ignored and instead the expiration is set to 1 hour in future.
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleWithWebIdentityResponse": {
@@ -2359,7 +2399,160 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) 
         "AccessKeyId": "akid",
         "SecretAccessKey": "secret",
         "SessionToken": "token",
-        "Expiration": "2018-01-02T04:04:05Z"
+        "Expiration": "2018-01-02T03:04:05Z"
+      }
+    }
+  }
+}
+)EOF"));
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Expect refresh timer to be started.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
+
+  // init_watcher ready is not called again.
+  init_watcher_.expectReady().Times(0);
+  // No need to restart timer since credentials are fetched from cache.
+  // Even though as per `Expiration` field (in wrong format) the credentials are expired
+  // the credentials won't be refreshed until the next refresh period (1hr) or new expiration
+  // value implicitly set to a value same as refresh interval.
+  EXPECT_CALL(*timer_, disableTimer()).Times(0);
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
+  // We don't expect any more call to cancel or fetch again.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
+
+  // Time 2019-01-02T03:04:05Z in unix_timestamp is 1546398245
+  expectDocument(200, std::move(R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "AssumeRoleWithWebIdentityResult": {
+      "Credentials": {
+        "AccessKeyId": "new_akid",
+        "SecretAccessKey": "new_secret",
+        "SessionToken": "new_token",
+        "Expiration": "2019-01-02T03:04:05Z"
+      }
+    }
+  }
+}
+)EOF"));
+  // Expect timer to have expired but we would re-start the timer eventually after refresh.
+  EXPECT_CALL(*timer_, disableTimer()).Times(0);
+  // Cancel will be called once more.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  time_system_.advanceTimeWait(std::chrono::minutes(61));
+  timer_->invokeCallback();
+
+  // We don't expect timer to be reset again for new fetch.
+  EXPECT_CALL(*timer_, disableTimer()).Times(0);
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
+  // Similarly we won't call fetch or cancel on metadata fetcher.
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
+
+  const auto cached_credentials = provider_->getCredentials();
+  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
+  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
+  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
+}
+
+TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsWithMissingExpiration) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  // STS API call with "Accept: application/json" is expected to return Exception in `Integer` unix
+  // timestamp format. However, if Expiration field is empty, then the expiration will set to 1 hour
+  // in future.
+  expectDocument(200, std::move(R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "AssumeRoleWithWebIdentityResult": {
+      "Credentials": {
+        "AccessKeyId": "akid",
+        "SecretAccessKey": "secret",
+        "SessionToken": "token"
+      }
+    }
+  }
+}
+)EOF"));
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Expect refresh timer to be started.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
+
+  // init_watcher ready is not called again.
+  init_watcher_.expectReady().Times(0);
+  // No need to restart timer since credentials are fetched from cache.
+  // The credentials won't be refreshed until the next refresh period (1hr) or new expiration
+  // value implicitly set to a value same as refresh interval.
+  EXPECT_CALL(*timer_, disableTimer()).Times(0);
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
+  // We don't expect any more call to cancel or fetch again.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
+
+  // Time 2019-01-02T03:04:05Z in unix_timestamp is 1546398245
+  expectDocument(200, std::move(R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "AssumeRoleWithWebIdentityResult": {
+      "Credentials": {
+        "AccessKeyId": "new_akid",
+        "SecretAccessKey": "new_secret",
+        "SessionToken": "new_token"
+      }
+    }
+  }
+}
+)EOF"));
+  // Expect timer to have expired but we would re-start the timer eventually after refresh.
+  EXPECT_CALL(*timer_, disableTimer()).Times(0);
+  // Cancel will be called once more.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  time_system_.advanceTimeWait(std::chrono::minutes(61));
+  timer_->invokeCallback();
+
+  // We don't expect timer to be reset again for new fetch.
+  EXPECT_CALL(*timer_, disableTimer()).Times(0);
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr)).Times(0);
+  // Similarly we won't call fetch or cancel on metadata fetcher.
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
+
+  const auto cached_credentials = provider_->getCredentials();
+  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
+  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
+  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
+}
+
+TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  // Time 2018-01-02T04:04:05Z in unix_timestamp is 1514865845
+  expectDocument(200, std::move(R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "AssumeRoleWithWebIdentityResult": {
+      "Credentials": {
+        "AccessKeyId": "akid",
+        "SecretAccessKey": "secret",
+        "SessionToken": "token",
+        "Expiration": 1514865845
       }
     }
   }
@@ -2384,7 +2577,7 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) 
   EXPECT_EQ("akid", credentials.accessKeyId().value());
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
-
+  // Time 2019-01-02T03:05:00Z in unix_timestamp is 1546398300
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleWithWebIdentityResponse": {
@@ -2393,7 +2586,7 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) 
         "AccessKeyId": "new_akid",
         "SecretAccessKey": "new_secret",
         "SessionToken": "new_token",
-        "Expiration": "2019-01-02T03:05:00Z"
+        "Expiration": 1546398300
       }
     }
   }
@@ -2423,6 +2616,7 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) 
 TEST_F(WebIdentityCredentialsProviderTest, TimestampCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  // Time 2018-01-02T03:04:05Z in unix_timestamp is 1514862245
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleWithWebIdentityResponse": {
@@ -2431,7 +2625,7 @@ TEST_F(WebIdentityCredentialsProviderTest, TimestampCredentialExpiration) {
         "AccessKeyId": "akid",
         "SecretAccessKey": "secret",
         "SessionToken": "token",
-        "Expiration": "2018-01-02T03:04:05Z"
+        "Expiration": 1514862245
       }
     }
   }
@@ -2458,6 +2652,7 @@ TEST_F(WebIdentityCredentialsProviderTest, TimestampCredentialExpiration) {
 
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  // Time 2019-01-02T03:04:05Z in unix_timestamp is 1546398245
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleWithWebIdentityResponse": {
@@ -2466,7 +2661,7 @@ TEST_F(WebIdentityCredentialsProviderTest, TimestampCredentialExpiration) {
         "AccessKeyId": "new_akid",
         "SecretAccessKey": "new_secret",
         "SessionToken": "new_token",
-        "Expiration": "2019-01-02T03:04:05Z"
+        "Expiration": 1546398245
       }
     }
   }

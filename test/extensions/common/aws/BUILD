@@ -43,9 +43,6 @@ envoy_cc_test(
         [
             "-DENVOY_SSL_FIPS",
         ],
-        [
-            "-DENVOY_SSL_FIPS",
-        ],
     ),
     deps = [
         "//source/extensions/common/aws:utility_lib",

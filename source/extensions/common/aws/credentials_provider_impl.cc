@@ -105,15 +105,16 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri)
     : api_(api), context_(context), fetch_metadata_using_curl_(fetch_metadata_using_curl),
       create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
-      cluster_name_(std::string(cluster_name)), cache_duration_(getCacheDuration()),
+      cluster_name_(std::string(cluster_name)), cluster_type_(cluster_type), uri_(std::string(uri)),
+      cache_duration_(getCacheDuration()),
       debug_name_(absl::StrCat("Fetching aws credentials from cluster=", cluster_name)) {
   if (context_) {
-    context_->mainThreadDispatcher().post([this, uri, cluster_type]() {
+    context_->mainThreadDispatcher().post([this]() {
       if (!Utility::addInternalClusterStatic(context_->clusterManager(), cluster_name_,
-                                             cluster_type, uri)) {
+                                             cluster_type_, uri_)) {
         ENVOY_LOG(critical,
                   "Failed to add [STATIC cluster = {} with address = {}] or cluster not found",
-                  cluster_name_, uri);
+                  cluster_name_, uri_);
         return;
       }
     });
@@ -673,27 +674,45 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  const auto access_key_id = credentials.value()->getString(ACCESS_KEY_ID, "");
-  const auto secret_access_key = credentials.value()->getString(SECRET_ACCESS_KEY, "");
-  const auto session_token = credentials.value()->getString(SESSION_TOKEN, "");
+  TRY_NEEDS_AUDIT {
+    const auto access_key_id = credentials.value()->getString(ACCESS_KEY_ID, "");
+    const auto secret_access_key = credentials.value()->getString(SECRET_ACCESS_KEY, "");
+    const auto session_token = credentials.value()->getString(SESSION_TOKEN, "");
 
-  ENVOY_LOG(debug, "Received the following AWS credentials from STS: {}={}, {}={}, {}={}",
-            AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
-            session_token.empty() ? "" : "*****");
+    ENVOY_LOG(debug, "Received the following AWS credentials from STS: {}={}, {}={}, {}={}",
+              AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
+              secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
+              session_token.empty() ? "" : "*****");
+    setCredentialsToAllThreads(
+        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+  }
+  END_TRY catch (EnvoyException& e) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS: {}", e.what());
+    handleFetchDone();
+    return;
+  }
 
-  const auto expiration = credentials.value()->getString(EXPIRATION, "");
-  if (!expiration.empty()) {
-    absl::Time expiration_time;
-    if (absl::ParseTime(EXPIRATION_FORMAT, expiration, &expiration_time, nullptr)) {
-      ENVOY_LOG(debug, "AWS STS credentials expiration time: {}", expiration);
-      expiration_time_ = absl::ToChronoTime(expiration_time);
+  TRY_NEEDS_AUDIT {
+    const auto expiration = credentials.value()->getInteger(EXPIRATION, 0);
+    if (expiration != 0) {
+      expiration_time_ =
+          std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(expiration));
+      ENVOY_LOG(debug, "AWS STS credentials expiration time (unix timestamp): {}", expiration);
+    } else {
+      expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
+      ENVOY_LOG(warn, "Could not get Expiration value of AWS credentials document from STS, so "
+                      "setting expiration to 1 hour in future");
     }
+  }
+  END_TRY catch (EnvoyException& e) {
+    expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
+    ENVOY_LOG(warn,
+              "Could not parse Expiration value of AWS credentials document from STS: {}, so "
+              "setting expiration to 1 hour in future",
+              e.what());
   }
 
   last_updated_ = api_.timeSource().systemTime();
-  setCredentialsToAllThreads(
-      std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   handleFetchDone();
 }
 

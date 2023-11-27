@@ -360,11 +360,17 @@ bool Utility::addInternalClusterStatic(
       }
 
       // TODO(suniltheta): use random number generator here for cluster version.
+      // While adding multiple clusters make sure that change in random version number across
+      // multiple clusters won't make Envoy delete/replace previously registered internal cluster.
       cm.addOrUpdateCluster(cluster, "12345");
+
+      const auto cluster_type_str = envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
+                                        ->FindValueByNumber(cluster_type)
+                                        ->name();
       ENVOY_LOG_MISC(info,
-                     "Added a {} internal cluster [name: {}, address:{}:{}] to fetch aws "
+                     "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
                      "credentials",
-                     cluster_type, cluster_name, host, port);
+                     cluster_type_str, cluster_name, host_port);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
