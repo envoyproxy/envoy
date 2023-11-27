@@ -80,7 +80,7 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() = default;
 
-  virtual void onDecodeError() PURE;
+  virtual void onDecodeError(const absl::optional<OpCodes> opcode) PURE;
   virtual void onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) PURE;
   virtual void onConnect(bool readonly) PURE;
   virtual void onPing() PURE;
@@ -187,7 +187,7 @@ private:
   absl::Status ensureMinLength(int32_t len, int32_t minlen) const;
   absl::Status ensureMaxLength(int32_t len) const;
   absl::StatusOr<std::string> pathOnlyRequest(Buffer::Instance& data, uint64_t& offset,
-                                              uint32_t len);
+                                              uint32_t len, OpCodes opcode);
   absl::Status parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                     const std::chrono::milliseconds latency);
   absl::Status parseWatchEvent(Buffer::Instance& data, uint64_t& offset, uint32_t len, int64_t zxid,
