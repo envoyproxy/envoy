@@ -363,7 +363,9 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
   NiceMock<MockStreamCodecFactoryConfig> codec_factory_config;
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
+  NiceMock<Network::MockListenerInfo> listener_info;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ON_CALL(factory_context, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info));
   factory_context.server_factory_context_.cluster_manager_.initializeClusters({"zipkin"}, {});
   factory_context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
       {"zipkin"});
