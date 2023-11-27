@@ -228,6 +228,9 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
   auto response2 = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounterEq("http.config_test.geoip.total", 2);
+  EXPECT_EQ(2, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
+  EXPECT_EQ(2, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
 }
 
 } // namespace
