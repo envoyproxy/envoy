@@ -50,6 +50,8 @@ public:
 
   void registerGeoDbStats(const std::string& db_type);
 
+  Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
+
 private:
   absl::optional<std::string> city_db_path_;
   absl::optional<std::string> isp_db_path_;
