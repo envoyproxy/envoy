@@ -1524,6 +1524,12 @@ envoy_h1_count{} 1
   EXPECT_EQ(expected_response, code_response.second);
 }
 
+TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusUnsupportedBucketMode) {
+  const std::string url = "/stats?format=prometheus&histogram_buckets=disjoint";
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+}
+
 class StatsHandlerPrometheusWithTextReadoutsTest
     : public StatsHandlerPrometheusTest,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, std::string>> {};

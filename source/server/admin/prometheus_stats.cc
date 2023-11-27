@@ -368,14 +368,15 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateSummaryOutput, "summary", custom_namespaces);
     break;
-  // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics, but are here
-  // to preserve backwards compatibility.
   case Utility::HistogramBucketsMode::Unset:
   case Utility::HistogramBucketsMode::Cumulative:
-  case Utility::HistogramBucketsMode::Detailed:
-  case Utility::HistogramBucketsMode::Disjoint:
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
+    break;
+  // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics
+  case Utility::HistogramBucketsMode::Detailed:
+  case Utility::HistogramBucketsMode::Disjoint:
+    IS_ENVOY_BUG("unsupported Prometheus histogram bucket mode");
     break;
   }
 
