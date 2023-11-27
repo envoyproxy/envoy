@@ -25,7 +25,7 @@ struct CacheEntryUsability {
   /**
    * Remaining freshness lifetime.
    */
-  Seconds ttl = Envoy::Seconds::max();
+  Seconds ttl = Seconds::max();
 
   friend bool operator==(const CacheEntryUsability& a, const CacheEntryUsability& b) {
     return std::tie(a.status, a.age, a.ttl) == std::tie(b.status, b.age, b.ttl);
@@ -63,7 +63,7 @@ enum class ResponseCacheability {
 //
 // NOT YET IMPLEMENTED: To make CacheFilter use a custom cache policy, store a mutable CachePolicy
 // in FilterState before CacheFilter::decodeHeaders is called.
-class CachePolicy : public Envoy::StreamInfo::FilterState::Object {
+class CachePolicy : public StreamInfo::FilterState::Object {
 public:
   // For use in FilterState.
   static constexpr absl::string_view Name =
@@ -95,8 +95,8 @@ public:
    * @return an enum indicating how the response should be handled.
    */
   virtual ResponseCacheability
-  responseCacheability(const Envoy::Http::RequestHeaderMap& request_headers,
-                       const Envoy::Http::ResponseHeaderMap& response_headers) PURE;
+  responseCacheability(const Http::RequestHeaderMap& request_headers,
+                       const Http::ResponseHeaderMap& response_headers) PURE;
 
   /**
    * Determines whether the cached entry may be used directly or must be validated with upstream.
