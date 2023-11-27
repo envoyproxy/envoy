@@ -17,6 +17,8 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -340,14 +342,14 @@ public:
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
   void onGetDataRequest(const std::string& path, bool watch) override;
-  void onCreateRequest(const std::string& path, CreateFlags flags, OpCodes opcode) override;
+  absl::Status onCreateRequest(const std::string& path, CreateFlags flags, OpCodes opcode) override;
   void onSetRequest(const std::string& path) override;
   void onGetChildrenRequest(const std::string& path, bool watch, bool v2) override;
   void onDeleteRequest(const std::string& path, int32_t version) override;
   void onExistsRequest(const std::string& path, bool watch) override;
   void onGetAclRequest(const std::string& path) override;
   void onSetAclRequest(const std::string& path, int32_t version) override;
-  void onSyncRequest(const std::string& path) override;
+  absl::Status onSyncRequest(const absl::StatusOr<std::string>& path) override;
   void onCheckRequest(const std::string& path, int32_t version) override;
   void onMultiRequest() override;
   void onReconfigRequest() override;
@@ -356,8 +358,8 @@ public:
   void onAddWatchRequest(const std::string& path, const int32_t mode) override;
   void onCheckWatchesRequest(const std::string& path, int32_t type) override;
   void onRemoveWatchesRequest(const std::string& path, int32_t type) override;
-  void onGetEphemeralsRequest(const std::string& path) override;
-  void onGetAllChildrenNumberRequest(const std::string& path) override;
+  absl::Status onGetEphemeralsRequest(const absl::StatusOr<std::string>& path) override;
+  absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) override;
   void onCloseRequest() override;
   void onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,

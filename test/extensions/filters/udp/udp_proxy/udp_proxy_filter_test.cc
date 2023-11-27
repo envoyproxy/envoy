@@ -203,7 +203,7 @@ public:
         upstream_address_(Network::Utility::parseInternetAddressAndPort(upstream_ip_address_)),
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
-    ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
+    ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(
             Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
     ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
