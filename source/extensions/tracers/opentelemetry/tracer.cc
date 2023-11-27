@@ -38,7 +38,7 @@ void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> spa
     return;
   }
   const auto sampling_result =
-      sampler->shouldSample(span_context, operation_name, new_span.getTraceIdAsHex(),
+      sampler->shouldSample(span_context, new_span.getTraceIdAsHex(), operation_name,
                             new_span.spankind(), trace_context, {});
   new_span.setSampled(sampling_result.isSampled());
 

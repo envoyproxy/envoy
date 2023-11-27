@@ -1180,6 +1180,13 @@ envoy.tracers.opentelemetry.samplers.always_on:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+envoy.tracers.opentelemetry.samplers.dynatrace:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers
