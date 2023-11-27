@@ -214,6 +214,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
     if (!info_.downstreamTransportFailureReason().empty()) {
       return CelValue::CreateStringView(info_.downstreamTransportFailureReason());
     }
+    return {};
   }
 
   auto ssl_info = info_.downstreamAddressProvider().sslConnection();

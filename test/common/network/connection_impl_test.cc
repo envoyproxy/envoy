@@ -480,7 +480,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::move(mocks.transport_socket_), stream_info_);
-
+  EXPECT_CALL(*transport_socket, failureReason()).WillRepeatedly(Return("custom error"));
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
   Stats::MockCounter timeout_counter;
   EXPECT_CALL(timeout_counter, inc());
@@ -489,7 +489,10 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   mock_timer->invokeCallback();
   EXPECT_THAT(stream_info_.connectionTerminationDetails(),
               Optional(HasSubstr("transport socket timeout")));
-  EXPECT_EQ(server_connection->transportFailureReason(), "connect timeout");
+  EXPECT_THAT(server_connection->transportFailureReason(), StartsWith("connect timeout"));
+  EXPECT_THAT(server_connection->transportFailureReason(), EndsWith("custom error"));
+  EXPECT_THAT(stream_info_.downstreamTransportFailureReason(), StartsWith("connect timeout"));
+  EXPECT_THAT(stream_info_.downstreamTransportFailureReason(), EndsWith("custom error"));
 }
 
 TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
