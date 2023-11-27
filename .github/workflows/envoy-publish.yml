@@ -34,14 +34,15 @@ jobs:
       }}
     uses: ./.github/workflows/_env.yml
     with:
-      check_mobile_run: false
-      prime_build_image: true
-      repo_ref: ${{ inputs.ref }}
-      repo_ref_sha: ${{ inputs.sha }}
-      repo_ref_name: ${{ inputs.head_ref }}
+      check-mobile-run: false
+      prime-build-image: true
+      repo-ref: ${{ inputs.ref }}
+      repo-ref-sha: ${{ inputs.sha }}
+      repo-ref-name: ${{ inputs.head_ref }}
     permissions:
       contents: read
       packages: read
+      pull-requests: read
 
   check:
     if: ${{ github.event_name != 'pull_request' }}
@@ -58,12 +59,12 @@ jobs:
     - env
     - check
     uses: ./.github/workflows/_stage_publish.yml
-    name: Publish ${{ needs.env.outputs.repo_ref_title }}
+    name: Publish ${{ needs.env.outputs.repo-ref-title }}
     with:
       build_image_ubuntu: ${{ needs.env.outputs.build_image_ubuntu }}
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
-      version_dev: ${{ needs.env.outputs.version_dev }}
-      repo_ref: ${{ inputs.ref }}
+      version-dev: ${{ needs.env.outputs.version-dev }}
+      repo-ref: ${{ inputs.ref }}
       sha: ${{ inputs.sha }}
     permissions:
       contents: read
@@ -76,7 +77,7 @@ jobs:
 
   verify:
     uses: ./.github/workflows/_stage_verify.yml
-    name: Verify ${{ needs.env.outputs.repo_ref_title }}
+    name: Verify ${{ needs.env.outputs.repo-ref-title }}
     needs:
     - env
     permissions:
@@ -84,4 +85,4 @@ jobs:
     with:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ inputs.ref }}
+      repo-ref: ${{ inputs.ref }}

@@ -7,6 +7,7 @@
 #include "source/common/common/logger.h"
 
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
+#include "contrib/kafka/filters/network/source/external/responses.h"
 #include "contrib/kafka/filters/network/source/response_codec.h"
 
 namespace Envoy {
@@ -37,6 +38,8 @@ using ResponseRewriterSharedPtr = std::shared_ptr<ResponseRewriter>;
  */
 class ResponseRewriterImpl : public ResponseRewriter, private Logger::Loggable<Logger::Id::kafka> {
 public:
+  ResponseRewriterImpl(const BrokerFilterConfig& config);
+
   // ResponseCallback
   void onMessage(AbstractResponseSharedPtr response) override;
   void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
@@ -44,9 +47,38 @@ public:
   // ResponseRewriter
   void process(Buffer::Instance& buffer) override;
 
+  /**
+   * Mutates response according to config.
+   */
+  void updateMetadataBrokerAddresses(MetadataResponse& response) const;
+
+  /**
+   * Mutates response according to config.
+   */
+  void updateFindCoordinatorBrokerAddresses(FindCoordinatorResponse& response) const;
+
+  /**
+   * Mutates response according to config.
+   */
+  void updateDescribeClusterBrokerAddresses(DescribeClusterResponse& response) const;
+
   size_t getStoredResponseCountForTest() const;
 
 private:
+  // Helper function to update various response structures.
+  // Pointer-to-member used to handle varying field names across the structs.
+  template <typename T> void maybeUpdateHostAndPort(T& arg, const int32_t T::*node_id_field) const {
+    const int32_t node_id = arg.*node_id_field;
+    const absl::optional<HostAndPort> hostAndPort = config_.findBrokerAddressOverride(node_id);
+    if (hostAndPort) {
+      ENVOY_LOG(trace, "Changing broker [{}] from {}:{} to {}:{}", node_id, arg.host_, arg.port_,
+                hostAndPort->first, hostAndPort->second);
+      arg.host_ = hostAndPort->first;
+      arg.port_ = hostAndPort->second;
+    }
+  }
+
+  const BrokerFilterConfig& config_;
   std::vector<AbstractResponseSharedPtr> responses_to_rewrite_;
 };
 

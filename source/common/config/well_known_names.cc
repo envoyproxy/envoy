@@ -198,6 +198,9 @@ TagNameValues::TagNameValues() {
 
   // listener_local_rate_limit.(<stat_prefix>.)
   addTokenized(LOCAL_LISTENER_RATELIMIT_PREFIX, "listener_local_ratelimit.$.**");
+
+  // dns_filter.(<stat_prefix>.).**
+  addTokenized(DNS_FILTER_PREFIX, "dns_filter.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

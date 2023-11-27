@@ -326,8 +326,8 @@ envoy.filters.http.ext_authz:
 envoy.filters.http.ext_proc:
   categories:
   - envoy.filters.http
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
   - envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
@@ -1697,3 +1697,10 @@ envoy.tracers.opentelemetry.resource_detectors.environment:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig
+envoy.tracers.opentelemetry.resource_detectors.dynatrace:
+  categories:
+  - envoy.tracers.opentelemetry.resource_detectors
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig

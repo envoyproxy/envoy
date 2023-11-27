@@ -12,7 +12,6 @@ BUILD_CONFIG="$(dirname "$(realpath "$0")")"/osx-build-config
 BAZEL_BUILD_OPTIONS=(
     "--curses=no"
     --verbose_failures
-    "--test_output=all"
     "--flaky_test_attempts=integration@2"
     "--override_repository=envoy_build_config=${BUILD_CONFIG}"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"

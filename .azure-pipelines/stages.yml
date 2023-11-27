@@ -70,10 +70,11 @@ stages:
   - template: stage/linux.yml
     parameters:
       cacheTestResults: ${{ parameters.cacheTestResults }}
+      bazelConfigRBE: --config=remote-ci --config=rbe-google --jobs=200
+      pool: envoy-x64-large
       # these are parsed differently and _must_ be expressed in this way
       runBuild: variables['RUN_BUILD']
       runTests: $(RUN_TESTS)
-      tmpfsDockerDisabled: true
 
 - stage: linux_arm64
   displayName: Linux arm64

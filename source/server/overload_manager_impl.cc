@@ -51,7 +51,7 @@ public:
         saturated_threshold_(config.saturation_threshold()),
         state_(OverloadActionState::inactive()) {
     if (scaling_threshold_ >= saturated_threshold_) {
-      throwEnvoyExceptionOrPanic("scaling_threshold must be less than saturation_threshold");
+      throw EnvoyException("scaling_threshold must be less than saturation_threshold");
     }
   }
 
@@ -90,7 +90,7 @@ TriggerPtr createTriggerFromConfig(const envoy::config::overload::v3::Trigger& t
     trigger = std::make_unique<ScaledTriggerImpl>(trigger_config.scaled());
     break;
   case envoy::config::overload::v3::Trigger::TriggerOneofCase::TRIGGER_ONEOF_NOT_SET:
-    throwEnvoyExceptionOrPanic(absl::StrCat("action not set for trigger ", trigger_config.name()));
+    throw EnvoyException(absl::StrCat("action not set for trigger ", trigger_config.name()));
   }
 
   return trigger;
@@ -130,7 +130,7 @@ Event::ScaledTimerType parseTimerType(
   case Config::TRANSPORT_SOCKET_CONNECT:
     return Event::ScaledTimerType::TransportSocketConnectTimeout;
   default:
-    throwEnvoyExceptionOrPanic(fmt::format("Unknown timer type {}", config_timer_type));
+    throw EnvoyException(fmt::format("Unknown timer type {}", config_timer_type));
   }
 }
 
@@ -156,8 +156,8 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
     auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));
     UNREFERENCED_PARAMETER(_);
     if (!inserted) {
-      throwEnvoyExceptionOrPanic(fmt::format("Found duplicate entry for timer type {}",
-                                             Config::TimerType_Name(scale_timer.timer())));
+      throw EnvoyException(fmt::format("Found duplicate entry for timer type {}",
+                                       Config::TimerType_Name(scale_timer.timer())));
     }
   }
 
@@ -274,7 +274,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
   for (const auto& trigger_config : config.triggers()) {
     if (!triggers_.try_emplace(trigger_config.name(), createTriggerFromConfig(trigger_config))
              .second) {
-      throwEnvoyExceptionOrPanic(
+      throw EnvoyException(
           absl::StrCat("Duplicate trigger resource for overload action ", config.name()));
     }
   }
@@ -321,7 +321,7 @@ LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShed
   for (const auto& trigger_config : config.triggers()) {
     if (!triggers_.try_emplace(trigger_config.name(), createTriggerFromConfig(trigger_config))
              .second) {
-      throwEnvoyExceptionOrPanic(
+      throw EnvoyException(
           absl::StrCat("Duplicate trigger resource for LoadShedPoint ", config.name()));
     }
   }
@@ -410,7 +410,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope).second;
     }
     if (!result) {
-      throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate resource monitor ", name));
+      throw EnvoyException(absl::StrCat("Duplicate resource monitor ", name));
     }
   }
 
@@ -425,7 +425,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
       if (std::find(well_known_actions.begin(), well_known_actions.end(), name) ==
           well_known_actions.end()) {
-        throwEnvoyExceptionOrPanic(absl::StrCat("Unknown Overload Manager Action ", name));
+        throw EnvoyException(absl::StrCat("Unknown Overload Manager Action ", name));
       }
     }
 
@@ -436,7 +436,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     // an invalid free.
     auto result = actions_.try_emplace(symbol, OverloadAction(action, stats_scope));
     if (!result.second) {
-      throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate overload action ", name));
+      throw EnvoyException(absl::StrCat("Duplicate overload action ", name));
     }
 
     if (name == OverloadActionNames::get().ReduceTimeouts) {
@@ -444,12 +444,12 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
           parseTimerMinimums(action.typed_config(), validation_visitor));
     } else if (name == OverloadActionNames::get().ResetStreams) {
       if (!config.has_buffer_factory_config()) {
-        throwEnvoyExceptionOrPanic(
+        throw EnvoyException(
             fmt::format("Overload action \"{}\" requires buffer_factory_config.", name));
       }
       makeCounter(api.rootScope(), OverloadActionStatsNames::get().ResetStreamsCount);
     } else if (action.has_typed_config()) {
-      throwEnvoyExceptionOrPanic(fmt::format(
+      throw EnvoyException(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));
     }
 
@@ -461,7 +461,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       if (resources_.find(resource) == resources_.end() &&
           proactive_resource_it ==
               OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
-        throwEnvoyExceptionOrPanic(
+        throw EnvoyException(
             fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
       }
       resource_to_actions_.insert(std::make_pair(resource, symbol));
@@ -472,8 +472,8 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
   for (const auto& point : config.loadshed_points()) {
     for (const auto& trigger : point.triggers()) {
       if (!resources_.contains(trigger.name())) {
-        throwEnvoyExceptionOrPanic(fmt::format("Unknown trigger resource {} for loadshed point {}",
-                                               trigger.name(), point.name()));
+        throw EnvoyException(fmt::format("Unknown trigger resource {} for loadshed point {}",
+                                         trigger.name(), point.name()));
       }
     }
 
@@ -482,7 +482,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
         std::make_unique<LoadShedPointImpl>(point, api.rootScope(), api.randomGenerator()));
 
     if (!result.second) {
-      throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate loadshed point ", point.name()));
+      throw EnvoyException(absl::StrCat("Duplicate loadshed point ", point.name()));
     }
   }
 }

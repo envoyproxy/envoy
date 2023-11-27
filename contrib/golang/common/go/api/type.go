@@ -132,7 +132,6 @@ type HeaderMap interface {
 
 type RequestHeaderMap interface {
 	HeaderMap
-	Protocol() string
 	Scheme() string
 	Method() string
 	Host() string

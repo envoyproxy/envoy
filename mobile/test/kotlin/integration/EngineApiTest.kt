@@ -23,7 +23,6 @@ class EngineApiTest {
     val engine =
       EngineBuilder()
         .addLogLevel(LogLevel.INFO)
-        .addStatsFlushSeconds(1)
         .setNodeId("node-id")
         .setNodeLocality("region", "zone", "subzone")
         .setNodeMetadata(

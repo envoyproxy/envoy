@@ -44,6 +44,22 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
+// Meaningless case to improve coverage rate.
+TEST(PerFilterChainFactoryContextImplTest, NopTest) {
+  NiceMock<Configuration::MockFactoryContext> parent_context;
+
+  PerFilterChainFactoryContextImpl context(parent_context, parent_context.init_manager_);
+
+  context.messageValidationContext();
+  context.grpcContext();
+  context.healthCheckFailed();
+  context.httpContext();
+  context.routerContext();
+  context.overloadManager();
+  context.timeSource();
+  context.lifecycleNotifier();
+}
+
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   MockFilterChainFactoryBuilder() {

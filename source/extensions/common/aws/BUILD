@@ -59,12 +59,16 @@ envoy_cc_library(
     external_deps = ["abseil_time"],
     deps = [
         ":credentials_provider_interface",
+        ":metadata_fetcher_lib",
         ":utility_lib",
         "//envoy/api:api_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/http:utility_lib",
+        "//source/common/init:target_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
 
@@ -81,6 +85,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],

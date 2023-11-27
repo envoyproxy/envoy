@@ -29,15 +29,14 @@ public:
       : request_mutations_(config.request_mutations()),
         response_mutations_(config.response_mutations()) {}
 
-  void mutateRequestHeaders(Http::RequestHeaderMap& request_headers,
+  void mutateRequestHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
                             const StreamInfo::StreamInfo& stream_info) const;
-  void mutateResponseHeaders(const Http::RequestHeaderMap& request_headers,
-                             Http::ResponseHeaderMap& response_headers,
+  void mutateResponseHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
                              const StreamInfo::StreamInfo& stream_info) const;
 
 private:
-  Http::HeaderMutations request_mutations_;
-  Http::HeaderMutations response_mutations_;
+  const Http::HeaderMutations request_mutations_;
+  const Http::HeaderMutations response_mutations_;
 };
 
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {

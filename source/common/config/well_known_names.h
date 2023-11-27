@@ -117,6 +117,8 @@ public:
   const std::string LOCAL_NETWORK_RATELIMIT_PREFIX = "envoy.local_network_ratelimit_prefix";
   // Stats prefix for the Local Ratelimit listener filter
   const std::string LOCAL_LISTENER_RATELIMIT_PREFIX = "envoy.local_listener_ratelimit_prefix";
+  // Stats prefix for the dns filter
+  const std::string DNS_FILTER_PREFIX = "envoy.dns_filter_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
   // Stats prefix for the UDP Proxy network filter

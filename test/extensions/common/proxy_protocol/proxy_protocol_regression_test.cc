@@ -10,6 +10,7 @@
 #include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -56,7 +57,7 @@ public:
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 getListenSocket(_))
         .WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this, runtime_);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr,
@@ -192,6 +193,7 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
   NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 // Parameterize the listener socket address version.

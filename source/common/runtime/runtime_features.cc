@@ -45,7 +45,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_connect_udp_support);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
 RUNTIME_GUARD(envoy_reloadable_features_enable_zone_routing_different_zone_counts);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_send_original_xff);
-RUNTIME_GUARD(envoy_reloadable_features_format_ports_as_numbers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_uppercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_hmac_base64_encoding_only);
 RUNTIME_GUARD(envoy_reloadable_features_http1_allow_codec_error_response_after_1xx_headers);
@@ -66,12 +65,14 @@ RUNTIME_GUARD(envoy_reloadable_features_lowercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
+RUNTIME_GUARD(envoy_reloadable_features_normalize_host_for_preresolve_dfp_dns);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_make_token_cookie_httponly);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_standard_max_age_value);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_overload_manager_error_unknown_action);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_upstream_request_timeout);
+RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
 RUNTIME_GUARD(envoy_reloadable_features_send_header_raw_value);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_transport_failure_reason_format);
@@ -113,6 +114,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
+// TODO(suniltheta): Once the newly added http async technique proves effective and
+// is stabilized get rid of this feature flag and code path that relies on libcurl.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_libcurl_to_fetch_aws_credentials);
 // TODO(adisuissa): enable by default once this is tested in prod.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 // TODO(#10646) change to true when UHV is sufficiently tested

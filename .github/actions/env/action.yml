@@ -12,11 +12,11 @@ inputs:
     type: string
     required: true
 
-  repo_ref:
+  repo-ref:
     type: string
-  repo_ref_sha:
+  repo-ref-sha:
     type: string
-  repo_ref_name:
+  repo-ref-name:
     type: string
 
   trusted_bots:
@@ -24,7 +24,7 @@ inputs:
     default: |
       trigger-release-envoy[bot]
 
-  check_mobile_run:
+  check-mobile-run:
     type: boolean
     default: true
 
@@ -60,24 +60,24 @@ outputs:
     value: ${{ steps.should_run.outputs.mobile_release_validation }}
   mobile_tsan:
     value: ${{ steps.should_run.outputs.mobile_tsan }}
-  repo_ref:
-    value: ${{ steps.context.outputs.repo_ref }}
-  repo_ref_name:
-    value: ${{ steps.context.outputs.repo_ref_name }}
-  repo_ref_pr_number:
-    value: ${{ steps.context.outputs.repo_ref_pr_number }}
-  repo_ref_sha:
-    value: ${{ steps.context.outputs.repo_ref_sha }}
-  repo_ref_sha_short:
-    value: ${{ steps.context.outputs.repo_ref_sha_short }}
-  repo_ref_title:
-    value: ${{ steps.context.outputs.repo_ref_title }}
+  repo-ref:
+    value: ${{ steps.context.outputs.repo-ref }}
+  repo-ref-name:
+    value: ${{ steps.context.outputs.repo-ref-name }}
+  repo-ref-pr-number:
+    value: ${{ steps.context.outputs.repo-ref-pr-number }}
+  repo-ref-sha:
+    value: ${{ steps.context.outputs.repo-ref-sha }}
+  repo-ref-sha-short:
+    value: ${{ steps.context.outputs.repo-ref-sha-short }}
+  repo-ref-title:
+    value: ${{ steps.context.outputs.repo-ref-title }}
   trusted:
     value: ${{ steps.trusted.outputs.trusted }}
-  version_dev:
-    value: ${{ steps.context.outputs.version_dev }}
-  version_patch:
-    value: ${{ steps.context.outputs.version_patch }}
+  version-dev:
+    value: ${{ steps.context.outputs.version-dev }}
+  version-patch:
+    value: ${{ steps.context.outputs.version-patch }}
 
 runs:
   using: composite
@@ -126,16 +126,16 @@ runs:
   # If we are in a trusted CI run then the provided commit _must_ be either the latest for
   # this branch, or an antecdent.
   - run: |
-      if ! git merge-base --is-ancestor "${{ inputs.repo_ref }}" HEAD &> /dev/null; then
-      echo "Provided Envoy ref (${{ inputs.repo_ref }}) is not an ancestor of current branch" >&2
+      if ! git merge-base --is-ancestor "${{ inputs.repo-ref }}" HEAD &> /dev/null; then
+      echo "Provided Envoy ref (${{ inputs.repo-ref }}) is not an ancestor of current branch" >&2
           exit 1
       fi
-      git checkout "${{ inputs.repo_ref }}"
-    if: ${{ steps.trusted.outputs.trusted == 'true' && inputs.repo_ref }}
+      git checkout "${{ inputs.repo-ref }}"
+    if: ${{ steps.trusted.outputs.trusted == 'true' && inputs.repo-ref }}
     name: Check provided ref
     shell: bash
 
-  - if: ${{ inputs.check_mobile_run != 'false' }}
+  - if: ${{ inputs.check-mobile-run != 'false' }}
     id: should_run
     name: 'Check what to run'
     run: ./mobile/tools/what_to_run.sh
@@ -151,7 +151,7 @@ runs:
       fi
       VERSION_PATCH="$(cat VERSION.txt | cut -d- -f1 | rev | cut -d. -f1 | rev)"
       # TODO: strip merge from pr names
-      REF_NAME=${{ inputs.repo_ref_name || github.ref_name }}
+      REF_NAME=${{ inputs.repo-ref-name || github.ref_name }}
       if [[ "$REF_NAME" =~ ^refs/pull/ ]]; then
           REF_NAME="${REF_NAME:10}"
           REF_PR_NUMBER="$(echo "${REF_NAME}" | cut -d/ -f1)"
@@ -160,8 +160,8 @@ runs:
       fi
       echo "SET PR NUMBER: ${REF_PR_NUMBER}"
 
-      REF="${{ steps.trusted.outputs.trusted != 'true' && inputs.repo_ref || '' }}"
-      REF_SHA=${{ inputs.repo_ref_sha || github.event.pull_request.head.sha || github.sha }}
+      REF="${{ steps.trusted.outputs.trusted != 'true' && inputs.repo-ref || '' }}"
+      REF_SHA=${{ inputs.repo-ref-sha || github.event.pull_request.head.sha || github.sha }}
       REF_SHA_SHORT="${REF_SHA:0:7}"
       REF_TITLE=(
           "${{ steps.trusted.outputs.trusted == 'true' && 'postsubmit' || 'pr' }}/"
@@ -169,14 +169,14 @@ runs:
           "@${REF_SHA_SHORT}")
       REF_TITLE="$(printf %s "${REF_TITLE[@]}" $'\n')"
       {
-          echo "repo_ref=$REF"
-          echo "repo_ref_name=$REF_NAME"
-          echo "repo_ref_pr_number=$REF_PR_NUMBER"
-          echo "repo_ref_sha=$REF_SHA"
-          echo "repo_ref_title=$REF_TITLE"
-          echo "repo_ref_sha_short=$REF_SHA_SHORT"
-          echo "version_dev=$VERSION_DEV"
-          echo "version_patch=$VERSION_PATCH"
+          echo "repo-ref=$REF"
+          echo "repo-ref-name=$REF_NAME"
+          echo "repo-ref-pr-number=$REF_PR_NUMBER"
+          echo "repo-ref-sha=$REF_SHA"
+          echo "repo-ref-title=$REF_TITLE"
+          echo "repo-ref-sha-short=$REF_SHA_SHORT"
+          echo "version-dev=$VERSION_DEV"
+          echo "version-patch=$VERSION_PATCH"
       } >> "$GITHUB_OUTPUT"
     shell: bash
 

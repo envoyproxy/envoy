@@ -46,7 +46,7 @@ std::string StdoutAccessLogFactory::name() const { return "envoy.access_loggers.
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(StdoutAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+LEGACY_REGISTER_FACTORY(StdoutAccessLogFactory, AccessLog::AccessLogInstanceFactory,
                         "envoy.stdout_access_log");
 
 AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
@@ -75,7 +75,7 @@ std::string StderrAccessLogFactory::name() const { return "envoy.access_loggers.
 /**
  * Static registration for the `stderr` access log. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(StderrAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+LEGACY_REGISTER_FACTORY(StderrAccessLogFactory, AccessLog::AccessLogInstanceFactory,
                         "envoy.stderr_access_log");
 
 } // namespace File
