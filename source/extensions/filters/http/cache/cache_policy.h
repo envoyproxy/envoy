@@ -39,7 +39,7 @@ struct CacheEntryUsability {
 enum class RequestCacheability {
   // This request is eligible for serving from cache, and for having its response stored.
   Cacheable,
-  // This request
+  // Don't respond to this requst from cache, or store its response into cache.
   Bypass,
   // This request is eligible for serving from cache, but its response must not be stored.
   NoStore,
