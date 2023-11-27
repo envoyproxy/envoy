@@ -6,6 +6,7 @@
 #include "source/common/filesystem/directory.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/node_hash_set.h"
@@ -14,6 +15,9 @@
 
 namespace Envoy {
 namespace Filesystem {
+
+using StatusHelpers::HasStatus;
+using testing::HasSubstr;
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const DirectoryEntry& entry, std::ostream* os) {
@@ -249,18 +253,16 @@ TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-// Test that the constructor throws an exception when given a non-existing path
+// Test that the status is an error when given a non-existing path
 TEST(DirectoryIteratorImpl, NonExistingDir) {
   const std::string dir_path("some/non/existing/dir");
-
+  DirectoryIteratorImpl dir_iterator(dir_path);
 #ifdef WIN32
-  EXPECT_THROW_WITH_MESSAGE(
-      DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
-      fmt::format("unable to open directory {}: {}", dir_path, ERROR_PATH_NOT_FOUND));
+  EXPECT_THAT(dir_iterator.status(),
+              HasStatus(absl::StatusCode::kUnknown, HasSubstr("unable to open directory")));
 #else
-  EXPECT_THROW_WITH_MESSAGE(
-      DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
-      fmt::format("unable to open directory {}: No such file or directory", dir_path));
+  EXPECT_THAT(dir_iterator.status(),
+              HasStatus(absl::StatusCode::kNotFound, HasSubstr("unable to open directory")));
 #endif
 }
 
@@ -284,8 +286,8 @@ TEST_F(DirectoryTest, Fifo) {
 // instead by directly calling the private function.
 TEST_F(DirectoryTest, MakeEntryThrowsOnStatFailure) {
   Directory directory(dir_path_);
-  EXPECT_THROW_WITH_REGEX(directory.begin().makeEntry("foo"), EnvoyException,
-                          "unable to stat file: '.*foo' .*");
+  EXPECT_THAT(directory.begin().makeEntry("foo"),
+              HasStatus(absl::StatusCode::kNotFound, HasSubstr("unable to stat file")));
 }
 #endif
 

@@ -252,8 +252,11 @@ public:
 
   virtual DirectoryIteratorImpl& operator++() PURE;
 
+  const absl::Status& status() const { return status_; }
+
 protected:
   DirectoryEntry entry_;
+  absl::Status status_;
 };
 
 } // namespace Filesystem
