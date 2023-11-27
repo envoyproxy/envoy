@@ -104,7 +104,7 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.expand_agnostic_stream_lifetime`` and legacy code paths.
 - area: http
   change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
+    removed ``envoy.reloadable_features.sanitize_original_path`` and legacy code paths.
 - area: maglev
   change: |
     Removed ``envoy.reloadable_features.allow_compact_maglev`` and legacy code paths.
