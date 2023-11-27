@@ -169,6 +169,11 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 		}
 		status = f.EncodeTrailers(header)
 	}
+
+	if endStream == 1 && (status == api.StopAndBuffer || status == api.StopAndBufferWatermark) {
+		panic("received wait data status when there is no data, please fix the returned status")
+	}
+
 	return uint64(status)
 }
 

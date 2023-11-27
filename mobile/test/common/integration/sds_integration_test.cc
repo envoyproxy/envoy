@@ -7,7 +7,6 @@
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/environment.h"
 
-#include "extension_registry.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -21,11 +20,6 @@ constexpr absl::string_view SECRET_NAME = "client_cert";
 class SdsIntegrationTest : public XdsIntegrationTest {
 public:
   void initialize() override {
-    create_xds_upstream_ = true;
-    use_lds_ = false;
-    skip_tag_extraction_rule_check_ = true;
-    ExtensionRegistry::registerFactories();
-
     XdsIntegrationTest::initialize();
     initializeXdsStream();
   }
@@ -38,6 +32,8 @@ public:
     builder_.setXds(std::move(xds_builder));
     XdsIntegrationTest::createEnvoy();
   }
+
+  void SetUp() override { initialize(); }
 
 protected:
   void sendCdsResponse() {
@@ -94,8 +90,6 @@ INSTANTIATE_TEST_SUITE_P(
 
 // Note: Envoy Mobile does not have listener sockets, so we aren't including a downstream test.
 TEST_P(SdsIntegrationTest, SdsForUpstreamCluster) {
-  initialize();
-
   // Wait until the new cluster from CDS is added before sending the SDS response.
   sendCdsResponse();
   ASSERT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));

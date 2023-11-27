@@ -38,7 +38,6 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
 
   internal var grpcInitialMetadata = mutableMapOf<String, String>()
   internal var sslRootCerts: String? = null
-  internal var sni: String? = null
   internal var rtdsResourceName: String? = null
   internal var rtdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
   internal var enableCds: Boolean = false
@@ -75,19 +74,6 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
    */
   fun setSslRootCerts(rootCerts: String): XdsBuilder {
     this.sslRootCerts = rootCerts
-    return this
-  }
-
-  /**
-   * Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake and
-   * the authority HTTP header. If not set, the SNI is set by default to the xDS server address and
-   * the authority HTTP header is not set.
-   *
-   * @param sni The SNI value.
-   * @return this builder.
-   */
-  fun setSni(sni: String): XdsBuilder {
-    this.sni = sni
     return this
   }
 
@@ -687,7 +673,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         xdsBuilder?.xdsServerPort ?: 0,
         xdsBuilder?.grpcInitialMetadata ?: mapOf<String, String>(),
         xdsBuilder?.sslRootCerts,
-        xdsBuilder?.sni,
         nodeId,
         nodeRegion,
         nodeZone,

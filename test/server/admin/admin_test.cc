@@ -16,6 +16,7 @@
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/server/admin/stats_request.h"
+#include "source/server/configuration_impl.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -67,29 +68,28 @@ TEST_P(AdminInstanceTest, Getters) {
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
-  std::ifstream address_file(address_out_path_);
+  std::ifstream address_file(server_.options_.admin_address_path_);
   std::string address_from_file;
   std::getline(address_file, address_from_file);
   EXPECT_EQ(admin_.socket().connectionInfoProvider().localAddress()->asString(), address_from_file);
 }
 
 TEST_P(AdminInstanceTest, AdminAddress) {
-  const std::string address_out_path = TestEnvironment::temporaryPath("admin.address");
+  server_.options_.admin_address_path_ = TestEnvironment::temporaryPath("admin.address");
   AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
-  EXPECT_LOG_CONTAINS("info", "admin address:",
-                      admin_address_out_path.startHttpListener(
-                          access_logs, address_out_path,
-                          Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                          listener_scope_.createScope("listener.admin.")));
+  EXPECT_LOG_CONTAINS(
+      "info", "admin address:",
+      admin_address_out_path.startHttpListener(
+          access_logs, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr));
 }
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
-  const std::string bad_path =
+  server_.options_.admin_address_path_ =
       TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
@@ -98,11 +98,12 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
       file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
-      "critical", "cannot open admin address output file " + bad_path + " for writing.",
+      "critical",
+      "cannot open admin address output file " + server_.options_.admin_address_path_ +
+          " for writing.",
       admin_bad_address_out_path.startHttpListener(
-          access_logs, bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-          listener_scope_.createScope("listener.admin.")));
-  EXPECT_FALSE(std::ifstream(bad_path));
+          access_logs, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr));
+  EXPECT_FALSE(std::ifstream(server_.options_.admin_address_path_));
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
@@ -315,7 +316,7 @@ private:
   NullOverloadManager::OverloadState overload_state_{server_.dispatcher(), false};
   AdminImpl::AdminListenSocketFactory socket_factory_{nullptr};
   Stats::ScopeSharedPtr listener_scope_;
-  AdminImpl::AdminListener listener_{admin_, std::move(listener_scope_)};
+  AdminImpl::AdminListener listener_{admin_, *listener_scope_};
 };
 
 // Covers override methods for admin-specific implementations of classes in

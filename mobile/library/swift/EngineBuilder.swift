@@ -6,7 +6,7 @@ import Foundation
 
 // swiftlint:disable file_length
 
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
 /// Builder for generating the xDS configuration for the Envoy Mobile engine.
 /// xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in
 /// https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
@@ -20,7 +20,6 @@ open class XdsBuilder: NSObject {
   let xdsServerPort: UInt32
   var xdsGrpcInitialMetadata: [String: String] = [:]
   var sslRootCerts: String?
-  var sni: String?
   var rtdsResourceName: String?
   var rtdsTimeoutInSeconds: UInt32 = 0
   var enableCds: Bool = false
@@ -68,19 +67,6 @@ open class XdsBuilder: NSObject {
   @discardableResult
   public func setSslRootCerts(rootCerts: String) -> Self {
     self.sslRootCerts = rootCerts
-    return self
-  }
-
-  /// Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake
-  /// and the authority HTTP header. If not set, the SNI is set by default to the xDS server address
-  /// and the authority HTTP header is not set.
-  ///
-  /// - parameter sni: The SNI (server name identification) value.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func setSni(sni: String) -> Self {
-    self.sni = sni
     return self
   }
 
@@ -192,7 +178,7 @@ open class EngineBuilder: NSObject {
   private var nodeRegion: String?
   private var nodeZone: String?
   private var nodeSubZone: String?
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
   private var xdsBuilder: XdsBuilder?
 #endif
   private var enableSwiftBootstrap = false
@@ -667,7 +653,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
   /// Sets the xDS configuration for the Envoy Mobile engine.
   ///
   /// - parameter xdsBuilder: The XdsBuilder instance which specifies the xDS config options.
@@ -742,19 +728,17 @@ open class EngineBuilder: NSObject {
     var xdsServerPort: UInt32 = 0
     var xdsGrpcInitialMetadata: [String: String] = [:]
     var xdsSslRootCerts: String?
-    var xdsSni: String?
     var rtdsResourceName: String?
     var rtdsTimeoutSeconds: UInt32 = 0
     var enableCds: Bool = false
     var cdsResourcesLocator: String?
     var cdsTimeoutSeconds: UInt32 = 0
 
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
     xdsServerAddress = self.xdsBuilder?.xdsServerAddress
     xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
     xdsGrpcInitialMetadata = self.xdsBuilder?.xdsGrpcInitialMetadata ?? [:]
     xdsSslRootCerts = self.xdsBuilder?.sslRootCerts
-    xdsSni = self.xdsBuilder?.sni
     rtdsResourceName = self.xdsBuilder?.rtdsResourceName
     rtdsTimeoutSeconds = self.xdsBuilder?.rtdsTimeoutInSeconds ?? 0
     enableCds = self.xdsBuilder?.enableCds ?? false
@@ -803,7 +787,6 @@ open class EngineBuilder: NSObject {
       xdsServerPort: xdsServerPort,
       xdsGrpcInitialMetadata: xdsGrpcInitialMetadata,
       xdsSslRootCerts: xdsSslRootCerts,
-      xdsSni: xdsSni,
       rtdsResourceName: rtdsResourceName,
       rtdsTimeoutSeconds: rtdsTimeoutSeconds,
       enableCds: enableCds,
@@ -897,7 +880,7 @@ private extension EngineBuilder {
   }
 
   private func generateXds(_ cxxBuilder: inout Envoy.Platform.EngineBuilder) {
-#if ENVOY_GOOGLE_GRPC
+#if ENVOY_MOBILE_XDS
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
                                                     xdsBuilder.xdsServerPort)
@@ -906,9 +889,6 @@ private extension EngineBuilder {
       }
       if let xdsSslRootCerts = xdsBuilder.sslRootCerts {
         cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
-      }
-      if let xdsSni = xdsBuilder.sni {
-        cxxXdsBuilder.setSni(xdsSni.toCXX())
       }
       if let rtdsResourceName = xdsBuilder.rtdsResourceName {
         cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(),

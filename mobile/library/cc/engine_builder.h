@@ -36,7 +36,7 @@ struct NodeLocality {
   std::string sub_zone;
 };
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 // A class for building the xDS configuration for the Envoy Mobile engine.
 // xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in:
 // https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
@@ -66,11 +66,6 @@ public:
   // Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
   // connection. If no root certs are specified, the operating system defaults are used.
   XdsBuilder& setSslRootCerts(std::string root_certs);
-
-  // Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake
-  // and the authority HTTP header. If not set, the SNI is set by default to the xDS server address
-  // and the authority HTTP header is not set.
-  XdsBuilder& setSni(std::string sni);
 
   // Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
   // to retrieve dynamic runtime configuration via the xDS management server.
@@ -114,7 +109,6 @@ private:
   uint32_t xds_server_port_;
   std::vector<envoy::config::core::v3::HeaderValue> xds_initial_grpc_metadata_;
   std::string ssl_root_certs_;
-  std::string sni_;
   std::string rtds_resource_name_;
   int rtds_timeout_in_seconds_ = DefaultXdsTimeout;
   bool enable_cds_ = false;
@@ -171,7 +165,7 @@ public:
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Sets the node.metadata field in the Bootstrap configuration.
   EngineBuilder& setNodeMetadata(ProtobufWkt::Struct node_metadata);
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   // Sets the xDS configuration for the Envoy Mobile engine.
   //
   // `xds_builder`: the XdsBuilder instance used to specify the xDS configuration options.
@@ -255,7 +249,7 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif
 };
