@@ -447,7 +447,7 @@ void InstanceProfileCredentialsProvider::extractCredentials(
 
 void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
-  ENVOY_LOG(info, "AWS Instance metadata fetch success, calling callback func");
+  ENVOY_LOG(debug, "AWS Instance metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
@@ -565,7 +565,7 @@ void TaskRoleCredentialsProvider::extractCredentials(
 
 void TaskRoleCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
-  ENVOY_LOG(debug, "AWS metadata fetch success, calling callback func");
+  ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
@@ -718,7 +718,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
 
 void WebIdentityCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
-  ENVOY_LOG(debug, "AWS metadata fetch success, calling callback func");
+  ENVOY_LOG(debug, "AWS metadata fetch from STS success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
