@@ -536,7 +536,7 @@ public:
   virtual void unregisterWorkerForListener(UdpListenerCallbacks& listener) PURE;
 
   /**
-   * Deliver ``data`` to the correct worker by calling ``ondataworker()``
+   * Deliver ``data`` to the correct worker by calling ``onDataWorker()``
    * or ``post()`` on one of the registered workers.
    */
   virtual void deliver(uint32_t dest_worker_index, UdpRecvData&& data) PURE;
