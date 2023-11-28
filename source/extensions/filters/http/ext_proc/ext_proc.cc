@@ -8,10 +8,6 @@
 
 #include "absl/strings/str_format.h"
 
-#if defined(USE_CEL_PARSER)
-#include "parser/parser.h"
-#endif
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -117,27 +113,6 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
-absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
-FilterConfig::initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const {
-  absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr> expressions;
-#if defined(USE_CEL_PARSER)
-  for (const auto& matcher : matchers) {
-    auto parse_status = google::api::expr::parser::Parse(matcher);
-    if (!parse_status.ok()) {
-      throw EnvoyException("Unable to parse descriptor expression: " +
-                           parse_status.status().ToString());
-    }
-    expressions.emplace(matcher, Extensions::Filters::Common::Expr::createExpression(
-                                     builder_->builder(), parse_status.value().expr()));
-  }
-#else
-  ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."
-                  " Attempted to parse " +
-                      std::to_string(matchers.size()) + " expressions");
-#endif
-  return expressions;
-}
-
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()) {
   if (config.has_overrides()) {
@@ -226,8 +201,7 @@ void Filter::onDestroy() {
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      absl::optional<ProtobufWkt::Struct> proto) {
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -245,9 +219,6 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
-  if (proto.has_value()) {
-    (*headers_req->mutable_attributes())[FilterName] = proto.value();
-  }
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -255,48 +226,6 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   stats_.stream_msgs_sent_.inc();
   state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
-}
-
-const absl::optional<ProtobufWkt::Struct> Filter::evaluateAttributes(
-    Filters::Common::Expr::ActivationPtr activation,
-    const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
-        expr) {
-  absl::optional<ProtobufWkt::Struct> proto;
-  if (expr.size() > 0) {
-    proto.emplace(ProtobufWkt::Struct{});
-    for (const auto& hash_entry : expr) {
-      ProtobufWkt::Arena arena;
-      const auto result = hash_entry.second.get()->Evaluate(*activation, &arena);
-      if (!result.ok()) {
-        // TODO: Stats?
-        continue;
-      }
-
-      if (result.value().IsError()) {
-        ENVOY_LOG(trace, "error parsing cel expression {}", hash_entry.first);
-        continue;
-      }
-
-      ProtobufWkt::Value value;
-      switch (result.value().type()) {
-      case google::api::expr::runtime::CelValue::Type::kBool:
-        value.set_bool_value(result.value().BoolOrDie());
-        break;
-      case google::api::expr::runtime::CelValue::Type::kNullType:
-        value.set_null_value(ProtobufWkt::NullValue{});
-        break;
-      case google::api::expr::runtime::CelValue::Type::kDouble:
-        value.set_number_value(result.value().DoubleOrDie());
-        break;
-      default:
-        value.set_string_value(Filters::Common::Expr::print(result.value()));
-      }
-
-      (*(proto.value()).mutable_fields())[hash_entry.first] = value;
-    }
-  }
-
-  return proto;
 }
 
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
@@ -308,14 +237,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
-    absl::optional<Envoy::ProtobufWkt::Struct> proto;
-    if (!config_->requestExpr().empty()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
-                                                                    &headers, nullptr, nullptr);
-      proto = evaluateAttributes(std::move(activation_ptr), config_->requestExpr());
-    }
-
-    status = onHeaders(decoding_state_, headers, end_stream, proto);
+    status = onHeaders(decoding_state_, headers, end_stream);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
@@ -593,14 +515,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
-    absl::optional<Envoy::ProtobufWkt::Struct> proto;
-    if (!config_->responseExpr().empty()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
-                                                                    nullptr, &headers, nullptr);
-      proto = evaluateAttributes(std::move(activation_ptr), config_->responseExpr());
-    }
-
-    status = onHeaders(encoding_state_, headers, end_stream, proto);
+    status = onHeaders(encoding_state_, headers, end_stream);
     ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
