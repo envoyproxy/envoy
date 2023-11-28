@@ -25,7 +25,8 @@ TEST(Factory, UnregisteredExtension) {
   CredentialInjectorFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context), EnvoyException,
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException,
       "Didn't find a registered implementation for type: 'test.mock_credential.Unregistered'");
 }
 

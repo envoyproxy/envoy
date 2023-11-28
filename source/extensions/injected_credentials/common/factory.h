@@ -18,7 +18,7 @@ public:
   createCredentialInjectorFromProto(const Protobuf::Message& config,
                                     Server::Configuration::FactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.credentials"; }
+  std::string category() const override { return "envoy.injected_credentials"; }
 };
 
 } // namespace Common

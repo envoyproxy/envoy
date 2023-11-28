@@ -49,6 +49,7 @@ typed_config:
       credential:
         name: credential
         sds_config:
+          resource_api_version: V3
           path_config_source:
             path: "{{ test_tmpdir }}/credential.yaml"
 )EOF";
@@ -86,6 +87,7 @@ typed_config:
       credential:
         name: credential
         sds_config:
+          resource_api_version: V3
           path_config_source:
             path: "{{ test_tmpdir }}/credential.yaml"
 )EOF";
@@ -125,6 +127,7 @@ typed_config:
       credential:
         name: credential
         sds_config:
+          resource_api_version: V3
           path_config_source:
             path: "{{ test_tmpdir }}/credential.yaml"
 )EOF";
