@@ -82,7 +82,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   const auto& city_it = captured_lookup_response_.find("x-geo-city");
   EXPECT_EQ("Boxford", city_it->second);
   const auto& region_it = captured_lookup_response_.find("x-geo-region");
-  EXPECT_EQ("England", region_it->second);
+  EXPECT_EQ("ENG", region_it->second);
   const auto& country_it = captured_lookup_response_.find("x-geo-country");
   EXPECT_EQ("GB", country_it->second);
   const auto& asn_it = captured_lookup_response_.find("x-geo-asn");

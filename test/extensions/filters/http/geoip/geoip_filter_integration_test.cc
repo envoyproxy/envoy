@@ -78,10 +78,10 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedNoXff) {
                            .get(Http::LowerCaseString("x-geo-city"))[0]
                            ->value()
                            .getStringView());
-  EXPECT_EQ("England", upstream_request_->headers()
-                           .get(Http::LowerCaseString("x-geo-region"))[0]
-                           ->value()
-                           .getStringView());
+  EXPECT_EQ("ENG", upstream_request_->headers()
+                       .get(Http::LowerCaseString("x-geo-region"))[0]
+                       ->value()
+                       .getStringView());
   EXPECT_EQ("GB", upstream_request_->headers()
                       .get(Http::LowerCaseString("x-geo-country"))[0]
                       ->value()
@@ -113,10 +113,10 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXff) {
                            .get(Http::LowerCaseString("x-geo-city"))[0]
                            ->value()
                            .getStringView());
-  EXPECT_EQ("England", upstream_request_->headers()
-                           .get(Http::LowerCaseString("x-geo-region"))[0]
-                           ->value()
-                           .getStringView());
+  EXPECT_EQ("ENG", upstream_request_->headers()
+                       .get(Http::LowerCaseString("x-geo-region"))[0]
+                       ->value()
+                       .getStringView());
   EXPECT_EQ("GB", upstream_request_->headers()
                       .get(Http::LowerCaseString("x-geo-country"))[0]
                       ->value()
