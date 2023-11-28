@@ -9,11 +9,16 @@
 #include "source/common/upstream/default_local_address_selector_factory.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/extensions/compression/brotli/compressor/config.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
 #include "source/extensions/filters/http/buffer/config.h"
+#include "source/extensions/filters/http/composite/action.h"
+#include "source/extensions/filters/http/composite/config.h"
+#include "source/extensions/filters/http/compressor/config.h"
 #include "source/extensions/filters/http/decompressor/config.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/http/router/config.h"
@@ -203,6 +208,13 @@ void ExtensionRegistry::registerFactories() {
 #endif
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
 #endif
+
+  // These are factories required for request decompression.
+  Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
+  Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
+  Extensions::HttpFilters::Composite::forceRegisterCompositeFilterFactory();
+  Extensions::HttpFilters::Composite::forceRegisterExecuteFilterActionFactory();
+  Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
 
 #ifdef ENVOY_MOBILE_XDS
   // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile
