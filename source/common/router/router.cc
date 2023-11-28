@@ -329,13 +329,6 @@ Filter::~Filter() {
   // Upstream resources should already have been cleaned.
   ASSERT(upstream_requests_.empty());
   ASSERT(!retry_state_);
-
-  // Unregister from shadow stream notifications and cancel active streams.
-  for (auto* shadow_stream : shadow_streams_) {
-    shadow_stream->removeDestructorCallback();
-    shadow_stream->removeWatermarkCallbacks();
-    shadow_stream->cancel();
-  }
 }
 
 const FilterUtility::StrictHeaderChecker::HeaderCheckResult
@@ -1058,6 +1051,14 @@ void Filter::onRequestComplete() {
 void Filter::onDestroy() {
   // Reset any in-flight upstream requests.
   resetAll();
+
+  // Unregister from shadow stream notifications and cancel active streams.
+  for (auto* shadow_stream : shadow_streams_) {
+    shadow_stream->removeDestructorCallback();
+    shadow_stream->removeWatermarkCallbacks();
+    shadow_stream->cancel();
+  }
+
   cleanup();
 }
 

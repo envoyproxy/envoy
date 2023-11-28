@@ -203,13 +203,6 @@ new_features:
 - area: tracing
   change: |
     Provide initial span attributes to a sampler used in the OpenTelemetry tracer.
-- area: ext_proc
-  change: |
-    implemented
-    :ref:`request_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.request_attributes>`
-    and
-    :ref:`response_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.response_attributes>`
-    config APIs to enable sending and receiving attributes from/to the external processing server.
 - area: tracing
   change: |
     Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.

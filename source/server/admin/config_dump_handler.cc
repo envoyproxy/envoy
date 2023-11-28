@@ -119,24 +119,14 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
   return checkFieldMaskAndTrimMessage(outer_field_mask, message);
 }
 
-// Helper method to get the resource parameter.
-absl::optional<std::string> resourceParam(const Http::Utility::QueryParams& params) {
-  return Utility::queryParam(params, "resource");
-}
-
-// Helper method to get the mask parameter.
-absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) {
-  return Utility::queryParam(params, "mask");
-}
-
 // Helper method to get the eds parameter.
-bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
-  return params.find("include_eds") != params.end();
+bool shouldIncludeEdsInDump(const Http::Utility::QueryParamsMulti& params) {
+  return params.getFirstValue("include_eds").has_value();
 }
 
 absl::StatusOr<Matchers::StringMatcherPtr>
-buildNameMatcher(const Http::Utility::QueryParams& params) {
-  const auto name_regex = Utility::queryParam(params, "name_regex");
+buildNameMatcher(const Http::Utility::QueryParamsMulti& params) {
+  const auto name_regex = params.getFirstValue("name_regex");
   if (!name_regex.has_value() || name_regex->empty()) {
     return std::make_unique<Matchers::UniversalStringMatcher>();
   }
@@ -160,9 +150,9 @@ ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& config_tracker, Server::Inst
 Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& response_headers,
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) const {
-  Http::Utility::QueryParams query_params = admin_stream.queryParams();
-  const auto resource = resourceParam(query_params);
-  const auto mask = maskParam(query_params);
+  Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
+  const auto resource = query_params.getFirstValue("resource");
+  const auto mask = query_params.getFirstValue("mask");
   const bool include_eds = shouldIncludeEdsInDump(query_params);
   const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher = buildNameMatcher(query_params);
   if (!name_matcher.ok()) {

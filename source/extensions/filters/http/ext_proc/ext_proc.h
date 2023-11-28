@@ -21,7 +21,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
@@ -123,13 +122,12 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
-class FilterConfig : public Logger::Loggable<Logger::Id::ext_proc> {
+class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-               const std::string& stats_prefix,
-               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder)
+               const std::string& stats_prefix)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
