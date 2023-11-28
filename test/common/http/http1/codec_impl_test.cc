@@ -4864,18 +4864,26 @@ TEST_P(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
-// Obsolete line folding is forbidden per RFC9110 Section 5.5, see
+// When receiving header value with obsolete line folding, `obs-fold` should be replaced by SP.
+// This is http-parser's behavior. BalsaParser does not support obsolete line folding and rejects
+// such messages (also permitted by the specification). See RFC9110 Section 5.5:
 // https://www.rfc-editor.org/rfc/rfc9110.html#name-field-values.
 TEST_P(Http1ServerConnectionImplTest, ObsFold) {
   initialize();
 
   StrictMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "GET"},
+      {"multi-line-header", "foo  bar"},
+  };
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     EXPECT_CALL(decoder,
                 sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
   } else {
-    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
   }
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
@@ -4898,8 +4906,13 @@ TEST_P(Http1ClientConnectionImplTest, ObsFold) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
+  TestRequestHeaderMapImpl expected_headers{
+      {":status", "200"},
+      {"multi-line-header", "foo  bar"},
+      {"content-length", "0"},
+  };
   if (parser_impl_ == Http1ParserImpl::HttpParser) {
-    EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+    EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
   }
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
