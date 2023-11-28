@@ -1840,12 +1840,13 @@ bool Filter::convertRequestHeadersForInternalRedirect(
   // Copy the old values, so they can be restored if the redirect fails.
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
 
-  auto saved_headers = Http::RequestHeaderMapImpl::create();
+  std::unique_ptr<Http::RequestHeaderMapImpl> saved_headers = Http::RequestHeaderMapImpl::create();
   Http::RequestHeaderMapImpl::copyFrom(*saved_headers, downstream_headers);
 
-  for (const auto& header : route_entry_->internalRedirectPolicy().responseHeadersToCopy()) {
-    auto result = upstream_headers.get(header);
-    auto downstream_result = downstream_headers.get(header);
+  for (const Http::LowerCaseString& header :
+       route_entry_->internalRedirectPolicy().responseHeadersToCopy()) {
+    Http::HeaderMap::GetResult result = upstream_headers.get(header);
+    Http::HeaderMap::GetResult downstream_result = downstream_headers.get(header);
     if (result.empty()) {
       // Clear headers if present, else do nothing:
       if (downstream_result.empty()) {
