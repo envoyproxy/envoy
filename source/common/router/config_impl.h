@@ -578,7 +578,7 @@ public:
   }
 
   std::vector<InternalRedirectPredicateSharedPtr> predicates() const override;
-  std::vector<Http::LowerCaseString> responseHeadersToCopy() const override;
+  const std::vector<Http::LowerCaseString>& responseHeadersToCopy() const override;
 
   uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 

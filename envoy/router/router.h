@@ -337,7 +337,7 @@ public:
   /**
    * @return a vector of response header names to preserve in the redirected request.
    */
-  virtual std::vector<Http::LowerCaseString> responseHeadersToCopy() const PURE;
+  virtual const std::vector<Http::LowerCaseString>& responseHeadersToCopy() const PURE;
 
   /**
    * @return the maximum number of allowed internal redirects on this route.

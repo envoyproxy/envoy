@@ -386,7 +386,8 @@ std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::pred
   return predicates;
 }
 
-std::vector<Http::LowerCaseString> InternalRedirectPolicyImpl::responseHeadersToCopy() const {
+const std::vector<Http::LowerCaseString>&
+InternalRedirectPolicyImpl::responseHeadersToCopy() const {
   return response_headers_to_copy_;
 }
 
