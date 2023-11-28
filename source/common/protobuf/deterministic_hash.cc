@@ -8,21 +8,77 @@ namespace Envoy {
 namespace DeterministicProtoHash {
 namespace {
 
-#define REFLECTION_FOR_EACH(get_type, value_type)                                                  \
-  if (field->is_repeated()) {                                                                      \
-    for (const value_type& q : reflection->GetRepeatedFieldRef<value_type>(message, field)) {      \
-      seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)},   \
-                                seed);                                                             \
-    }                                                                                              \
-  } else {                                                                                         \
-    const value_type q = reflection->Get##get_type(message, field);                                \
-    seed =                                                                                         \
-        HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed); \
+// Get a scalar field from protobuf reflection field definition. The return
+// type must be specified by the caller. Every implementation is a specialization
+// because the reflection interface did separate named functions instead of a
+// template.
+template <typename T>
+T reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                const Protobuf::FieldDescriptor& field);
+
+template <>
+uint32_t reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                       const Protobuf::FieldDescriptor& field) {
+  return reflection.GetUInt32(message, &field);
+}
+
+template <>
+int32_t reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                      const Protobuf::FieldDescriptor& field) {
+  return reflection.GetInt32(message, &field);
+}
+
+template <>
+uint64_t reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                       const Protobuf::FieldDescriptor& field) {
+  return reflection.GetUInt64(message, &field);
+}
+
+template <>
+int64_t reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                      const Protobuf::FieldDescriptor& field) {
+  return reflection.GetInt64(message, &field);
+}
+
+template <>
+float reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                    const Protobuf::FieldDescriptor& field) {
+  return reflection.GetFloat(message, &field);
+}
+
+template <>
+double reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                     const Protobuf::FieldDescriptor& field) {
+  return reflection.GetDouble(message, &field);
+}
+
+template <>
+bool reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                   const Protobuf::FieldDescriptor& field) {
+  return reflection.GetBool(message, &field);
+}
+
+// Takes a field of scalar type, which may be a repeated field, and hashes
+// it (or each of it).
+template <typename T>
+uint64_t hashScalarField(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
+                         const Protobuf::FieldDescriptor& field, uint64_t seed) {
+  if (field.is_repeated()) {
+    for (const T& q : reflection.GetRepeatedFieldRef<T>(message, &field)) {
+      seed =
+          HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed);
+    }
+  } else {
+    const T q = reflectionGet<T>(reflection, message, field);
+    seed =
+        HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed);
   }
+  return seed;
+}
 
 uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed = 0);
 uint64_t reflectionHashField(const Protobuf::Message& message,
-                             const Protobuf::FieldDescriptor* field, uint64_t seed);
+                             const Protobuf::FieldDescriptor& field, uint64_t seed);
 
 // MapFieldComparator uses selectCompareFn at init-time, rather than putting the
 // switch into the comparator, because that way the switch is only performed once,
@@ -41,21 +97,11 @@ struct MapFieldComparator {
   }
 
 private:
-  bool compareByInt32(const Protobuf::Message& a, const Protobuf::Message& b) const {
-    return reflection_.GetInt32(a, &key_field_) < reflection_.GetInt32(b, &key_field_);
-  }
-  bool compareByUInt32(const Protobuf::Message& a, const Protobuf::Message& b) const {
-    return reflection_.GetUInt32(a, &key_field_) < reflection_.GetUInt32(b, &key_field_);
-  }
-  bool compareByInt64(const Protobuf::Message& a, const Protobuf::Message& b) const {
-    return reflection_.GetInt64(a, &key_field_) < reflection_.GetInt64(b, &key_field_);
-  }
-  bool compareByUInt64(const Protobuf::Message& a, const Protobuf::Message& b) const {
-    return reflection_.GetUInt64(a, &key_field_) < reflection_.GetUInt64(b, &key_field_);
-  }
-  bool compareByBool(const Protobuf::Message& a, const Protobuf::Message& b) const {
-    return reflection_.GetBool(a, &key_field_) < reflection_.GetBool(b, &key_field_);
-  }
+  template <typename T>
+  bool compareByScalar(const Protobuf::Message& a, const Protobuf::Message& b) const {
+    return reflectionGet<T>(reflection_, a, key_field_) <
+           reflectionGet<T>(reflection_, b, key_field_);
+  };
   bool compareByString(const Protobuf::Message& a, const Protobuf::Message& b) const {
     std::string scratch_a, scratch_b;
     return reflection_.GetStringReference(a, &key_field_, &scratch_a) <
@@ -67,15 +113,15 @@ private:
     using Protobuf::FieldDescriptor;
     switch (key_field_.cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32:
-      return &MapFieldComparator::compareByInt32;
+      return &MapFieldComparator::compareByScalar<int32_t>;
     case FieldDescriptor::CPPTYPE_UINT32:
-      return &MapFieldComparator::compareByUInt32;
+      return &MapFieldComparator::compareByScalar<uint32_t>;
     case FieldDescriptor::CPPTYPE_INT64:
-      return &MapFieldComparator::compareByInt64;
+      return &MapFieldComparator::compareByScalar<int64_t>;
     case FieldDescriptor::CPPTYPE_UINT64:
-      return &MapFieldComparator::compareByUInt64;
+      return &MapFieldComparator::compareByScalar<uint64_t>;
     case FieldDescriptor::CPPTYPE_BOOL:
-      return &MapFieldComparator::compareByBool;
+      return &MapFieldComparator::compareByScalar<bool>;
     case FieldDescriptor::CPPTYPE_STRING:
       return &MapFieldComparator::compareByString;
     case FieldDescriptor::CPPTYPE_DOUBLE:
@@ -105,8 +151,8 @@ sortedMapField(const Protobuf::RepeatedFieldRef<Protobuf::Message> map_entries) 
 // Here we're going to sort the keys into numerical order for number keys,
 // or lexicographical order for strings, and then hash them in that order.
 uint64_t reflectionHashMapField(const Protobuf::Message& message,
-                                const Protobuf::FieldDescriptor* field, uint64_t seed) {
-  const Protobuf::Reflection* reflection = message.GetReflection();
+                                const Protobuf::FieldDescriptor& field, uint64_t seed) {
+  const Protobuf::Reflection& reflection = *message.GetReflection();
   // For repeated fields in general the order is significant. For map fields,
   // the implementation may have a fixed order or a nondeterministic order,
   // but conceptually a map field is supposed to be order agnostic.
@@ -122,12 +168,12 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
   // of protobuf could potentially change the internal map representation. Sorting
   // also means theoretically we could produce a cross-language compatible hash;
   // golang, for example, explicitly randomly orders map fields in its implementation.
-  ASSERT(field->is_map());
+  ASSERT(field.is_map());
   auto sorted_entries =
-      sortedMapField(reflection->GetRepeatedFieldRef<Protobuf::Message>(message, field));
-  const Protobuf::Descriptor* map_descriptor = sorted_entries.begin()->get().GetDescriptor();
-  const Protobuf::FieldDescriptor* key_field = map_descriptor->map_key();
-  const Protobuf::FieldDescriptor* value_field = map_descriptor->map_value();
+      sortedMapField(reflection.GetRepeatedFieldRef<Protobuf::Message>(message, &field));
+  const Protobuf::Descriptor& map_descriptor = *sorted_entries.begin()->get().GetDescriptor();
+  const Protobuf::FieldDescriptor& key_field = *map_descriptor.map_key();
+  const Protobuf::FieldDescriptor& value_field = *map_descriptor.map_value();
   for (const Protobuf::Message& entry : sorted_entries) {
     seed = reflectionHashField(entry, key_field, seed);
     seed = reflectionHashField(entry, value_field, seed);
@@ -136,68 +182,68 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
 }
 
 uint64_t reflectionHashField(const Protobuf::Message& message,
-                             const Protobuf::FieldDescriptor* field, uint64_t seed) {
+                             const Protobuf::FieldDescriptor& field, uint64_t seed) {
   using Protobuf::FieldDescriptor;
-  const Protobuf::Reflection* reflection = message.GetReflection();
+  const Protobuf::Reflection& reflection = *message.GetReflection();
   {
-    const int q = field->number();
+    const int q = field.number();
     seed =
         HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed);
   }
-  switch (field->cpp_type()) {
+  switch (field.cpp_type()) {
   case FieldDescriptor::CPPTYPE_INT32:
-    REFLECTION_FOR_EACH(Int32, int32_t);
+    seed = hashScalarField<int32_t>(reflection, message, field, seed);
     break;
   case FieldDescriptor::CPPTYPE_UINT32:
-    REFLECTION_FOR_EACH(UInt32, uint32_t);
+    seed = hashScalarField<uint32_t>(reflection, message, field, seed);
     break;
   case FieldDescriptor::CPPTYPE_INT64:
-    REFLECTION_FOR_EACH(Int64, int64_t);
+    seed = hashScalarField<int64_t>(reflection, message, field, seed);
     break;
   case FieldDescriptor::CPPTYPE_UINT64:
-    REFLECTION_FOR_EACH(UInt64, uint64_t);
+    seed = hashScalarField<uint64_t>(reflection, message, field, seed);
     break;
   case FieldDescriptor::CPPTYPE_DOUBLE:
-    REFLECTION_FOR_EACH(Double, double);
+    seed = hashScalarField<double>(reflection, message, field, seed);
     break;
   case FieldDescriptor::CPPTYPE_FLOAT:
-    REFLECTION_FOR_EACH(Float, float);
+    seed = hashScalarField<float>(reflection, message, field, seed);
     break;
   case FieldDescriptor::CPPTYPE_BOOL:
-    REFLECTION_FOR_EACH(Bool, bool);
+    seed = hashScalarField<bool>(reflection, message, field, seed);
     break;
   case FieldDescriptor::CPPTYPE_ENUM:
-    if (field->is_repeated()) {
-      int c = reflection->FieldSize(message, field);
+    if (field.is_repeated()) {
+      int c = reflection.FieldSize(message, &field);
       for (int i = 0; i < c; i++) {
-        int v = reflection->GetRepeatedEnumValue(message, field, i);
+        int v = reflection.GetRepeatedEnumValue(message, &field, i);
         seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<char*>(&v), sizeof(v)}, seed);
       }
     } else {
-      int v = reflection->GetEnumValue(message, field);
+      int v = reflection.GetEnumValue(message, &field);
       seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<char*>(&v), sizeof(v)}, seed);
     }
     break;
   case FieldDescriptor::CPPTYPE_STRING: {
-    if (field->is_repeated()) {
-      for (const std::string& str : reflection->GetRepeatedFieldRef<std::string>(message, field)) {
+    if (field.is_repeated()) {
+      for (const std::string& str : reflection.GetRepeatedFieldRef<std::string>(message, &field)) {
         seed = HashUtil::xxHash64(str, seed);
       }
     } else {
       std::string scratch;
-      seed = HashUtil::xxHash64(reflection->GetStringReference(message, field, &scratch), seed);
+      seed = HashUtil::xxHash64(reflection.GetStringReference(message, &field, &scratch), seed);
     }
   } break;
   case FieldDescriptor::CPPTYPE_MESSAGE:
-    if (field->is_map()) {
+    if (field.is_map()) {
       seed = reflectionHashMapField(message, field, seed);
-    } else if (field->is_repeated()) {
+    } else if (field.is_repeated()) {
       for (const Protobuf::Message& submsg :
-           reflection->GetRepeatedFieldRef<Protobuf::Message>(message, field)) {
+           reflection.GetRepeatedFieldRef<Protobuf::Message>(message, &field)) {
         seed = reflectionHashMessage(submsg, seed);
       }
     } else {
-      seed = reflectionHashMessage(reflection->GetMessage(message, field), seed);
+      seed = reflectionHashMessage(reflection.GetMessage(message, &field), seed);
     }
     break;
   }
@@ -246,7 +292,7 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
   reflection->ListFields(message, &fields);
   // If we wanted to handle unknown fields, we'd need to also GetUnknownFields here.
   for (const FieldDescriptor* field : fields) {
-    seed = reflectionHashField(message, field, seed);
+    seed = reflectionHashField(message, *field, seed);
   }
   // Hash one extra character to signify end of message, so that
   // msg{} field2=2
