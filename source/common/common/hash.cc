@@ -11,6 +11,12 @@ uint64_t HashUtil::xxHash64(absl::Span<absl::string_view> input, uint64_t seed) 
   return seed;
 }
 
+// Explicit specialization for bool because its size may be implementation dependent.
+template <> uint64_t HashUtil::xxHash64Value(bool input, uint64_t seed) {
+  char b = input ? 1 : 0;
+  return XXH64(&b, 1, seed);
+}
+
 // Computes a 64-bit murmur hash 2, only works with 64-bit platforms. Revisit if support for 32-bit
 // platforms are needed.
 // from

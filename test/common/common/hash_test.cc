@@ -12,8 +12,6 @@ TEST(Hash, xxHash) {
 }
 
 TEST(Hash, xxHash64Value) {
-  enum Enum { A = 0, B, C };
-  enum class ClassEnum { X = 0, Y, Z };
   // Verifying against constants should protect against surprise hash behavior
   // changes, and, when run on a test host with different endianness, should also
   // verify that different endianness doesn't change the result.
@@ -26,10 +24,6 @@ TEST(Hash, xxHash64Value) {
   EXPECT_EQ(9962287286179718960UL, HashUtil::xxHash64Value(true));
   EXPECT_EQ(16804241149081757544UL, HashUtil::xxHash64Value(false));
   EXPECT_EQ(9486749600008296231UL, HashUtil::xxHash64Value(false, /*seed=*/42));
-  // 0 as enum, 0 as class enum, and 0 as int32 should all hash to the same value.
-  EXPECT_EQ(4246796580750024372, HashUtil::xxHash64Value(A));
-  EXPECT_EQ(4246796580750024372, HashUtil::xxHash64Value(ClassEnum::X));
-  EXPECT_EQ(4246796580750024372, HashUtil::xxHash64Value(0));
 }
 
 TEST(Hash, xxHashWithVector) {

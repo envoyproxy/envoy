@@ -40,7 +40,9 @@ public:
    * @param seed supplies the hash seed which defaults to 0.
    * See https://github.com/Cyan4973/xxHash for details.
    */
-  template <typename ValueType, std::enable_if_t<std::is_scalar_v<ValueType>, bool> = true>
+  template <
+      typename ValueType,
+      std::enable_if_t<std::is_scalar_v<ValueType> && !std::is_enum_v<ValueType>, bool> = true>
   static uint64_t xxHash64Value(ValueType input, uint64_t seed = 0) {
     if (absl::little_endian::IsLittleEndian()) {
       return XXH64(reinterpret_cast<const char*>(&input), sizeof(input), seed);
@@ -52,17 +54,6 @@ public:
       }
       return XXH64(buf, sizeof(input), seed);
     }
-  }
-  // Explicit specialization for bool because its size may be implementation dependent.
-  template <> uint64_t xxHash64Value(bool input, uint64_t seed) {
-    char b = input ? 1 : 0;
-    return XXH64(&b, 1, seed);
-  }
-  // Explicit specialization for enums because their size may be implementation dependent.
-  template <typename T, std::enable_if_t<std::is_enum_v<T>, bool> = true>
-  uint64_t xxHash64Value(T input, uint64_t seed) {
-    uint32_t value = static_cast<uint32_t>(input);
-    return xxHash64Value(value, seed);
   }
 
   /**
