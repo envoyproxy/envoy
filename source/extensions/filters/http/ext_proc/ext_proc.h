@@ -25,6 +25,7 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
@@ -137,10 +138,11 @@ public:
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
-        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
-        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
-        builder_(builder), request_expr_(initExpressions(config.request_attributes())),
-        response_expr_(initExpressions(config.response_attributes())) {}
+        allowed_headers_(
+            MatchingUtils::initHeaderMatchers(config.forward_rules().allowed_headers())),
+        disallowed_headers_(
+            MatchingUtils::initHeaderMatchers(config.forward_rules().disallowed_headers())),
+        expression_manager_(builder, config.request_attributes(), config.response_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -170,15 +172,19 @@ public:
 
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
-  const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
-  requestExpr() const {
-    return request_expr_;
+  const absl::optional<ProtobufWkt::Struct>
+  evaluateRequestAttributes(const Filters::Common::Expr::ActivationPtr& activation) const {
+    return expression_manager_.evaluateRequestAttributes(std::move(activation));
   }
 
-  const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
-  responseExpr() const {
-    return response_expr_;
+  const absl::optional<ProtobufWkt::Struct>
+  evaluateResponseAttributes(const Filters::Common::Expr::ActivationPtr& activation) const {
+    return expression_manager_.evaluateResponseAttributes(std::move(activation));
   }
+
+  bool hasRequestExpr() const { return expression_manager_.hasRequestExpr(); }
+
+  bool hasResponseExpr() const { return expression_manager_.hasResponseExpr(); }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -186,20 +192,6 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
-  const std::vector<Matchers::StringMatcherPtr>
-  initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list) {
-    std::vector<Matchers::StringMatcherPtr> header_matchers;
-    for (const auto& matcher : header_list.patterns()) {
-      header_matchers.push_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher));
-    }
-    return header_matchers;
-  }
-
-  absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
-  initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const;
-
   const bool failure_mode_allow_;
   const bool disable_clear_route_cache_;
   const std::chrono::milliseconds message_timeout_;
@@ -219,12 +211,7 @@ private:
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
 
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
-
-  const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
-      request_expr_;
-  const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
-      response_expr_;
+  const ExpressionManager expression_manager_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -327,10 +314,6 @@ private:
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream,
                                       absl::optional<ProtobufWkt::Struct> proto);
 
-  const absl::optional<ProtobufWkt::Struct> evaluateAttributes(
-      Filters::Common::Expr::ActivationPtr activation,
-      const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
-          expr);
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);

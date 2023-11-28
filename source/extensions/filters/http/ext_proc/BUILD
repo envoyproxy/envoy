@@ -27,6 +27,7 @@ envoy_cc_library(
     }),
     deps = [
         ":client_interface",
+        ":matching_utils_lib",
         ":mutation_utils_lib",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
@@ -101,6 +102,28 @@ envoy_cc_library(
         "@com_google_absl//absl/status",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "matching_utils_lib",
+    hdrs = ["matching_utils.h"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    deps = [
+        "//source/common/protobuf",
+        "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
+    ] + select(
+        {
+            "//bazel:windows_x86_64": [],
+            "//conditions:default": [
+                "@com_google_cel_cpp//parser",
+            ],
+        },
+    ),
 )
 
 envoy_cc_library(

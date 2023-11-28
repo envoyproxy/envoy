@@ -8,10 +8,6 @@
 
 #include "absl/strings/str_format.h"
 
-#if defined(USE_CEL_PARSER)
-#include "parser/parser.h"
-#endif
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -115,27 +111,6 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
   return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
              ? decoding_processor_grpc_calls_
              : encoding_processor_grpc_calls_;
-}
-
-absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
-FilterConfig::initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const {
-  absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr> expressions;
-#if defined(USE_CEL_PARSER)
-  for (const auto& matcher : matchers) {
-    auto parse_status = google::api::expr::parser::Parse(matcher);
-    if (!parse_status.ok()) {
-      throw EnvoyException("Unable to parse descriptor expression: " +
-                           parse_status.status().ToString());
-    }
-    expressions.emplace(matcher, Extensions::Filters::Common::Expr::createExpression(
-                                     builder_->builder(), parse_status.value().expr()));
-  }
-#else
-  ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."
-                  " Attempted to parse " +
-                      std::to_string(matchers.size()) + " expressions");
-#endif
-  return expressions;
 }
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
@@ -257,48 +232,6 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   return FilterHeadersStatus::StopIteration;
 }
 
-const absl::optional<ProtobufWkt::Struct> Filter::evaluateAttributes(
-    Filters::Common::Expr::ActivationPtr activation,
-    const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
-        expr) {
-  absl::optional<ProtobufWkt::Struct> proto;
-  if (expr.size() > 0) {
-    proto.emplace(ProtobufWkt::Struct{});
-    for (const auto& hash_entry : expr) {
-      ProtobufWkt::Arena arena;
-      const auto result = hash_entry.second.get()->Evaluate(*activation, &arena);
-      if (!result.ok()) {
-        // TODO: Stats?
-        continue;
-      }
-
-      if (result.value().IsError()) {
-        ENVOY_LOG(trace, "error parsing cel expression {}", hash_entry.first);
-        continue;
-      }
-
-      ProtobufWkt::Value value;
-      switch (result.value().type()) {
-      case google::api::expr::runtime::CelValue::Type::kBool:
-        value.set_bool_value(result.value().BoolOrDie());
-        break;
-      case google::api::expr::runtime::CelValue::Type::kNullType:
-        value.set_null_value(ProtobufWkt::NullValue{});
-        break;
-      case google::api::expr::runtime::CelValue::Type::kDouble:
-        value.set_number_value(result.value().DoubleOrDie());
-        break;
-      default:
-        value.set_string_value(Filters::Common::Expr::print(result.value()));
-      }
-
-      (*(proto.value()).mutable_fields())[hash_entry.first] = value;
-    }
-  }
-
-  return proto;
-}
-
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   mergePerRouteConfig();
@@ -309,12 +242,16 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
     absl::optional<Envoy::ProtobufWkt::Struct> proto;
-    if (!config_->requestExpr().empty()) {
+    std::cout << "checking if requestExpr empty" << std::endl;
+    if (config_->hasRequestExpr()) {
+      std::cout << "requestExpr not empty" << std::endl;
       auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
                                                                     &headers, nullptr, nullptr);
-      proto = evaluateAttributes(std::move(activation_ptr), config_->requestExpr());
+      std::cout << "evaluating attributes" << std::endl;
+      proto = config_->evaluateRequestAttributes(std::move(activation_ptr));
     }
 
+    std::cout << "entering onHeaders" << std::endl;
     status = onHeaders(decoding_state_, headers, end_stream, proto);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   } else {
@@ -594,10 +531,10 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
     absl::optional<Envoy::ProtobufWkt::Struct> proto;
-    if (!config_->responseExpr().empty()) {
+    if (config_->hasResponseExpr()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
                                                                     nullptr, &headers, nullptr);
-      proto = evaluateAttributes(std::move(activation_ptr), config_->responseExpr());
+      proto = config_->evaluateResponseAttributes(std::move(activation_ptr));
     }
 
     status = onHeaders(encoding_state_, headers, end_stream, proto);
