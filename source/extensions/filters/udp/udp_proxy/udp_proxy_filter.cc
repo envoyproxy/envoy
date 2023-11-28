@@ -393,7 +393,7 @@ bool UdpProxyFilter::ActiveSession::onNewSession() {
     access_log_flush_timer_ =
         cluster_.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
             [this] { onAccessLogFlushInterval(); });
-    resetAccessLogFlushTimer();
+    rearmAccessLogFlushTimer();
   }
 
   // Set UUID for the session. This is used for logging and tracing.
@@ -662,10 +662,10 @@ void UdpProxyFilter::ActiveSession::onAccessLogFlushInterval() {
     access_log->log(log_context, udp_session_info_);
   }
 
-  resetAccessLogFlushTimer();
+  rearmAccessLogFlushTimer();
 }
 
-void UdpProxyFilter::ActiveSession::resetAccessLogFlushTimer() {
+void UdpProxyFilter::ActiveSession::rearmAccessLogFlushTimer() {
   if (access_log_flush_timer_ != nullptr) {
     ASSERT(cluster_.filter_.config_->accessLogFlushInterval().has_value());
     access_log_flush_timer_->enableTimer(

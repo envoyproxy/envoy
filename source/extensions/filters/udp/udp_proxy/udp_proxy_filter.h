@@ -426,7 +426,7 @@ private:
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   const UdpTunnelingConfig& tunnel_config_;
   StreamInfo::StreamInfo& downstream_info_;
-  bool flush_access_log_on_tunnel_connected_;
+  const bool flush_access_log_on_tunnel_connected_;
   const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
@@ -554,7 +554,7 @@ private:
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
 
     void onAccessLogFlushInterval();
-    void resetAccessLogFlushTimer();
+    void rearmAccessLogFlushTimer();
     void disableAccessLogFlushTimer();
 
     // SessionFilters::FilterChainFactoryCallbacks
