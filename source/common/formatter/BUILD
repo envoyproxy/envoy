@@ -47,6 +47,7 @@ envoy_cc_library(
     hdrs = ["substitution_format_string.h"],
     deps = [
         ":substitution_formatter_lib",
+        "//source/common/config:config_factory_context_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

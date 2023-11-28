@@ -195,6 +195,27 @@ public:
 };
 
 /**
+ * Factory context for configuration parsing and initiation. This context contains server factory
+ * context reference and a validation visitor from uncertain context (server, listener, cluster or
+ * others).
+ */
+class ConfigFactoryContext {
+public:
+  virtual ~ConfigFactoryContext() = default;
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server and provides
+   *         access to the server's resources.
+   */
+  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+};
+
+/**
  * Factory context for access loggers that need access to listener properties.
  * This context is supplied to the access log factory when called with the listener context
  * available, such as from downstream HTTP filters.

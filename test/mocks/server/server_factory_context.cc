@@ -40,6 +40,15 @@ MockServerFactoryContext::~MockServerFactoryContext() = default;
 MockStatsConfig::MockStatsConfig() = default;
 MockStatsConfig::~MockStatsConfig() = default;
 
+MockConfigFactoryContext::MockConfigFactoryContext() = default;
+MockConfigFactoryContext::~MockConfigFactoryContext() = default;
+
+MockConfigFactoryContext::MockConfigFactoryContext() {
+  ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+}
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

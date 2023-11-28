@@ -108,6 +108,17 @@ public:
   testing::NiceMock<MockOptions> options_;
 };
 
+class MockConfigFactoryContext : public ConfigFactoryContext {
+public:
+  MockConfigFactoryContext();
+  ~MockConfigFactoryContext() override;
+
+  MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (const));
+
+  NiceMock<MockServerFactoryContext> server_factory_context_;
+};
+
 // Stateless mock ServerFactoryContext for cases where it needs to be used concurrently in different
 // threads. Global state in the MockServerFactoryContext causes thread safety issues in this case.
 class StatelessMockServerFactoryContext : public virtual ServerFactoryContext {

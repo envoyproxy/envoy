@@ -16,6 +16,7 @@ envoy_cc_extension(
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/config:config_factory_context_lib",
         "//source/extensions/filters/common/set_filter_state:filter_config_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

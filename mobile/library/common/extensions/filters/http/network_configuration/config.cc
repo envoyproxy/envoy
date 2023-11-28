@@ -12,7 +12,8 @@ Http::FilterFactoryCb NetworkConfigurationFilterFactory::createFilterFactoryFrom
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 
-  auto connectivity_manager = Network::ConnectivityManagerFactory{context}.get();
+  auto connectivity_manager =
+      Network::ConnectivityManagerFactory{context.getServerFactoryContext()}.get();
   bool enable_drain_post_dns_refresh = proto_config.enable_drain_post_dns_refresh();
   bool enable_interface_binding = proto_config.enable_interface_binding();
 

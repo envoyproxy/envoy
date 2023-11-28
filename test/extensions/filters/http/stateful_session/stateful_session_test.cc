@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "source/common/config/config_factory_context.h"
 #include "source/extensions/filters/http/stateful_session/stateful_session.h"
 
 #include "test/mocks/http/mocks.h"
@@ -49,7 +50,8 @@ public:
             .WillOnce(Return(route_factory_));
       }
 
-      route_config_ = std::make_shared<PerRouteStatefulSession>(proto_route_config, context_);
+      Envoy::Config::ConfigFactoryContextImpl config_context(context_);
+      route_config_ = std::make_shared<PerRouteStatefulSession>(proto_route_config, config_context);
 
       ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
           .WillByDefault(Return(route_config_.get()));
@@ -208,9 +210,9 @@ TEST_F(StatefulSessionTest, NullSessionState) {
 
 TEST(EmpytProtoConfigTest, EmpytProtoConfigTest) {
   ProtoConfig empty_proto_config;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  testing::NiceMock<Server::Configuration::MockConfigFactoryContext> config_context;
 
-  StatefulSessionConfig config(empty_proto_config, server_context);
+  StatefulSessionConfig config(empty_proto_config, config_context);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};

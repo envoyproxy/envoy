@@ -23,7 +23,7 @@ TEST(HeaderBasedSessionStateFactoryConfigTest, Basic) {
     )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockConfigFactoryContext> context;
   EXPECT_NE(factory->createSessionStateFactory(proto_config, context), nullptr);
 }
 
@@ -38,7 +38,7 @@ TEST(HeaderBasedSessionStateFactoryConfigTest, MissingHeaderName) {
     )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockConfigFactoryContext> context;
   EXPECT_THROW(factory->createSessionStateFactory(proto_config, context), EnvoyException);
 }
 
