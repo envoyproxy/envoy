@@ -263,7 +263,7 @@ using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
  */
 class ConnectivityManagerFactory {
 public:
-  ConnectivityManagerFactory(Server::Configuration::ServerFactoryContext& server_context,
+  ConnectivityManagerFactory(Server::Configuration::ServerFactoryContext& context,
                              ProtobufMessage::ValidationVisitor& visitor)
       : context_(context), visitor_(visitor) {}
 
