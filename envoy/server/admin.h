@@ -62,7 +62,7 @@ public:
    *
    * @param The query name/value map.
    */
-  virtual Http::Utility::QueryParams queryParams() const PURE;
+  virtual Http::Utility::QueryParamsMulti queryParams() const PURE;
 };
 
 /**
