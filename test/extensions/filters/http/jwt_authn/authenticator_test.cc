@@ -189,6 +189,18 @@ TEST_F(AuthenticatorTest, TestClaimToHeaderWithClearRouteCache) {
   }
 }
 
+TEST_F(AuthenticatorTest, TestPayloadInMetadataWithClearRouteCache) {
+  TestUtility::loadFromYaml(PayloadClearRouteCacheConfig, proto_config_);
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(NestedGoodToken)}};
+  expectVerifyStatus(Status::Ok, headers, true);
+}
+
 // This test verifies when wrong claim is passed in claim_to_headers
 TEST_F(AuthenticatorTest, TestClaimToHeaderWithHeaderReplace) {
   createAuthenticator();
