@@ -14,7 +14,7 @@ ConfigFactoryContextImpl::ConfigFactoryContextImpl(
                                factory_context.messageValidationVisitor()) {}
 
 ConfigFactoryContextImpl::ConfigFactoryContextImpl(
-    Server::Configuration::ConfigFactoryContext& config_context)
+    const Server::Configuration::ConfigFactoryContext& config_context)
     : ConfigFactoryContextImpl(config_context.getServerFactoryContext(),
                                config_context.messageValidationVisitor()) {}
 
