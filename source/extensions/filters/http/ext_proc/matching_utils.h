@@ -21,12 +21,14 @@ public:
       : builder_(builder), request_expr_(initExpressions(request_matchers)),
         response_expr_(initExpressions(response_matchers)){};
 
+  // This struct exists because the lifetime of the api expr must exceed expressions
+  // parsed from it.
   struct ExpressionPtrWithExpr {
     ExpressionPtrWithExpr(const google::api::expr::v1alpha1::Expr& expr,
-                          const Filters::Common::Expr::ExpressionPtr& expr_ptr)
-        : expression_ptr_(std::move(expr_ptr)), expr_(std::move(expr)){};
-    const Filters::Common::Expr::ExpressionPtr& expression_ptr_;
+                          const Filters::Common::Expr::ExpressionPtr&& expr_ptr)
+        : expr_(std::move(expr)), expression_ptr_(std::move(expr_ptr)){};
     const google::api::expr::v1alpha1::Expr& expr_;
+    const Filters::Common::Expr::ExpressionPtr& expression_ptr_;
   };
 
   bool hasRequestExpr() const { return !request_expr_.empty(); };
@@ -46,25 +48,18 @@ public:
   const absl::optional<ProtobufWkt::Struct>
   evaluateAttributes(const Filters::Common::Expr::ActivationPtr& activation,
                      const absl::flat_hash_map<std::string, ExpressionPtrWithExpr>& expr) const {
-    std::cout << "entered evaluateAttributes" << std::endl;
     absl::optional<ProtobufWkt::Struct> proto;
     if (expr.size() > 0) {
       proto.emplace(ProtobufWkt::Struct{});
       for (const auto& hash_entry : expr) {
-        std::cout << "evaluating attr" << std::endl;
-        std::cout << "evaluating " << hash_entry.first << std::endl;
         ProtobufWkt::Arena arena;
         std::cout << "expression_ptr_: ";
         std::cout << hash_entry.second.expression_ptr_.get() << std::endl;
-        std::cout << "activation: ";
-        std::cout << activation.get() << std::endl;
         const auto result = hash_entry.second.expression_ptr_.get()->Evaluate(*activation, &arena);
         if (!result.ok()) {
-          std::cout << "!result.ok()" << std::endl;
           // TODO: Stats?
           continue;
         }
-        std::cout << "result.ok()" << std::endl;
 
         if (result.value().IsError()) {
           ENVOY_LOG(trace, "error parsing cel expression {}", hash_entry.first);
@@ -95,30 +90,8 @@ public:
 
 private:
   absl::flat_hash_map<std::string, ExpressionPtrWithExpr>
-  initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const {
-    absl::flat_hash_map<std::string, ExpressionPtrWithExpr> expressions;
-#if defined(USE_CEL_PARSER)
-    for (const auto& matcher : matchers) {
-      auto parse_status = google::api::expr::parser::Parse(matcher);
-      if (!parse_status.ok()) {
-        throw EnvoyException("Unable to parse descriptor expression: " +
-                             parse_status.status().ToString());
-      }
-      auto parse_status_expr = parse_status.value().expr();
-      auto expression = Extensions::Filters::Common::Expr::createExpression(builder_->builder(),
-                                                                            parse_status_expr);
-      const ExpressionPtrWithExpr expr(parse_status_expr, expression);
-      std::cout << "expression_ptr_: ";
-      std::cout << expr.expression_ptr_.get() << std::endl;
-      expressions.try_emplace(matcher, std::move(expr));
-    }
-#else
-    ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."
-                    " Attempted to parse " +
-                        std::to_string(matchers.size()) + " expressions");
-#endif
-    return expressions;
-  }
+  initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const;
+
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
 
   const absl::flat_hash_map<std::string, ExpressionPtrWithExpr> request_expr_;

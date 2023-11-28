@@ -242,16 +242,12 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
     absl::optional<Envoy::ProtobufWkt::Struct> proto;
-    std::cout << "checking if requestExpr empty" << std::endl;
     if (config_->hasRequestExpr()) {
-      std::cout << "requestExpr not empty" << std::endl;
       auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
                                                                     &headers, nullptr, nullptr);
-      std::cout << "evaluating attributes" << std::endl;
       proto = config_->evaluateRequestAttributes(std::move(activation_ptr));
     }
 
-    std::cout << "entering onHeaders" << std::endl;
     status = onHeaders(decoding_state_, headers, end_stream, proto);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   } else {

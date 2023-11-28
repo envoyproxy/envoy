@@ -106,6 +106,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "matching_utils_lib",
+    srcs = ["matching_utils.cc"],
     hdrs = ["matching_utils.h"],
     copts = select({
         "//bazel:windows_x86_64": [],
