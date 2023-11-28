@@ -34,8 +34,8 @@ export PATH="$(dirname `which cmake`):/usr/bin:/bin"
 # Clang
 VERSION=12.0.0
 if [[ "$ARCH" == "x86_64" ]]; then
-  PLATFORM="x86_64-linux-gnu-ubuntu-20.04"
-  SHA256=a9ff205eb0b73ca7c86afc6432eed1c2d49133bd0d49e47b15be59bbf0dd292e
+  PLATFORM="x86_64-linux-gnu-ubuntu-16.04"
+  SHA256=9694f4df031c614dbe59b8431f94c68631971ad44173eecc1ea1a9e8ee27b2a3
 else
   PLATFORM="aarch64-linux-gnu"
   SHA256=d05f0b04fb248ce1e7a61fcd2087e6be8bc4b06b2cc348792f383abf414dec48
