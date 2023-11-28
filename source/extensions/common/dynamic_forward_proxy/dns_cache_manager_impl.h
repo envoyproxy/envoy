@@ -3,9 +3,9 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/server/factory_context.h"
 
+#include "source/common/config/config_factory_context.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/server/factory_context_base_impl.h"
-#include "source/common/config/config_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
 
