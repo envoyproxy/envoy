@@ -504,14 +504,15 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   if (status_ == ReadEnabled) {
     // If the read error is zero, it means remote close, then needn't new request.
     if (!read_error_.has_value() || read_error_.value() != 0) {
-      // Submit a read accept request for the next read.
+      // Submit a read request for the next read.
       submitReadRequest();
     }
   } else if (status_ == ReadDisabled) {
     // Since error in a disabled socket will not be handled by the handler, stop submit read
     // request if there is any error.
     if (!read_error_.has_value()) {
-      // Submit a read accept request for the next read.
+      // Submit a read request for monitoring the remote close event, otherwise there is no
+      // way to know the connection is closed by the remote.
       submitReadRequest();
     }
   }
