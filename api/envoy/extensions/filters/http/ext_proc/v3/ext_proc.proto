@@ -125,6 +125,7 @@ message ExternalProcessor {
   // for a reply.
   bool async_mode = 4;
 
+  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the request_headers message.
@@ -132,6 +133,7 @@ message ExternalProcessor {
   // for the list of supported attributes and their types.
   repeated string request_attributes = 5;
 
+  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the response_headers message.
@@ -255,10 +257,12 @@ message ExtProcOverrides {
   // Set a different asynchronous processing option than the default.
   bool async_mode = 2;
 
+  // [#not-implemented-hide:]
   // Set different optional attributes than the default setting of the
   // ``request_attributes`` field.
   repeated string request_attributes = 3;
 
+  // [#not-implemented-hide:]
   // Set different optional properties than the default setting of the
   // ``response_attributes`` field.
   repeated string response_attributes = 4;
