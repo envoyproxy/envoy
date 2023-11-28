@@ -10,6 +10,7 @@ public:
   ConfigFactoryContextImpl(Server::Configuration::ServerFactoryContext& server_context,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   ConfigFactoryContextImpl(Server::Configuration::FactoryContext& factory_context);
+  ConfigFactoryContextImpl(Server::Configuration::ConfigFactoryContext& config_context);
 
   // Server::Configuration::ConfigFactoryContext
   Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override;

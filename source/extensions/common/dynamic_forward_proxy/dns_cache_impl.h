@@ -48,8 +48,7 @@ class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy
 public:
   // Create a DnsCacheImpl or return a failed status;
   static absl::StatusOr<std::shared_ptr<DnsCacheImpl>> createDnsCacheImpl(
-      Server::Configuration::FactoryContextBase& context,
-      ProtobufMessage::ValidationVisitor& visitor,
+      Server::Configuration::ConfigFactoryContext& context,
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
 
   ~DnsCacheImpl() override;
@@ -70,8 +69,7 @@ public:
   void forceRefreshHosts() override;
 
 private:
-  DnsCacheImpl(Server::Configuration::FactoryContextBase& context,
-               ProtobufMessage::ValidationVisitor& visitor,
+  DnsCacheImpl(Server::Configuration::ConfigFactoryContext& context,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   struct LoadDnsCacheEntryHandleImpl
       : public LoadDnsCacheEntryHandle,

@@ -13,6 +13,11 @@ ConfigFactoryContextImpl::ConfigFactoryContextImpl(
     : ConfigFactoryContextImpl(factory_context.getServerFactoryContext(),
                                factory_context.messageValidationVisitor()) {}
 
+ConfigFactoryContextImpl::ConfigFactoryContextImpl(
+    Server::Configuration::ConfigFactoryContext& config_context)
+    : ConfigFactoryContextImpl(config_context.getServerFactoryContext(),
+                               config_context.messageValidationVisitor()) {}
+
 // Server::Configuration::ConfigFactoryContext
 Server::Configuration::ServerFactoryContext&
 ConfigFactoryContextImpl::getServerFactoryContext() const {
