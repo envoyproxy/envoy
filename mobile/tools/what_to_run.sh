@@ -5,7 +5,7 @@ set -euo pipefail
 BRANCH_NAME="$GITHUB_REF_NAME"
 BASE_COMMIT="$(git merge-base origin/main HEAD)"
 CHANGED_FILES="$(git diff "${BASE_COMMIT}" --name-only)"
-CHANGE_MATCH='^mobile/|^bazel/repository_locations\.bzl|^\.bazelrc|^\.github/workflows/mobile-*|^\.github/workflows/_env.yml'
+CHANGE_MATCH='^mobile/|^bazel/repository_locations\.bzl|^\.bazelrc|^\.bazelversion|^\.github/workflows/mobile-*|^\.github/workflows/_env.yml|^tools/code_format/check_format.py|bazel/external/quiche.BUILD'
 
 # The logic in this file is roughly:
 #

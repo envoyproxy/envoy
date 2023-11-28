@@ -1,5 +1,8 @@
 name: ios_build
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -14,46 +17,61 @@ jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     uses: ./.github/workflows/_env.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: read
 
   iosbuild:
     if: ${{ needs.env.outputs.mobile_ios_build == 'true' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: ios_build
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v3
-    - run: cd mobile && ./ci/mac_ci_setup.sh
+    - uses: actions/checkout@v4
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Build Envoy.framework distributable'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw shutdown
-          ./bazelw build \
+        cd mobile
+        ./bazelw shutdown
+        ./bazelw build \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //library/swift:ios_framework
+
   swifthelloworld:
     if: ${{ needs.env.outputs.mobile_ios_build == 'true' }}
     name: swift_helloworld
     needs:
     - env
     - iosbuild
+    permissions:
+      contents: read
+      packages: read
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-    - run: cd mobile && ./ci/mac_ci_setup.sh
+    - uses: actions/checkout@v4
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Build app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
+        cd mobile
+        ./bazelw build \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //examples/swift/hello_world:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start simulator'
@@ -66,34 +84,43 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw run \
+        cd mobile
+        ./bazelw run \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //examples/swift/hello_world:app &> /tmp/envoy.log &
-    - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+    - run: |
+        sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log
       if: ${{ failure() || cancelled() }}
       name: 'Log app run'
+
   swiftbaselineapp:
     if: ${{ needs.env.outputs.mobile_ios_build_all == 'true' }}
     needs:
     - env
     - iosbuild
+    permissions:
+      contents: read
+      packages: read
     name: swift_baseline_app
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-    - run: cd mobile && ./ci/mac_ci_setup.sh
+    - uses: actions/checkout@v4
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Build app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
+        cd mobile
+        ./bazelw build \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //test/swift/apps/baseline:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start simulator'
@@ -106,36 +133,44 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw run \
+        cd mobile
+        ./bazelw run \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //test/swift/apps/baseline:app &> /tmp/envoy.log &
-    - run: sed '/received headers with status 301/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+    - run: |
+        sed '/received headers with status 301/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log
       if: ${{ failure() || cancelled() }}
       name: 'Log app run'
+
   swiftexperimentalapp:
     if: ${{ needs.env.outputs.mobile_ios_build_all == 'true' }}
     needs:
     - env
     - iosbuild
+    permissions:
+      contents: read
+      packages: read
     name: swift_experimental_app
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-    - run: cd mobile && ./ci/mac_ci_setup.sh
+    - uses: actions/checkout@v4
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Build app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
+        cd mobile
+        ./bazelw build \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             --define=admin_functionality=enabled \
-            --define envoy_mobile_listener=enabled \
             //test/swift/apps/experimental:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start simulator'
@@ -148,36 +183,44 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw run \
+        cd mobile
+        ./bazelw run \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             --define=admin_functionality=enabled \
-            --define envoy_mobile_listener=enabled \
             //test/swift/apps/experimental:app &> /tmp/envoy.log &
-    - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+    - run: |
+        sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log
       if: ${{ failure() || cancelled() }}
       name: 'Log app run'
+
   swiftasyncawait:
     if: ${{ needs.env.outputs.mobile_ios_build_all == 'true' }}
     needs:
     - env
     - iosbuild
+    permissions:
+      contents: read
+      packages: read
     name: swift_async_await
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-    - run: cd mobile && ./ci/mac_ci_setup.sh
+    - uses: actions/checkout@v4
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Build app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
+        cd mobile
+        ./bazelw build \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //examples/swift/async_await:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start simulator'
@@ -190,9 +233,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw run \
+        cd mobile
+        ./bazelw run \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //examples/swift/async_await:app &> /tmp/envoy.log &
     - run: |
         checklogs () {
@@ -216,25 +260,32 @@ jobs:
     - run: cat /tmp/envoy.log
       if: ${{ failure() || cancelled() }}
       name: 'Log app run'
+
   objchelloworld:
     if: ${{ needs.env.outputs.mobile_ios_build_all == 'true' }}
     needs:
     - env
     - iosbuild
+    permissions:
+      contents: read
+      packages: read
     name: objc_helloworld
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
-    - run: cd mobile && ./ci/mac_ci_setup.sh
+    - uses: actions/checkout@v4
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Build app'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
+        cd mobile
+        ./bazelw build \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //examples/objective-c/hello_world:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start simulator'
@@ -247,9 +298,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw run \
+        cd mobile
+        ./bazelw run \
             --config=ios \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --config=mobile-remote-ci-macos \
             //examples/objective-c/hello_world:app &> /tmp/envoy.log &
     - run: sed '/received headers with status 301/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       name: 'Check connectivity'

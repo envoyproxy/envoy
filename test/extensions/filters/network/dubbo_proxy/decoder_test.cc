@@ -42,7 +42,7 @@ public:
               context->setBodySize(body_size);
               metadata->setMessageType(type);
 
-              return std::pair<ContextSharedPtr, bool>(context, true);
+              return {context, true};
             }));
   }
 
@@ -177,7 +177,7 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
   EXPECT_CALL(protocol_, decodeHeader(_, _))
       .WillOnce(Invoke(
           [](Buffer::Instance&, MessageMetadataSharedPtr) -> std::pair<ContextSharedPtr, bool> {
-            return std::pair<ContextSharedPtr, bool>(nullptr, false);
+            return {nullptr, false};
           }));
 
   RequestDecoder decoder(protocol_, request_callbacks_);
@@ -196,7 +196,7 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
-        return std::pair<ContextSharedPtr, bool>(context, true);
+        return {context, true};
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _))
       .WillOnce(Invoke([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
@@ -230,7 +230,7 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
-        return std::pair<ContextSharedPtr, bool>(context, true);
+        return {context, true};
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
@@ -253,7 +253,7 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
-        return std::pair<ContextSharedPtr, bool>(context, true);
+        return {context, true};
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));

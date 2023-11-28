@@ -13,6 +13,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "codec_impl_test",
+    size = "large",
     srcs = ["codec_impl_test.cc"],
     external_deps = [
         "quiche_http2_adapter",

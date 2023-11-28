@@ -34,6 +34,8 @@ public:
   QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) override;
   Network::Socket::OptionConstSharedPtr
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) override;
+  QuicConnectionIdWorkerSelector
+  getCompatibleConnectionIdWorkerSelector(uint32_t concurrency) override;
 
 private:
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)

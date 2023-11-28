@@ -84,8 +84,16 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
   if (match_type_ == MatchType::MethodName) {
     const std::string& method_name{method_or_service_name_};
-    return method_name.empty() ||
-           (metadata.hasMethodName() && metadata.methodName() == method_name);
+    if (method_name.empty()) {
+      return true;
+    }
+
+    const std::string& metadata_method_name = metadata.hasMethodName() ? metadata.methodName() : "";
+    const auto func_pos = metadata_method_name.find(':');
+    if (func_pos != std::string::npos) {
+      return metadata_method_name.substr(func_pos + 1) == method_name;
+    }
+    return metadata_method_name == method_name;
   }
   ASSERT(match_type_ == MatchType::ServiceName);
   const std::string& service_name{method_or_service_name_};
@@ -244,15 +252,8 @@ bool PayloadToMetadataFilter::addMetadata(const std::string& meta_namespace, con
   }
   }
 
-  // Have we seen this namespace before?
-  auto namespace_iter = structs_by_namespace_.find(meta_namespace);
-  if (namespace_iter == structs_by_namespace_.end()) {
-    structs_by_namespace_[meta_namespace] = ProtobufWkt::Struct();
-    namespace_iter = structs_by_namespace_.find(meta_namespace);
-  }
-
-  auto& keyval = namespace_iter->second;
-  (*keyval.mutable_fields())[key] = val;
+  auto& keyval = structs_by_namespace_[meta_namespace];
+  (*keyval.mutable_fields())[key] = std::move(val);
 
   return true;
 }

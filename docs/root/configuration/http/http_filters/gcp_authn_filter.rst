@@ -20,7 +20,7 @@ The filter configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.fil
 * ``cache_config`` specifies the configuration for the token cache which is used to avoid duplicated queries to GCE metadata server for the same request.
 
 The audience configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience>` is the URL of the destination service,
-which is the receiving service that the calling service is invoking. This information is provided through cluster's metadata field :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`
+which is the receiving service that the calling service is invoking. This information is provided through cluster's metadata field :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`.
 
 The token cache configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.TokenCacheConfig>` is used to avoid redundant queries to
 the authentication server (GCE metadata server in the context of this filter) for duplicated tokens.

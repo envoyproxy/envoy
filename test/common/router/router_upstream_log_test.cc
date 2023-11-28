@@ -53,7 +53,7 @@ typed_config:
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  return absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log);
+  return {upstream_log};
 }
 
 } // namespace
@@ -104,7 +104,7 @@ public:
       upstream_log_options->mutable_upstream_log_flush_interval()->set_seconds(1);
     }
     if (upstream_log) {
-      ON_CALL(*context_.access_log_manager_.file_, write(_))
+      ON_CALL(*context_.server_factory_context_.access_log_manager_.file_, write(_))
           .WillByDefault(
               Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
 
@@ -124,10 +124,15 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
-    context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
-    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, address())
+    context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
+    ON_CALL(
+        *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+        address())
         .WillByDefault(Return(host_address_));
-    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, locality())
+    ON_CALL(
+        *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+        locality())
         .WillByDefault(ReturnRef(upstream_locality_));
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
@@ -155,19 +160,21 @@ public:
     NiceMock<Http::MockRequestEncoder> encoder;
     Http::ResponseDecoder* response_decoder = nullptr;
 
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-        .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                             Http::ConnectionPool::Callbacks& callbacks,
-                             const Http::ConnectionPool::Instance::StreamOptions&)
-                             -> Http::ConnectionPool::Cancellable* {
-          response_decoder = &decoder;
-          EXPECT_CALL(encoder.stream_, connectionInfoProvider())
-              .WillRepeatedly(ReturnRef(connection_info1_));
-          callbacks.onPoolReady(encoder,
-                                context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                stream_info_, Http::Protocol::Http10);
-          return nullptr;
-        }));
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+                newStream(_, _, _))
+        .WillOnce(
+            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Http::ConnectionPool::Instance::StreamOptions&)
+                       -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              EXPECT_CALL(encoder.stream_, connectionInfoProvider())
+                  .WillRepeatedly(ReturnRef(connection_info1_));
+              callbacks.onPoolReady(encoder,
+                                    context_.server_factory_context_.cluster_manager_
+                                        .thread_local_cluster_.conn_pool_.host_,
+                                    stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
     expectResponseTimerCreate();
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
@@ -181,7 +188,8 @@ public:
         new Http::TestResponseHeaderMapImpl(response_headers_init));
     response_headers->setStatus(response_code);
 
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
+                    .host_->outlier_detector_,
                 putHttpResponseCode(response_code));
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), false);
@@ -197,19 +205,21 @@ public:
     NiceMock<Http::MockRequestEncoder> encoder1;
     Http::ResponseDecoder* response_decoder = nullptr;
 
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-        .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                             Http::ConnectionPool::Callbacks& callbacks,
-                             const Http::ConnectionPool::Instance::StreamOptions&)
-                             -> Http::ConnectionPool::Cancellable* {
-          response_decoder = &decoder;
-          EXPECT_CALL(encoder1.stream_, connectionInfoProvider())
-              .WillRepeatedly(ReturnRef(connection_info1_));
-          callbacks.onPoolReady(encoder1,
-                                context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                stream_info_, Http::Protocol::Http10);
-          return nullptr;
-        }));
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+                newStream(_, _, _))
+        .WillOnce(
+            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Http::ConnectionPool::Instance::StreamOptions&)
+                       -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              EXPECT_CALL(encoder1.stream_, connectionInfoProvider())
+                  .WillRepeatedly(ReturnRef(connection_info1_));
+              callbacks.onPoolReady(encoder1,
+                                    context_.server_factory_context_.cluster_manager_
+                                        .thread_local_cluster_.conn_pool_.host_,
+                                    stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
     expectPerTryTimerCreate();
     expectResponseTimerCreate();
 
@@ -220,28 +230,31 @@ public:
     router_->decodeHeaders(headers, true);
 
     router_->retry_state_->expectResetRetry();
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
+                    .host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
     per_try_timeout_->invokeCallback();
 
     // We expect this reset to kick off a new request.
     NiceMock<Http::MockRequestEncoder> encoder2;
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-        .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                             Http::ConnectionPool::Callbacks& callbacks,
-                             const Http::ConnectionPool::Instance::StreamOptions&)
-                             -> Http::ConnectionPool::Cancellable* {
-          response_decoder = &decoder;
-          EXPECT_CALL(
-              context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
-          EXPECT_CALL(encoder2.stream_, connectionInfoProvider())
-              .WillRepeatedly(ReturnRef(connection_info2_));
-          callbacks.onPoolReady(encoder2,
-                                context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                stream_info_, Http::Protocol::Http10);
-          return nullptr;
-        }));
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+                newStream(_, _, _))
+        .WillOnce(
+            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Http::ConnectionPool::Instance::StreamOptions&)
+                       -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                              .conn_pool_.host_->outlier_detector_,
+                          putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
+              EXPECT_CALL(encoder2.stream_, connectionInfoProvider())
+                  .WillRepeatedly(ReturnRef(connection_info2_));
+              callbacks.onPoolReady(encoder2,
+                                    context_.server_factory_context_.cluster_manager_
+                                        .thread_local_cluster_.conn_pool_.host_,
+                                    stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
     expectPerTryTimerCreate();
     router_->retry_state_->callback_();
 
@@ -250,7 +263,8 @@ public:
         .WillOnce(Return(RetryStatus::No));
     Http::ResponseHeaderMapPtr response_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
+                    .host_->outlier_detector_,
                 putHttpResponseCode(200));
     if (response_decoder != nullptr) {
       response_decoder->decodeHeaders(std::move(response_headers), true);
@@ -460,7 +474,8 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+              newStream(_, _, _))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
                      const Http::ConnectionPool::Instance::StreamOptions&)
@@ -470,7 +485,8 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
                 .WillRepeatedly(ReturnRef(connection_info1_));
             encoder.stream_.bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
             callbacks.onPoolReady(encoder,
-                                  context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+                                  context_.server_factory_context_.cluster_manager_
+                                      .thread_local_cluster_.conn_pool_.host_,
                                   stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
@@ -490,9 +506,11 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
   encoder.stream_.bytes_meter_->addWireBytesReceived(9);
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
-  EXPECT_CALL(*mock_upstream_log_, log(_, _, _, _, AccessLog::AccessLogType::UpstreamPeriodic))
-      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  EXPECT_CALL(*mock_upstream_log_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamPeriodic);
+
         EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
 
         EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastUpstreamPeriodicLog(),
@@ -507,9 +525,11 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
   encoder.stream_.bytes_meter_->addWireBytesReceived(7);
 
   EXPECT_CALL(*periodic_log_flush_, enableTimer(_, _));
-  EXPECT_CALL(*mock_upstream_log_, log(_, _, _, _, AccessLog::AccessLogType::UpstreamPeriodic))
-      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  EXPECT_CALL(*mock_upstream_log_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamPeriodic);
+
         EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10 + 8);
         EXPECT_EQ(stream_info.getDownstreamBytesMeter()
                       ->bytesAtLastUpstreamPeriodicLog()
@@ -529,11 +549,14 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
   callbacks_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(6);
   encoder.stream_.bytes_meter_->addWireBytesReceived(5);
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
+                  .host_->outlier_detector_,
               putHttpResponseCode(200));
-  EXPECT_CALL(*mock_upstream_log_, log(_, _, _, _, AccessLog::AccessLogType::UpstreamEnd))
-      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  EXPECT_CALL(*mock_upstream_log_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
+
         EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10 + 8 + 6);
         EXPECT_EQ(stream_info.getDownstreamBytesMeter()
                       ->bytesAtLastUpstreamPeriodicLog()

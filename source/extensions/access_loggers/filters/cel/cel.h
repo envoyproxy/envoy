@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
@@ -20,10 +22,8 @@ public:
   CELAccessLogExtensionFilter(Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr,
                               const google::api::expr::v1alpha1::Expr&);
 
-  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers,
-                AccessLog::AccessLogType access_log_type) const override;
+  bool evaluate(const Formatter::HttpFormatterContext& log_context,
+                const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;

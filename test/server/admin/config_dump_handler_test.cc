@@ -1,4 +1,5 @@
 #include "test/integration/filters/test_listener_filter.pb.h"
+#include "test/integration/filters/test_network_filter.pb.h"
 #include "test/server/admin/admin_instance.h"
 
 using testing::HasSubstr;
@@ -199,44 +200,44 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
 
+  const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
+  const std::string empty_hostname_for_healthcheck = "";
+
+  envoy::config::core::v3::Locality locality_1;
+
   Upstream::MockHostSet* host_set_1 = cluster.priority_set_.getMockHostSet(0);
   auto host_1 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_1);
+  const std::string hostname_1 = "coo.com";
 
-  envoy::config::core::v3::Locality locality_1;
-  locality_1.set_region("oceania");
-  locality_1.set_zone("hello");
-  locality_1.set_sub_zone("world");
+  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.8:8", locality_1, empty_hostname_for_healthcheck,
+              "tcp://1.2.3.8:8", 3, 4);
 
-  const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
-  const std::string hostname_1 = "foo.com";
-
-  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.4:80", locality_1, hostname_for_healthcheck,
-              "tcp://1.2.3.5:90", 5, 6);
-
+  const std::string hostname_2 = "foo.com";
   auto host_2 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_2);
-  const std::string empty_hostname_for_healthcheck = "";
-  const std::string hostname_2 = "boo.com";
-
-  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.7:8", locality_1, empty_hostname_for_healthcheck,
-              "tcp://1.2.3.7:8", 3, 6);
 
   envoy::config::core::v3::Locality locality_2;
+  locality_2.set_region("oceania");
+  locality_2.set_zone("hello");
+  locality_2.set_sub_zone("world");
+
+  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.4:80", locality_2, hostname_for_healthcheck,
+              "tcp://1.2.3.5:90", 5, 6);
 
   auto host_3 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_3);
-  const std::string hostname_3 = "coo.com";
+  const std::string hostname_3 = "boo.com";
 
-  addHostInfo(*host_3, hostname_3, "tcp://1.2.3.8:8", locality_2, empty_hostname_for_healthcheck,
-              "tcp://1.2.3.8:8", 3, 4);
+  addHostInfo(*host_3, hostname_3, "tcp://1.2.3.7:8", locality_2, empty_hostname_for_healthcheck,
+              "tcp://1.2.3.7:8", 3, 6);
 
   std::vector<Upstream::HostVector> locality_hosts = {
-      {Upstream::HostSharedPtr(host_1), Upstream::HostSharedPtr(host_2)},
-      {Upstream::HostSharedPtr(host_3)}};
+      {Upstream::HostSharedPtr(host_1)},
+      {Upstream::HostSharedPtr(host_2), Upstream::HostSharedPtr(host_3)}};
   auto hosts_per_locality = new Upstream::HostsPerLocalityImpl(std::move(locality_hosts), false);
 
-  Upstream::LocalityWeightsConstSharedPtr locality_weights{new Upstream::LocalityWeights{1, 3}};
+  Upstream::LocalityWeightsConstSharedPtr locality_weights{new Upstream::LocalityWeights{3, 1}};
   ON_CALL(*host_set_1, hostsPerLocality()).WillByDefault(ReturnRef(*hosts_per_locality));
   ON_CALL(*host_set_1, localityWeights()).WillByDefault(Return(locality_weights));
 
@@ -245,7 +246,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   host_set_2->hosts_.emplace_back(host_4);
   const std::string hostname_4 = "doo.com";
 
-  addHostInfo(*host_4, hostname_4, "tcp://1.2.3.9:8", locality_1, empty_hostname_for_healthcheck,
+  addHostInfo(*host_4, hostname_4, "tcp://1.2.3.9:8", locality_2, empty_hostname_for_healthcheck,
               "tcp://1.2.3.9:8", 3, 2);
 
   Buffer::OwnedImpl response;
@@ -262,6 +263,28 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
       "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
       "cluster_name": "fake_cluster",
       "endpoints": [
+       {
+        "locality": {},
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.8",
+             "port_value": 8
+            }
+           },
+           "health_check_config": {},
+           "hostname": "coo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 3
+         }
+        ],
+        "load_balancing_weight": 3,
+        "priority": 4
+       },
        {
         "locality": {
          "region": "oceania",
@@ -305,28 +328,6 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
         ],
         "load_balancing_weight": 1,
         "priority": 6
-       },
-       {
-        "locality": {},
-        "lb_endpoints": [
-         {
-          "endpoint": {
-           "address": {
-            "socket_address": {
-             "address": "1.2.3.8",
-             "port_value": 8
-            }
-           },
-           "health_check_config": {},
-           "hostname": "coo.com"
-          },
-          "health_status": "HEALTHY",
-          "metadata": {},
-          "load_balancing_weight": 3
-         }
-        ],
-        "load_balancing_weight": 3,
-        "priority": 4
        },
        {
         "locality": {
@@ -793,16 +794,27 @@ TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
 
 ProtobufTypes::MessagePtr testDumpEcdsConfig(const Matchers::StringMatcher&) {
   auto msg = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
-  auto* ecds = msg->mutable_ecds_filters()->Add();
-  ecds->set_version_info("1");
-  ecds->mutable_last_updated()->set_seconds(5);
 
-  envoy::config::core::v3::TypedExtensionConfig filter_config;
-  filter_config.set_name("foo");
+  auto* ecds_listener = msg->mutable_ecds_filters()->Add();
+  ecds_listener->set_version_info("1");
+  ecds_listener->mutable_last_updated()->set_seconds(5);
+  envoy::config::core::v3::TypedExtensionConfig listener_filter_config;
+  listener_filter_config.set_name("foo");
   auto listener_config = test::integration::filters::TestTcpListenerFilterConfig();
   listener_config.set_drain_bytes(5);
-  filter_config.mutable_typed_config()->PackFrom(listener_config);
-  ecds->mutable_ecds_filter()->PackFrom(filter_config);
+  listener_filter_config.mutable_typed_config()->PackFrom(listener_config);
+  ecds_listener->mutable_ecds_filter()->PackFrom(listener_filter_config);
+
+  auto* ecds_network = msg->mutable_ecds_filters()->Add();
+  ecds_network->set_version_info("1");
+  ecds_network->mutable_last_updated()->set_seconds(5);
+  envoy::config::core::v3::TypedExtensionConfig network_filter_config;
+  network_filter_config.set_name("bar");
+  auto network_config = test::integration::filters::TestDrainerNetworkFilterConfig();
+  network_config.set_bytes_to_drain(5);
+  network_filter_config.mutable_typed_config()->PackFrom(network_config);
+  ecds_network->mutable_ecds_filter()->PackFrom(network_filter_config);
+
   return msg;
 }
 
@@ -821,6 +833,19 @@ TEST_P(AdminInstanceTest, ConfigDumpEcds) {
     "typed_config": {
      "@type": "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig",
      "drain_bytes": 5
+    }
+   },
+   "last_updated": "1970-01-01T00:00:05Z"
+  },
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EcdsConfigDump.EcdsFilterConfig",
+   "version_info": "1",
+   "ecds_filter": {
+    "@type": "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig",
+    "name": "bar",
+    "typed_config": {
+     "@type": "type.googleapis.com/test.integration.filters.TestDrainerNetworkFilterConfig",
+     "bytes_to_drain": 5
     }
    },
    "last_updated": "1970-01-01T00:00:05Z"
@@ -846,6 +871,14 @@ TEST_P(AdminInstanceTest, ConfigDumpEcdsByResourceAndMask) {
    "ecds_filter": {
     "@type": "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig",
     "name": "foo"
+   }
+  },
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EcdsConfigDump.EcdsFilterConfig",
+   "version_info": "1",
+   "ecds_filter": {
+    "@type": "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig",
+    "name": "bar"
    }
   }
  ]

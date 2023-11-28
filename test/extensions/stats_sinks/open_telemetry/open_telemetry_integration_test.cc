@@ -35,6 +35,16 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
+  void setStatPrefix(const std::string& stat_prefix) { stat_prefix_ = stat_prefix; }
+
+  const std::string getFullStatName(const std::string& stat_name) {
+    if (stat_prefix_.empty()) {
+      return stat_name;
+    }
+
+    return absl::StrCat(stat_prefix_, ".", stat_name);
+  }
+
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* otlp_collector_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -47,10 +57,11 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       setGrpcService(*sink_config.mutable_grpc_service(), "otlp_collector",
                      fake_upstreams_.back()->localAddress());
+      sink_config.set_prefix(stat_prefix_);
       metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
-          Protobuf::util::TimeUtil::MillisecondsToDuration(300));
+          Protobuf::util::TimeUtil::MillisecondsToDuration(500));
     });
 
     HttpIntegrationTest::initialize();
@@ -77,7 +88,6 @@ public:
     VERIFY_ASSERTION(waitForMetricsServiceConnection());
 
     while (!known_counter_exists || !known_gauge_exists || !known_histogram_exists) {
-      std::cout << "loop\n\n";
       VERIFY_ASSERTION(waitForMetricsStream());
       opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest export_request;
       VERIFY_ASSERTION(otlp_collector_request_->waitForGrpcMessage(*dispatcher_, export_request));
@@ -95,7 +105,7 @@ public:
 
       long long int previous_time_stamp = 0;
       for (const opentelemetry::proto::metrics::v1::Metric& metric : metrics) {
-        if (metric.name() == "cluster.membership_change" && metric.has_sum()) {
+        if (metric.name() == getFullStatName("cluster.membership_change") && metric.has_sum()) {
           known_counter_exists = true;
           EXPECT_EQ(1, metric.sum().data_points().size());
           EXPECT_EQ(1, metric.sum().data_points()[0].as_int());
@@ -108,7 +118,7 @@ public:
           previous_time_stamp = metric.sum().data_points()[0].time_unix_nano();
         }
 
-        if (metric.name() == "cluster.membership_total" && metric.has_gauge()) {
+        if (metric.name() == getFullStatName("cluster.membership_total") && metric.has_gauge()) {
           known_gauge_exists = true;
           EXPECT_EQ(1, metric.gauge().data_points().size());
           EXPECT_EQ(1, metric.gauge().data_points()[0].as_int());
@@ -121,7 +131,8 @@ public:
           previous_time_stamp = metric.gauge().data_points()[0].time_unix_nano();
         }
 
-        if (metric.name() == "cluster.upstream_rq_time" && metric.has_histogram()) {
+        if (metric.name() == getFullStatName("cluster.upstream_rq_time") &&
+            metric.has_histogram()) {
           known_histogram_exists = true;
           EXPECT_EQ(1, metric.histogram().data_points().size());
           EXPECT_EQ(metric.histogram().data_points()[0].bucket_counts().size(),
@@ -154,6 +165,19 @@ public:
     return AssertionSuccess();
   }
 
+  void expectUpstreamRequestFinished() {
+    switch (clientType()) {
+    case Grpc::ClientType::EnvoyGrpc:
+      test_server_->waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+      break;
+    case Grpc::ClientType::GoogleGrpc:
+      test_server_->waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
+      break;
+    default:
+      PANIC("reached unexpected code");
+    }
+  }
+
   void cleanup() {
     if (fake_metrics_service_connection_ != nullptr) {
       AssertionResult result = fake_metrics_service_connection_->close();
@@ -165,6 +189,7 @@ public:
 
   FakeHttpConnectionPtr fake_metrics_service_connection_;
   FakeStreamPtr otlp_collector_request_;
+  std::string stat_prefix_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OpenTelemetryGrpcIntegrationTest,
@@ -181,17 +206,22 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   ASSERT_TRUE(waitForMetricsRequest());
 
-  switch (clientType()) {
-  case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
-    break;
-  case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
-    break;
-  default:
-    PANIC("reached unexpected code");
-  }
+  expectUpstreamRequestFinished();
+  cleanup();
+}
 
+TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlowWithStatPrefix) {
+  setStatPrefix("prefix");
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/path"}, {":scheme", "http"}, {":authority", "host"}};
+
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(waitForMetricsRequest());
+
+  expectUpstreamRequestFinished();
   cleanup();
 }
 

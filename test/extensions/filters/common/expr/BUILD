@@ -18,10 +18,13 @@ envoy_extension_cc_test(
     srcs = ["context_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
     deps = [
+        "//source/common/network:filter_state_dst_address_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:context_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

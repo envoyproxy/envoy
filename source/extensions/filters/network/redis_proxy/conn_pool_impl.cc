@@ -35,6 +35,24 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 }
 
 static uint16_t default_port = 6379;
+
+bool isClusterProvidedLb(const Upstream::ClusterInfo& info) {
+  const auto lb_type = info.lbType();
+  bool cluster_provided_lb = lb_type == Upstream::LoadBalancerType::ClusterProvided;
+  if (lb_type == Upstream::LoadBalancerType::LoadBalancingPolicyConfig) {
+    auto* typed_lb_factory = info.loadBalancerFactory();
+    if (typed_lb_factory == nullptr) {
+      // This should never happen because if there is no valid factory, the cluster should
+      // have been rejected during config load and this code should never be reached.
+      IS_ENVOY_BUG("ClusterInfo should contain a valid factory");
+      return false;
+    }
+    cluster_provided_lb =
+        typed_lb_factory->name() == "envoy.load_balancing_policies.cluster_provided";
+  }
+  return cluster_provided_lb;
+}
+
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -92,14 +110,17 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
-      is_redis_cluster_(false), client_factory_(parent->client_factory_), config_(parent->config_),
+      client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
       refresh_manager_(parent->refresh_manager_) {
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
-    onClusterAddOrUpdateNonVirtual(*cluster);
+    Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+      return *cluster;
+    };
+    onClusterAddOrUpdateNonVirtual(cluster->info()->name(), command);
   }
 }
 
@@ -116,8 +137,8 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
-    Upstream::ThreadLocalCluster& cluster) {
-  if (cluster.info()->name() != cluster_name_) {
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+  if (cluster_name != cluster_name_) {
     return;
   }
   // Ensure the filter is not deleted in the main thread during this method.
@@ -132,6 +153,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   }
 
   ASSERT(cluster_ == nullptr);
+  auto& cluster = get_cluster();
   cluster_ = &cluster;
   // Update username and password when cluster updates.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
@@ -158,8 +180,8 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type =
       info->clusterType();
-  is_redis_cluster_ = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
-                      cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
+  is_redis_cluster_ = isClusterProvidedLb(*info) && cluster_type.has_value() &&
+                      cluster_type->name() == "envoy.clusters.redis";
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {

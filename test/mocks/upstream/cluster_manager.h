@@ -91,6 +91,8 @@ public:
         common_lb_config);
   }
 
+  MOCK_METHOD(Config::EdsResourcesCacheOptRef, edsResourcesCache, ());
+
   envoy::config::core::v3::BindConfig& mutableBindConfig();
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;

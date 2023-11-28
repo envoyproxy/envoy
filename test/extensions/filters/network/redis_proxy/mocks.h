@@ -4,6 +4,8 @@
 #include <list>
 #include <string>
 
+#include "envoy/stream_info/stream_info.h"
+
 #include "source/extensions/common/redis/cluster_refresh_manager.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
@@ -26,8 +28,9 @@ public:
   MockRouter(RouteSharedPtr route);
   ~MockRouter() override;
 
-  MOCK_METHOD(RouteSharedPtr, upstreamPool, (std::string & key));
-  MOCK_METHOD(void, setReadFilterCallback, (Network::ReadFilterCallbacks * callbacks));
+  MOCK_METHOD(RouteSharedPtr, upstreamPool,
+              (std::string & key, const StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(void, initializeReadFilterCallbacks, (Network::ReadFilterCallbacks * callbacks));
   RouteSharedPtr route_;
 };
 
@@ -36,7 +39,7 @@ public:
   MockRoute(ConnPool::InstanceSharedPtr);
   ~MockRoute() override;
 
-  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
+  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (const std::string&), (const));
   MOCK_METHOD(const MirrorPolicies&, mirrorPolicies, (), (const));
   ConnPool::InstanceSharedPtr conn_pool_;
   MirrorPolicies policies_;
@@ -127,13 +130,13 @@ public:
   ~MockInstance() override;
 
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
-                              Event::Dispatcher& dispatcher) override {
-    return SplitRequestPtr{makeRequest_(*request, callbacks, dispatcher)};
+                              Event::Dispatcher& dispatcher,
+                              const StreamInfo::StreamInfo& stream_info) override {
+    return SplitRequestPtr{makeRequest_(*request, callbacks, dispatcher, stream_info)};
   }
-  void setReadFilterCallback(Network::ReadFilterCallbacks*) override{};
   MOCK_METHOD(SplitRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
-               Event::Dispatcher& dispatcher));
+               Event::Dispatcher& dispatcher, const StreamInfo::StreamInfo& stream_info));
 };
 
 } // namespace CommandSplitter

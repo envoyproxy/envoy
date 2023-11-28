@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
@@ -101,6 +102,44 @@ public:
      * This method can be used to get an unstructured serialization result.
      */
     virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
+  };
+
+  /**
+   * Generic reflection support for the filter state objects.
+   */
+  class ObjectReflection {
+  public:
+    virtual ~ObjectReflection() = default;
+
+    using FieldType = absl::variant<absl::monostate, absl::string_view, int64_t>;
+
+    /**
+     * @return FieldType a field value for a field name.
+     */
+    virtual FieldType getField(absl::string_view) const PURE;
+  };
+
+  /**
+   * Generic factory for filter state objects. The factory registry uses the
+   * object data name as the index for the object factory. This factory should be used by the
+   * dynamic extensions that cannot use the object constructors directly.
+   */
+  class ObjectFactory : public Config::UntypedFactory {
+  public:
+    // Config::UntypedFactory
+    std::string category() const override { return "filter_state.object"; }
+
+    /**
+     * @return std::unique_ptr<Object> from the serialized object data or nullptr if the input
+     * is malformed.
+     */
+    virtual std::unique_ptr<Object> createFromBytes(absl::string_view data) const PURE;
+
+    /**
+     * @return std::unique_ptr<ObjectReflection> for the runtime object
+     * Note that the reflection object is a view and should not outlive the object.
+     */
+    virtual std::unique_ptr<ObjectReflection> reflect(const Object*) const { return nullptr; }
   };
 
   struct FilterObject {

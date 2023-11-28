@@ -99,7 +99,7 @@ minor_behavior_changes:
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
 - area: http
   change: |
-    the upstream remote address is now available to downstream filters via the ``upstreamRemoteAddress`` function.
+    the upstream remote address is now available to downstream HTTP filters via the ``upstreamRemoteAddress`` function.
 - area: stats
   change: |
     Default tag extraction rules were changed for ``worker_id`` extraction. Previously, ``worker_`` was removed from the
@@ -193,13 +193,13 @@ new_features:
 - area: http
   change: |
     made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work
-    as an upstream filter.
+    as an upstream HTTP filter.
 - area: http
   change: |
     added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
 - area: http
   change: |
-    added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
+    added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream HTTP filters.
 - area: dns_resolver
   change: |
     added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.

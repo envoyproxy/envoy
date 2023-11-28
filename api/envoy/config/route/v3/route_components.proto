@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -153,15 +153,11 @@ message VirtualHost {
   //   to configure the CORS HTTP filter.
   CorsPolicy cors = 8 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
-  // The key should match the :ref:`filter config name
+  // This field can be used to provide virtual host level per filter config. The key should match the
+  // :ref:`filter config name
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-  // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
-  // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
-  // entry referred by the canonical filter name will be provided to the filters as fallback.
-  //
-  // Use of this field is filter specific;
-  // see the :ref:`HTTP filter documentation <config_http_filters>` for if and how it is utilized.
+  // See :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>`
+  // for details.
   // [#comment: An entry's value may be wrapped in a
   // :ref:`FilterConfig<envoy_v3_api_msg_config.route.v3.FilterConfig>`
   // message to specify additional options.]
@@ -219,6 +215,13 @@ message VirtualHost {
   // It takes precedence over the route config mirror policy entirely.
   // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
+
+  // The metadata field can be used to provide additional information
+  // about the virtual host. It can be used for configuration, stats, and logging.
+  // The metadata should go under the filter namespace that will need it.
+  // For instance, if the metadata is intended for the Router filter,
+  // the filter name should be specified as ``envoy.filters.http.router``.
+  core.v3.Metadata metadata = 24;
 }
 
 // A filter-defined action type.
@@ -292,15 +295,11 @@ message Route {
   // Decorator for the matched route.
   Decorator decorator = 5;
 
-  // The per_filter_config field can be used to provide route-specific configurations for filters.
-  // The key should match the :ref:`filter config name
+  // This field can be used to provide route specific per filter config. The key should match the
+  // :ref:`filter config name
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-  // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
-  // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
-  // entry referred by the canonical filter name will be provided to the filters as fallback.
-  //
-  // Use of this field is filter specific;
-  // see the :ref:`HTTP filter documentation <config_http_filters>` for if and how it is utilized.
+  // See :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>`
+  // for details.
   // [#comment: An entry's value may be wrapped in a
   // :ref:`FilterConfig<envoy_v3_api_msg_config.route.v3.FilterConfig>`
   // message to specify additional options.]
@@ -451,16 +450,11 @@ message WeightedCluster {
       items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
     }];
 
-    // The per_filter_config field can be used to provide weighted cluster-specific configurations
-    // for filters.
-    // The key should match the :ref:`filter config name
+    // This field can be used to provide weighted cluster specific per filter config. The key should match the
+    // :ref:`filter config name
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-    // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
-    // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
-    // entry referred by the canonical filter name will be provided to the filters as fallback.
-    //
-    // Use of this field is filter specific;
-    // see the :ref:`HTTP filter documentation <config_http_filters>` for if and how it is utilized.
+    // See :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>`
+    // for details.
     // [#comment: An entry's value may be wrapped in a
     // :ref:`FilterConfig<envoy_v3_api_msg_config.route.v3.FilterConfig>`
     // message to specify additional options.]
@@ -537,10 +531,20 @@ message RouteMatch {
 
     // If specified, the route will match against whether or not a certificate is validated.
     // If not specified, certificate validation status (true or false) will not be considered when route matching.
+    //
+    // .. warning::
+    //
+    //    Client certificate validation is not currently performed upon TLS session resumption. For
+    //    a resumed TLS session the route will match only when ``validated`` is false, regardless of
+    //    whether the client TLS certificate is valid.
+    //
+    //    The only known workaround for this issue is to disable TLS session resumption entirely, by
+    //    setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+    //    and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
     google.protobuf.BoolValue validated = 2;
   }
 
-  // An extensible message for matching CONNECT requests.
+  // An extensible message for matching CONNECT or CONNECT-UDP requests.
   message ConnectMatcher {
   }
 
@@ -573,11 +577,10 @@ message RouteMatch {
     // stripping. This needs more thought.]
     type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
 
-    // If this is used as the matcher, the matcher will only match CONNECT requests.
-    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
-    // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
-    // upgrades.
-    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
+    // If this is used as the matcher, the matcher will only match CONNECT or CONNECT-UDP requests.
+    // Note that this will not match other Extended CONNECT requests (WebSocket and the like) as
+    // they are normalized in Envoy as HTTP/1.1 style upgrades.
+    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2 and HTTP/3,
     // where Extended CONNECT requests may have a path, the path matchers will work if
     // there is a path present.
     // Note that CONNECT support is currently considered alpha in Envoy.
@@ -632,7 +635,8 @@ message RouteMatch {
   // match. The router will check the query string from the ``path`` header
   // against all the specified query parameters. If the number of specified
   // query parameters is nonzero, they all must match the ``path`` header's
-  // query string for a match to occur.
+  // query string for a match to occur. In the event query parameters are
+  // repeated, only the first value for each key will be considered.
   //
   // .. note::
   //
@@ -895,7 +899,8 @@ message RouteAction {
 
       // The name of the URL query parameter that will be used to obtain the hash
       // key. If the parameter is not present, no hash will be produced. Query
-      // parameter names are case-sensitive.
+      // parameter names are case-sensitive. If query parameters are repeated, only
+      // the first value will be considered.
       string name = 1 [(validate.rules).string = {min_len: 1}];
     }
 
@@ -1150,7 +1155,9 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
     // option is applicable only when the destination cluster for a route is of
-    // type ``strict_dns`` or ``logical_dns``. Setting this to true with other cluster types
+    // type ``strict_dns`` or ``logical_dns``,
+    // or when :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>`
+    // field is not empty. Setting this to true with other cluster types
     // has no effect. Using this option will append the
     // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
     // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
@@ -1204,7 +1211,7 @@ message RouteAction {
   // :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
   // causes the original value of the host header, if any, to be appended to the
   // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header if it is different to the last value appended.
-  // This can be disabled by setting the runtime guard `envoy_reloadable_features_append_xfh_idempotent` to false.
+  // This can be disabled by setting the runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
   bool append_x_forwarded_host = 38;
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This

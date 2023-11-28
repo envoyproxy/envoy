@@ -35,7 +35,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   TimeSource& time_source_;
   ProtobufTypes::MessagePtr route_config_proto_;
-  uint64_t last_config_hash_;
+  uint64_t last_config_hash_{0ull};
   SystemTime last_updated_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ConfigConstSharedPtr config_;

@@ -172,6 +172,16 @@ private:
   ValueMatcherConstSharedPtr oneof_value_matcher_;
 };
 
+class OrMatcher : public ValueMatcher {
+public:
+  OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher);
+
+  bool match(const ProtobufWkt::Value& value) const override;
+
+private:
+  std::vector<ValueMatcherConstSharedPtr> or_matchers_;
+};
+
 class MetadataMatcher {
 public:
   MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher& matcher);

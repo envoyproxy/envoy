@@ -59,7 +59,8 @@ public:
   Upstream::ClusterUpdateCallbacksHandlePtr addThreadLocalClusterUpdateCallbacks();
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterAddOrUpdate(absl::string_view cluster_name,
+                            Upstream::ThreadLocalClusterCommand&) override;
   void onClusterRemoval(const std::string&) override;
 
 private:

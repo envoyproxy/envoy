@@ -131,6 +131,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_reply:local_reply_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -238,6 +239,7 @@ envoy_cc_test_library(
         "//source/common/http:context_lib",
         "//source/common/tracing:custom_tag_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
@@ -264,7 +266,6 @@ envoy_cc_test(
         "conn_manager_impl_test.cc",
         "conn_manager_impl_test_2.cc",
     ],
-    shard_count = 3,
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",

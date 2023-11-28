@@ -57,8 +57,9 @@ ProxyFilterConfig::ProxyFilterConfig(
     Server::Configuration::FactoryContext& context)
     : cluster_store_(cluster_store_factory.get()), dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
-      cluster_manager_(context.clusterManager()),
-      main_thread_dispatcher_(context.mainThreadDispatcher()), tls_slot_(context.threadLocal()),
+      cluster_manager_(context.getServerFactoryContext().clusterManager()),
+      main_thread_dispatcher_(context.getServerFactoryContext().mainThreadDispatcher()),
+      tls_slot_(context.getServerFactoryContext().threadLocal()),
       cluster_init_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config.sub_cluster_config(),
                                                        cluster_init_timeout, 5000)),
       save_upstream_address_(proto_config.save_upstream_address()) {
@@ -111,8 +112,8 @@ ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
   }
 }
 
-void ProxyFilterConfig::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  const std::string& cluster_name = cluster.info()->name();
+void ProxyFilterConfig::onClusterAddOrUpdate(absl::string_view cluster_name,
+                                             Upstream::ThreadLocalClusterCommand&) {
   ENVOY_LOG(debug, "thread local cluster {} added or updated", cluster_name);
   ThreadLocalClusterInfo& tls_cluster_info = *tls_slot_;
   auto it = tls_cluster_info.pending_clusters_.find(cluster_name);

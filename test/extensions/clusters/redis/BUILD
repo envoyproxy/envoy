@@ -24,6 +24,8 @@ envoy_extension_cc_test(
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",
         "//source/extensions/filters/network/redis_proxy:config",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
@@ -68,6 +70,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
@@ -94,13 +97,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["redis_cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.redis"],
-    # This test takes a while to run specially under tsan.
-    # Shard it to avoid test timeout.
-    shard_count = 2,
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",
         "//source/extensions/filters/network/redis_proxy:config",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/integration:ads_integration_lib",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

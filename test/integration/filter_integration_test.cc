@@ -73,7 +73,7 @@ TEST_P(FilterIntegrationTest, OnLocalReply) {
   }
 
   // The second two tests validate the filter intercepting local replies, but
-  // upstream filters don't run on local replies.
+  // upstream HTTP filters don't run on local replies.
   if (!testing_downstream_filter_) {
     return;
   }
@@ -121,10 +121,6 @@ TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(FilterIntegrationTest, AddBodyToRequestAndWaitForIt) {
-  // Make sure one end to end test verifies the old path with runtime singleton,
-  // to check for regressions.
-  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "false");
-
   prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");
@@ -188,15 +184,9 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(40, 58, 40, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(0, 58, 0, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                         BytesCountExpectation(40, 58, 40, 58),
+                                         BytesCountExpectation(7, 10, 7, 8));
   }
 }
 
@@ -309,7 +299,7 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   if (testing_downstream_filter_) {
-    // When testing an upstream filters, we may receive body bytes before we
+    // When testing an upstream HTTP filters, we may receive body bytes before we
     // process headers, so don't set expectations.
     expectDownstreamBytesSentAndReceived(BytesCountExpectation(109, 1152, 90, 81),
                                          BytesCountExpectation(0, 58, 0, 58),
@@ -691,7 +681,7 @@ name: passthrough-filter
   verifyUpStreamRequestAfterStopAllFilter();
 }
 
-// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
+// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(FilterIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
   prependFilter(R"EOF(
@@ -1177,8 +1167,15 @@ TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeTrailersWithContinu
   codec_client_->sendData(*request_encoder, 1024, false);
   codec_client_->sendData(*request_encoder, 1024, false);
 
-  codec_client_->sendTrailers(*request_encoder,
-                              Http::TestRequestTrailerMapImpl{{"some", "trailer"}});
+  if (std::get<0>(GetParam()).http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_LOG_NOT_CONTAINS(
+        "error", "DataFrameSource will send fin, preventing trailers",
+        codec_client_->sendTrailers(*request_encoder,
+                                    Http::TestRequestTrailerMapImpl{{"some", "trailer"}}));
+  } else {
+    codec_client_->sendTrailers(*request_encoder,
+                                Http::TestRequestTrailerMapImpl{{"some", "trailer"}});
+  }
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -1249,10 +1246,6 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
 }
 
 TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeFilter) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {
-    return;
-  }
   prependFilter(R"EOF(
   name: assert-non-reentrant-filter
   )EOF");

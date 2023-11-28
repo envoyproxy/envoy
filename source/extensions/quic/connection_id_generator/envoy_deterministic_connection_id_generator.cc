@@ -1,5 +1,7 @@
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator.h"
 
+#include <cstdint>
+
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -80,6 +82,46 @@ EnvoyDeterministicConnectionIdGeneratorFactory::createCompatibleLinuxBpfSocketOp
   UNREFERENCED_PARAMETER(concurrency);
   PANIC("BPF filter is not supported in this platform.");
 #endif
+}
+
+static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint32_t concurrency,
+                                      uint32_t default_value) {
+  // This is a re-implementation of the same algorithm written in BPF in
+  // createCompatibleLinuxBpfSocketOption
+  const uint64_t packet_length = packet.length();
+  if (packet_length < 9) {
+    return default_value;
+  }
+
+  uint8_t first_octet;
+  packet.copyOut(0, sizeof(first_octet), &first_octet);
+
+  uint32_t connection_id_snippet;
+  if (first_octet & 0x80) {
+    // IETF QUIC long header.
+    // The connection id starts from 7th byte.
+    // Minimum length of a long header packet is 14.
+    if (packet_length < 14) {
+      return default_value;
+    }
+
+    packet.copyOut(6, sizeof(connection_id_snippet), &connection_id_snippet);
+  } else {
+    // IETF QUIC short header, or gQUIC.
+    // The connection id starts from 2nd byte.
+    packet.copyOut(1, sizeof(connection_id_snippet), &connection_id_snippet);
+  }
+
+  connection_id_snippet = htonl(connection_id_snippet);
+  return connection_id_snippet % concurrency;
+}
+
+QuicConnectionIdWorkerSelector
+EnvoyDeterministicConnectionIdGeneratorFactory::getCompatibleConnectionIdWorkerSelector(
+    uint32_t concurrency) {
+  return [concurrency](const Buffer::Instance& packet, uint32_t default_value) {
+    return bpfEquivalentFunction(packet, concurrency, default_value);
+  };
 }
 
 } // namespace Quic

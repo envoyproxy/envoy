@@ -46,8 +46,11 @@ class DnsCacheImplTest;
 
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  DnsCacheImpl(Server::Configuration::FactoryContextBase& context,
-               const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+  // Create a DnsCacheImpl or return a failed status;
+  static absl::StatusOr<std::shared_ptr<DnsCacheImpl>> createDnsCacheImpl(
+      Server::Configuration::FactoryContextBase& context,
+      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
   static Network::DnsResolverSharedPtr selectDnsResolver(
@@ -66,6 +69,8 @@ public:
   void forceRefreshHosts() override;
 
 private:
+  DnsCacheImpl(Server::Configuration::FactoryContextBase& context,
+               const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   struct LoadDnsCacheEntryHandleImpl
       : public LoadDnsCacheEntryHandle,
         RaiiMapOfListElement<std::string, LoadDnsCacheEntryHandleImpl*> {

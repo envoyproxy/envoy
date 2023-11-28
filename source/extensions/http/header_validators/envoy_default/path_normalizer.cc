@@ -19,17 +19,14 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::envoy::extensions::http::header_validators::envoy_default::v3::
     HeaderValidatorConfig_UriPathNormalizationOptions;
 using ::Envoy::Http::HeaderUtility;
+using ::Envoy::Http::PathNormalizerResponseCodeDetail;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-struct PathNormalizerResponseCodeDetailValues {
-  const std::string RedirectNormalized = "uhv.path_noramlization_redirect";
-};
-
-using PathNormalizerResponseCodeDetail = ConstSingleton<PathNormalizerResponseCodeDetailValues>;
-
-PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config) : config_(config) {}
+PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config,
+                               const ConfigOverrides& config_overrides)
+    : config_(config), config_overrides_(config_overrides) {}
 
 PathNormalizer::DecodedOctet
 PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
@@ -60,8 +57,7 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     return {PercentDecodeResult::Invalid};
   }
 
-  const bool preserve_case =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_preserve_url_encoded_case");
+  const bool preserve_case = config_overrides_.preserve_url_encoded_case_;
 
   char ch = '\0';
   // Normalize and decode the octet
@@ -92,7 +88,7 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     return {PercentDecodeResult::Decoded, ch};
   }
 
-  if (ch == '/') {
+  if (ch == '/' || ch == '\\') {
     // We decoded a slash character and how we handle it depends on the active configuration.
     switch (config_.uri_path_normalization_options().path_with_escaped_slashes_action()) {
     case HeaderValidatorConfig_UriPathNormalizationOptions::IMPLEMENTATION_SPECIFIC_DEFAULT:
@@ -242,8 +238,9 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     redirect |= result.action() == PathNormalizationResult::Action::Redirect;
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.uhv_translate_backslash_to_slash")) {
+  // The `envoy.uhv.allow_non_compliant_characters_in_path` flag allows the \ (back slash)
+  // character, which legacy path normalization was changing to / (forward slash).
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
     translateBackToForwardSlashes(path);
   }
 
@@ -274,7 +271,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
   return PathNormalizationResult::success();
@@ -342,7 +339,7 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
   path.resize(std::distance(begin, write));
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
   return PathNormalizationResult::success();

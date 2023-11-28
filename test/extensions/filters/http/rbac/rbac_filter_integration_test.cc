@@ -504,7 +504,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.filters.http.rbac"].PackFrom(per_route_config);
+        (*config)["rbac"].PackFrom(per_route_config);
       });
   config_helper_.prependFilter(RBAC_CONFIG);
 
@@ -530,6 +530,8 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
 }
 
 TEST_P(RBACIntegrationTest, PathWithQueryAndFragmentWithOverride) {
+  // Allow client to send path fragment
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_CONFIG_WITH_PATH_EXACT_MATCH);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                     "false");
@@ -559,6 +561,8 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragmentWithOverride) {
 }
 
 TEST_P(RBACIntegrationTest, PathWithFragmentRejectedByDefault) {
+  // Prevent UHV in test client from stripping fragment
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_CONFIG_WITH_PATH_EXACT_MATCH);
   initialize();
 
@@ -582,6 +586,7 @@ TEST_P(RBACIntegrationTest, PathWithFragmentRejectedByDefault) {
 // This test ensures that the exact match deny rule is not affected by fragment and query
 // when Envoy is configured to strip both fragment and query.
 TEST_P(RBACIntegrationTest, DenyExactMatchIgnoresQueryAndFragment) {
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_CONFIG_DENY_WITH_PATH_EXACT_MATCH);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                     "false");
@@ -894,7 +899,7 @@ TEST_P(RBACIntegrationTest, MatcherRouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.filters.http.rbac"].PackFrom(per_route_config);
+        (*config)["rbac"].PackFrom(per_route_config);
       });
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG);
 
@@ -920,6 +925,8 @@ TEST_P(RBACIntegrationTest, MatcherRouteOverride) {
 }
 
 TEST_P(RBACIntegrationTest, PathMatcherWithQueryAndFragmentWithOverride) {
+  // Allow client to send path fragment
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG_WITH_PATH_EXACT_MATCH);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                     "false");
@@ -949,6 +956,8 @@ TEST_P(RBACIntegrationTest, PathMatcherWithQueryAndFragmentWithOverride) {
 }
 
 TEST_P(RBACIntegrationTest, PathMatcherWithFragmentRejectedByDefault) {
+  // Allow client to send path fragment
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG_WITH_PATH_EXACT_MATCH);
   initialize();
 
@@ -972,6 +981,7 @@ TEST_P(RBACIntegrationTest, PathMatcherWithFragmentRejectedByDefault) {
 // This test ensures that the exact match deny rule is not affected by fragment and query
 // when Envoy is configured to strip both fragment and query.
 TEST_P(RBACIntegrationTest, MatcherDenyExactMatchIgnoresQueryAndFragment) {
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG_DENY_WITH_PATH_EXACT_MATCH);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                     "false");

@@ -61,7 +61,7 @@ For Envoy acting as a forward proxy, the preferred configuration is the
 :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
 By default it will use TCP and ALPN to select the best available protocol of HTTP/2 and HTTP/1.1.
 
-.. _arch_overview_http3_upstream:
+.. _arch_overview_http3_pooling_upstream:
 
 For auto-http with HTTP/3, an alternate protocol cache must be configured via
 :ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`.  HTTP/3 connections will only be attempted to servers which

@@ -47,7 +47,7 @@ MockFactoryContext::MockFactoryContext()
 
 MockFactoryContext::~MockFactoryContext() = default;
 
-MockUpstreamHttpFactoryContext::MockUpstreamHttpFactoryContext() {
+MockUpstreamFactoryContext::MockUpstreamFactoryContext() {
   ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));

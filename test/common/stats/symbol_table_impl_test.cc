@@ -287,7 +287,7 @@ TEST_F(StatNameTest, TestSameValueOnPartialFree) {
   StatNameStorage stat_foobar_1("foo.bar", table_);
   SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1.statName());
   stat_foobar_1.free(table_);
-  StatName stat_foobar_2(makeStat("foo.bar"));
+  StatName stat_foobar_2(makeStat("foo.bar")); // NOLINT(clang-analyzer-unix.Malloc)
   SymbolVec stat_foobar_2_symbols = getSymbols(stat_foobar_2);
 
   EXPECT_EQ(stat_foobar_1_symbols[0],
@@ -337,7 +337,7 @@ TEST_F(StatNameTest, TestShrinkingExpectation) {
   size_t table_size_0 = table_.numSymbols();
 
   auto make_stat_storage = [this](absl::string_view name) -> StatNameStorage {
-    return StatNameStorage(name, table_);
+    return {name, table_};
   };
 
   StatNameStorage stat_a(make_stat_storage("a"));
@@ -362,7 +362,7 @@ TEST_F(StatNameTest, TestShrinkingExpectation) {
   stat_ace.free(table_);
   EXPECT_EQ(table_size_4, table_.numSymbols());
 
-  stat_acd.free(table_);
+  stat_acd.free(table_); // NOLINT(clang-analyzer-unix.Malloc)
   EXPECT_EQ(table_size_3, table_.numSymbols());
 
   stat_ac.free(table_);
@@ -586,7 +586,7 @@ TEST_F(StatNameTest, MutexContentionOnExistingSymbols) {
           accesses.DecrementCount();
 
           wait.wait();
-        }));
+        })); // NOLINT(clang-analyzer-unix.Malloc)
   }
   creation.setReady();
   creates.Wait();
@@ -744,7 +744,7 @@ TEST(SymbolTableTest, Memory) {
     };
     symbol_table_mem_used = test_memory_usage(record_stat);
     for (StatNameStorage& name : names) {
-      name.free(table);
+      name.free(table); // NOLINT(clang-analyzer-unix.Malloc)
     }
   }
 

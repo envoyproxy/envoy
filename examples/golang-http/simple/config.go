@@ -25,7 +25,9 @@ type config struct {
 type parser struct {
 }
 
-func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
+// Parse the filter configuration. We can call the ConfigCallbackHandler to control the filter's
+// behavior
+func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
 		return nil, err
@@ -45,6 +47,7 @@ func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
 	return conf, nil
 }
 
+// Merge configuration from the inherited parent configuration
 func (p *parser) Merge(parent interface{}, child interface{}) interface{} {
 	parentConfig := parent.(*config)
 	childConfig := child.(*config)

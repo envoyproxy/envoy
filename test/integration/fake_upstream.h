@@ -194,15 +194,18 @@ public:
     if (!waitForData(client_dispatcher, 5, timeout)) {
       return testing::AssertionFailure() << "Timed out waiting for start of gRPC message.";
     }
+    int last_body_size = 0;
     {
       absl::MutexLock lock(&lock_);
+      last_body_size = body_.length();
       if (!grpc_decoder_.decode(body_, decoded_grpc_frames_)) {
         return testing::AssertionFailure()
                << "Couldn't decode gRPC data frame: " << body_.toString();
       }
     }
     if (decoded_grpc_frames_.empty()) {
-      if (!waitForData(client_dispatcher, grpc_decoder_.length(), bound.timeLeft())) {
+      if (!waitForData(client_dispatcher, grpc_decoder_.length() - last_body_size,
+                       bound.timeLeft())) {
         return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
       }
       {
@@ -300,6 +303,10 @@ public:
     absl::MutexLock lock(&lock_);
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
+      if (connection_.detectedCloseType() == Network::DetectedCloseType::RemoteReset ||
+          connection_.detectedCloseType() == Network::DetectedCloseType::LocalReset) {
+        rst_disconnected_ = true;
+      }
       disconnected_ = true;
     }
   }
@@ -319,6 +326,11 @@ public:
                               // is acquired via the base connection reference. Fix this to
                               // remove the reference.
     return !disconnected_;
+  }
+
+  bool rstDisconnected() {
+    lock_.AssertReaderHeld();
+    return rst_disconnected_;
   }
 
   // This provides direct access to the underlying connection, but only to const methods.
@@ -383,6 +395,7 @@ private:
   absl::Mutex lock_;
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
+  bool rst_disconnected_ ABSL_GUARDED_BY(lock_){};
 };
 
 using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
@@ -402,12 +415,20 @@ public:
   testing::AssertionResult close(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
+  testing::AssertionResult close(Network::ConnectionCloseType close_type,
+                                 std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
   testing::AssertionResult
   readDisable(bool disable, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForDisconnect(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForRstDisconnect(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -732,6 +753,7 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager& listener) override;
 
   void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
   void setDisableAllAndDoNotEnable(bool value) { disable_and_do_not_enable_ = value; }
@@ -766,6 +788,8 @@ public:
   absl::Mutex& lock() { return lock_; }
 
 protected:
+  const FakeUpstreamConfig& config() const { return config_; }
+
   Stats::IsolatedStoreImpl stats_store_;
   const Http::CodecType http_type_;
 
@@ -921,6 +945,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is

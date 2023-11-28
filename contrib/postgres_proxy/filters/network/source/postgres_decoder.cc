@@ -461,7 +461,9 @@ Decoder::Result DecoderImpl::onDataInNegotiating(Buffer::Instance& data, bool fr
 
   data.drain(data.length());
 
-  callbacks_->encryptUpstream(upstreamSSL, temp_storage_);
+  if (callbacks_->encryptUpstream(upstreamSSL, temp_storage_)) {
+    state_ = State::InSyncState;
+  }
 
   return Decoder::Result::Stopped;
 }

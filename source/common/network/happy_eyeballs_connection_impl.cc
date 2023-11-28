@@ -7,7 +7,8 @@ namespace Network {
 
 HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    const std::shared_ptr<Upstream::UpstreamLocalAddressSelector>& upstream_local_address_selector,
+    const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
+        upstream_local_address_selector,
     UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,

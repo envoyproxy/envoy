@@ -18,6 +18,7 @@ jobs:
     if: ${{ github.actor == 'trigger-workflow-envoy[bot]' }}
     runs-on: ubuntu-22.04
     permissions:
+      contents: read
       statuses: write
     steps:
     - name: 'Download artifact'
@@ -53,7 +54,7 @@ jobs:
         echo "state=${STATE}" >> "$GITHUB_OUTPUT"
       id: job
     - name: Complete status check
-      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.0.10
+      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.1.8
       with:
         authToken: ${{ secrets.GITHUB_TOKEN }}
         context: Verify/examples

@@ -79,7 +79,7 @@ public:
 
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::CommonFactoryContext&) override {
+                               Server::Configuration::UpstreamFactoryContext&) override {
     auto config = dynamic_cast<const ProtobufWkt::StringValue&>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));
@@ -115,8 +115,8 @@ public:
                                   std::get<1>(GetParam()));
   }
 
-  // Get the test parameter whether upstream filters are initialized right after the upstream
-  // connection has been established
+  // Get the test parameter whether upstream network filters are initialized right after the
+  // upstream connection has been established
   bool upstreamFiltersInitializedWhenConnected() const { return std::get<1>(GetParam()); }
 
   void initialize() { on_new_connection_called_after_on_write_.store(absl::optional<bool>{}); }

@@ -16,6 +16,7 @@ filters.
   dubbo_proxy_filter
   echo_filter
   ext_authz_filter
+  generic_proxy_filter
   golang_filter
   kafka_broker_filter
   kafka_mesh_filter
@@ -27,6 +28,7 @@ filters.
   rbac_filter
   redis_proxy_filter
   rocketmq_proxy_filter
+  set_filter_state
   sni_cluster_filter
   sni_dynamic_forward_proxy_filter
   tcp_proxy_filter

@@ -29,6 +29,8 @@ routing PRs, questions, etc. to the right place.
   * Docs, tooling, CI, containers and sandbox examples
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3, upstream connection management, Envoy Mobile.
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 
 # Maintainers
 
@@ -38,14 +40,16 @@ routing PRs, questions, etc. to the right place.
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
   * Data plane, overload management, flow control.
-* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
-  * Performance, Dubbo.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
   * Bazel, CI, compilers, linkers, general build issues, etc.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
   * Listeners, RBAC, CEL, matching, Istio.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
   * Caches, file filters, and file I/O.
+* Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
+  * Listeners, iouring, data plane.
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
+  * Load balancing, GeoIP, overload manager, security.
 
 # Envoy mobile maintainers
 
@@ -62,34 +66,20 @@ without further review.
 
 * Michael Warres ([mpwarres] (https://github.com/mpwarres)) (mpw@google.com)
   * Wasm
+* doujiang24 ([doujiang24] https://github.com/doujiang24) (doujiang24@gmail.com)
+  * Golang
 
 # Envoy security team
 
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
-* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
-* Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
 * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
-* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
-
-In addition to the permanent Envoy security team, we have additional temporary
-contributors to envoy-setec and relevant Slack channels from:
-
-* [Trail of Bits](https://www.trailofbits.com/) expiring 9/30/2022.
-  * Adam Meily ([ameily](https://github.com/ameily))
-  * Alessandro Gario ([alessandrogario](https://github.com/alessandrogario))
-  * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
-* [X41 D-Sec](https://x41-dsec.de/) expiring 12/31/2022. Triage and fixes for OSS-Fuzz bugs.
-  * Markus Vervier ([markusx41](https://github.com/markusx41))
-  * Eric Sesterhenn ([ericsesterhennx41](https://github.com/ericsesterhennx41))
-  * Ralf Weinmann ([rpw-x41](https://github.com/rpw-x41))
-  * Dr. Andre Vehreschild ([vehre-x41](https://github.com/vehre-x41))
-  * Robert Femmer ([robertfemmer](https://github.com/robertfemmer))
-* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) expiring 12/31/2022. Review fixes for OSS-Fuzz bugs.
-* Boteng Yao ([botengyao](https://github.com/botengyao)) expiring 12/31/2022. Review fixes for OSS-Fuzz bugs.
-* Tianyu Xia ([tyxia](https://github.com/tyxia)) expiring 12/31/2022. Review fixes for OSS-Fuzz bugs.
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (nezdolik@spotify.com)
+* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
+* Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
 
 # Emeritus maintainers
 

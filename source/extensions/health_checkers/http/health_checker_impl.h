@@ -39,6 +39,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(HttpHealthCheckerFactory);
+
 /**
  * HTTP health checker implementation. Connection keep alive is used where possible.
  */

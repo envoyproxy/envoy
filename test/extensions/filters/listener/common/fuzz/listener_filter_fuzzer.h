@@ -7,6 +7,7 @@
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -60,12 +61,8 @@ public:
   uint64_t listenerTag() const override { return 1; }
   ResourceLimit& openConnections() override { return open_connections_; }
   const std::string& name() const override { return name_; }
-  Network::UdpListenerConfigOptRef udpListenerConfig() override {
-    return Network::UdpListenerConfigOptRef();
-  }
-  Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return Network::InternalListenerConfigOptRef();
-  }
+  Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -101,6 +98,7 @@ private:
   void disconnect();
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;

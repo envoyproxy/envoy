@@ -260,6 +260,62 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   codec_client_->close();
 }
 
+TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHandshake) {
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_fix_filter_manager_uaf", "true"}});
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* proof_source_config = bootstrap.mutable_static_resources()
+                                    ->mutable_listeners(0)
+                                    ->mutable_udp_listener_config()
+                                    ->mutable_quic_options()
+                                    ->mutable_proof_source_config();
+    proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
+    proof_source_config->mutable_typed_config();
+  });
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
+      timer_scale_factors:
+        - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+          min_timeout: 3s
+    )EOF"));
+
+  // Set the load so the timer is reduced but not to the minimum value.
+  updateResource(0.8);
+  test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
+  // Create an HTTP connection without finishing the handshake.
+  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                        /*wait_till_connected=*/false);
+  EXPECT_FALSE(codec_client_->connected());
+
+  // Advancing past the minimum time shouldn't close the connection.
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(codec_client_->connected());
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  // Increase load more so that the timer is reduced to the minimum.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                               100);
+
+  // Create another HTTP connection without finishing handshake.
+  IntegrationCodecClientPtr codec_client2 = makeRawHttpConnection(
+      makeClientConnection((lookupPort("http"))), absl::nullopt, /*wait_till_connected=*/false);
+  EXPECT_FALSE(codec_client2->connected());
+  // Advancing past the minimum time and wait for the proxy to notice and close both connections.
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_idle_timeout", 2);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_FALSE(codec_client_->sawGoAway());
+  EXPECT_FALSE(codec_client2->connected());
+  ASSERT_TRUE(codec_client2->waitForDisconnect());
+  EXPECT_FALSE(codec_client2->sawGoAway());
+}
+
 TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(

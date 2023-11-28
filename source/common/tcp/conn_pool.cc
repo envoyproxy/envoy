@@ -34,8 +34,7 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   connection_->noDelay(true);
   connection_->connect();
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_pool_idle_timeout") &&
-      idle_timeout_.has_value()) {
+  if (idle_timeout_.has_value()) {
     idle_timer_ = connection_->dispatcher().createTimer([this]() -> void { onIdleTimeout(); });
     setIdleTimer();
   }

@@ -37,7 +37,7 @@ HdsDelegate::HdsDelegate(Server::Configuration::ServerFactoryContext& server_con
       async_client_(std::move(async_client)), dispatcher_(server_context.mainThreadDispatcher()),
       server_context_(server_context), store_stats_(stats),
       ssl_context_manager_(ssl_context_manager), info_factory_(info_factory),
-      tls_(server_context_.threadLocal()), specifier_hash_(0) {
+      tls_(server_context_.threadLocal()) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       server_context.localInfo().node());
   backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(

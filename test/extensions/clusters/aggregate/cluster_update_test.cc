@@ -31,7 +31,8 @@ envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
-class AggregateClusterUpdateTest : public Event::TestUsingSimulatedTime, public testing::Test {
+class AggregateClusterUpdateTest : public Event::TestUsingSimulatedTime,
+                                   public testing::TestWithParam<bool> {
 public:
   AggregateClusterUpdateTest()
       : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()),
@@ -39,7 +40,9 @@ public:
 
   void initialize(const std::string& yaml_config) {
     auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
-    cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
+    const bool use_deferred_cluster = GetParam();
+    bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(use_deferred_cluster);
+    cluster_manager_ = Upstream::TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
@@ -77,12 +80,14 @@ public:
   )EOF";
 };
 
-TEST_F(AggregateClusterUpdateTest, NoHealthyUpstream) {
+INSTANTIATE_TEST_SUITE_P(DeferredClusters, AggregateClusterUpdateTest, testing::Bool());
+
+TEST_P(AggregateClusterUpdateTest, NoHealthyUpstream) {
   initialize(default_yaml_config_);
   EXPECT_EQ(nullptr, cluster_->loadBalancer().chooseHost(nullptr));
 }
 
-TEST_F(AggregateClusterUpdateTest, BasicFlow) {
+TEST_P(AggregateClusterUpdateTest, BasicFlow) {
   initialize(default_yaml_config_);
 
   std::unique_ptr<Upstream::MockClusterUpdateCallbacks> callbacks(
@@ -132,7 +137,7 @@ TEST_F(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 }
 
-TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
+TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
   initialize(default_yaml_config_);
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
@@ -242,7 +247,7 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
   }
 }
 
-TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters) {
+TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters) {
   const std::string config = R"EOF(
  static_resources:
   clusters:
@@ -272,7 +277,7 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   )EOF";
 
   auto bootstrap = parseBootstrapFromV2Yaml(config);
-  cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
+  cluster_manager_ = Upstream::TestClusterManagerImpl::createAndInit(
       bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.local_info_,
       log_manager_, factory_.dispatcher_, admin_, validation_context_, *factory_.api_,
       http_context_, grpc_context_, router_context_, server_);

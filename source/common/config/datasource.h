@@ -24,11 +24,13 @@ namespace DataSource {
  * @param source data source.
  * @param allow_empty return an empty string if no DataSource case is specified.
  * @param api reference to the Api object
+ * @param max_size max size limit of file to read, default 0 means no limit, and if the file data
+ * would exceed the limit, it will throw a EnvoyException.
  * @return std::string with DataSource contents.
  * @throw EnvoyException if no DataSource case is specified and !allow_empty.
  */
-std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
-                 Api::Api& api);
+std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty, Api::Api& api,
+                 uint64_t max_size = 0);
 
 /**
  * @param source data source.

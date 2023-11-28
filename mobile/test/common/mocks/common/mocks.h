@@ -1,3 +1,5 @@
+#pragma once
+
 #include "gmock/gmock.h"
 #include "library/common/common/system_helper.h"
 

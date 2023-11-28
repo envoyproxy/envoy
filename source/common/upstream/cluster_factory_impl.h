@@ -128,9 +128,9 @@ protected:
 
 private:
   /**
-   * Create an instance of ClusterImplBase.
+   * Create an instance of ClusterImplBase or return failure.
    */
-  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) PURE;
   const std::string name_;
@@ -153,7 +153,7 @@ protected:
   ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
@@ -165,7 +165,7 @@ private:
                                    context);
   }
 
-  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
                           const ConfigProto& proto_config, ClusterFactoryContext& context) PURE;
 };

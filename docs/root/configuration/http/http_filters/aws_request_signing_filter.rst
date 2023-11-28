@@ -23,7 +23,7 @@ policies to determine if this option is appropriate.
 
 When :ref:`use_unsigned_payload <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.use_unsigned_payload>`
 is false (the default), requests which exceed the configured buffer limit will receive a 413 response. See the
-ref:`flow control docs <faq_flow_control>` for details.
+:ref:`flow control docs <faq_flow_control>` for details.
 
 The :ref:`match_excluded_headers <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.match_excluded_headers>`
 option allows excluding certain request headers from being signed. This usually applies to headers that are likely to mutate or

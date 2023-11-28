@@ -250,9 +250,25 @@ envoy_cc_library(
     srcs = ["host_utility.cc"],
     hdrs = ["host_utility.h"],
     deps = [
+        "//envoy/stats:primitive_stats_interface",
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/config:well_known_names",
         "//source/common/runtime:runtime_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "subset_lb_config_lib",
+    srcs = ["subset_lb_config.cc"],
+    hdrs = ["subset_lb_config.h"],
+    deps = [
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/config:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/subset/v3:pkg_cc_proto",
     ],
 )
 
@@ -262,6 +278,7 @@ envoy_cc_library(
     hdrs = ["load_balancer_impl.h"],
     deps = [
         ":scheduler_lib",
+        ":subset_lb_config_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",
@@ -271,7 +288,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_protos_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
@@ -393,6 +410,7 @@ envoy_cc_library(
     srcs = ["upstream_impl.cc"],
     deps = [
         ":cluster_factory_lib",
+        ":default_local_address_selector_factory",
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":upstream_includes",
@@ -401,12 +419,15 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "//source/common/stats:deferred_creation",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:dns_interface",
         "//envoy/network:listen_socket_interface",
+        "//envoy/registry",
         "//envoy/ssl:context_interface",
         "//envoy/upstream:health_checker_interface",
         "//source/common/common:dns_utils_lib",
@@ -453,7 +474,7 @@ envoy_cc_library(
     deps = [
         ":load_balancer_lib",
         ":resource_manager_lib",
-        ":upstream_http_factory_context_lib",
+        ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",
@@ -557,11 +578,47 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "upstream_http_factory_context_lib",
-    hdrs = ["upstream_http_factory_context_impl.h"],
+    name = "upstream_factory_context_lib",
+    hdrs = ["upstream_factory_context_impl.h"],
     deps = [
         "//envoy/init:manager_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/stats:stats_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "default_local_address_selector",
+    srcs = [
+        "default_local_address_selector.cc",
+    ],
+    hdrs = [
+        "default_local_address_selector.h",
+    ],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "default_local_address_selector_factory",
+    srcs = [
+        "default_local_address_selector_factory.cc",
+    ],
+    hdrs = [
+        "default_local_address_selector_factory.h",
+    ],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":default_local_address_selector",
+        "//envoy/network:address_interface",
+        "//envoy/network:socket_interface",
+        "//envoy/registry",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/network:resolver_lib",
+        "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
+    ],
+    # Ensure this factory in the source is always linked in.
+    alwayslink = 1,
 )

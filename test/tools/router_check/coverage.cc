@@ -14,7 +14,7 @@ double RouteCoverage::report() {
 }
 
 std::vector<bool> RouteCoverage::coverageFields() {
-  if (route_entry_ != nullptr) {
+  if (route_ != nullptr) {
     return std::vector<bool>{cluster_covered_, virtual_cluster_covered_, virtual_host_covered_,
                              path_rewrite_covered_, host_rewrite_covered_};
   } else if (direct_response_entry_ != nullptr) {
@@ -24,35 +24,37 @@ std::vector<bool> RouteCoverage::coverageFields() {
   }
 }
 
-void Coverage::markClusterCovered(const Envoy::Router::Route& route) {
+void Coverage::markClusterCovered(const Envoy::Router::RouteConstSharedPtr route) {
   coveredRoute(route).setClusterCovered();
 }
 
-void Coverage::markVirtualClusterCovered(const Envoy::Router::Route& route) {
+void Coverage::markVirtualClusterCovered(const Envoy::Router::RouteConstSharedPtr route) {
   coveredRoute(route).setVirtualClusterCovered();
 }
 
-void Coverage::markVirtualHostCovered(const Envoy::Router::Route& route) {
+void Coverage::markVirtualHostCovered(const Envoy::Router::RouteConstSharedPtr route) {
   coveredRoute(route).setVirtualHostCovered();
 }
 
-void Coverage::markPathRewriteCovered(const Envoy::Router::Route& route) {
+void Coverage::markPathRewriteCovered(const Envoy::Router::RouteConstSharedPtr route) {
   coveredRoute(route).setPathRewriteCovered();
 }
 
-void Coverage::markHostRewriteCovered(const Envoy::Router::Route& route) {
+void Coverage::markHostRewriteCovered(const Envoy::Router::RouteConstSharedPtr route) {
   coveredRoute(route).setHostRewriteCovered();
 }
 
-void Coverage::markRedirectPathCovered(const Envoy::Router::Route& route) {
+void Coverage::markRedirectPathCovered(const Envoy::Router::RouteConstSharedPtr route) {
   coveredRoute(route).setRedirectPathCovered();
 }
 
-void Coverage::markRedirectCodeCovered(const Envoy::Router::Route& route) {
+void Coverage::markRedirectCodeCovered(const Envoy::Router::RouteConstSharedPtr route) {
   coveredRoute(route).setRedirectCodeCovered();
 }
 
-double Coverage::report() {
+double Coverage::report(bool detailed_coverage_report) {
+  std::set<std::string> all_route_names;
+  std::set<std::string> covered_route_names;
   uint64_t num_routes = 0;
   for (const auto& host : route_config_.virtual_hosts()) {
     for (const auto& route : host.routes()) {
@@ -61,12 +63,21 @@ double Coverage::report() {
       } else {
         num_routes += 1;
       }
+      all_route_names.emplace(route.name());
     }
   }
+
+  if (detailed_coverage_report) {
+    for (auto& covered_route : covered_routes_) {
+      covered_route_names.emplace(covered_route->routeName());
+    }
+    printNotCoveredRouteNames(all_route_names, covered_route_names);
+  }
+
   return 100 * static_cast<double>(covered_routes_.size()) / num_routes;
 }
 
-double Coverage::detailedReport() {
+double Coverage::comprehensiveReport() {
   std::set<std::string> all_route_names;
   std::set<std::string> covered_route_names;
   uint64_t num_routes = 0;
@@ -108,23 +119,39 @@ void Coverage::printMissingTests(const std::set<std::string>& all_route_names,
   }
 }
 
-RouteCoverage& Coverage::coveredRoute(const Envoy::Router::Route& route) {
+void Coverage::printNotCoveredRouteNames(const std::set<std::string>& all_route_names,
+                                         const std::set<std::string>& covered_route_names) {
+  std::set<std::string> missing_route_names;
+  std::set_difference(all_route_names.begin(), all_route_names.end(), covered_route_names.begin(),
+                      covered_route_names.end(),
+                      std::inserter(missing_route_names, missing_route_names.end()));
+
+  for (const auto& host : route_config_.virtual_hosts()) {
+    for (const auto& route : host.routes()) {
+      if (missing_route_names.find(route.name()) != missing_route_names.end()) {
+        std::cout << "Missing test for host: " << host.name() << ", route name: " << route.name()
+                  << std::endl;
+      }
+    }
+  }
+}
+
+RouteCoverage& Coverage::coveredRoute(const Envoy::Router::RouteConstSharedPtr& route) {
   std::string route_name;
-  if (route.routeEntry() != nullptr) {
-    const Envoy::Router::RouteEntry* route_entry = route.routeEntry();
-    route_name = route.routeEntry()->routeName();
+  if (route->routeEntry() != nullptr) {
+    route_name = route->routeName();
     for (auto& route_coverage : covered_routes_) {
-      if (route_coverage->covers(route_entry)) {
+      if (route_coverage->covers(route)) {
         return *route_coverage;
       }
     }
     std::unique_ptr<RouteCoverage> new_coverage =
-        std::make_unique<RouteCoverage>(route_entry, route_name);
+        std::make_unique<RouteCoverage>(route, route_name);
     covered_routes_.push_back(std::move(new_coverage));
     return coveredRoute(route);
-  } else if (route.directResponseEntry() != nullptr) {
-    const Envoy::Router::DirectResponseEntry* direct_response_entry = route.directResponseEntry();
-    route_name = route.directResponseEntry()->routeName();
+  } else if (route->directResponseEntry() != nullptr) {
+    const Envoy::Router::DirectResponseEntry* direct_response_entry = route->directResponseEntry();
+    route_name = route->routeName();
     for (auto& route_coverage : covered_routes_) {
       if (route_coverage->covers(direct_response_entry)) {
         return *route_coverage;

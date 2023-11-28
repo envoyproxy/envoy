@@ -49,11 +49,13 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
   auto dso_lib = std::make_shared<Dso::MockHttpFilterDsoImpl>();
 
   // hard code the return config_id to 1 since the default 0 is invalid.
-  ON_CALL(*dso_lib.get(), envoyGoFilterNewHttpPluginConfig(_, _, _, _)).WillByDefault(Return(1));
+  ON_CALL(*dso_lib.get(), envoyGoFilterNewHttpPluginConfig(_)).WillByDefault(Return(1));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpHeader(_, _, _, _))
       .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Continue)));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpData(_, _, _, _))
       .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Continue)));
+  ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpLog(_, _))
+      .WillByDefault(Invoke([&](httpRequest*, int) -> void {}));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpDestroy(_, _))
       .WillByDefault(Invoke([&](httpRequest* p0, int) -> void {
         // delete the filter->req_, make LeakSanitizer happy.

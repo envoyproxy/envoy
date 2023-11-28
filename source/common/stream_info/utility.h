@@ -15,10 +15,16 @@ namespace StreamInfo {
  */
 class ResponseFlagUtils {
 public:
+  static const std::string toString(const StreamInfo& stream_info);
   static const std::string toShortString(const StreamInfo& stream_info);
   static absl::optional<ResponseFlag> toResponseFlag(absl::string_view response_flag);
 
-  using FlagStringAndEnum = std::pair<const absl::string_view, ResponseFlag>;
+  struct FlagStrings {
+    const absl::string_view short_string_;
+    const absl::string_view long_string_; // PascalCase string
+  };
+
+  using FlagStringsAndEnum = std::pair<const FlagStrings, ResponseFlag>;
 
   constexpr static absl::string_view NONE = "-";
   constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION = "DC";
@@ -49,40 +55,91 @@ public:
   constexpr static absl::string_view OVERLOAD_MANAGER = "OM";
   constexpr static absl::string_view DNS_FAIL = "DF";
 
-  static constexpr std::array ALL_RESPONSE_STRING_FLAGS{
-      FlagStringAndEnum{FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck},
-      FlagStringAndEnum{NO_HEALTHY_UPSTREAM, ResponseFlag::NoHealthyUpstream},
-      FlagStringAndEnum{UPSTREAM_REQUEST_TIMEOUT, ResponseFlag::UpstreamRequestTimeout},
-      FlagStringAndEnum{LOCAL_RESET, ResponseFlag::LocalReset},
-      FlagStringAndEnum{UPSTREAM_REMOTE_RESET, ResponseFlag::UpstreamRemoteReset},
-      FlagStringAndEnum{UPSTREAM_CONNECTION_FAILURE, ResponseFlag::UpstreamConnectionFailure},
-      FlagStringAndEnum{UPSTREAM_CONNECTION_TERMINATION,
-                        ResponseFlag::UpstreamConnectionTermination},
-      FlagStringAndEnum{UPSTREAM_OVERFLOW, ResponseFlag::UpstreamOverflow},
-      FlagStringAndEnum{NO_ROUTE_FOUND, ResponseFlag::NoRouteFound},
-      FlagStringAndEnum{DELAY_INJECTED, ResponseFlag::DelayInjected},
-      FlagStringAndEnum{FAULT_INJECTED, ResponseFlag::FaultInjected},
-      FlagStringAndEnum{RATE_LIMITED, ResponseFlag::RateLimited},
-      FlagStringAndEnum{UNAUTHORIZED_EXTERNAL_SERVICE, ResponseFlag::UnauthorizedExternalService},
-      FlagStringAndEnum{RATELIMIT_SERVICE_ERROR, ResponseFlag::RateLimitServiceError},
-      FlagStringAndEnum{DOWNSTREAM_CONNECTION_TERMINATION,
-                        ResponseFlag::DownstreamConnectionTermination},
-      FlagStringAndEnum{UPSTREAM_RETRY_LIMIT_EXCEEDED, ResponseFlag::UpstreamRetryLimitExceeded},
-      FlagStringAndEnum{STREAM_IDLE_TIMEOUT, ResponseFlag::StreamIdleTimeout},
-      FlagStringAndEnum{INVALID_ENVOY_REQUEST_HEADERS, ResponseFlag::InvalidEnvoyRequestHeaders},
-      FlagStringAndEnum{DOWNSTREAM_PROTOCOL_ERROR, ResponseFlag::DownstreamProtocolError},
-      FlagStringAndEnum{UPSTREAM_MAX_STREAM_DURATION_REACHED,
-                        ResponseFlag::UpstreamMaxStreamDurationReached},
-      FlagStringAndEnum{RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
-      FlagStringAndEnum{NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
-      FlagStringAndEnum{DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
-      FlagStringAndEnum{UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
-      FlagStringAndEnum{NO_CLUSTER_FOUND, ResponseFlag::NoClusterFound},
-      FlagStringAndEnum{OVERLOAD_MANAGER, ResponseFlag::OverloadManager},
+  constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION_LONG =
+      "DownstreamConnectionTermination";
+  constexpr static absl::string_view FAILED_LOCAL_HEALTH_CHECK_LONG = "FailedLocalHealthCheck";
+  constexpr static absl::string_view NO_HEALTHY_UPSTREAM_LONG = "NoHealthyUpstream";
+  constexpr static absl::string_view UPSTREAM_REQUEST_TIMEOUT_LONG = "UpstreamRequestTimeout";
+  constexpr static absl::string_view LOCAL_RESET_LONG = "LocalReset";
+  constexpr static absl::string_view UPSTREAM_REMOTE_RESET_LONG = "UpstreamRemoteReset";
+  constexpr static absl::string_view UPSTREAM_CONNECTION_FAILURE_LONG = "UpstreamConnectionFailure";
+  constexpr static absl::string_view UPSTREAM_CONNECTION_TERMINATION_LONG =
+      "UpstreamConnectionTermination";
+  constexpr static absl::string_view UPSTREAM_OVERFLOW_LONG = "UpstreamOverflow";
+  constexpr static absl::string_view UPSTREAM_RETRY_LIMIT_EXCEEDED_LONG =
+      "UpstreamRetryLimitExceeded";
+  constexpr static absl::string_view NO_ROUTE_FOUND_LONG = "NoRouteFound";
+  constexpr static absl::string_view DELAY_INJECTED_LONG = "DelayInjected";
+  constexpr static absl::string_view FAULT_INJECTED_LONG = "FaultInjected";
+  constexpr static absl::string_view RATE_LIMITED_LONG = "RateLimited";
+  constexpr static absl::string_view UNAUTHORIZED_EXTERNAL_SERVICE_LONG =
+      "UnauthorizedExternalService";
+  constexpr static absl::string_view RATELIMIT_SERVICE_ERROR_LONG = "RateLimitServiceError";
+  constexpr static absl::string_view STREAM_IDLE_TIMEOUT_LONG = "StreamIdleTimeout";
+  constexpr static absl::string_view INVALID_ENVOY_REQUEST_HEADERS_LONG =
+      "InvalidEnvoyRequestHeaders";
+  constexpr static absl::string_view DOWNSTREAM_PROTOCOL_ERROR_LONG = "DownstreamProtocolError";
+  constexpr static absl::string_view UPSTREAM_MAX_STREAM_DURATION_REACHED_LONG =
+      "UpstreamMaxStreamDurationReached";
+  constexpr static absl::string_view RESPONSE_FROM_CACHE_FILTER_LONG = "ResponseFromCacheFilter";
+  constexpr static absl::string_view NO_FILTER_CONFIG_FOUND_LONG = "NoFilterConfigFound";
+  constexpr static absl::string_view DURATION_TIMEOUT_LONG = "DurationTimeout";
+  constexpr static absl::string_view UPSTREAM_PROTOCOL_ERROR_LONG = "UpstreamProtocolError";
+  constexpr static absl::string_view NO_CLUSTER_FOUND_LONG = "NoClusterFound";
+  constexpr static absl::string_view OVERLOAD_MANAGER_LONG = "OverloadManagerTerminated";
+
+  static constexpr std::array ALL_RESPONSE_STRINGS_FLAGS{
+      FlagStringsAndEnum{{FAILED_LOCAL_HEALTH_CHECK, FAILED_LOCAL_HEALTH_CHECK_LONG},
+                         ResponseFlag::FailedLocalHealthCheck},
+      FlagStringsAndEnum{{NO_HEALTHY_UPSTREAM, NO_HEALTHY_UPSTREAM_LONG},
+                         ResponseFlag::NoHealthyUpstream},
+      FlagStringsAndEnum{{UPSTREAM_REQUEST_TIMEOUT, UPSTREAM_REQUEST_TIMEOUT_LONG},
+                         ResponseFlag::UpstreamRequestTimeout},
+      FlagStringsAndEnum{{LOCAL_RESET, LOCAL_RESET_LONG}, ResponseFlag::LocalReset},
+      FlagStringsAndEnum{{UPSTREAM_REMOTE_RESET, UPSTREAM_REMOTE_RESET_LONG},
+                         ResponseFlag::UpstreamRemoteReset},
+      FlagStringsAndEnum{{UPSTREAM_CONNECTION_FAILURE, UPSTREAM_CONNECTION_FAILURE_LONG},
+                         ResponseFlag::UpstreamConnectionFailure},
+      FlagStringsAndEnum{{UPSTREAM_CONNECTION_TERMINATION, UPSTREAM_CONNECTION_TERMINATION_LONG},
+                         ResponseFlag::UpstreamConnectionTermination},
+      FlagStringsAndEnum{{UPSTREAM_OVERFLOW, UPSTREAM_OVERFLOW_LONG},
+                         ResponseFlag::UpstreamOverflow},
+      FlagStringsAndEnum{{NO_ROUTE_FOUND, NO_ROUTE_FOUND_LONG}, ResponseFlag::NoRouteFound},
+      FlagStringsAndEnum{{DELAY_INJECTED, DELAY_INJECTED_LONG}, ResponseFlag::DelayInjected},
+      FlagStringsAndEnum{{FAULT_INJECTED, FAULT_INJECTED_LONG}, ResponseFlag::FaultInjected},
+      FlagStringsAndEnum{{RATE_LIMITED, RATE_LIMITED_LONG}, ResponseFlag::RateLimited},
+      FlagStringsAndEnum{{UNAUTHORIZED_EXTERNAL_SERVICE, UNAUTHORIZED_EXTERNAL_SERVICE_LONG},
+                         ResponseFlag::UnauthorizedExternalService},
+      FlagStringsAndEnum{{RATELIMIT_SERVICE_ERROR, RATELIMIT_SERVICE_ERROR_LONG},
+                         ResponseFlag::RateLimitServiceError},
+      FlagStringsAndEnum{
+          {DOWNSTREAM_CONNECTION_TERMINATION, DOWNSTREAM_CONNECTION_TERMINATION_LONG},
+          ResponseFlag::DownstreamConnectionTermination},
+      FlagStringsAndEnum{{UPSTREAM_RETRY_LIMIT_EXCEEDED, UPSTREAM_RETRY_LIMIT_EXCEEDED_LONG},
+                         ResponseFlag::UpstreamRetryLimitExceeded},
+      FlagStringsAndEnum{{STREAM_IDLE_TIMEOUT, STREAM_IDLE_TIMEOUT_LONG},
+                         ResponseFlag::StreamIdleTimeout},
+      FlagStringsAndEnum{{INVALID_ENVOY_REQUEST_HEADERS, INVALID_ENVOY_REQUEST_HEADERS_LONG},
+                         ResponseFlag::InvalidEnvoyRequestHeaders},
+      FlagStringsAndEnum{{DOWNSTREAM_PROTOCOL_ERROR, DOWNSTREAM_PROTOCOL_ERROR_LONG},
+                         ResponseFlag::DownstreamProtocolError},
+      FlagStringsAndEnum{
+          {UPSTREAM_MAX_STREAM_DURATION_REACHED, UPSTREAM_MAX_STREAM_DURATION_REACHED_LONG},
+          ResponseFlag::UpstreamMaxStreamDurationReached},
+      FlagStringsAndEnum{{RESPONSE_FROM_CACHE_FILTER, RESPONSE_FROM_CACHE_FILTER_LONG},
+                         ResponseFlag::ResponseFromCacheFilter},
+      FlagStringsAndEnum{{NO_FILTER_CONFIG_FOUND, NO_FILTER_CONFIG_FOUND_LONG},
+                         ResponseFlag::NoFilterConfigFound},
+      FlagStringsAndEnum{{DURATION_TIMEOUT, DURATION_TIMEOUT_LONG}, ResponseFlag::DurationTimeout},
+      FlagStringsAndEnum{{UPSTREAM_PROTOCOL_ERROR, UPSTREAM_PROTOCOL_ERROR_LONG},
+                         ResponseFlag::UpstreamProtocolError},
+      FlagStringsAndEnum{{NO_CLUSTER_FOUND, NO_CLUSTER_FOUND_LONG}, ResponseFlag::NoClusterFound},
+      FlagStringsAndEnum{{OVERLOAD_MANAGER, OVERLOAD_MANAGER_LONG}, ResponseFlag::OverloadManager},
   };
 
 private:
   ResponseFlagUtils();
+  static const std::string toString(const StreamInfo& stream_info, bool use_long_name);
   static absl::flat_hash_map<std::string, ResponseFlag> getFlagMap();
 };
 
@@ -192,7 +249,7 @@ public:
   constexpr static absl::string_view CONNECTION_WRITE_TIMEOUT = "connection_write_timeout";
   constexpr static absl::string_view CONNECTION_LIMIT_REACHED = "connection_limit_reached";
   constexpr static absl::string_view TLS_PROTOCOL_ERROR = "tls_protocol_error";
-  constexpr static absl::string_view TLS_CERTIFICATE_ERORR = "tls_certificate_error";
+  constexpr static absl::string_view TLS_CERTIFICATE_ERROR = "tls_certificate_error";
   constexpr static absl::string_view TLS_ALERT_RECEIVED = "tls_alert_received";
   constexpr static absl::string_view HTTP_REQUEST_ERROR = "http_request_error";
   constexpr static absl::string_view HTTP_REQUEST_DENIED = "http_request_denied";

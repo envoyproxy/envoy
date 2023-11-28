@@ -1,6 +1,9 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include <chrono>
+#include <optional>
+#include <string>
+#include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
 
@@ -14,6 +17,46 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+
+namespace {
+
+using MetadataProto = ::envoy::config::core::v3::Metadata;
+
+void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadata,
+                         const std::vector<std::string>& metadata_context_namespaces,
+                         const std::vector<std::string>& typed_metadata_context_namespaces,
+                         MetadataProto& metadata_context) {
+  for (const auto& context_key : metadata_context_namespaces) {
+    for (const MetadataProto* metadata : source_metadata) {
+      if (metadata == nullptr) {
+        continue;
+      }
+      const auto& filter_metadata = metadata->filter_metadata();
+      if (const auto metadata_it = filter_metadata.find(context_key);
+          metadata_it != filter_metadata.end()) {
+        (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+        break;
+      }
+    }
+  }
+
+  for (const auto& context_key : typed_metadata_context_namespaces) {
+    for (const MetadataProto* metadata : source_metadata) {
+      if (metadata == nullptr) {
+        continue;
+      }
+      const auto& typed_filter_metadata = metadata->typed_filter_metadata();
+      if (const auto metadata_it = typed_filter_metadata.find(context_key);
+          metadata_it != typed_filter_metadata.end()) {
+        (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] =
+            metadata_it->second;
+        break;
+      }
+    }
+  }
+}
+
+} // namespace
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   // We only merge context extensions here, and leave boolean flags untouched since those flags are
@@ -41,35 +84,29 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
 
+  // If metadata_context_namespaces or typed_metadata_context_namespaces is specified,
+  // pass matching filter metadata to the ext_authz service.
+  // If metadata key is set in both the connection and request metadata,
+  // then the value will be the request metadata value.
   envoy::config::core::v3::Metadata metadata_context;
+  fillMetadataContext({&decoder_callbacks_->streamInfo().dynamicMetadata(),
+                       &decoder_callbacks_->connection()->streamInfo().dynamicMetadata()},
+                      config_->metadataContextNamespaces(),
+                      config_->typedMetadataContextNamespaces(), metadata_context);
 
-  // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_authz
-  // service.
-  const auto& request_metadata =
-      decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-  for (const auto& context_key : config_->metadataContextNamespaces()) {
-    if (const auto& metadata_it = request_metadata.find(context_key);
-        metadata_it != request_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    }
-  }
-
-  // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
-  // ext_authz service.
-  const auto& request_typed_metadata =
-      decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
-  for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
-    if (const auto& metadata_it = request_typed_metadata.find(context_key);
-        metadata_it != request_typed_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    }
+  // Fill route_metadata_context from the selected route's metadata.
+  envoy::config::core::v3::Metadata route_metadata_context;
+  if (decoder_callbacks_->route() != nullptr) {
+    fillMetadataContext({&decoder_callbacks_->route()->metadata()},
+                        config_->routeMetadataContextNamespaces(),
+                        config_->routeTypedMetadataContextNamespaces(), route_metadata_context);
   }
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
-      config_->includePeerCertificate(), config_->includeTLSSession(), config_->destinationLabels(),
-      config_->requestHeaderMatchers());
+      std::move(route_metadata_context), check_request_, config_->maxRequestBytes(),
+      config_->packAsBytes(), config_->includePeerCertificate(), config_->includeTLSSession(),
+      config_->destinationLabels(), config_->requestHeaderMatchers());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   // Store start time of ext_authz filter call
@@ -109,14 +146,25 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   request_headers_ = &headers;
-  buffer_data_ = config_->withRequestBody() && !per_route_flags.skip_request_body_buffering_ &&
+  const auto check_settings = per_route_flags.check_settings_;
+  buffer_data_ = (config_->withRequestBody() || check_settings.has_with_request_body()) &&
+                 !check_settings.disable_request_body_buffering() &&
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
                    Http::Utility::isH2UpgradeRequest(headers));
 
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *decoder_callbacks_);
-    if (!config_->allowPartialMessage()) {
-      decoder_callbacks_->setDecoderBufferLimit(config_->maxRequestBytes());
+
+    const auto allow_partial_message =
+        check_settings.has_with_request_body()
+            ? check_settings.with_request_body().allow_partial_message()
+            : config_->allowPartialMessage();
+    const auto max_request_bytes = check_settings.has_with_request_body()
+                                       ? check_settings.with_request_body().max_request_bytes()
+                                       : config_->maxRequestBytes();
+
+    if (!allow_partial_message) {
+      decoder_callbacks_->setDecoderBufferLimit(max_request_bytes);
     }
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -130,14 +178,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (buffer_data_ && !skip_check_) {
-    const bool buffer_is_full = isBufferFull();
+    const bool buffer_is_full = isBufferFull(data.length());
     if (end_stream || buffer_is_full) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
                        *decoder_callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
-      if (!buffer_is_full) {
-        // Make sure data is available in initiateCall.
-        decoder_callbacks_->addDecodedData(data, true);
-      }
+      // Make sure data is available in initiateCall.
+      decoder_callbacks_->addDecodedData(data, true);
       initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
@@ -308,36 +354,36 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       response_headers_to_set_ = std::move(response->response_headers_to_set);
     }
 
-    absl::optional<Http::Utility::QueryParams> modified_query_parameters;
+    absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
     if (!response->query_parameters_to_set.empty()) {
-      modified_query_parameters =
-          Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+      modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
+          request_headers_->Path()->value().getStringView());
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
       for (const auto& [key, value] : response->query_parameters_to_set) {
         ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
-        (*modified_query_parameters)[key] = value;
+        modified_query_parameters->overwrite(key, value);
       }
     }
 
     if (!response->query_parameters_to_remove.empty()) {
       if (!modified_query_parameters) {
-        modified_query_parameters =
-            Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+        modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
+            request_headers_->Path()->value().getStringView());
       }
       ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
                        *decoder_callbacks_);
       for (const auto& key : response->query_parameters_to_remove) {
         ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
-        (*modified_query_parameters).erase(key);
+        modified_query_parameters->remove(key);
       }
     }
 
     // We modified the query parameters in some way, so regenerate the `path` header and set it
     // here.
     if (modified_query_parameters) {
-      const auto new_path = Http::Utility::replaceQueryString(request_headers_->Path()->value(),
-                                                              modified_query_parameters.value());
+      const auto new_path =
+          modified_query_parameters->replaceQueryString(request_headers_->Path()->value());
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter modified query parameter(s), using new path for request: {}",
           *decoder_callbacks_, new_path);
@@ -359,19 +405,20 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
-
-      Http::CodeStats::ResponseStatInfo info{config_->scope(),
-                                             cluster_->statsScope(),
-                                             empty_stat_name,
-                                             enumToInt(response->status_code),
-                                             true,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             empty_stat_name,
-                                             false};
-      config_->httpContext().codeStats().chargeResponseStat(info, false);
+      if (config_->chargeClusterResponseStats()) {
+        Http::CodeStats::ResponseStatInfo info{config_->scope(),
+                                               cluster_->statsScope(),
+                                               empty_stat_name,
+                                               enumToInt(response->status_code),
+                                               true,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               empty_stat_name,
+                                               false};
+        config_->httpContext().codeStats().chargeResponseStat(info, false);
+      }
     }
 
     // setResponseFlag must be called before sendLocalReply
@@ -411,8 +458,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       if (cluster_) {
         config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
       }
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.http_ext_auth_failure_mode_allow_header_add")) {
+      if (config_->failureModeAllowHeaderAdd()) {
         request_headers_->addReferenceKey(
             Filters::Common::ExtAuthz::Headers::get().EnvoyAuthFailureModeAllowed, "true");
       }
@@ -432,12 +478,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 }
 
-bool Filter::isBufferFull() const {
-  const auto* buffer = decoder_callbacks_->decodingBuffer();
-  if (config_->allowPartialMessage() && buffer != nullptr) {
-    return buffer->length() >= config_->maxRequestBytes();
+bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
+  if (!config_->allowPartialMessage()) {
+    return false;
   }
-  return false;
+
+  uint64_t num_bytes_buffered = num_bytes_processing;
+  const auto* buffer = decoder_callbacks_->decodingBuffer();
+  if (buffer != nullptr) {
+    num_bytes_buffered += buffer->length();
+  }
+
+  return num_bytes_buffered >= config_->maxRequestBytes();
 }
 
 void Filter::continueDecoding() {
@@ -452,17 +504,21 @@ void Filter::continueDecoding() {
 
 Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
   if (route == nullptr) {
-    return PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
+    return PerRouteFlags{
+        true /*skip_check_*/,
+        envoy::extensions::filters::http::ext_authz::v3::CheckSettings() /*check_settings_*/};
   }
 
-  const auto* specific_per_route_config =
+  const auto* specific_check_settings =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
-  if (specific_per_route_config != nullptr) {
-    return PerRouteFlags{specific_per_route_config->disabled(),
-                         specific_per_route_config->disableRequestBodyBuffering()};
+  if (specific_check_settings != nullptr) {
+    return PerRouteFlags{specific_check_settings->disabled(),
+                         specific_check_settings->checkSettings()};
   }
 
-  return PerRouteFlags{false /*skip_check_*/, false /*skip_request_body_buffering_*/};
+  return PerRouteFlags{
+      false /*skip_check_*/,
+      envoy::extensions::filters::http::ext_authz::v3::CheckSettings() /*check_settings_*/};
 }
 
 } // namespace ExtAuthz

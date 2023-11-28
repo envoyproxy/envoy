@@ -30,9 +30,9 @@ public:
 
   ssize_t fileSize(const std::string& path) override;
 
-  std::string fileReadToEnd(const std::string& path) override;
+  absl::StatusOr<std::string> fileReadToEnd(const std::string& path) override;
 
-  PathSplitResult splitPathFromFilename(absl::string_view path) override {
+  absl::StatusOr<PathSplitResult> splitPathFromFilename(absl::string_view path) override {
     return file_system_->splitPathFromFilename(path);
   }
 
@@ -59,7 +59,7 @@ private:
 
   std::unique_ptr<Instance> file_system_;
   absl::Mutex lock_;
-  bool use_memfiles_ ABSL_GUARDED_BY(lock_);
+  bool use_memfiles_ ABSL_GUARDED_BY(lock_){false};
   absl::flat_hash_map<std::string, std::shared_ptr<MemFileInfo>> files_ ABSL_GUARDED_BY(lock_);
 };
 

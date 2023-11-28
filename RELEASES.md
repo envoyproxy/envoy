@@ -20,13 +20,6 @@ Major releases happen quartely and follow the schedule below. Security fixes typ
 quarterly as well, but this depends on the number and severity of security bugs. Other releases
 are ad-hoc and best-effort.
 
-### Hand-off
-
-Hand-off to the maintainers of stable releases happens after Envoy maintainers release a new
-version from the `main` branch by creating a `vX.Y.0` tag and a corresponding `release/vX.Y`
-branch, with merge permissions given to the release manager of stable releases, and CI configured
-to execute tests on it.
-
 ### Security releases
 
 Critical security fixes are owned by the Envoy security team, which provides fixes for the
@@ -57,19 +50,21 @@ team and is responsible for coordinating the overall release. This includes iden
 issues to be fixed in the release, communications with the Envoy community, and the
 actual mechanics of the release itself.
 
-| Quarter |       Release Manager                                          |         Fix Lead                                                      |
-|:-------:|:--------------------------------------------------------------:|:----------------------------------------------------------------------|
-| 2020 Q1 | Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora))   |                                                                       |
-| 2020 Q2 | Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora))   |                                                                       |
-| 2020 Q3 | Yuchen Dai ([lambdai](https://github.com/lambdai))             |                                                                       |
-| 2020 Q4 | Christoph Pakulski ([cpakulski](https://github.com/cpakulski)) |                                                                       |
-| 2021 Q1 | Rei Shimizu ([Shikugawa](https://github.com/Shikugawa))        |                                                                       |
-| 2021 Q2 | Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d))      |                                                                       |
-| 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |                                                                       |
-| 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |                                                                       |
-| 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    | Ryan Hamilton ([RyanTheOptimist](https://github.com/RyanTheOptimist)) |
-| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | Matt Klein ([mattklein123](https://github.com/mattklein123)           |
-| 2022 Q4 | Can Cecen ([cancecen](https://github.com/cancecen))            | Tony Allen ([tonya11en](https://github.com/tonya11en))                |
+| Quarter |       Release Manager                                          |         Fix Lead                                                         |
+|:-------:|:--------------------------------------------------------------:|:-------------------------------------------------------------------------|
+| 2020 Q1 | Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora))   |                                                                          |
+| 2020 Q2 | Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora))   |                                                                          |
+| 2020 Q3 | Yuchen Dai ([lambdai](https://github.com/lambdai))             |                                                                          |
+| 2020 Q4 | Christoph Pakulski ([cpakulski](https://github.com/cpakulski)) |                                                                          |
+| 2021 Q1 | Rei Shimizu ([Shikugawa](https://github.com/Shikugawa))        |                                                                          |
+| 2021 Q2 | Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d))      |                                                                          |
+| 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |                                                                          |
+| 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |                                                                          |
+| 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    | Ryan Hamilton ([RyanTheOptimist](https://github.com/RyanTheOptimist))    |
+| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | Matt Klein ([mattklein123](https://github.com/mattklein123)              |
+| 2022 Q4 | Can Cecen ([cancecen](https://github.com/cancecen))            | Tony Allen ([tonya11en](https://github.com/tonya11en))                   |
+| 2022 Q3 | Boteng Yao ([botengyao](https://github.com/botengyao))         | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))              |
+| 2022 Q4 | Paul Merrison ([pmerrison](https://github.com/pmerrison))      | Brian Sonnenberg ([briansonnenberg](https://github.com/briansonnenberg)) |
 
 ## Major release schedule
 
@@ -94,7 +89,9 @@ deadline of 3 weeks.
 | 1.24.0  | 2022/10/15 | 2022/10/19 |   +4 days  | 2023/10/19  |
 | 1.25.0  | 2023/01/15 | 2023/01/18 |   +3 days  | 2024/01/18  |
 | 1.26.0  | 2023/04/15 | 2023/04/18 |   +3 days  | 2024/04/18  |
-| 1.27.0  | 2023/07/14 |            |            |             |
+| 1.27.0  | 2023/07/14 | 2023/07/27 |  +13 days  | 2024/07/27  |
+| 1.28.0  | 2023/10/16 | 2023/10/19 |  +3 days   | 2024/10/19  |
+| 1.29.0  | 2024/01/16 |            |            |             |
 
 ### Cutting a major release
 
@@ -118,15 +115,7 @@ deadline of 3 weeks.
   * Get a review and merge.
 * Create a pull request with the commit created by the project tool and **wait for tests to
   pass**.
-* Once the tests have passed, and the PR has landed, CI will automatically create the tagged release.
-* From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
-  using the minor version from the tagged release, e.g. `1.6.0` -> `release/v1.6`. It will be used for the
-  [stable releases](RELEASES.md#stable-releases).
-* Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
-  tag build to make sure that the final docker images get pushed along with
-  the final docs and [release assets](https://github.com/envoyproxy/envoy/releases). The final documentation will end up in the
-  [envoy-website repository](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy).
-* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) with the new release version.
+* Once the tests have passed, and the PR has landed, CI will automatically create the tagged release and corresponding release branch.
 * Craft a witty/uplifting email and send it to all the email aliases: envoy-announce@ envoy-users@ envoy-dev@ envoy-maintainers
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.

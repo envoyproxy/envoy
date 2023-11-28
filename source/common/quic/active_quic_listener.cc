@@ -10,6 +10,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/network/udp_listener_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
@@ -33,19 +34,21 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t packets_to_read_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-    QuicConnectionIdGeneratorPtr&& cid_generator)
+    QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
-          dispatcher.createUdpListener(
-              listen_socket, *this,
+          std::make_unique<Network::UdpListenerImpl>(
+              dispatcher, listen_socket, *this, dispatcher.timeSource(),
               listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedHttp3Versions()),
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory),
-      connection_id_generator_(std::move(cid_generator)) {
+      connection_id_generator_(std::move(cid_generator)),
+      select_connection_id_worker_(std::move(worker_selector)) {
   ASSERT(!GetQuicFlag(quic_header_size_limit_includes_overhead));
+  ASSERT(select_connection_id_worker_ != nullptr);
 
   enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
 
@@ -95,7 +98,7 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
-  if (enabled_.has_value() && !enabled_.value().enabled()) {
+  if ((enabled_.has_value() && !enabled_.value().enabled()) || reject_all_) {
     return;
   }
 
@@ -115,7 +118,11 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
-  quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
+  if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
+    if (non_dispatched_udp_packet_handler_.has_value()) {
+      non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
+    }
+  }
 
   if (quic_dispatcher_->HasChlosBuffered()) {
     // If there are any buffered CHLOs, activate a read event for the next event loop to process
@@ -127,6 +134,19 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
 void ActiveQuicListener::onReadReady() {
   if (enabled_.has_value() && !enabled_.value().enabled()) {
     ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_->name());
+    return;
+  }
+  const bool reject_all =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_reject_all");
+  if (reject_all != reject_all_) {
+    reject_all_ = reject_all;
+    if (reject_all_) {
+      ENVOY_LOG(trace, "Quic listener {}: start rejecting traffic.", config_->name());
+    } else {
+      ENVOY_LOG(trace, "Quic listener {}: start accepting traffic.", config_->name());
+    }
+  }
+  if (reject_all_) {
     return;
   }
 
@@ -150,7 +170,9 @@ void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewCo
 
 void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
 
-void ActiveQuicListener::shutdownListener() {
+void ActiveQuicListener::shutdownListener(const Network::ExtraShutdownListenerOptions& options) {
+  non_dispatched_udp_packet_handler_ = options.non_dispatched_udp_packet_handler_;
+
   // Same as pauseListening() because all we want is to stop accepting new
   // connections.
   quic_dispatcher_->StopAcceptingNewConnections();
@@ -162,41 +184,9 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
     return worker_index_;
   }
 
-  // This implementation is not as performant as it could be. It will result in most packets being
+  // Taking this path is not as performant as it could be. It means most packets are being
   // delivered by the kernel to the wrong worker, and then redirected to the correct worker.
-  //
-  // This could possibly be improved by keeping a global table of connection IDs, so that a new
-  // connection will add its connection ID to the table on the current worker, and so packets should
-  // be delivered to the correct worker by the kernel unless the client changes address.
-
-  // This is a re-implementation of the same algorithm written in BPF in
-  // ``ActiveQuicListenerFactory::createActiveUdpListener``
-  const uint64_t packet_length = data.buffer_->length();
-  if (packet_length < 9) {
-    return worker_index_;
-  }
-
-  uint8_t first_octet;
-  data.buffer_->copyOut(0, sizeof(first_octet), &first_octet);
-
-  uint32_t connection_id_snippet;
-  if (first_octet & 0x80) {
-    // IETF QUIC long header.
-    // The connection id starts from 7th byte.
-    // Minimum length of a long header packet is 14.
-    if (packet_length < 14) {
-      return worker_index_;
-    }
-
-    data.buffer_->copyOut(6, sizeof(connection_id_snippet), &connection_id_snippet);
-  } else {
-    // IETF QUIC short header, or gQUIC.
-    // The connection id starts from 2nd byte.
-    data.buffer_->copyOut(1, sizeof(connection_id_snippet), &connection_id_snippet);
-  }
-
-  connection_id_snippet = htonl(connection_id_snippet);
-  return connection_id_snippet % concurrency_;
+  return select_connection_id_worker_(*data.buffer_, worker_index_);
 }
 
 size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
@@ -303,6 +293,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
             validation_visitor, context_);
   }
 
+  worker_selector_ =
+      quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
@@ -325,7 +317,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
     Runtime::Loader& runtime, uint32_t worker_index, Network::UdpConnectionHandler& parent,
-    Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& disptacher,
+    Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& dispatcher,
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
   if (server_preferred_address_config_ != nullptr) {
@@ -349,7 +341,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
   }
 
   return createActiveQuicListener(
-      runtime, worker_index, concurrency_, disptacher, parent, std::move(listen_socket_ptr), config,
+      runtime, worker_index, concurrency_, dispatcher, parent, std::move(listen_socket_ptr), config,
       quic_config_, kernel_worker_routing_, enabled_, quic_stat_names_,
       packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
       proof_source_factory_.value(),
@@ -370,7 +362,7 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
-      std::move(cid_generator));
+      std::move(cid_generator), worker_selector_);
 }
 
 } // namespace Quic

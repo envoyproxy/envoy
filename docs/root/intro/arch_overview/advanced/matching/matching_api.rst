@@ -3,11 +3,6 @@
 Matching API
 ============
 
-.. attention::
-
-   The matching API is alpha and is currently under active development.
-   Capabilities will be expanded over time and the configuration structures are likely to change.
-
 Envoy makes use of a :ref:`matching API <envoy_v3_api_msg_config.common.matcher.v3.Matcher>`
 to allow the various subsystems to express actions that should be performed based on incoming data.
 
@@ -97,6 +92,8 @@ are available in some contexts:
 .. _extension_envoy.matching.matchers.cel_matcher:
 
   * CEL matching input matcher: :ref:`CEL input matcher <envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher>`.
+
+* Regex matching using :ref:`Hyperscan matcher <envoy_v3_api_msg_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan>`.
 
 Matching actions
 ################

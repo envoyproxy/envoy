@@ -33,12 +33,20 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
           defer_processing_values.push_back(true);
         }
 
+        std::vector<bool> use_header_validator_values;
+#ifdef ENVOY_ENABLE_UHV
+        use_header_validator_values.push_back(true);
+#else
+        use_header_validator_values.push_back(false);
+#endif
         for (Http1ParserImpl http1_implementation : http1_implementations) {
           for (Http2Impl http2_implementation : http2_implementations) {
             for (bool defer_processing : defer_processing_values) {
-              ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol,
-                                                   upstream_protocol, http1_implementation,
-                                                   http2_implementation, defer_processing});
+              for (bool use_header_validator : use_header_validator_values) {
+                ret.push_back(HttpProtocolTestParams{
+                    ip_version, downstream_protocol, upstream_protocol, http1_implementation,
+                    http2_implementation, defer_processing, use_header_validator});
+              }
             }
           }
         }
@@ -90,7 +98,8 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
                       TestUtility::http1ParserImplToString(params.param.http1_implementation),
                       http2ImplementationToString(params.param.http2_implementation),
                       params.param.defer_processing_backedup_streams ? "WithDeferredProcessing"
-                                                                     : "NoDeferredProcessing");
+                                                                     : "NoDeferredProcessing",
+                      params.param.use_universal_header_validator ? "Uhv" : "Legacy");
 }
 
 void HttpProtocolIntegrationTest::setUpstreamOverrideStreamErrorOnInvalidHttpMessage() {

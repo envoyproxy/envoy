@@ -2,163 +2,190 @@ name: Envoy CI
 
 on:
   workflow_call:
+    secrets:
+      app-id:
+      app-key:
+      rbe-key:
     inputs:
-      target:
-        required: true
+      bazel-extra:
         type: string
+      bazel-rbe-jobs:
+        type: number
+        default: 75
+      cache-build-image:
+        type: string
+      catch-errors:
+        type: boolean
+        default: false
+      command-prefix:
+        type: string
+        default: ./ci/run_envoy_docker.sh
+      command-ci:
+        type: string
+        default: ./ci/do_ci.sh
+      diskspace-hack:
+        type: boolean
+        default: false
+      error-match:
+        type: string
+        default: |
+          ERROR
+          error:
+          Error:
+      notice-match:
+        type: string
+        default: |
+          NOTICE
       rbe:
         type: boolean
         default: true
-      managed:
-        type: boolean
-        default: true
-
-      auth_bazel_rbe:
-        type: string
-        default: ''
-
-      bazel_extra:
-        type: string
-        default:
-      bazel_local_cache:
-        type: string
-        default:
-      bazel_rbe_cache:
-        type: string
-        default: grpcs://remotebuildexecution.googleapis.com
-      bazel_rbe_instance:
-        type: string
-        default: projects/envoy-ci/instances/default_instance
-      bazel_rbe_jobs:
-        type: number
-        default: 75
-
-      cache_build_image:
-        type: string
-
-      command_prefix:
-        type: string
-        default: ./ci/run_envoy_docker.sh
-      command_ci:
-        type: string
-        default: ./ci/do_ci.sh
-
-      diskspace_hack:
-        type: boolean
-        default: false
-
-      run_pre:
-        type: string
-        default:
-      run_pre_with:
-        type: string
-        default:
-
-      run_post:
-        type: string
-        default:
-      run_post_with:
-        type: string
-        default:
-
-      repo_fetch_depth:
+      repo-fetch-depth:
         type: number
         default: 1
-      repo_ref:
+      repo-ref:
         type: string
+      runs-on:
+        type: string
+        default: ubuntu-22.04
       skip:
         type: boolean
         default: false
+      source:
+        type: string
+      steps-pre:
+        type: string
+      steps-pre-name:
+        type: string
+      steps-post:
+        type: string
+        default: |
+          - run: |
+              du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G"
+            shell: bash
+      steps-post-name:
+        type: string
+      target:
+        type: string
+        required: true
+      temp-dir:
+        type: string
       trusted:
         type: boolean
         default: false
-
-      env:
+      upload-name:
         type: string
+      upload-path:
+        type: string
+      warning-match:
+        type: string
+        default: |
+          WARNING
+          warning:
+          Warning:
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-ci-${{ inputs.target }}
+  group: |
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-${{ inputs.target }}
   cancel-in-progress: true
 
 jobs:
   do_ci:
     if: ${{ ! inputs.skip }}
-    runs-on: ubuntu-22.04
-    name: ${{ inputs.command_ci }} (${{ inputs.target }})
+    runs-on: ${{ inputs.runs-on }}
+    name: ${{ inputs.command-ci }} ${{ inputs.target }}
     steps:
-    - if: ${{ inputs.cache_build_image }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.10
+    - if: ${{ inputs.cache-build-image }}
+      name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.1.8
       with:
-        image_tag: ${{ inputs.cache_build_image }}
+        image_tag: ${{ inputs.cache-build-image }}
 
-    # If the run is "trusted" (ie has access to secrets) then it should
-    # **not** set the ref and should use the code of the calling context.
-    - if: ${{ inputs.repo_ref && inputs.trusted }}
-      run: |
-        echo '`repo_ref` should not be set for trusted CI runs'
-        exit 1
-
-    - uses: actions/checkout@v3
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
+      id: checkout
+      name: Checkout Envoy repository
       with:
-        fetch-depth: ${{ inputs.repo_fetch_depth }}
-        # WARNING: This allows untrusted code to run!!!
-        #  If this is set, then anything before or after in the job should be regarded as
-        #  compromised.
-        ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
+        app_id: ${{ inputs.trusted && secrets.app-id || '' }}
+        app_key: ${{ inputs.trusted && secrets.app-key || '' }}
+        config: |
+          fetch-depth: ${{ ! inputs.trusted && inputs.repo-fetch-depth || 0 }}
+          # WARNING: This allows untrusted code to run!!!
+          #  If this is set, then anything before or after in the job should be regarded as
+          #  compromised.
+          ref: ${{ ! inputs.trusted && inputs.repo-ref || github.ref }}
+
+    # If we are in a trusted CI run then the provided commit _must_ be either the latest for
+    # this branch, or an antecdent.
+    - run: |
+        if ! git merge-base --is-ancestor "${{ inputs.repo-ref }}" HEAD; then
+            echo "Provided Envoy ref (${{ inputs.repo-ref }}) is not an ancestor of current branch" >&2
+            exit 1
+        fi
+        git checkout "${{ inputs.repo-ref }}"
+      if: ${{ inputs.trusted }}
+      name: Check provided ref
+      shell: bash
+
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
 
-    - if: ${{ inputs.diskspace_hack }}
-      name: Cruft removal
-      run: |
-        echo "Disk space before cruft removal"
-        df -h
-
-        TO_REMOVE=(
-            /opt/hostedtoolcache
-            /usr/local/lib/android
-            /usr/local/.ghcup)
-
-        for removal in "${TO_REMOVE[@]}"; do
-            echo "Removing: ${removal} ..."
-            sudo rm -rf "$removal"
-        done
+    - if: ${{ inputs.diskspace-hack }}
+      name: Free diskspace
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.8
     - run: |
         echo "disk space at beginning of build:"
         df -h
       name: "Check disk space at beginning"
+      shell: bash
 
-    - if: ${{ inputs.run_pre }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
+    - uses: envoyproxy/toolshed/gh-actions/using/steps@actions-v0.1.8
+      name: Run pre steps
+      if: ${{ inputs.steps-pre }}
       with:
-        uses: ${{ inputs.run_pre }}
-        with: ${{ inputs.run_pre_with }}
+        name: ${{ inputs.steps-pre-name }}
+        steps: ${{ inputs.steps-pre }}
 
-    - uses: ./.github/actions/do_ci
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.8
+      name: 'Run CI target ${{ inputs.target }}'
       with:
-        target: ${{ inputs.target }}
-        rbe: ${{ inputs.rbe }}
-        managed: ${{ inputs.managed }}
-        auth_bazel_rbe: ${{ inputs.auth_bazel_rbe }}
-        bazel_extra: ${{ inputs.bazel_extra }}
-        bazel_local_cache: ${{ inputs.bazel_local_cache }}
-        bazel_rbe_cache: ${{ inputs.bazel_rbe_cache }}
-        bazel_rbe_instance: ${{ inputs.bazel_rbe_instance }}
-        bazel_rbe_jobs: ${{ inputs.bazel_rbe_jobs }}
-        command_prefix: ${{ inputs.command_prefix }}
-        command_ci: ${{ inputs.command_ci }}
-        env: ${{ inputs.env }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        catch-errors: ${{ inputs.catch-errors }}
+        container-command: ${{ inputs.command-prefix }}
+        command-prefix: ${{ inputs.command-ci }}
+        command: ${{ inputs.target }}
+        source: ${{ inputs.source }}
+        error-match: ${{ inputs.error-match }}
+        notice-match: ${{ inputs.notice-match }}
+        warning-match: ${{ inputs.warning-match }}
+      env:
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token != '' && steps.checkout.outputs.token || secrets.GITHUB_TOKEN }}
+        ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
+        ENVOY_RBE: ${{ inputs.rbe != 'false' && 1 || '' }}
+        RBE_KEY: ${{ secrets.rbe-key }}
+        BAZEL_BUILD_EXTRA_OPTIONS: >-
+          --config=remote-ci
+          ${{ inputs.bazel-extra }}
+          ${{ inputs.rbe != 'false' && format('--jobs={0}', inputs.bazel-rbe-jobs) || '' }}
+        BAZEL_FAKE_SCM_REVISION: ${{ github.event_name == 'pull_request' && 'e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9' || '' }}
+        CI_TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.event.base.ref || github.ref }}
 
-    - if: ${{ inputs.run_post }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
+    - uses: envoyproxy/toolshed/gh-actions/using/steps@actions-v0.1.8
+      name: Run post steps
+      if: ${{ inputs.steps-post }}
       with:
-        uses: ${{ inputs.run_post }}
-        with: ${{ inputs.run_post_with }}
+        name: ${{ inputs.steps-post-name }}
+        steps: ${{ inputs.steps-post }}
 
     - run: |
         echo "disk space at end of build:"
         df -h
-        echo
-        du -ch "${{ runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G"
       name: "Check disk space at end"
+      shell: bash
+
+    - uses: actions/upload-artifact@v3
+      name: Upload artefacts
+      if: ${{ inputs.upload-name && inputs.upload-path }}
+      with:
+        name: ${{ inputs.upload-name }}
+        path: ${{ inputs.upload-path }}

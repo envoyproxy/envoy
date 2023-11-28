@@ -10,12 +10,6 @@ updates:
 # Please ensure any new ones are added here, and any that are removed are removed here also.
 
 - package-ecosystem: "pip"
-  directory: "/.github/actions/pr_notifier"
-  schedule:
-    interval: "daily"
-    time: "06:00"
-
-- package-ecosystem: "pip"
   directory: "/examples/grpc-bridge/client"
   schedule:
     interval: "daily"
@@ -40,19 +34,8 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "pip"
-  directory: "/mobile/docs"
-  schedule:
-    interval: "daily"
-    time: "06:00"
-
-- package-ecosystem: "pip"
   directory: "/tools/base"
-  schedule:
-    interval: "daily"
-    time: "06:00"
-
-- package-ecosystem: "pip"
-  directory: "/tools/code_format"
+  open-pull-requests-limit: 20
   schedule:
     interval: "daily"
     time: "06:00"
@@ -227,13 +210,43 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/metric"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/passthrough"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/access_log"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/action"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/buffer"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/routeconfig"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/property"
   schedule:
     interval: daily
     time: "06:00"

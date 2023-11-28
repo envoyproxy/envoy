@@ -27,7 +27,6 @@
 using namespace std::chrono_literals;
 using ::Envoy::AccessLog::FilterPtr;
 using ::Envoy::AccessLog::MockFilter;
-using envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig;
 using opentelemetry::proto::common::v1::AnyValue;
 using opentelemetry::proto::common::v1::KeyValueList;
 using opentelemetry::proto::logs::v1::LogRecord;
@@ -64,7 +63,7 @@ public:
 class AccessLogTest : public testing::Test {
 public:
   AccessLogPtr makeAccessLog(const AnyValue& body_config, const KeyValueList& attributes_config) {
-    ON_CALL(*filter_, evaluate(_, _, _, _, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
     *config_.mutable_body() = body_config;
     *config_.mutable_attributes() = attributes_config;
     config_.mutable_common_config()->set_log_name("test_log");
@@ -108,7 +107,7 @@ TEST_F(AccessLogTest, Marshalling) {
   stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
   stream_info.protocol_ = Http::Protocol::Http10;
   stream_info.addBytesReceived(10);
-  stream_info.response_code_ = 200;
+  stream_info.setResponseCode(200);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-header", "test-request-header"},
@@ -145,8 +144,7 @@ TEST_F(AccessLogTest, Marshalling) {
           value:
             string_value: "10"
     )EOF");
-  access_log->log(&request_headers, &response_headers, nullptr, stream_info,
-                  Envoy::AccessLog::AccessLogType::NotSet);
+  access_log->log({&request_headers, &response_headers}, stream_info);
 }
 
 // Test log with empty config.
@@ -160,8 +158,7 @@ TEST_F(AccessLogTest, EmptyConfig) {
   expectLog(R"EOF(
       time_unix_nano: 3600000000000
     )EOF");
-  access_log->log(&request_headers, &response_headers, nullptr, stream_info,
-                  Envoy::AccessLog::AccessLogType::NotSet);
+  access_log->log({&request_headers, &response_headers}, stream_info);
 }
 
 } // namespace

@@ -28,6 +28,7 @@ export ENVOY_BUILD_FILTER_EXAMPLE="${ENVOY_BUILD_FILTER_EXAMPLE:-0}"
 
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
+read -ra BAZEL_STARTUP_EXTRA_OPTIONS <<< "${BAZEL_STARTUP_EXTRA_OPTIONS:-}"
 read -ra BAZEL_OPTIONS <<< "${BAZEL_OPTIONS:-}"
 
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
@@ -55,6 +56,10 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
+  if [[ -n "$CLANG_TOOLCHAIN_SETUP" ]]; then
+    return
+  fi
+  export CLANG_TOOLCHAIN_SETUP=1
   ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
@@ -75,18 +80,20 @@ function setup_clang_toolchain() {
   echo "clang toolchain with ${ENVOY_STDLIB} configured"
 }
 
-export BUILD_DIR=${BUILD_DIR:-/build}
-if [[ ! -d "${BUILD_DIR}" ]]
-then
-  echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
-  mkdir -p "${BUILD_DIR}"
+if [[ -z "${BUILD_DIR}" ]]; then
+    echo "BUILD_DIR not set - defaulting to ~/.cache/envoy-bazel" >&2
+    BUILD_DIR="${HOME}/.cache/envoy-bazel"
 fi
+if [[ ! -d "${BUILD_DIR}" ]]; then
+    echo "${BUILD_DIR} missing - Creating." >&2
+    mkdir -p "${BUILD_DIR}"
+fi
+export BUILD_DIR
 
 # Environment setup.
 export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export PATH=${LLVM_ROOT}/bin:${PATH}
-export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
   BAZEL_BUILD_EXTRA_OPTIONS+=("--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1")
@@ -105,24 +112,19 @@ trap cleanup EXIT
 _bazel="$(which bazel)"
 
 BAZEL_STARTUP_OPTIONS=(
+    "${BAZEL_STARTUP_EXTRA_OPTIONS[@]}"
     "--output_user_root=${BUILD_DIR}/bazel_root"
     "--output_base=${BUILD_DIR}/bazel_root/base")
 
 bazel () {
-    # echo "RUNNING BAZEL (${PWD}): ${BAZEL_STARTUP_OPTIONS[*]} <> ${*}" >&2
-    "$_bazel" "${BAZEL_STARTUP_OPTIONS[@]}" "$@"
+    local startup_options
+    read -ra startup_options <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
+    # echo "RUNNING BAZEL (${PWD}): ${startup_options[*]} <> ${*}" >&2
+    "$_bazel" "${startup_options[@]}" "$@"
 }
 
 export _bazel
 export -f bazel
-
-if [[ -n "$BAZEL_NO_CACHE_TEST_RESULTS" ]]; then
-    VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
-    # Use uncached test results for non-release commits to a branch.
-    if [[ $VERSION_DEV == "dev" ]]; then
-        BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
-    fi
-fi
 
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
@@ -134,8 +136,6 @@ BAZEL_BUILD_OPTIONS=(
   "${BAZEL_GLOBAL_OPTIONS[@]}"
   "--verbose_failures"
   "--experimental_generate_json_trace_profile"
-  "--test_output=errors"
-  "--action_env=CLANG_FORMAT"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
@@ -190,9 +190,6 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 # This is where we copy the build profile to.
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
-
-export BUILDIFIER_BIN="${BUILDIFIER_BIN:-/usr/local/bin/buildifier}"
-export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
 
 if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]]; then
   # shellcheck source=ci/filter_example_setup.sh

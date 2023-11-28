@@ -5,8 +5,8 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
-load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
 
@@ -27,8 +27,10 @@ envoy_cc_test_library(
     name = "router_check_main_lib",
     srcs = [
         "coverage.cc",
-        "coverage.h",
         "router.cc",
+    ],
+    hdrs = [
+        "coverage.h",
         "router.h",
     ],
     copts = ["-DHAVE_LONG_LONG"],

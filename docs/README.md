@@ -8,15 +8,23 @@ In both cases, the generated output can be found in `generated/docs`.
 
 If you have an [existing Envoy development environment](https://github.com/envoyproxy/envoy/tree/main/bazel#quick-start-bazel-build-for-developers), you should have the necessary dependencies and requirements and be able to build the documentation directly.
 
+If using the Docker build container, you can run:
+
 ```bash
-./docs/build.sh
+./ci/do_ci.sh docs
 ```
 
 By default configuration examples are going to be validated during build. To disable validation,
 set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
 
 ```bash
-SPHINX_SKIP_CONFIG_VALIDATION=true docs/build.sh
+SPHINX_SKIP_CONFIG_VALIDATION=true ./ci/do_ci.sh docs
+```
+
+If not using the Docker build container, you can run:
+
+```bash
+bazel run --//tools/tarball:target=//docs:html //tools/tarball:unpack "$PWD"/generated/docs/
 ```
 
 ## Using the Docker build container to build the documentation
@@ -27,7 +35,7 @@ image that is used in continuous integration.
 This can be done as follows:
 
 ```
-./ci/run_envoy_docker.sh 'docs/build.sh'
+./ci/run_envoy_docker.sh './ci/do_ci.sh docs'
 ```
 
 To use this method you will need a minimum of 4-5GB of disk space available to accommodate the build image.
@@ -43,10 +51,9 @@ To do this:
 
 # How the Envoy website and docs are updated
 
-1. The docs are published to [docs/envoy/latest](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy/latest)
-   on every commit to main. This process is handled by Azure Pipelines with the
-  [`publish.sh`](https://github.com/envoyproxy/envoy/blob/main/docs/publish.sh) script.
 
-2. The docs are published to [docs/envoy](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy)
-   in a directory named after every tagged commit in this repo. Thus, on every tagged release there
-   are snapped docs.
+The docs are published dynamically by Netlify on every commit to main. This process is handled by the
+[envoy-website repo](https://github.com/envoyproxy/envoy-website)
+
+For tagged commits the docs are built statically by the [archive repo](https://github.com/envoyproxy/archive),
+which in turn triggers a rebuild of the website.

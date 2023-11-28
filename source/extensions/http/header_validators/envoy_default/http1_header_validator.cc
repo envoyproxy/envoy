@@ -18,7 +18,6 @@ namespace EnvoyDefault {
 
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
@@ -35,17 +34,73 @@ using Http1ResponseCodeDetail = ::Envoy::Http::Http1ResponseCodeDetail;
  *
  */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stats),
+                                           ::Envoy::Http::HeaderValidatorStats& stats,
+                                           const ConfigOverrides& config_overrides)
+    : HeaderValidator(config, protocol, stats, config_overrides),
       request_header_validator_map_{
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
           {":authority", absl::bind_front(&HeaderValidator::validateHostHeader, this)},
           {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
-          {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {":path", getPathValidationMethod()},
           {"transfer-encoding",
            absl::bind_front(&Http1HeaderValidator::validateTransferEncodingHeader, this)},
           {"content-length", absl::bind_front(&HeaderValidator::validateContentLengthHeader, this)},
       } {}
+
+HeaderValidator::HeaderValidatorFunction Http1HeaderValidator::getPathValidationMethod() {
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
+    return absl::bind_front(&Http1HeaderValidator::validatePathHeaderWithAdditionalCharacters,
+                            this);
+  }
+  return absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this);
+}
+
+HeaderValidator::HeaderValueValidationResult
+Http1HeaderValidator::validatePathHeaderWithAdditionalCharacters(
+    const HeaderString& path_header_value) {
+  ASSERT(config_overrides_.allow_non_compliant_characters_in_path_);
+  // Same table as the kPathHeaderCharTable but with the following additional character allowed
+  // " < > [ ] ^ ` { } \ |
+  // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
+  // runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000000000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b01101111111111111111111111111110,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+
+  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // allowed " < > [ ] ^ ` { } \ | # This table is used when the
+  // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kQueryAndFragmentCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000000000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b01111111111111111111111111111111,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+  return HeaderValidator::validatePathHeaderCharacterSet(
+      path_header_value, kPathHeaderCharTableWithAdditionalCharacters,
+      kQueryAndFragmentCharTableWithAdditionalCharacters);
+}
 
 HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -307,11 +362,10 @@ void ServerHttp1HeaderValidator::sanitizeContentLength(
 ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
   sanitizeContentLength(header_map);
   sanitizeHeadersWithUnderscores(header_map);
-  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
-    auto path_result = path_normalizer_.normalizePathUri(header_map);
-    if (!path_result.ok()) {
-      return path_result;
-    }
+  sanitizePathWithFragment(header_map);
+  auto path_result = transformUrlPath(header_map);
+  if (!path_result.ok()) {
+    return path_result;
   }
   return ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::success();
 }

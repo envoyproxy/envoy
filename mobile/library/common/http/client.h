@@ -306,10 +306,17 @@ private:
       }
     }
 
+    OptRef<RequestDecoder> requestDecoder() {
+      if (!request_decoder_) {
+        return {};
+      }
+      return request_decoder_->get();
+    }
+
     const envoy_stream_t stream_handle_;
 
     // Used to issue outgoing HTTP stream operations.
-    RequestDecoder* request_decoder_;
+    RequestDecoderHandlePtr request_decoder_;
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
     Client& parent_;

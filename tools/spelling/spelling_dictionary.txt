@@ -26,15 +26,22 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+bm
 BSON
 BPF
 Bdecoded
 Bencoded
+CIO
+deadcode
 DFP
+Dynatrace
 DOM
+Gasd
 GiB
 IPTOS
+OTEL
 Repick
+Reserializer
 SION
 TRA
 Websockets
@@ -70,7 +77,9 @@ FIXME
 HEXDIG
 HEXDIGIT
 HPE
+Kwasi
 LRU
+Mensah
 NAK
 OWS
 Preconnecting
@@ -164,6 +173,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+curr
 eslint
 freeifaddrs
 FUZZER
@@ -175,6 +185,7 @@ dnsresolvers
 endpos
 eps
 fo
+gb
 ghi
 golang
 guarddog
@@ -246,10 +257,13 @@ LF
 LHS
 hls
 iframe
+ilp
 ingressed
 integrations
+iouring
 jkl
 lang
+libcurl
 libsxg
 LLVM
 LPT
@@ -296,6 +310,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+na
 oghttp
 OID
 OK
@@ -632,6 +647,7 @@ cryptographic
 cryptographically
 cstate
 cstring
+ctad
 ctor
 ctrl
 customizations
@@ -764,6 +780,7 @@ gateway
 gcov
 genrule
 geolocation
+geo
 geoip
 Geoip
 getaddrinfo
@@ -808,6 +825,7 @@ hostnames
 hostset
 hotrestart
 hrefs
+htpasswd
 huffman
 hystrix
 idempotency
@@ -848,6 +866,7 @@ iovecs
 ips
 iptables
 ish
+isp
 istio
 istream
 istringstream
@@ -910,6 +929,8 @@ matcher
 matchers
 maxage
 maxbuffer
+Maxmind
+maxmind
 megamiss
 mem
 memcmp
@@ -931,6 +952,7 @@ misconfigured
 mixin
 mkdir
 mmap
+mmdb
 mmsg
 mmsghdr
 mongo
@@ -1288,6 +1310,7 @@ subtypes
 subzone
 suf
 superclass
+superroot
 superset
 svc
 symlink
@@ -1338,6 +1361,7 @@ transcoder
 transcoding
 transferral
 trds
+tri
 triaged
 trie
 tuple
@@ -1396,6 +1420,7 @@ versa
 versioned
 vhost
 viewable
+viewport
 vip
 virtualhost
 virtualize
@@ -1454,3 +1479,4 @@ SSLKEYLOGFILE
 DLB
 PCIE
 EDNS
+CNAME

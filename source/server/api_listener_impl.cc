@@ -38,20 +38,22 @@ HttpApiListener::ApiListenerWrapper::~ApiListenerWrapper() {
   read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-Http::RequestDecoder&
-HttpApiListener::ApiListenerWrapper::newStream(Http::ResponseEncoder& response_encoder,
-                                               bool is_internally_created) {
-  return http_connection_manager_->newStream(response_encoder, is_internally_created);
+Http::RequestDecoderHandlePtr
+HttpApiListener::ApiListenerWrapper::newStreamHandle(Http::ResponseEncoder& response_encoder,
+                                                     bool is_internally_created) {
+  return http_connection_manager_->newStreamHandle(response_encoder, is_internally_created);
 }
 
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  Server::Instance& server, const std::string& name)
     : ApiListenerImplBase(config, server, name) {
   if (config.api_listener().api_listener().type_url() ==
-      absl::StrCat("type.googleapis.com/",
-                   envoy::extensions::filters::network::http_connection_manager::v3::
-                       EnvoyMobileHttpConnectionManager::descriptor()
-                           ->full_name())) {
+      absl::StrCat(
+          "type.googleapis.com/",
+          createReflectableMessage(envoy::extensions::filters::network::http_connection_manager::
+                                       v3::EnvoyMobileHttpConnectionManager::default_instance())
+              ->GetDescriptor()
+              ->full_name())) {
     auto typed_config = MessageUtil::anyConvertAndValidate<
         envoy::extensions::filters::network::http_connection_manager::v3::
             EnvoyMobileHttpConnectionManager>(config.api_listener().api_listener(),

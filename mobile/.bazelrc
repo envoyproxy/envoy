@@ -1,3 +1,6 @@
+## Any new configs - ie that are not defined in Envoy's bazelrc ...
+#    **should be prefixed with mobile-**
+
 # Envoy Mobile Bazel build/test options.
 try-import ../.bazelrc
 
@@ -46,9 +49,9 @@ build:rules_xcodeproj --features=-swift.use_global_index_store
 # Override PGV validation with NOP functions
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
 
-build:dbg-common --compilation_mode=dbg
+build:mobile-dbg-common --compilation_mode=dbg
 # Enable source map for debugging in IDEs
-build:dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
+build:mobile-dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 
 # Default flags for builds targeting iOS
 # Manual stamping is necessary in order to get versioning information in the iOS
@@ -62,12 +65,12 @@ build:ios --test_timeout=390,750,1500,5700
 build:android --define=logger=android
 
 # Default flags for Android debug builds
-build:dbg-android --config=dbg-common
-build:dbg-android --config=android
+build:mobile-dbg-android --config=mobile-dbg-common
+build:mobile-dbg-android --config=android
 
 # Default flags for iOS debug builds
-build:dbg-ios --config=dbg-common
-build:dbg-ios --config=ios
+build:mobile-dbg-ios --config=mobile-dbg-common
+build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 # TODO(jpsim): Explicitly register test extensions for Android tests
@@ -77,193 +80,158 @@ build:test-android --define=static_extension_registration=enabled
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
 # https://github.com/bazelbuild/bazel/issues/6932
-build:asan-dev --strip=never
-build:asan-dev --copt -Wno-macro-redefined # ASAN sets _FORTIFY_SOURCE=0
-build:asan-dev --copt -DADDRESS_SANITIZER
-build:asan-dev --copt -D_LIBCPP_HAS_NO_ASAN
-build:asan-dev --copt -g
-build:asan-dev --copt -fno-omit-frame-pointer
-build:asan-dev --copt -fno-optimize-sibling-calls
-build:asan-dev --copt -fsanitize=address
-build:asan-dev --linkopt -fsanitize=address
-build:asan-dev --platform_suffix=-asan
+build:mobile-asan-dev --strip=never
+build:mobile-asan-dev --copt -Wno-macro-redefined # ASAN sets _FORTIFY_SOURCE=0
+build:mobile-asan-dev --copt -DADDRESS_SANITIZER
+build:mobile-asan-dev --copt -D_LIBCPP_HAS_NO_ASAN
+build:mobile-asan-dev --copt -g
+build:mobile-asan-dev --copt -fno-omit-frame-pointer
+build:mobile-asan-dev --copt -fno-optimize-sibling-calls
+build:mobile-asan-dev --copt -fsanitize=address
+build:mobile-asan-dev --linkopt -fsanitize=address
+build:mobile-asan-dev --platform_suffix=-asan
 
 build:clang-asan --linkopt --rtlib=compiler-rt
 build:clang-asan --linkopt --unwindlib=libgcc
 
 # Locally-runnable TSAN config
-build:tsan-dev --features=tsan
-build:tsan-dev --copt -fsanitize=thread
-build:tsan-dev --linkopt -fsanitize=thread
-build:tsan-dev --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-build:tsan-dev --platform_suffix=-tsan
+build:mobile-tsan-dev --features=tsan
+build:mobile-tsan-dev --copt -fsanitize=thread
+build:mobile-tsan-dev --linkopt -fsanitize=thread
+build:mobile-tsan-dev --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+build:mobile-tsan-dev --platform_suffix=-tsan
 # Needed due to https://github.com/libevent/libevent/issues/777
-build:tsan-dev --copt -DEVENT__DISABLE_DEBUG_MODE
+build:mobile-tsan-dev --copt -DEVENT__DISABLE_DEBUG_MODE
 # https://github.com/abseil/abseil-cpp/issues/760
 # https://github.com/google/sanitizers/issues/953
-build:tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
+build:mobile-tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
-build:release-common --define=no_debug_info=1
+build:mobile-release-common --define=no_debug_info=1
+
+# order matters here to ensure downloads
+build:mobile-remote-release-clang --config=mobile-remote-ci-linux-clang
+build:mobile-remote-release-clang --config=mobile-release-common
+build:mobile-remote-release-clang --remote_download_toplevel
+build:mobile-remote-release-clang --config=ci
+build:mobile-remote-release-clang --config=remote
 
 # Compile releases optimizing for size (eg -Os, etc).
-build:release-common --config=sizeopt
+build:mobile-release-common --config=sizeopt
 
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
-build:release-common --copt=-fvisibility=hidden
+build:mobile-release-common --copt=-fvisibility=hidden
 
 # Disable google_grpc in production by default
-build:release-common --define=google_grpc=disabled
+build:mobile-release-common --define=google_grpc=disabled
+
+# Disable envoy_mobile_xds in production by default
+build:mobile-release-common --define=envoy_mobile_xds=disabled
 
 # Enable automatic extension factory registration for release builds
-build:release-common --define=static_extension_registration=enabled
+build:mobile-release-common --define=static_extension_registration=enabled
 
 # Flags for release builds targeting iOS
-build:release-ios --config=ios
-build:release-ios --config=release-common
-build:release-ios --compilation_mode=opt
+build:mobile-release-ios --config=ios
+build:mobile-release-ios --config=mobile-release-common
+build:mobile-release-ios --compilation_mode=opt
 
 # Flags for release builds targeting Android or the JVM
 # Release does not use the option --define=logger=android
-build:release-android --config=release-common
-build:release-android --compilation_mode=opt
+build:mobile-release-android --config=mobile-release-common
+build:mobile-release-android --compilation_mode=opt
 
 # Instrument Envoy Mobile's C++ code for coverage
-build:coverage --instrumentation_filter="//library/common[/:]"
+coverage --instrumentation_filter="//library/common[/:]"
 
 #############################################################################
 # Experimental EngFlow Remote Execution Configs
 #############################################################################
-# remote-ci-common: These options are valid for any platform, use the configs below
+# mobile-remote-ci-common: These options are valid for any platform, use the configs below
 # to add platform-specific options. Avoid using this config directly and
 # instead use a platform-specific config
 #############################################################################
-build:remote-ci-common --config=ci
-build:remote-ci-common --config=remote
-build:remote-ci-common --google_default_credentials=false
-build:remote-ci-common --remote_cache=grpcs://envoy.cluster.engflow.com
-build:remote-ci-common --remote_executor=grpcs://envoy.cluster.engflow.com
-build:remote-ci-common --bes_backend=grpcs://envoy.cluster.engflow.com/
-build:remote-ci-common --bes_results_url=https://envoy.cluster.engflow.com/invocation/
-build:remote-ci-common --experimental_credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:remote-ci-common --jobs=40
-build:remote-ci-common --verbose_failures
-build:remote-ci-common --spawn_strategy=remote,sandboxed,local
-build:remote-ci-common --grpc_keepalive_time=30s
-build:remote-ci-common --remote_timeout=3600s
-build:remote-ci-common --bes_timeout=3600s
-build:remote-ci-common --bes_upload_mode=fully_async
+build:mobile-remote-ci-common --config=rbe-engflow
+build:mobile-remote-ci-common --jobs=40
+build:mobile-remote-ci-common --verbose_failures
+build:mobile-remote-ci-common --spawn_strategy=remote,sandboxed,local
+
 #############################################################################
-# remote-ci-linux: These options are linux-only using GCC by default
+# mobile-remote-ci-linux: These options are linux-only using GCC by default
 #############################################################################
 # Common Engflow flags
-build:remote-ci-linux --define=EXECUTOR=remote
-build:remote-ci-linux --disk_cache=
-build:remote-ci-linux --incompatible_strict_action_env=true
+build:mobile-remote-ci-linux --define=EXECUTOR=remote
+build:mobile-remote-ci-linux --disk_cache=
+build:mobile-remote-ci-linux --incompatible_strict_action_env=true
 # GCC toolchain options
-build:remote-ci-linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:remote-ci-linux --crosstool_top=//third_party/rbe_configs/cc:toolchain
-build:remote-ci-linux --extra_execution_platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
-build:remote-ci-linux --host_platform=//third_party/rbe_configs/config:platform
-build:remote-ci-linux --platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux --config=remote-ci-common
+build:mobile-remote-ci-linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:mobile-remote-ci-linux --crosstool_top=//third_party/rbe_configs/cc:toolchain
+build:mobile-remote-ci-linux --extra_execution_platforms=//third_party/rbe_configs/config:platform
+build:mobile-remote-ci-linux --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
+build:mobile-remote-ci-linux --host_platform=//third_party/rbe_configs/config:platform
+build:mobile-remote-ci-linux --platforms=//third_party/rbe_configs/config:platform
+build:mobile-remote-ci-linux --config=mobile-remote-ci-common
+
 #############################################################################
-# remote-ci-linux-clang: These options are linux-only using Clang by default
+# mobile-remote-ci-linux-clang: These options are linux-only using Clang by default
 #############################################################################
-build:remote-ci-linux-clang --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
-build:remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
-build:remote-ci-linux-clang --crosstool_top=//third_party/rbe_configs/cc:toolchain
-build:remote-ci-linux-clang --extra_execution_platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-clang --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
-build:remote-ci-linux-clang --host_platform=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-clang --platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-clang --config=remote-ci-common
+build:mobile-remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
+build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
+build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
+
 #############################################################################
-# remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
+# mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
 #############################################################################
-build:remote-ci-linux-asan --config=clang-asan
-build:remote-ci-linux-asan --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:remote-ci-linux-asan --action_env=CC=/opt/llvm/bin/clang
-build:remote-ci-linux-asan --action_env=CXX=/opt/llvm/bin/clang++
-build:remote-ci-linux-asan --crosstool_top=//third_party/rbe_configs/cc:toolchain
-build:remote-ci-linux-asan --extra_execution_platforms=//third_party/rbe_configs/config:platform-asan
-build:remote-ci-linux-asan --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
-build:remote-ci-linux-asan --host_platform=//third_party/rbe_configs/config:platform-asan
-build:remote-ci-linux-asan --platforms=//third_party/rbe_configs/config:platform-asan
-build:remote-ci-linux-asan --config=remote-ci-common
+build:mobile-remote-ci-linux-asan --config=clang-asan
+build:mobile-remote-ci-linux-asan --config=mobile-remote-ci-linux-clang
+build:mobile-remote-ci-linux-asan --config=remote-ci
+
 #############################################################################
-# remote-ci-linux-tsan: These options are Linux-only using Clang and ThreadSanitizer
+# mobile-remote-ci-linux-tsan: These options are Linux-only using Clang and ThreadSanitizer
 #############################################################################
-build:remote-ci-linux-tsan --config=clang-tsan
-build:remote-ci-linux-tsan --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:remote-ci-linux-tsan --action_env=CC=/opt/llvm/bin/clang
-build:remote-ci-linux-tsan --action_env=CXX=/opt/llvm/bin/clang++
-build:remote-ci-linux-tsan --crosstool_top=//third_party/rbe_configs/cc:toolchain
-build:remote-ci-linux-tsan --extra_execution_platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-tsan --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
-build:remote-ci-linux-tsan --host_platform=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-tsan --platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-tsan --config=remote-ci-common
+build:mobile-remote-ci-linux-tsan --config=clang-tsan
+build:mobile-remote-ci-linux-tsan --config=mobile-remote-ci-linux-clang
+build:mobile-remote-ci-linux-tsan --config=remote-ci
+
 #############################################################################
-# remote-ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
+# ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
 #############################################################################
 # Clang environment variables (keep in sync with //third_party/rbe_configs)
-build:remote-ci-linux-coverage --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:remote-ci-linux-coverage --action_env=CC=/opt/llvm/bin/clang
-build:remote-ci-linux-coverage --test_env=CC=/opt/llvm/bin/clang
-build:remote-ci-linux-coverage --action_env=CXX=/opt/llvm/bin/clang++
-build:remote-ci-linux-coverage --test_env=CXX=/opt/llvm/bin/clang++
 # Coverage environment variables (keep in sync with //third_party/rbe_configs)
-build:remote-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:remote-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:remote-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:remote-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:remote-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
-build:remote-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
-# Toolchain flags (Java is required for C++ coverage due to Bazel's LCOV merger)
-build:remote-ci-linux-coverage --crosstool_top=//third_party/rbe_configs/cc:toolchain
-build:remote-ci-linux-coverage --extra_execution_platforms=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-coverage --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
-build:remote-ci-linux-coverage --host_platform=//third_party/rbe_configs/config:platform
-build:remote-ci-linux-coverage --platforms=//third_party/rbe_configs/config:platform
+build:mobile-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
+build:mobile-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
+build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
+build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llm/bin/llvm-cov
+build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+
+#############################################################################
+# mobile-remote-ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
+#############################################################################
+# Clang environment variables (keep in sync with //third_party/rbe_configs)
+# Coverage environment variables (keep in sync with //third_party/rbe_configs)
 # Flags to run tests locally which are necessary since Bazel C++ LLVM coverage isn't fully supported for remote builds
 # TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote test execution and LLVM coverage.
-build:remote-ci-linux-coverage --remote_download_outputs=all
-build:remote-ci-linux-coverage --strategy=TestRunner=local,remote
-build:remote-ci-linux-coverage --strategy=CoverageReport=local,remote
-# Bazel remote caching is incompatible with C++ LLVM coverage so we need to deactivate it for coverage builds
-# TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote caching and LLVM coverage.
-build:remote-ci-linux-coverage --noremote_accept_cached
-build:remote-ci-linux-coverage --config=remote-ci-common
-build:remote-ci-linux-coverage --build_runfile_links
-build:remote-ci-linux-coverage --legacy_important_outputs=false
-build:remote-ci-linux-coverage --test_env=CC_CODE_COVERAGE_SCRIPT=external/envoy/bazel/coverage/collect_cc_coverage.sh
-build:remote-ci-linux-coverage --nocache_test_results
+build:mobile-remote-ci-linux-coverage --config=mobile-ci-linux-coverage
+build:mobile-remote-ci-linux-coverage --config=mobile-remote-ci-linux-clang
+build:mobile-remote-ci-linux-coverage --legacy_important_outputs=false
+build:mobile-remote-ci-linux-coverage --config=ci
+build:mobile-remote-ci-linux-coverage --config=remote
 
 # IPv6 tests fail on CI
-build:remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+build:mobile-remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
-# remote-ci-macos: These options are macOS-only
+# mobile-remote-ci-macos: These options are macOS-only
 #############################################################################
-build:remote-ci-macos --config=remote-ci-common
-build:remote-ci-macos --host_platform=//ci/platform:macos
-build:remote-ci-macos --platforms=//ci/platform:macos
-build:remote-ci-macos --extra_execution_platforms=//ci/platform:macos
-build:remote-ci-macos --xcode_version_config=//ci:xcode_config
-#############################################################################
-# remote-ci-debug: Various Bazel debugging flags
-#############################################################################
-common:remote-ci-debug --announce_rc
-common:remote-ci-debug -s
-common:remote-ci-debug -c dbg
-common:remote-ci-debug --verbose_failures
-common:remote-ci-debug --sandbox_debug
-common:remote-ci-debug --action_env=VERBOSE_COVERAGE=true
-common:remote-ci-debug --test_env=VERBOSE_COVERAGE=true
-common:remote-ci-debug --test_env=DISPLAY_LCOV_CMD=true
-#############################################################################
-# Experimental EngFlow Remote Execution Configs.
-#############################################################################
+build:mobile-remote-ci-macos --config=mobile-remote-ci-common
+build:mobile-remote-ci-macos --host_platform=//ci/platform:macos
+build:mobile-remote-ci-macos --platforms=//ci/platform:macos
+build:mobile-remote-ci-macos --extra_execution_platforms=//ci/platform:macos
+build:mobile-remote-ci-macos --xcode_version_config=//ci:xcode_config
+build:mobile-remote-ci-macos --remote_download_toplevel
+build:mobile-remote-ci-macos --config=ci
+build:mobile-remote-ci-macos --config=remote
+
+build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
+build:mobile-remote-ci --config=remote-ci

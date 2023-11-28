@@ -89,7 +89,9 @@ private:
                                    public ThreadLocal::ThreadLocalObject {};
 
   void onDictionaryUpdate(unsigned origin_id, const std::string& filename) {
-    const auto data = api_.fileSystem().fileReadToEnd(filename);
+    auto file_or_error = api_.fileSystem().fileReadToEnd(filename);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    const auto data = file_or_error.value();
     if (!data.empty()) {
       auto dictionary = DictionarySharedPtr(builder_(data.data(), data.length()));
       auto id = getDictId(dictionary.get());

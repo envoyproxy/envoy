@@ -14,7 +14,10 @@
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "quiche/common/structured_headers.h"
+#endif
 #include "quiche/http2/adapter/header_validator.h"
 
 namespace Envoy {
@@ -192,10 +195,6 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   return match != header_data.invert_match_;
 }
 
-bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
-  return scheme == Headers::get().SchemeValues.Https || scheme == Headers::get().SchemeValues.Http;
-}
-
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return http2::adapter::HeaderValidator::IsValidHeaderValue(header_value,
                                                              http2::adapter::ObsTextOption::kAllow);
@@ -243,9 +242,17 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }
 
-bool HeaderUtility::isConnectUdp(const RequestHeaderMap& headers) {
-  return headers.Upgrade() &&
-         headers.Upgrade()->value() == Http::Headers::get().UpgradeValues.ConnectUdp;
+bool HeaderUtility::isConnectUdpRequest(const RequestHeaderMap& headers) {
+  return headers.Upgrade() && absl::EqualsIgnoreCase(headers.getUpgradeValue(),
+                                                     Http::Headers::get().UpgradeValues.ConnectUdp);
+}
+
+bool HeaderUtility::isConnectUdpResponse(const ResponseHeaderMap& headers) {
+  // In connect-udp case, Envoy will transform the H2 headers to H1 upgrade headers.
+  // A valid response should have SwitchingProtocol status and connect-udp upgrade.
+  return headers.Upgrade() && Utility::getResponseStatus(headers) == 101 &&
+         absl::EqualsIgnoreCase(headers.getUpgradeValue(),
+                                Http::Headers::get().UpgradeValues.ConnectUdp);
 }
 
 bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,

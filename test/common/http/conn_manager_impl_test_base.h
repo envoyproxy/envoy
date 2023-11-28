@@ -6,6 +6,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -201,6 +202,11 @@ public:
   void expectUhvTrailerCheck(HeaderValidator::ValidationResult validation_result,
                              HeaderValidator::TransformationResult transformation_result,
                              bool expect_response = true);
+  // This method sets-up expectation that UHV will be called and provides real default UHV to
+  // validate headers.
+  void expectCheckWithDefaultUhv();
+
+  Event::MockSchedulableCallback* enableStreamsPerIoLimit(uint32_t limit);
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -290,6 +296,10 @@ public:
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   NiceMock<MockHeaderValidatorFactory> header_validator_factory_;
   NiceMock<MockHeaderValidatorStats> header_validator_stats_;
+  envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      header_validator_config_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
 };
 
 class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,

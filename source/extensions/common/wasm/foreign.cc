@@ -1,5 +1,6 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
+#include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
 #if defined(WASM_USE_CEL_PARSER)
@@ -22,6 +23,20 @@ using CelStateType = Filters::Common::Expr::CelStateType;
 template <typename T> WasmForeignFunction createFromClass() {
   auto c = std::make_shared<T>();
   return c->create(c);
+}
+
+inline StreamInfo::FilterState::LifeSpan
+toFilterStateLifeSpan(envoy::source::extensions::common::wasm::LifeSpan span) {
+  switch (span) {
+  case envoy::source::extensions::common::wasm::LifeSpan::FilterChain:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  case envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest:
+    return StreamInfo::FilterState::LifeSpan::Request;
+  case envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection:
+    return StreamInfo::FilterState::LifeSpan::Connection;
+  default:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  }
 }
 
 RegisterForeignFunction registerCompressForeignFunction(
@@ -59,6 +74,19 @@ RegisterForeignFunction registerUncompressForeignFunction(
         }
         dest_len = dest_len * 2;
       }
+    });
+
+RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
+    "set_envoy_filter_state",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>&) -> WasmResult {
+      envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
+      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+        auto context = static_cast<Context*>(proxy_wasm::current_context_);
+        return context->setEnvoyFilterState(args.path(), args.value(),
+                                            toFilterStateLifeSpan(args.span()));
+      }
+      return WasmResult::BadArgument;
     });
 
 #if defined(WASM_USE_CEL_PARSER)
@@ -242,21 +270,7 @@ public:
           // do nothing
           break;
         }
-        StreamInfo::FilterState::LifeSpan span = StreamInfo::FilterState::LifeSpan::FilterChain;
-        switch (args.span()) {
-        case envoy::source::extensions::common::wasm::LifeSpan::FilterChain:
-          span = StreamInfo::FilterState::LifeSpan::FilterChain;
-          break;
-        case envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest:
-          span = StreamInfo::FilterState::LifeSpan::Request;
-          break;
-        case envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection:
-          span = StreamInfo::FilterState::LifeSpan::Connection;
-          break;
-        default:
-          // do nothing
-          break;
-        }
+        StreamInfo::FilterState::LifeSpan span = toFilterStateLifeSpan(args.span());
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
         return context->declareProperty(
             args.name(), std::make_unique<const Filters::Common::Expr::CelStatePrototype>(

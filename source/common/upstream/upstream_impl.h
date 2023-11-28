@@ -60,7 +60,7 @@
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
-#include "source/common/upstream/upstream_http_factory_context_impl.h"
+#include "source/common/upstream/upstream_factory_context_impl.h"
 #include "source/extensions/upstreams/http/config.h"
 #include "source/extensions/upstreams/tcp/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -71,38 +71,26 @@
 namespace Envoy {
 namespace Upstream {
 
-/**
- * An implementation of UpstreamLocalAddressSelector.
- */
-class UpstreamLocalAddressSelectorImpl : public UpstreamLocalAddressSelector {
+using ClusterProto = envoy::config::cluster::v3::Cluster;
+
+using UpstreamNetworkFilterConfigProviderManager =
+    Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
+                                        Server::Configuration::UpstreamFactoryContext>;
+
+class LegacyLbPolicyConfigHelper {
 public:
-  UpstreamLocalAddressSelectorImpl(
-      const envoy::config::cluster::v3::Cluster& config,
-      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config);
+  struct Result {
+    TypedLoadBalancerFactory* factory;
+    LoadBalancerConfigPtr config;
+  };
 
-  // UpstreamLocalAddressSelector
-  UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address,
-      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const override;
+  static absl::StatusOr<Result>
+  getTypedLbConfigFromLegacyProtoWithoutSubset(const ClusterProto& cluster,
+                                               ProtobufMessage::ValidationVisitor& visitor);
 
-private:
-  const Network::ConnectionSocket::OptionsSharedPtr
-  buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                         const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
-  const Network::ConnectionSocket::OptionsSharedPtr
-  buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                            const envoy::config::core::v3::BindConfig bind_config);
-  void parseBindConfig(const std::string cluster_name,
-                       const envoy::config::core::v3::BindConfig& bind_config,
-                       const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
-                       const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
-  Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
-      const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
-      const Network::ConnectionSocket::OptionsSharedPtr& options) const;
-
-  Network::ConnectionSocket::OptionsSharedPtr base_socket_options_;
-  Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
-  std::vector<UpstreamLocalAddress> upstream_local_addresses_;
+  static absl::StatusOr<Result>
+  getTypedLbConfigFromLegacyProto(const ClusterProto& cluster,
+                                  ProtobufMessage::ValidationVisitor& visitor);
 };
 
 /**
@@ -495,9 +483,23 @@ public:
   HostsPerLocalityImpl() : HostsPerLocalityImpl(std::vector<HostVector>(), false) {}
 
   // Single locality constructor
+  //
+  // Parameter requirements:
+  // 1. All entries in hosts must have the same locality.
+  // 2. If has_local_locality is true, then the locality of all entries in hosts
+  //    must be equal to the current envoy's locality.
   HostsPerLocalityImpl(const HostVector& hosts, bool has_local_locality = false)
       : HostsPerLocalityImpl(std::vector<HostVector>({hosts}), has_local_locality) {}
 
+  // Multiple localities constructor
+  //
+  // locality_hosts must adhere to the following ordering constraints:
+  // 1. All hosts within a single HostVector bucket must have the same locality
+  // 2. No hosts in different HostVector buckets can have the same locality
+  // 3. If has_local_locality is true, then the locality of all hosts in the first HostVector bucket
+  //    must be equal to the current envoy's locality.
+  // 4. All non-local HostVector buckets must be sorted in ascending order by the LocalityLess
+  // comparator
   HostsPerLocalityImpl(std::vector<HostVector>&& locality_hosts, bool has_local_locality)
       : local_(has_local_locality), hosts_per_locality_(std::move(locality_hosts)) {
     ASSERT(!has_local_locality || !hosts_per_locality_.empty());
@@ -894,22 +896,42 @@ public:
   }
   OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
   lbRoundRobinConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbRoundRobinConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbLeastRequestConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
   lbRingHashConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbRingHashConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
   lbMaglevConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbMaglevConfig();
   }
   OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const override {
+    if (lb_policy_config_ == nullptr) {
+      return {};
+    }
+
     return lb_policy_config_->lbOriginalDstConfig();
   }
   OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const override {
@@ -958,7 +980,9 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  std::shared_ptr<UpstreamLocalAddressSelector> getUpstreamLocalAddressSelector() const override {
+  bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
+
+  UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override {
@@ -1020,7 +1044,7 @@ public:
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
-    // Upgrade filter chains not yet supported for upstream filters.
+    // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
 
@@ -1036,6 +1060,10 @@ protected:
   getRetryBudgetParams(const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds);
 
 private:
+  std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+  createSingletonUpstreamNetworkFilterConfigProviderManager(
+      Server::Configuration::ServerFactoryContext& context);
+
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name, Stats::Scope& stats_scope,
@@ -1087,8 +1115,8 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
-  const std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
+  UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
+  std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
@@ -1098,14 +1126,20 @@ private:
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
       common_lb_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
-  const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
+  // TODO(ohadvano): http_filter_config_provider_manager_ and
+  // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as a
+  // singleton. This is currently not possible due to circular dependency (filter config provider
+  // manager depends on the ClusterManager object). The circular dependency can be resolved when the
+  // following issue is resolved: https://github.com/envoyproxy/envoy/issues/26653.
+  std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
+  std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+      network_filter_config_provider_manager_;
   Filter::NetworkFilterFactoriesList filter_factories_;
-  Filter::UpstreamNetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
-  UpstreamHttpFactoryContextImpl upstream_context_;
+  UpstreamFactoryContextImpl upstream_context_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment
@@ -1120,6 +1154,7 @@ private:
   const bool added_via_api_ : 1;
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
+  const bool per_endpoint_stats_ : 1;
 };
 
 /**
@@ -1237,6 +1272,8 @@ protected:
       const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
 
 private:
+  static const absl::string_view DoNotValidateAlpnRuntimeKey;
+
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 

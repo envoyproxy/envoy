@@ -571,13 +571,13 @@ void RedisCluster::RedisDiscoverySession::onFailure() {
 
 RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 
-std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 RedisClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
   if (!cluster.has_cluster_type() || cluster.cluster_type().name() != "envoy.clusters.redis") {
-    throw EnvoyException("Redis cluster can only created with redis cluster type.");
+    return absl::InvalidArgumentError("Redis cluster can only created with redis cluster type.");
   }
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy
   // in the future

@@ -3,11 +3,6 @@
 Composite Filter
 ================
 
-.. attention::
-
-   The composite filter is in alpha and is currently under active development.
-   Capabilities will be expanded over time and the configuration structures are likely to change.
-
 The composite filter allows delegating filter actions to a filter specified by a
 :ref:`match result <arch_overview_matching_api>`. The purpose of this is to allow different filters
 or filter configurations to be selected based on the incoming request, allowing for more dynamic
@@ -39,7 +34,7 @@ instantiated.
 Statistics
 ----------
 
-The composite filter outputs statistics in the <stat_prefix>.composite.* namespace.
+The composite filter outputs statistics in the ``<stat_prefix>.composite.*`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description

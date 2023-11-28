@@ -1,5 +1,8 @@
 name: mobile_traffic_director
 
+permissions:
+  contents: read
+
 on:
   schedule:
   # Once a day at midnight.
@@ -7,16 +10,13 @@ on:
   # Allows manual triggering in the UI. Makes it easier to test.
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-github.workflow
   cancel-in-progress: true
 
 jobs:
   cc_test:
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.schedule
@@ -24,23 +24,26 @@ jobs:
       }}
     name: cc_test
     permissions:
+      contents: read
       packages: read
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run GcpTrafficDirectorIntegrationTest'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GCP_JWT_PRIVATE_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_JWT_TOKEN }}
+        GCP_TEST_PROJECT_PROD_API_KEY: ${{ secrets.GCP_TEST_PROJECT_PROD_API_KEY }}
+        # TODO(abeyad): remove this key once we're fully switched over to using the
+        # prod consumer mesh shard.
+        GCP_TEST_PROJECT_API_KEY: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
         ENVOY_IP_TEST_VERSIONS: v4only
       run: |
         cd mobile
         ./bazelw run \
-            --config=remote-ci-linux \
+            --config=mobile-remote-ci \
             --config=ci \
-            --test_output=all \
             //test/non_hermetic:gcp_traffic_director_integration_test

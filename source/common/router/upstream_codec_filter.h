@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Router {
 
-// This is the last filter in the upstream filter chain.
+// This is the last filter in the upstream HTTP filter chain.
 // It takes request headers/body/data from the filter manager and encodes them to the upstream
 // codec. It also registers the CodecBridge with the upstream stream, and takes response
 // headers/body/data from the upstream stream and sends them to the filter manager.
@@ -113,9 +113,9 @@ public:
   UpstreamCodecFilterFactory() : CommonFactoryBase("envoy.filters.http.upstream_codec") {}
 
   std::string category() const override { return "envoy.filters.http.upstream"; }
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::UpstreamHttpFactoryContext&) override {
+                               Server::Configuration::UpstreamFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
     };

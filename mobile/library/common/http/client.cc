@@ -1,6 +1,5 @@
 #include "library/common/http/client.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/http/codes.h"
@@ -14,8 +13,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
-#include "library/common/jni/android_jni_utility.h"
-#include "library/common/network/connectivity_manager.h"
 #include "library/common/stream_info/extra_stream_info.h"
 
 namespace Envoy {
@@ -53,9 +50,10 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
 
   // Capture some metadata before potentially closing the stream.
   absl::string_view alpn = "";
-  if (direct_stream_.request_decoder_) {
+  OptRef<RequestDecoder> request_decoder = direct_stream_.requestDecoder();
+  if (request_decoder) {
     direct_stream_.saveLatestStreamIntel();
-    const auto& info = direct_stream_.request_decoder_->streamInfo();
+    const auto& info = request_decoder->streamInfo();
     // Set the initial number of bytes consumed for the non terminal callbacks.
     direct_stream_.stream_intel_.consumed_bytes_from_response =
         info.getUpstreamBytesMeter() ? info.getUpstreamBytesMeter()->headerBytesReceived() : 0;
@@ -380,7 +378,11 @@ envoy_final_stream_intel& Client::DirectStreamCallbacks::finalStreamIntel() {
 }
 
 void Client::DirectStream::saveLatestStreamIntel() {
-  const auto& info = request_decoder_->streamInfo();
+  OptRef<RequestDecoder> request_decoder = requestDecoder();
+  if (!request_decoder) {
+    return;
+  }
+  const auto& info = request_decoder->streamInfo();
   if (info.upstreamInfo()) {
     stream_intel_.connection_id = info.upstreamInfo()->upstreamConnectionId().value_or(-1);
   }
@@ -389,16 +391,21 @@ void Client::DirectStream::saveLatestStreamIntel() {
 }
 
 void Client::DirectStream::saveFinalStreamIntel() {
-  if (!request_decoder_ || !parent_.getStream(stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS)) {
+  OptRef<RequestDecoder> request_decoder = requestDecoder();
+  if (!request_decoder || !parent_.getStream(stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS)) {
     return;
   }
-  StreamInfo::setFinalStreamIntel(request_decoder_->streamInfo(), parent_.dispatcher_.timeSource(),
+  StreamInfo::setFinalStreamIntel(request_decoder->streamInfo(), parent_.dispatcher_.timeSource(),
                                   envoy_final_stream_intel_);
 }
 
 envoy_error Client::DirectStreamCallbacks::streamError() {
-  const auto& info = direct_stream_.request_decoder_->streamInfo();
   envoy_error error{};
+  OptRef<RequestDecoder> request_decoder = direct_stream_.requestDecoder();
+  if (!request_decoder) {
+    return error;
+  }
+  const auto& info = request_decoder->streamInfo();
 
   if (info.responseCode().has_value()) {
     error.error_code = Bridge::Utility::errorCodeFromLocalStatus(
@@ -476,7 +483,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
   // Note: streams created by Envoy Mobile are tagged as is_internally_created. This means that
   // the Http::ConnectionManager _will not_ sanitize headers when creating a stream.
   direct_stream->request_decoder_ =
-      &api_listener_->newStream(*direct_stream->callbacks_, true /* is_internally_created */);
+      api_listener_->newStreamHandle(*direct_stream->callbacks_, true /* is_internally_created */);
 
   streams_.emplace(new_stream_handle, std::move(direct_stream));
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
@@ -493,38 +500,44 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   // first place. Additionally it is possible to get a nullptr due to bogus envoy_stream_t
   // from the caller.
   // https://github.com/envoyproxy/envoy-mobile/issues/301
-  if (direct_stream) {
-    ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-    RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
-
-    // This is largely a check for the android platform: is_cleartext_permitted
-    // is a no-op for other platforms.
-    if (internal_headers->getSchemeValue() != "https" &&
-        !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
-      direct_stream->request_decoder_->sendLocalReply(
-          Http::Code::BadRequest, "Cleartext is not permitted", nullptr, absl::nullopt, "");
-      return;
-    }
-
-    setDestinationCluster(*internal_headers);
-    // Set the x-forwarded-proto header to https because Envoy Mobile only has clusters with TLS
-    // enabled. This is done here because the ApiListener's synthetic connection would make the
-    // Http::ConnectionManager set the scheme to http otherwise. In the future we might want to
-    // configure the connection instead of setting the header here.
-    // https://github.com/envoyproxy/envoy/issues/10291
-    //
-    // Setting this header is also currently important because Envoy Mobile starts stream with the
-    // ApiListener setting the is_internally_created bool to true. This means the
-    // Http::ConnectionManager *will not* mutate Envoy Mobile's request headers. One of the
-    // mutations done is adding the x-forwarded-proto header if not present. Unfortunately, the
-    // router relies on the present of this header to determine if it should provided a route for
-    // a request here:
-    // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
-    internal_headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
-    ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
-              *internal_headers);
-    direct_stream->request_decoder_->decodeHeaders(std::move(internal_headers), end_stream);
+  if (!direct_stream) {
+    return;
   }
+  OptRef<RequestDecoder> request_decoder = direct_stream->requestDecoder();
+  if (!request_decoder) {
+    return;
+  }
+
+  ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
+  RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
+
+  // This is largely a check for the android platform: isCleartextPermitted
+  // is a no-op for other platforms.
+  if (internal_headers->getSchemeValue() != "https" &&
+      !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {
+    request_decoder->sendLocalReply(Http::Code::BadRequest, "Cleartext is not permitted", nullptr,
+                                    absl::nullopt, "");
+    return;
+  }
+
+  setDestinationCluster(*internal_headers);
+  // Set the x-forwarded-proto header to https because Envoy Mobile only has clusters with TLS
+  // enabled. This is done here because the ApiListener's synthetic connection would make the
+  // Http::ConnectionManager set the scheme to http otherwise. In the future we might want to
+  // configure the connection instead of setting the header here.
+  // https://github.com/envoyproxy/envoy/issues/10291
+  //
+  // Setting this header is also currently important because Envoy Mobile starts stream with the
+  // ApiListener setting the is_internally_created bool to true. This means the
+  // Http::ConnectionManager *will not* mutate Envoy Mobile's request headers. One of the
+  // mutations done is adding the x-forwarded-proto header if not present. Unfortunately, the
+  // router relies on the present of this header to determine if it should provided a route for
+  // a request here:
+  // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
+  internal_headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
+  ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
+            *internal_headers);
+  request_decoder->decodeHeaders(std::move(internal_headers), end_stream);
 }
 
 void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
@@ -550,32 +563,38 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
   // first place. Additionally it is possible to get a nullptr due to bogus envoy_stream_t
   // from the caller.
   // https://github.com/envoyproxy/envoy-mobile/issues/301
-  if (direct_stream) {
-    ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-    // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
-    // of the InstancePtr to outlive this function call.
-    Buffer::InstancePtr buf = Data::Utility::toInternalData(data);
+  if (!direct_stream) {
+    return;
+  }
+  OptRef<RequestDecoder> request_decoder = direct_stream->requestDecoder();
+  if (!request_decoder) {
+    return;
+  }
 
-    ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream,
-              data.length, end_stream);
-    direct_stream->request_decoder_->decodeData(*buf, end_stream);
+  ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
+  // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
+  // of the InstancePtr to outlive this function call.
+  Buffer::InstancePtr buf = Data::Utility::toInternalData(data);
 
-    if (direct_stream->explicit_flow_control_ && !end_stream) {
-      if (direct_stream->read_disable_count_ == 0) {
-        // If there is still buffer space after the write, notify the sender
-        // that send window is available, on the next dispatcher iteration so
-        // that repeated writes do not starve reads.
-        direct_stream->wants_write_notification_ = false;
-        // A new callback must be scheduled each time to capture any changes to the
-        // DirectStream's callbacks from call to call.
-        scheduled_callback_ = dispatcher_.createSchedulableCallback(
-            [direct_stream] { direct_stream->callbacks_->onSendWindowAvailable(); });
-        scheduled_callback_->scheduleCallbackNextIteration();
-      } else {
-        // Otherwise, make sure the stack will send a notification when the
-        // buffers are drained.
-        direct_stream->wants_write_notification_ = true;
-      }
+  ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream, data.length,
+            end_stream);
+  request_decoder->decodeData(*buf, end_stream);
+
+  if (direct_stream->explicit_flow_control_ && !end_stream) {
+    if (direct_stream->read_disable_count_ == 0) {
+      // If there is still buffer space after the write, notify the sender
+      // that send window is available, on the next dispatcher iteration so
+      // that repeated writes do not starve reads.
+      direct_stream->wants_write_notification_ = false;
+      // A new callback must be scheduled each time to capture any changes to the
+      // DirectStream's callbacks from call to call.
+      scheduled_callback_ = dispatcher_.createSchedulableCallback(
+          [direct_stream] { direct_stream->callbacks_->onSendWindowAvailable(); });
+      scheduled_callback_->scheduleCallbackNextIteration();
+    } else {
+      // Otherwise, make sure the stack will send a notification when the
+      // buffers are drained.
+      direct_stream->wants_write_notification_ = true;
     }
   }
 }
@@ -593,12 +612,17 @@ void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
   // first place. Additionally it is possible to get a nullptr due to bogus envoy_stream_t
   // from the caller.
   // https://github.com/envoyproxy/envoy-mobile/issues/301
-  if (direct_stream) {
-    ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-    RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);
-    ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
-    direct_stream->request_decoder_->decodeTrailers(std::move(internal_trailers));
+  if (!direct_stream) {
+    return;
   }
+  OptRef<RequestDecoder> request_decoder = direct_stream->requestDecoder();
+  if (!request_decoder) {
+    return;
+  }
+  ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
+  RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);
+  ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
+  request_decoder->decodeTrailers(std::move(internal_trailers));
 }
 
 void Client::cancelStream(envoy_stream_t stream) {

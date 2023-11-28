@@ -74,6 +74,10 @@ IntegrationTcpClient::IntegrationTcpClient(
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
+void IntegrationTcpClient::close(Network::ConnectionCloseType close_type) {
+  connection_->close(close_type);
+}
+
 void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match) {
   auto found = payload_reader_->data().find(data);
   if (found == 0 || (!exact_match && found != std::string::npos)) {
@@ -94,6 +98,9 @@ AssertionResult IntegrationTcpClient::waitForData(size_t length,
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  if (disconnected_) {
+    return;
+  }
   Event::TimerPtr timeout_timer =
       connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
   timeout_timer->enableTimer(TestUtility::DefaultTimeout);

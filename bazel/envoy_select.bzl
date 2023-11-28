@@ -66,17 +66,17 @@ def envoy_select_envoy_mobile_request_compression(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Selects the given values if Envoy Mobile stats reporting is enabled in the current build.
-def envoy_select_envoy_mobile_stats_reporting(xs, repository = ""):
-    return select({
-        repository + "//bazel:disable_envoy_mobile_stats_reporting": [],
-        "//conditions:default": xs,
-    })
-
 # Selects the given values if the Envoy Mobile listener is enabled in the current build.
 def envoy_select_envoy_mobile_listener(xs, repository = ""):
     return select({
         repository + "//bazel:disable_envoy_mobile_listener": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if Envoy Mobile xDS is enabled in the current build.
+def envoy_select_envoy_mobile_xds(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_xds": [],
         "//conditions:default": xs,
     })
 
@@ -113,6 +113,20 @@ def envoy_select_hot_restart(xs, repository = ""):
     return select({
         repository + "//bazel:disable_hot_restart": [],
         "//conditions:default": xs,
+    })
+
+# Selects the given values if full protos are enabled in the current build.
+def envoy_select_enable_full_protos(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_full_protos": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if lite protos are enabled in the current build.
+def envoy_select_enable_lite_protos(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_full_protos": xs,
+        "//conditions:default": [],
     })
 
 # Selects the given values if signal trace is enabled in the current build.

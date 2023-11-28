@@ -252,6 +252,23 @@ public:
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Wait for a proactive resource usage in the overload manager to be == a given value.
+   * @param overload_state used to lookup corresponding proactive resource.
+   * @param resource_name name of the proactive resource to lookup.
+   * @param expected_value target resource usage value.
+   * @param time_system the time system to use for waiting.
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
+   * @param timeout the maximum time to wait before timing out.
+   * @return AssertionSuccess() if the resource usage was == to the value within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitForProactiveOverloadResourceUsageEq(
+      Server::ThreadLocalOverloadState& overload_state,
+      const Server::OverloadProactiveResourceName resource_name, int64_t expected_value,
+      Event::TestTimeSystem& time_system, Event::Dispatcher& dispatcher,
+      std::chrono::milliseconds timeout);
+
+  /**
    * Wait for a gauge to >= a given value.
    * @param store supplies the stats store.
    * @param name gauge name.
@@ -369,6 +386,7 @@ public:
    */
   static std::string uniqueFilename(absl::string_view prefix = "");
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two protos of the same type for equality.
    *
@@ -410,6 +428,7 @@ public:
            lhs.version() == rhs.version() && lhs.hasResource() == rhs.hasResource() &&
            (!lhs.hasResource() || protoEqual(lhs.resource(), rhs.resource()));
   }
+#endif
 
   /**
    * Symmetrically pad a string with '=' out to a desired length.
@@ -438,6 +457,7 @@ public:
   static std::vector<std::string> split(const std::string& source, const std::string& split,
                                         bool keep_empty_string = false);
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two RepeatedPtrFields of the same type for equality.
    *
@@ -502,6 +522,7 @@ public:
 
     return AssertionSuccess();
   }
+#endif
 
   /**
    * Returns a "novel" IPv4 loopback address, if available.
@@ -884,6 +905,7 @@ public:
     setByKey(key, val);
   }
   void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
+  void removeByKey(absl::string_view key) override { context_map_.erase(std::string(key)); }
 
   std::string context_protocol_;
   std::string context_host_;
@@ -1156,6 +1178,7 @@ public:
     ASSERT(header_map_);
     header_map_->setByReferenceKey(key, val);
   }
+  void removeByKey(absl::string_view key) override { header_map_->removeByKey(key); }
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;
@@ -1227,6 +1250,7 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   return equal;
 }
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 MATCHER_P(ProtoEq, expected, "") {
   const bool equal =
       TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/false);
@@ -1322,6 +1346,8 @@ MATCHER_P(Percent, rhs, "") {
   expected.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
+
+#endif
 
 #ifdef ENVOY_ENABLE_YAML
 MATCHER_P(JsonStringEq, expected, "") {

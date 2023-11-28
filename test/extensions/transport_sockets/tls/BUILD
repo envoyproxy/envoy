@@ -11,11 +11,15 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "ssl_certs_test_lib",
+    hdrs = ["ssl_certs_test.h"],
+)
+
 envoy_cc_test(
     name = "ssl_socket_test",
     size = "large",
     srcs = [
-        "ssl_certs_test.h",
         "ssl_socket_test.cc",
     ],
     data = [
@@ -26,8 +30,8 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    shard_count = 4,
     deps = [
+        ":ssl_certs_test_lib",
         ":test_private_key_method_provider_test_lib",
         "//envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
@@ -73,13 +77,13 @@ envoy_cc_test(
     name = "context_impl_test",
     srcs = [
         "context_impl_test.cc",
-        "ssl_certs_test.h",
     ],
     data = [
         "//test/extensions/transport_sockets/tls/ocsp/test_data:certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
+        "ssl_certs_test_lib",
         ":ssl_test_utils",
         "//source/common/common:base64_lib",
         "//source/common/json:json_loader_lib",
@@ -133,7 +137,7 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "ssl_test_utils",
-    srcs = [
+    hdrs = [
         "ssl_test_utility.h",
     ],
     deps = [

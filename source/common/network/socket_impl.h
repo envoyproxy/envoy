@@ -73,6 +73,12 @@ public:
   void setRoundTripTime(std::chrono::milliseconds round_trip_time) override {
     round_trip_time_ = round_trip_time;
   }
+  OptRef<const FilterChainInfo> filterChainInfo() const override {
+    return makeOptRefFromPtr<const FilterChainInfo>(filter_chain_info_.get());
+  }
+  void setFilterChainInfo(FilterChainInfoConstSharedPtr filter_chain_info) override {
+    filter_chain_info_ = std::move(filter_chain_info);
+  }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
@@ -86,6 +92,7 @@ private:
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   std::string ja3_hash_;
   absl::optional<std::chrono::milliseconds> round_trip_time_;
+  FilterChainInfoConstSharedPtr filter_chain_info_;
 };
 
 class SocketImpl : public virtual Socket {

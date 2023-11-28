@@ -3,8 +3,10 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/quic/envoy_quic_stream.h"
-#include "source/common/quic/http_datagram_handler.h"
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+#include "source/common/quic/http_datagram_handler.h"
+#endif
 #include "quiche/common/simple_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
 
@@ -64,6 +66,7 @@ protected:
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
+  void OnInvalidHeaders() override;
 
   // Http::MultiplexedStreamImplBase
   bool hasPendingData() override;

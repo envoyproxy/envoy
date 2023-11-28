@@ -6,7 +6,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::EndsWith;
 using testing::HasSubstr;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
@@ -27,7 +29,7 @@ const Admin::UrlHandler handler() {
 
 class StatsHtmlRenderTest : public StatsRenderTestBase {
 protected:
-  Http::Utility::QueryParams query_params_;
+  Http::Utility::QueryParamsMulti query_params_;
 };
 
 TEST_F(StatsHtmlRenderTest, String) {
@@ -47,13 +49,37 @@ TEST_F(StatsHtmlRenderTest, HistogramNoBuckets) {
               HasSubstr(expected));
 }
 
-TEST_F(StatsHtmlRenderTest, HistogramDetailed) {
-  // The goal of this test is to show that we have embedded the histogram as a json fragment.
+TEST_F(StatsHtmlRenderTest, HistogramStreamingDetailed) {
+  // The goal of this test is to show that we have embedded the histogram as a
+  // json fragment, which gets streamed out to HTML one histogram at a time,
+  // rather than buffered.
   params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+
   StatsHtmlRender renderer{response_headers_, response_, params_};
-  constexpr absl::string_view expected = "const json = \n{\"stats\":[{\"histograms\":";
-  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
-              HasSubstr(expected));
+  renderer.generate(response_, "scalar", 42);
+  EXPECT_THAT(response_.toString(), StartsWith("<!DOCTYPE html>\n<html lang='en'>\n<head>\n"));
+  EXPECT_THAT(response_.toString(), EndsWith("\nscalar: 42\n"));
+  response_.drain(response_.length());
+
+  renderer.generate(response_, "h1", populateHistogram("h1", {200, 300, 300}));
+  EXPECT_THAT(response_.toString(), StartsWith("</pre>\n<div id='histograms'></div>\n"
+                                               "<script>\nconst supportedPercentiles = ["));
+  EXPECT_THAT(response_.toString(),
+              HasSubstr("\nconst histogramDiv = document.getElementById('histograms');\n"
+                        "renderHistogram(histogramDiv, supportedPercentiles,\n"
+                        "{\"name\":\"h1\",\"totals\":[{\"lower_bound\":"));
+  EXPECT_THAT(response_.toString(), EndsWith("\n</script>\n"));
+  response_.drain(response_.length());
+
+  renderer.generate(response_, "h2", populateHistogram("h2", {200, 300, 300}));
+  EXPECT_THAT(response_.toString(),
+              StartsWith("<script>\nrenderHistogram(histogramDiv, supportedPercentiles,\n"
+                         "{\"name\":\"h2\",\"totals\":[{\"lower_bound\":"));
+  EXPECT_THAT(response_.toString(), EndsWith("\n</script>\n"));
+  response_.drain(response_.length());
+
+  renderer.finalize(response_);
+  EXPECT_EQ("</body>\n</html>\n", response_.toString());
 }
 
 TEST_F(StatsHtmlRenderTest, RenderActive) {

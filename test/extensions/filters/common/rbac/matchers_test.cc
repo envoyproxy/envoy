@@ -35,9 +35,7 @@ void checkMatcher(
   EXPECT_EQ(expected, matcher.matches(connection, headers, info));
 }
 
-PortRangeMatcher createPortRangeMatcher(envoy::type::v3::Int32Range range) {
-  return PortRangeMatcher(range);
-}
+PortRangeMatcher createPortRangeMatcher(envoy::type::v3::Int32Range range) { return {range}; }
 
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
 

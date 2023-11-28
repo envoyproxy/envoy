@@ -42,96 +42,72 @@ jobs:
     maxParallel: ${{ parameters.concurrencyChecks }}
     matrix:
       # These are ordered by most time-consuming first.
+      coverage:
+        CI_TARGET: "coverage"
+      fuzz_coverage:
+        CI_TARGET: "fuzz_coverage"
       compile_time_options:
-        CI_TARGET: "bazel.compile_time_options"
+        CI_TARGET: "compile_time_options"
         ENVOY_FILTER_EXAMPLE: true
       tsan:
-        CI_TARGET: "bazel.tsan"
+        CI_TARGET: "tsan"
       asan:
-        CI_TARGET: "bazel.asan"
+        CI_TARGET: "asan"
         ENVOY_FILTER_EXAMPLE: true
       # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
       # api_compat:
-      #  CI_TARGET: "bazel.api_compat"
+      #  CI_TARGET: "api_compat"
       gcc:
-        CI_TARGET: "bazel.gcc"
+        CI_TARGET: "gcc"
       msan:
-        CI_TARGET: "bazel.msan"
+        CI_TARGET: "msan"
         ENVOY_FILTER_EXAMPLE: true
-      clang_tidy:
-        CI_TARGET: "bazel.clang_tidy"
-        REPO_FETCH_DEPTH: 0
-        REPO_FETCH_TAGS: true
-        PUBLISH_TEST_RESULTS: false
-        PUBLISH_ENVOY: false
+      #
+      # Temporarily disabled to facilitate release CI, should be resolved
+      #    as part of https://github.com/envoyproxy/envoy/issues/28566
+      #
+      # clang_tidy:
+      #   CI_TARGET: "clang_tidy"
+      #   REPO_FETCH_DEPTH: 0
+      #   REPO_FETCH_TAGS: true
+      #   PUBLISH_TEST_RESULTS: false
+      #   PUBLISH_ENVOY: false
       api:
-        CI_TARGET: "bazel.api"
+        CI_TARGET: "api"
   timeoutInMinutes: 180
-  pool:
-    vmImage: $(agentUbuntu)
+  pool: envoy-x64-small
   steps:
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: $(CI_TARGET)
+      cacheName: $(CI_TARGET)
       envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
       cacheTestResults: ${{ parameters.cacheTestResults }}
+      managedAgent: false
       repoFetchDepth: $(REPO_FETCH_DEPTH)
       repoFetchTags: $(REPO_FETCH_TAGS)
       publishTestResults: variables.PUBLISH_TEST_RESULTS
       publishEnvoy: variables.PUBLISH_ENVOY
+      tmpfsDockerDisabled: true
       stepsPost:
-
       # TODO(phlax): consolidate "fix" paths/jobs
       - task: PublishBuildArtifacts@1
         inputs:
           pathtoPublish: "$(Build.StagingDirectory)/tmp/lint-fixes"
           artifactName: "$(CI_TARGET).fixes"
         timeoutInMinutes: 10
-        condition: and(failed(), eq(variables['CI_TARGET'], 'bazel.clang_tidy'))
-
-- job: coverage
-  displayName: "Linux x64"
-  dependsOn: []
-  condition: |
-    and(not(canceled()),
-        eq(${{ parameters.runChecks }}, 'true'))
-  timeoutInMinutes: 240
-  pool: "envoy-x64-large"
-  strategy:
-    maxParallel: 2
-    matrix:
-      coverage:
-        CI_TARGET: "coverage"
-      fuzz_coverage:
-        CI_TARGET: "fuzz_coverage"
-  steps:
-  - template: ../bazel.yml
-    parameters:
-      managedAgent: false
-      ciTarget: bazel.$(CI_TARGET)
-      rbe: false
-      # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
-      bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
-      cacheTestResults: ${{ parameters.cacheTestResults }}
-
-  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)-upload'
-    displayName: "Upload $(CI_TARGET) Report to GCS"
-    env:
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-      GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci"
-      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
-      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
-      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-        BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
-    condition: not(canceled())
+        condition: and(failed(), eq(variables['CI_TARGET'], 'clang_tidy'))
+      - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)-upload'
+        displayName: "Upload $(CI_TARGET) Report to GCS"
+        condition: and(not(canceled()), or(eq(variables['CI_TARGET'], 'coverage'), eq(variables['CI_TARGET'], 'fuzz_coverage')))
+        env:
+          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
 
 - job: complete
   displayName: "Checks complete"
-  dependsOn: ["bazel", "coverage"]
-  pool: x64-nano
+  dependsOn: ["bazel"]
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:
@@ -139,8 +115,7 @@ jobs:
   condition: |
     and(
       eq(variables['Build.Reason'], 'PullRequest'),
-      in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-      in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+      in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
   - checkout: none
   - bash: |

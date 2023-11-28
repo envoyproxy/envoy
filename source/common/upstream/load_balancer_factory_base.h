@@ -5,19 +5,6 @@
 namespace Envoy {
 namespace Upstream {
 
-class LoadBalancerConfigWrapper : public LoadBalancerConfig {
-public:
-  LoadBalancerConfigWrapper(ProtobufTypes::MessagePtr config) : config_(std::move(config)) {}
-
-  template <typename ProtoType> OptRef<const ProtoType> typedProtoConfig() const {
-    auto* typed_config = dynamic_cast<const ProtoType*>(config_.get());
-    return makeOptRefFromPtr<const ProtoType>(typed_config);
-  }
-
-private:
-  ProtobufTypes::MessagePtr config_;
-};
-
 /**
  * Base class for cluster provided load balancers and load balancers specified by load balancing
  * policy config. This class should be extended directly if the load balancing policy specifies a
@@ -33,11 +20,6 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new Proto()};
-  }
-
-  LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
-                                   ProtobufMessage::ValidationVisitor&) override {
-    return std::make_unique<LoadBalancerConfigWrapper>(std::move(config));
   }
 
 protected:

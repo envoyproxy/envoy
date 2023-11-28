@@ -80,19 +80,20 @@ public:
   }
 
   // Envoy::Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
-                      const std::string& version_info) override {
+  absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
+                              const std::string& version_info) override {
     const auto& config =
         dynamic_cast<const test::common::config::DummyConfig&>(resources[0].get().resource());
     if (checkAndApplyConfigUpdate(config, "dummy_config", version_info)) {
       config_proto_ = config;
     }
 
-    ConfigSubscriptionCommonBase::onConfigUpdate();
+    return ConfigSubscriptionCommonBase::onConfigUpdate();
   }
   // Envoy::Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<DecodedResourceRef>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
+  absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>&,
+                              const Protobuf::RepeatedPtrField<std::string>&,
+                              const std::string&) override {
     PANIC("not implemented");
   }
 
@@ -273,7 +274,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   DummyConfigSubscription& subscription =
       dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription();
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
-  subscription.onConfigUpdate(decoded_resources.refvec_, "1");
+  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "1").ok());
 
   // Check that a newly created provider with the same config source will share
   // the subscription, config proto and resulting ConfigProvider::Config.
@@ -300,9 +301,10 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   EXPECT_NE(provider1->config<const DummyConfig>().get(),
             provider3->config<const DummyConfig>().get());
 
-  dynamic_cast<DummyDynamicConfigProvider&>(*provider3)
-      .subscription()
-      .onConfigUpdate(decoded_resources.refvec_, "provider3");
+  ASSERT_TRUE(dynamic_cast<DummyDynamicConfigProvider&>(*provider3)
+                  .subscription()
+                  .onConfigUpdate(decoded_resources.refvec_, "provider3")
+                  .ok());
 
   EXPECT_EQ(2UL, static_cast<test::common::config::DummyConfigsDump*>(
                      provider_manager_->dumpConfigs().get())
@@ -370,13 +372,13 @@ TEST_F(ConfigProviderImplTest, DuplicateConfigProto) {
   // First time issuing a configUpdate(). A new ConfigProvider::Config should be created.
   const auto dummy_config = parseDummyConfigFromYaml("a: a dynamic dummy config");
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
-  subscription.onConfigUpdate(decoded_resources.refvec_, "1");
+  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "1").ok());
   EXPECT_NE(subscription.getConfig(), nullptr);
   auto config_ptr = subscription.getConfig();
   EXPECT_EQ(typed_provider->config<DummyConfig>().get(), config_ptr.get());
   // Second time issuing the configUpdate(), this time with a duplicate proto. A new
   // ConfigProvider::Config _should not_ be created.
-  subscription.onConfigUpdate(decoded_resources.refvec_, "2");
+  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "2").ok());
   EXPECT_EQ(config_ptr, subscription.getConfig());
   EXPECT_EQ(typed_provider->config<DummyConfig>().get(), config_ptr.get());
 }
@@ -461,7 +463,7 @@ dynamic_dummy_configs:
   DummyConfigSubscription& subscription =
       dynamic_cast<DummyDynamicConfigProvider&>(*dynamic_provider).subscription();
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
-  subscription.onConfigUpdate(decoded_resources.refvec_, "v1");
+  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "v1").ok());
 
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
       Matchers::UniversalStringMatcher());
@@ -535,10 +537,10 @@ public:
   void start() override {}
 
   // Envoy::Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
-                      const std::string& version_info) override {
+  absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
+                              const std::string& version_info) override {
     if (resources.empty()) {
-      return;
+      return absl::OkStatus();
     }
 
     // For simplicity, there is no logic here to track updates and/or removals to the existing
@@ -559,11 +561,16 @@ public:
       });
     }
 
-    ConfigSubscriptionCommonBase::onConfigUpdate();
+    absl::Status status = ConfigSubscriptionCommonBase::onConfigUpdate();
+    if (!status.ok()) {
+      return status;
+    }
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
+    return absl::OkStatus();
   }
-  void onConfigUpdate(const std::vector<DecodedResourceRef>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
+  absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>&,
+                              const Protobuf::RepeatedPtrField<std::string>&,
+                              const std::string&) override {
     PANIC("not implemented");
   }
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
@@ -705,7 +712,7 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
 
   DeltaDummyConfigSubscription& subscription =
       dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider1).subscription();
-  subscription.onConfigUpdate(decoded_resources.refvec_, "1");
+  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "1").ok());
 
   ConfigProviderPtr provider2 = provider_manager_->createXdsConfigProvider(
       config_source_proto, server_factory_context_, init_manager_, "dummy_prefix",
@@ -726,7 +733,7 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
 
   // Issue a second config update to validate that having multiple providers bound to the
   // subscription causes a single update to the underlying shared config implementation.
-  subscription.onConfigUpdate(decoded_resources.refvec_, "2");
+  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "2").ok());
   // NOTE: the config implementation is append only and _does not_ track updates/removals to the
   // config proto set, so the expectation is to double the size of the set.
   EXPECT_EQ(provider1->config<const DummyConfig>().get(),

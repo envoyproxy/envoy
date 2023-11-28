@@ -96,7 +96,6 @@ Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_e
 
 void vclEndptFromAddress(vppcom_endpt_t& endpt,
                          Envoy::Network::Address::InstanceConstSharedPtr address) {
-  endpt.is_cut_thru = 0;
   if (address->ip()->version() == Envoy::Network::Address::IpVersion::v4) {
     const sockaddr_in* in = reinterpret_cast<const sockaddr_in*>(address->sockAddr());
     endpt.is_ip4 = 1;
@@ -114,17 +113,13 @@ void vclEndptFromAddress(vppcom_endpt_t& endpt,
 Api::IoCallUint64Result vclCallResultToIoCallResult(const int32_t result) {
   if (result >= 0) {
     // Return nullptr as IoError upon success.
-    return Api::IoCallUint64Result(
-        result, Api::IoErrorPtr(nullptr, Envoy::Network::IoSocketError::deleteIoError));
+    return {static_cast<unsigned long>(result), Api::IoError::none()};
   }
   RELEASE_ASSERT(result != VPPCOM_EINVAL, "Invalid argument passed in.");
-  return Api::IoCallUint64Result(
-      /*rc=*/0, (result == VPPCOM_EAGAIN
-                     // EAGAIN is frequent enough that its memory allocation should be avoided.
-                     ? Api::IoErrorPtr(Envoy::Network::IoSocketError::getIoSocketEagainInstance(),
-                                       Envoy::Network::IoSocketError::deleteIoError)
-                     : Api::IoErrorPtr(new Envoy::Network::IoSocketError(-result),
-                                       Envoy::Network::IoSocketError::deleteIoError)));
+  return {/*rc=*/0, (result == VPPCOM_EAGAIN
+                         // EAGAIN is frequent enough that its memory allocation should be avoided.
+                         ? Envoy::Network::IoSocketError::getIoSocketEagainError()
+                         : Envoy::Network::IoSocketError::create(-result))};
 }
 
 } // namespace
@@ -136,16 +131,24 @@ VclIoHandle::~VclIoHandle() {
 }
 
 Api::IoCallUint64Result VclIoHandle::close() {
-  VCL_LOG("closing sh {:x}", sh_);
-  RELEASE_ASSERT(VCL_SH_VALID(sh_), "sh must be valid");
+  int wrk_index = vclWrkIndexOrRegister();
   int rc = 0;
 
-  int wrk_index = vclWrkIndexOrRegister();
+  VCL_LOG("closing sh {:x}", sh_);
+
+  if (!VCL_SH_VALID(sh_)) {
+    ENVOY_LOG_MISC(info, "[{}] sh {:x} already closed is_listener {} isWrkListener{}", wrk_index,
+                   sh_, is_listener_, isWrkListener());
+    return {static_cast<unsigned long>(rc), Api::IoError::none()};
+  }
 
   if (is_listener_) {
+    ENVOY_LOG_MISC(info, "[{}] destroying listener sh {}", wrk_index, sh_);
     if (wrk_index) {
-      uint32_t sh = wrk_listener_->sh();
-      RELEASE_ASSERT(wrk_index == vppcom_session_worker(sh), "listener close on wrong thread");
+      if (wrk_listener_ != nullptr) {
+        uint32_t sh = wrk_listener_->sh();
+        RELEASE_ASSERT(wrk_index == vppcom_session_worker(sh), "listener close on wrong thread");
+      }
       clearChildWrkListener();
       // sh_ not invalidated yet, waiting for destructor on main to call `vppcom_session_close`
     } else {
@@ -158,8 +161,7 @@ Api::IoCallUint64Result VclIoHandle::close() {
     VCL_SET_SH_INVALID(sh_);
   }
 
-  return Api::IoCallUint64Result(
-      rc, Api::IoErrorPtr(nullptr, Envoy::Network::IoSocketError::deleteIoError));
+  return {static_cast<unsigned long>(rc), Api::IoError::none()};
 }
 
 bool VclIoHandle::isOpen() const { return VCL_SH_VALID(sh_); }

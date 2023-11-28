@@ -64,15 +64,19 @@ void GrpcSubscriptionImpl::requestOnDemandUpdate(
 }
 
 // Config::SubscriptionCallbacks
-void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                          const std::string& version_info) {
+absl::Status
+GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                     const std::string& version_info) {
   disableInitFetchTimeoutTimer();
   // TODO(mattklein123): In the future if we start tracking per-resource versions, we need to
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
   // version_info. This way, both types of versions can be tracked and exposed for debugging by
   // the configuration update targets.
   auto start = dispatcher_.timeSource().monotonicTime();
-  callbacks_.onConfigUpdate(resources, version_info);
+  absl::Status status = callbacks_.onConfigUpdate(resources, version_info);
+  if (!status.ok()) {
+    return status;
+  }
   std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher_.timeSource().monotonicTime() - start);
   stats_.update_success_.inc();
@@ -88,16 +92,21 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
     ENVOY_LOG(debug, "gRPC config update took {} ms! Resources names: {}", update_duration.count(),
               absl::StrJoin(resources, ",", ResourceNameFormatter()));
   }
+  return absl::OkStatus();
 }
 
-void GrpcSubscriptionImpl::onConfigUpdate(
+absl::Status GrpcSubscriptionImpl::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   disableInitFetchTimeoutTimer();
   stats_.update_attempt_.inc();
   auto start = dispatcher_.timeSource().monotonicTime();
-  callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  absl::Status status =
+      callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  if (!status.ok()) {
+    return status;
+  }
   std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher_.timeSource().monotonicTime() - start);
   stats_.update_success_.inc();
@@ -105,6 +114,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
   stats_.version_text_.set(system_version_info);
   stats_.update_duration_.recordValue(update_duration.count());
+  return absl::OkStatus();
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,

@@ -14,25 +14,6 @@
 
 namespace Envoy {
 namespace Http {
-
-const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
-    AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
-const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
-const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
-const Router::InternalRedirectPolicyImpl AsyncStreamImpl::RouteEntryImpl::internal_redirect_policy_;
-const Router::PathMatcherSharedPtr AsyncStreamImpl::RouteEntryImpl::path_matcher_;
-const Router::PathRewriterSharedPtr AsyncStreamImpl::RouteEntryImpl::path_rewriter_;
-const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
-const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
-const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
-const AsyncStreamImpl::NullCommonConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
-const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
-const AsyncStreamImpl::NullPathMatchCriterion
-    AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
-const AsyncStreamImpl::RouteEntryImpl::ConnectConfigOptRef
-    AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
-const std::list<LowerCaseString> AsyncStreamImpl::NullCommonConfig::internal_only_headers_;
-
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
@@ -40,11 +21,11 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context, Router::Context& router_context)
-    : cluster_(cluster),
+    : singleton_manager_(cm.clusterManagerFactory().singletonManager()), cluster_(cluster),
       config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
               runtime, random, std::move(shadow_writer), true, false, false, false, false, false,
               {}, dispatcher.timeSource(), http_context, router_context),
-      dispatcher_(dispatcher), singleton_manager_(cm.clusterManagerFactory().singletonManager()) {}
+      dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -101,13 +82,15 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
-      route_(std::make_shared<RouteImpl>(parent_, options.timeout, options.hash_policy,
-                                         options.retry_policy)),
+      route_(std::make_shared<NullRouteImpl>(parent_.cluster_->name(), parent_.singleton_manager_,
+                                             options.timeout, options.hash_policy,
+                                             options.retry_policy)),
       account_(options.account_), buffer_limit_(options.buffer_limit_),
       send_xff_(options.send_xff) {
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
+  stream_info_.route_ = route_;
 
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>(account_);
@@ -157,6 +140,8 @@ void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
+  request_headers_ = &headers;
+
   if (Http::Headers::get().MethodValues.Head == headers.getMethodValue()) {
     is_head_request_ = true;
   }
@@ -199,6 +184,8 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
+  request_trailers_ = &trailers;
+
   ASSERT(dispatcher().isThreadSafe());
   // See explanation in sendData.
   if (local_closed_) {
@@ -319,14 +306,11 @@ void AsyncRequestSharedImpl::onComplete() {
 
 void AsyncRequestSharedImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
-  streamInfo().response_code_ = response_code;
+  streamInfo().setResponseCode(response_code);
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 
-void AsyncRequestSharedImpl::onData(Buffer::Instance& data, bool) {
-  streamInfo().addBytesReceived(data.length());
-  response_->body().move(data);
-}
+void AsyncRequestSharedImpl::onData(Buffer::Instance& data, bool) { response_->body().move(data); }
 
 void AsyncRequestSharedImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
   response_->trailers(std::move(trailers));

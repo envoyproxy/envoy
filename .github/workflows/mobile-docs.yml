@@ -1,5 +1,8 @@
 name: mobile_docs
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -14,31 +17,47 @@ jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     uses: ./.github/workflows/_env.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: read
 
   docs:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 20
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
-    - uses: actions/checkout@v3
+    # Checkout the Envoy repo
+    - uses: actions/checkout@v4
+    # Checkout the envoy-mobile/envoy-mobile.github.io repo
+    - uses: actions/checkout@v4
+      with:
+        repository: envoy-mobile/envoy-mobile.github.io
+        path: mobile-docs
+        fetch-depth: 0
+        ssh-key: ${{ secrets.ENVOY_MOBILE_WEBSITE_DEPLOY_KEY }}
     - name: Add safe directory
       run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+    # Not sure if this is necessary
+    - name: Add safe directory
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE/mobile-docs"
     - name: Generate docs
-      run: mobile/docs/build.sh
-    - name: Set up deploy key
-      if: github.ref == 'refs/heads/main'
-      uses: shimataro/ssh-key-action@v2.5.1
-      with:
-        key: ${{ secrets.ENVOY_MOBILE_WEBSITE_DEPLOY_KEY }}
-        known_hosts: unnecessary
+      run: ./ci/run_envoy_docker.sh 'cd mobile && docs/build.sh'
     - name: Publish docs
-      if: github.ref == 'refs/heads/main'
-      run: mobile/docs/publish.sh
+      run: ./ci/run_envoy_docker.sh 'cd mobile && docs/publish.sh'
+      env:
+        # Path relative to ./mobile directory
+        MOBILE_DOCS_CHECKOUT_DIR: ../mobile-docs
+    # This step needs to be done outside the container to access ssh creds
+    - name: Push changes
+      if: ${{ github.event_name != 'pull_request' }}
+      run: |
+        git -C mobile-docs push origin master
+
     - uses: actions/upload-artifact@v3
       with:
         name: docs
-        path: generated/docs
+        path: mobile/generated/docs

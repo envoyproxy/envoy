@@ -36,6 +36,9 @@ public:
   MOCK_METHOD(std::vector<Network::UdpListenerFilterFactoryCb>, createUdpListenerFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
+  MOCK_METHOD(Filter::QuicListenerFilterFactoriesList, createQuicListenerFilterFactoryList,
+              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
+               Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
               (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
                const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
@@ -45,6 +48,8 @@ public:
   MOCK_METHOD(uint64_t, nextListenerTag, ());
   MOCK_METHOD(Filter::TcpListenerFilterConfigProviderManagerImpl*,
               getTcpListenerConfigProviderManager, ());
+  MOCK_METHOD(Filter::QuicListenerFilterConfigProviderManagerImpl*,
+              getQuicListenerConfigProviderManager, ());
 
   std::shared_ptr<Network::MockListenSocket> socket_;
 };

@@ -9,6 +9,11 @@
 namespace Envoy {
 namespace Api {
 
+class IoError;
+
+using IoErrorDeleterType = void (*)(IoError*);
+using IoErrorPtr = std::unique_ptr<IoError, IoErrorDeleterType>;
+
 /**
  * Base class for any I/O error.
  */
@@ -37,6 +42,8 @@ public:
     ConnectionReset,
     // Network is unreachable due to network settings.
     NetworkUnreachable,
+    // Invalid arguments passed in.
+    InvalidArgument,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
@@ -45,10 +52,20 @@ public:
   virtual IoErrorCode getErrorCode() const PURE;
   virtual std::string getErrorDetails() const PURE;
   virtual int getSystemErrorCode() const PURE;
-};
 
-using IoErrorDeleterType = void (*)(IoError*);
-using IoErrorPtr = std::unique_ptr<IoError, IoErrorDeleterType>;
+  // Wrap an IoError* in unique_ptr with custom deleter that doesn't delete.
+  static IoErrorPtr reusedStatic(IoError* err) {
+    return {err, [](IoError*) {}};
+  }
+  // Wrap an IoError* in unique_ptr with custom deleter.
+  static IoErrorPtr wrap(IoError* err) {
+    return {err, [](IoError* err) { delete err; }};
+  }
+  // Use this non-error for the success case.
+  static IoErrorPtr none() {
+    return {nullptr, [](IoError*) {}};
+  }
+};
 
 /**
  * Basic type for return result which has a return code and error code defined
@@ -62,7 +79,7 @@ template <typename ReturnValue> struct IoCallResult {
       : return_value_(return_value), err_(std::move(err)) {}
 
   IoCallResult(IoCallResult<ReturnValue>&& result) noexcept
-      : return_value_(result.return_value_), err_(std::move(result.err_)) {}
+      : return_value_(std::move(result.return_value_)), err_(std::move(result.err_)) {}
 
   virtual ~IoCallResult() = default;
 

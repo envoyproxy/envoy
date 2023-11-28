@@ -1,9 +1,9 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 selects.config_setting_group(
     name = "use_android_system_helper",

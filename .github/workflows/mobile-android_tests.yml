@@ -1,5 +1,8 @@
 name: android_tests
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -13,92 +16,74 @@ concurrency:
 jobs:
   env:
     uses: ./.github/workflows/_env.yml
-    secrets: inherit
+    with:
+      prime-build-image: true
+    permissions:
+      contents: read
+      pull-requests: read
 
-  kotlintestsmac:
+  javatestslinux:
     if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
     needs: env
-    # revert to //test/kotlin/... once fixed
-    # https://github.com/envoyproxy/envoy-mobile/issues/1932
-    name: kotlin_tests_mac
-    runs-on: macos-12
-    timeout-minutes: 90
-    steps:
-    - uses: actions/checkout@v3
-    - name: 'Java setup'
-      uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
-      with:
-        java-version: '8'
-        java-package: jdk
-        architecture: x64
-        distribution: zulu
-    - name: 'Install dependencies'
-      run: cd mobile && ./ci/mac_ci_setup.sh
-    - name: 'Run Kotlin library tests'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        cd mobile && ./bazelw test \
-            --test_output=all \
-            --build_tests_only \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --define=signal_trace=disabled \
-            //test/kotlin/io/...
-  javatestsmac:
-    if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
-    needs: env
-    name: java_tests_mac
-    runs-on: macos-12
-    timeout-minutes: 120
-    steps:
-    - uses: actions/checkout@v3
-    - name: 'Java setup'
-      uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
-      with:
-        java-version: '8'
-        java-package: jdk
-        architecture: x64
-        distribution: zulu
-    - name: 'Install dependencies'
-      run: cd mobile && ./ci/mac_ci_setup.sh
-    - name: 'Run Java library tests'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        cd mobile && ./bazelw test \
-            --test_output=all \
-            --build_tests_only \
-            --config test-android \
-            --define envoy_mobile_listener=enabled \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --define=signal_trace=disabled \
-            --define=system-helper=android \
-            //test/java/...
-  kotlintestslinux:
-    if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
-    needs: env
-    # Only kotlin tests are executed since with linux:
-    # https://github.com/envoyproxy/envoy-mobile/issues/1418.
-    name: kotlin_tests_linux
+    permissions:
+      contents: read
+      packages: read
+    name: java_tests_linux
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 90
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
-      env:
-        CC: /opt/llvm/bin/clang
-        CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - name: Pre-cleanup
+      # Using the defaults in
+      # https://github.com/envoyproxy/toolshed/blob/main/gh-actions/diskspace/action.yml.
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.8
+    - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run Kotlin library integration tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
       run: |
-        cd mobile && ./bazelw test \
-            --test_output=all \
-            --build_tests_only \
-            --config test-android \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
-            --define=signal_trace=disabled \
-            //test/kotlin/...
+        docker run --volume="${PWD}:/source" --workdir="/source/mobile" \
+          -e GITHUB_TOKEN -e CC -e CXX ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
+          ./bazelw test \
+          --build_tests_only \
+          --config=test-android \
+          --config=mobile-remote-ci \
+          --define=signal_trace=disabled \
+          //test/java/...
+
+  kotlintestslinux:
+    if: ${{ needs.env.outputs.mobile_android_tests == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    # Only kotlin tests are executed since with linux:
+    # https://github.com/envoyproxy/envoy-mobile/issues/1418.
+    name: kotlin_tests_linux
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    timeout-minutes: 90
+    steps:
+    - name: Pre-cleanup
+      # Using the defaults in
+      # https://github.com/envoyproxy/toolshed/blob/main/gh-actions/diskspace/action.yml.
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.8
+    - uses: actions/checkout@v4
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Run Kotlin library integration tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+      run: |
+        docker run --volume="${PWD}:/source" --workdir="/source/mobile" \
+          -e GITHUB_TOKEN -e CC -e CXX ${{ needs.env.outputs.build_image_ubuntu_mobile }} \
+          ./bazelw test \
+          --build_tests_only \
+          --config=test-android \
+          --config=mobile-remote-ci \
+          --define=signal_trace=disabled \
+          //test/kotlin/...

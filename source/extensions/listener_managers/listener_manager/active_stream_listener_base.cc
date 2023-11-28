@@ -7,6 +7,17 @@
 namespace Envoy {
 namespace Server {
 
+class FilterChainInfoImpl : public Network::FilterChainInfo {
+public:
+  FilterChainInfoImpl(absl::string_view name) : name_(name) {}
+
+  // Network::FilterChainInfo
+  absl::string_view name() const override { return name_; }
+
+private:
+  const std::string name_;
+};
+
 ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& parent,
                                                    Event::Dispatcher& dispatcher,
                                                    Network::ListenerPtr&& listener,
@@ -20,7 +31,7 @@ void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
                                         StreamInfo::StreamInfo& stream_info) {
   stream_info.onRequestComplete();
   for (const auto& access_log : config.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+    access_log->log({}, stream_info);
   }
 }
 
@@ -39,7 +50,10 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     socket->close();
     return;
   }
-  stream_info->setFilterChainName(filter_chain->name());
+
+  socket->connectionInfoProvider().setFilterChainInfo(
+      std::make_shared<FilterChainInfoImpl>(filter_chain->name()));
+
   auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
   auto server_conn_ptr = dispatcher().createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
@@ -108,7 +122,7 @@ ActiveTcpConnection::~ActiveTcpConnection() {
 }
 
 void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
-  ENVOY_LOG(trace, "[C{}] connection on event {}", connection_->id(), static_cast<int>(event));
+  ENVOY_CONN_LOG(trace, "tcp connection on event {}", *connection_, static_cast<int>(event));
   // Any event leads to destruction of the connection.
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {

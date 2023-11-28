@@ -12,7 +12,7 @@ def _protodoc_impl(target, ctx):
 #
 # The aspect builds the transitive docs, so any .proto in the dependency graph
 # get docs created.
-protodoc_aspect = api_proto_plugin_aspect("//tools/protodoc", _protodoc_impl)
+protodoc_aspect = api_proto_plugin_aspect("@envoy//tools/protodoc", _protodoc_impl)
 
 def _protodoc_rule_impl(ctx):
     deps = []
@@ -20,7 +20,7 @@ def _protodoc_rule_impl(ctx):
         for path in dep[OutputGroupInfo].rst.to_list():
             envoy_api = (
                 path.short_path.startswith("../envoy_api") or
-                path.short_path.startswith("../com_github_cncf_udpa")
+                path.short_path.startswith("../com_github_cncf_xds")
             )
             if envoy_api:
                 deps.append(path)

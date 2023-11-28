@@ -9,16 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "access_log_config_interface",
-    hdrs = ["access_log_config.h"],
-    deps = [
-        ":filter_config_interface",
-        "//envoy/access_log:access_log_interface",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "admin_interface",
     hdrs = ["admin.h"],
     deps = [
@@ -43,6 +33,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:context_interface",
+        "//envoy/stats:sink_interface",
         "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -167,6 +158,7 @@ envoy_cc_library(
     name = "watchdog_interface",
     hdrs = ["watchdog.h"],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/thread:thread_interface",
     ],
 )

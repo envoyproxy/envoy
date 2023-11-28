@@ -1,7 +1,10 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_stream.h"
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "source/common/quic/http_datagram_handler.h"
+#endif
 #include "source/common/quic/quic_stats_gatherer.h"
 
 #include "quiche/common/platform/api/quiche_reference_counted.h"
@@ -91,6 +94,7 @@ protected:
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
   void OnHeadersTooLarge() override;
+  void OnInvalidHeaders() override;
 
   // Http::MultiplexedStreamImplBase
   void onPendingFlushTimer() override;

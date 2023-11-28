@@ -72,6 +72,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "buffer_util_test",
+    srcs = ["buffer_util_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:buffer_util_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "watermark_buffer_test",
     srcs = ["watermark_buffer_test.cc"],
     deps = [

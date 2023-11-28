@@ -25,6 +25,7 @@
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -491,6 +492,59 @@ typed_config:
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
+TEST_P(SslIntegrationTest, AsyncCertValidationSucceedsWithLocalAddress) {
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
+      new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            *custom_validator_config);
+  auto* cert_validator_factory =
+      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
+          getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
+  initialize();
+  Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
+  auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config),
+      *context_manager_, *api_);
+  Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
+
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+
+  // Get the `TimedCertValidator` object and set its expected local address.
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
+      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
+          *client_transport_socket_factory_ptr)
+          .sslCtx();
+  Extensions::TransportSockets::Tls::TimedCertValidator& cert_validator =
+      static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+          ContextImplPeer::getMutableCertValidator(
+              static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(connection->connectionInfoProvider().localAddress() != nullptr);
+  cert_validator.setExpectedLocalAddress(
+      connection->connectionInfoProvider().localAddress()->asString());
+
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+  while (socket->state() == Ssl::SocketState::PreHandshake) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
 TEST_P(SslIntegrationTest, AsyncCertValidationAfterTearDown) {
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
@@ -808,6 +862,35 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
 // Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
 // Test the access log.
 TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ssl_transport_failure_reason_format", "true"}});
+  useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
+                       "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
+  server_rsa_cert_ = false;
+  server_ecdsa_cert_ = true;
+  initialize();
+  auto codec_client =
+      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
+  EXPECT_FALSE(codec_client->connected());
+
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    EXPECT_THAT(log_result,
+                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435709:SSL_routines:"
+                           "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS:TLS_error_end"));
+  } else {
+    EXPECT_THAT(log_result,
+                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435640:"
+                           "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end"));
+  }
+}
+
+// Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
+TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLogOriginalFormat) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ssl_transport_failure_reason_format", "false"}});
   useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
                        "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
   server_rsa_cert_ = false;

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-22.04
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.push
@@ -26,8 +26,9 @@ jobs:
         - go-control-plane
         - envoy-filter-example
         - data-plane-api
+        - mobile-website
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.10
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.8
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main

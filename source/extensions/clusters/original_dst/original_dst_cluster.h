@@ -19,6 +19,9 @@
 namespace Envoy {
 namespace Upstream {
 
+class OriginalDstClusterFactory;
+class OriginalDstClusterTest;
+
 struct HostsForAddress {
   HostsForAddress(HostSharedPtr& host) : host_(host), used_(true) {}
 
@@ -50,7 +53,7 @@ public:
   ~OriginalDstClusterHandle();
 
 private:
-  const std::shared_ptr<OriginalDstCluster> cluster_;
+  std::shared_ptr<OriginalDstCluster> cluster_;
   friend class OriginalDstCluster;
 };
 
@@ -64,9 +67,6 @@ using OriginalDstClusterHandleSharedPtr = std::shared_ptr<OriginalDstClusterHand
  */
 class OriginalDstCluster : public ClusterImplBase {
 public:
-  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                     ClusterFactoryContext& context);
-
   ~OriginalDstCluster() override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     cleanup_timer_->disableTimer();
@@ -128,6 +128,11 @@ public:
   const absl::optional<uint32_t> portOverride() { return port_override_; }
 
 private:
+  friend class OriginalDstClusterFactory;
+  friend class OriginalDstClusterTest;
+  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
+                     ClusterFactoryContext& context);
+
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(const OriginalDstClusterHandleSharedPtr& cluster) : cluster_(cluster) {}
 
@@ -180,15 +185,21 @@ private:
   friend class OriginalDstClusterHandle;
 };
 
+constexpr absl::string_view OriginalDstClusterFilterStateKey =
+    "envoy.network.transport_socket.original_dst_address";
+
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:
   OriginalDstClusterFactory() : ClusterFactoryImplBase("envoy.cluster.original_dst") {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  friend class OriginalDstClusterTest;
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
+
+DECLARE_FACTORY(OriginalDstClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

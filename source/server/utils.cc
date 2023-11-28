@@ -23,19 +23,20 @@ envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
   return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
 }
 
-void assertExclusiveLogFormatMethod(
+absl::Status assertExclusiveLogFormatMethod(
     const Options& options,
     const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config) {
   if (options.logFormatSet() && application_log_config.has_log_format()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
   }
+  return absl::OkStatus();
 }
 
-void maybeSetApplicationLogFormat(
+absl::Status maybeSetApplicationLogFormat(
     const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config) {
   if (!application_log_config.has_log_format()) {
-    return;
+    return absl::OkStatus();
   }
 
   if (application_log_config.log_format().has_text_format()) {
@@ -45,9 +46,11 @@ void maybeSetApplicationLogFormat(
         Logger::Registry::setJsonLogFormat(application_log_config.log_format().json_format());
 
     if (!status.ok()) {
-      throw EnvoyException(fmt::format("setJsonLogFormat error: {}", status.ToString()));
+      return absl::InvalidArgumentError(
+          fmt::format("setJsonLogFormat error: {}", status.ToString()));
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace Utility

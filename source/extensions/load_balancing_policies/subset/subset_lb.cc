@@ -20,6 +20,31 @@
 namespace Envoy {
 namespace Upstream {
 
+namespace {
+
+/**
+ * Iterates all the selectors and finds the first one that match_criteria contains all the keys
+ * of the selector. Returns nullptr if no selector matches, otherwise returns sub match criteria
+ * that contains only the keys of the selector.
+ */
+Router::MetadataMatchCriteriaConstPtr
+filterCriteriaBySelectors(const std::vector<SubsetSelectorPtr>& subset_selectors,
+                          const Router::MetadataMatchCriteria* match_criteria) {
+  if (match_criteria != nullptr) {
+    for (const auto& selector : subset_selectors) {
+      const auto& selector_keys = selector->selectorKeys();
+      auto sub_match_criteria = match_criteria->filterMatchCriteria(selector_keys);
+      if (sub_match_criteria != nullptr &&
+          sub_match_criteria->metadataMatchCriteria().size() == selector_keys.size()) {
+        return sub_match_criteria;
+      }
+    }
+  }
+  return nullptr;
+}
+
+} // namespace
+
 using HostPredicate = std::function<bool(const Host&)>;
 
 LegacyChildLoadBalancerCreatorImpl::LegacyChildLoadBalancerCreatorImpl(
@@ -101,6 +126,38 @@ LegacyChildLoadBalancerCreatorImpl::createLoadBalancer(
   return {nullptr, nullptr};
 }
 
+SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
+    const SubsetLoadbalancingPolicyProto& subset_config,
+    ProtobufMessage::ValidationVisitor& visitor)
+    : subset_info_(subset_config) {
+
+  absl::InlinedVector<absl::string_view, 4> missing_policies;
+
+  for (const auto& policy : subset_config.subset_lb_policy().policies()) {
+    auto* factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(
+        policy.typed_extension_config(), /*is_optional=*/true);
+
+    if (factory != nullptr) {
+      // Load and validate the configuration.
+      auto sub_lb_proto_message = factory->createEmptyConfigProto();
+      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
+                                             visitor, *sub_lb_proto_message);
+
+      sub_load_balancer_config_ = factory->loadConfig(*sub_lb_proto_message, visitor);
+      sub_load_balancer_factory_ = factory;
+      break;
+    }
+
+    missing_policies.push_back(policy.typed_extension_config().name());
+  }
+
+  if (sub_load_balancer_factory_ == nullptr) {
+    throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
+                                     "implementation for subset lb with names from [{}]",
+                                     absl::StrJoin(missing_policies, ", ")));
+  }
+}
+
 SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
                                        ChildLoadBalancerCreatorPtr child_lb,
                                        const PrioritySet& priority_set,
@@ -115,7 +172,8 @@ SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set), child_lb_creator_(std::move(child_lb)),
       locality_weight_aware_(subsets.localityWeightAware()),
-      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
+      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
+      allow_redundant_keys_(subsets.allowRedundantKeys()) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
@@ -304,20 +362,35 @@ SubsetLoadBalancer::getMetadataFallbackList(LoadBalancerContext* context) const 
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* context) {
   if (context) {
+    LoadBalancerContext* actual_used_context = context;
+    std::unique_ptr<LoadBalancerContextWrapper> actual_used_context_wrapper;
+
+    if (allow_redundant_keys_) {
+      // If redundant keys are allowed then we can filter the metadata match criteria by the
+      // selectors first to reduce the redundant keys.
+      auto actual_used_criteria =
+          filterCriteriaBySelectors(subset_selectors_, context->metadataMatchCriteria());
+      if (actual_used_criteria != nullptr) {
+        actual_used_context_wrapper =
+            std::make_unique<LoadBalancerContextWrapper>(context, std::move(actual_used_criteria));
+        actual_used_context = actual_used_context_wrapper.get();
+      }
+    }
+
     bool host_chosen;
-    HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
+    HostConstSharedPtr host = tryChooseHostFromContext(actual_used_context, host_chosen);
     if (host_chosen) {
       // Subset lookup succeeded, return this result even if it's nullptr.
       return host;
     }
     // otherwise check if there is fallback policy configured for given route metadata
     absl::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
-        tryFindSelectorFallbackParams(context);
+        tryFindSelectorFallbackParams(actual_used_context);
     if (selector_fallback_params &&
         selector_fallback_params->get().fallback_policy_ !=
             envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       // return result according to configured fallback policy
-      return chooseHostForSelectorFallbackPolicy(*selector_fallback_params, context);
+      return chooseHostForSelectorFallbackPolicy(*selector_fallback_params, actual_used_context);
     }
   }
 
@@ -828,12 +901,12 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_host
   auto excluded_hosts_per_locality =
       original_host_set_.excludedHostsPerLocality().filter({cached_predicate})[0];
 
-  HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
-                               hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
-                               degraded_hosts, degraded_hosts_per_locality, excluded_hosts,
-                               excluded_hosts_per_locality),
-                           determineLocalityWeights(*hosts_per_locality), hosts_added,
-                           hosts_removed, absl::nullopt, absl::nullopt);
+  HostSetImpl::updateHosts(
+      HostSetImpl::updateHostsParams(
+          hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality, degraded_hosts,
+          degraded_hosts_per_locality, excluded_hosts, excluded_hosts_per_locality),
+      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed,
+      original_host_set_.weightedPriorityHealth(), original_host_set_.overprovisioningFactor());
 }
 
 LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(

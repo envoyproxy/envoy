@@ -36,7 +36,8 @@ public:
 
   void invokeClusterAdded(ThreadLocalCluster& cluster) {
     for (auto& cb : update_callbacks_) {
-      cb->onClusterAddOrUpdate(cluster);
+      ThreadLocalClusterCommand command = [&cluster]() -> ThreadLocalCluster& { return cluster; };
+      cb->onClusterAddOrUpdate(cluster.info()->name(), command);
     }
   }
 

@@ -11,13 +11,9 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/extensions/load_balancing_policies/common/v3/common.pb.h"
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
-#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.validate.h"
 #include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
-#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.validate.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
-#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
@@ -26,6 +22,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
+#include "source/common/upstream/subset_lb_config.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -362,6 +359,17 @@ private:
     LocalityResidual
   };
 
+  struct LocalityPercentages {
+    // The percentage of local hosts in a specific locality.
+    // Percentage is stored as integer number and scaled by 10000 multiplier for better precision.
+    // If upstream_percentage is 0, local_percentage may not be representative
+    // of the actual percentage and will be set to 0.
+    uint64_t local_percentage;
+    // The percentage of upstream hosts in a specific locality.
+    // Percentage is stored as integer number and scaled by 10000 multiplier for better precision.
+    uint64_t upstream_percentage;
+  };
+
   /**
    * Increase per_priority_state_ to at least priority_set.hostSetsPerPriority().size()
    */
@@ -370,6 +378,15 @@ private:
   /**
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
+   */
+  bool earlyExitNonLocalityRoutingNew();
+
+  /**
+   * @return decision on quick exit from locality aware routing based on cluster configuration.
+   * This gets recalculated on update callback.
+   *
+   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
+   * as an alternate code-path to reduce the risk of changes.
    */
   bool earlyExitNonLocalityRouting();
 
@@ -380,14 +397,34 @@ private:
   uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set) const;
 
   /**
+   * @return combined per-locality information about percentages of local/upstream hosts in each
+   * upstream locality. See LocalityPercentages for more details. The ordering of localities
+   * matches the ordering of upstream localities in the input upstream_hosts_per_locality.
+   */
+  absl::FixedArray<LocalityPercentages>
+  calculateLocalityPercentagesNew(const HostsPerLocality& local_hosts_per_locality,
+                                  const HostsPerLocality& upstream_hosts_per_locality);
+
+  /**
    * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
    * The result is stored as integer number and scaled by 10000 multiplier for better precision.
    * Caller is responsible for allocation/de-allocation of `ret`.
+   *
+   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
+   * as an alternate code-path to reduce the risk of changes.
    */
   void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
 
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
+   */
+  void regenerateLocalityRoutingStructuresNew();
+
+  /**
+   * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
+   *
+   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
+   * as an alternate code-path to reduce the risk of changes.
    */
   void regenerateLocalityRoutingStructures();
 
@@ -443,6 +480,7 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
   const bool fail_traffic_on_panic_ : 1;
+  const bool use_new_locality_routing_ : 1;
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;
@@ -494,8 +532,8 @@ protected:
 
   virtual void refresh(uint32_t priority);
 
-  bool isSlowStartEnabled();
-  bool noHostsAreInSlowStart();
+  bool isSlowStartEnabled() const;
+  bool noHostsAreInSlowStart() const;
 
   virtual void recalculateHostsInSlowStart(const HostVector& hosts_added);
 
@@ -506,13 +544,12 @@ protected:
   // overload.
   const uint64_t seed_;
 
-  double applyAggressionFactor(double time_factor);
-  double applySlowStartFactor(double host_weight, const Host& host);
+  double applySlowStartFactor(double host_weight, const Host& host) const;
 
 private:
   friend class EdfLoadBalancerBasePeer;
   virtual void refreshHostSource(const HostsSource& source) PURE;
-  virtual double hostWeight(const Host& host) PURE;
+  virtual double hostWeight(const Host& host) const PURE;
   virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -526,7 +563,6 @@ private:
 protected:
   // Slow start related config
   const std::chrono::milliseconds slow_start_window_;
-  double aggression_{1.0};
   const absl::optional<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
   MonotonicTime latest_host_added_time_;
@@ -580,7 +616,7 @@ private:
     // index.
     peekahead_index_ = 0;
   }
-  double hostWeight(const Host& host) override {
+  double hostWeight(const Host& host) const override {
     if (!noHostsAreInSlowStart()) {
       return applySlowStartFactor(host.weight(), host);
     }
@@ -674,7 +710,9 @@ public:
             least_request_config.has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
                       {least_request_config.active_request_bias(), runtime})
-                : absl::nullopt) {
+                : absl::nullopt),
+        enable_full_scan_(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, enable_full_scan, false)) {
     initialize();
   }
 
@@ -696,7 +734,7 @@ protected:
 
 private:
   void refreshHostSource(const HostsSource&) override {}
-  double hostWeight(const Host& host) override;
+  double hostWeight(const Host& host) const override;
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -710,6 +748,7 @@ private:
   double active_request_bias_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
+  const bool enable_full_scan_{};
 };
 
 /**
@@ -742,97 +781,6 @@ public:
 protected:
   HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
 };
-
-/**
- * Implementation of SubsetSelector
- */
-class SubsetSelectorImpl : public SubsetSelector {
-public:
-  SubsetSelectorImpl(const Protobuf::RepeatedPtrField<std::string>& selector_keys,
-                     envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
-                         LbSubsetSelectorFallbackPolicy fallback_policy,
-                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
-                     bool single_host_per_subset);
-
-  // SubsetSelector
-  const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
-  envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
-      LbSubsetSelectorFallbackPolicy
-      fallbackPolicy() const override {
-    return fallback_policy_;
-  }
-  const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
-  bool singleHostPerSubset() const override { return single_host_per_subset_; }
-
-private:
-  const std::set<std::string> selector_keys_;
-  const std::set<std::string> fallback_keys_subset_;
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
-      LbSubsetSelectorFallbackPolicy fallback_policy_;
-  const bool single_host_per_subset_ : 1;
-};
-
-/**
- * Implementation of LoadBalancerSubsetInfo.
- */
-class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
-public:
-  LoadBalancerSubsetInfoImpl(
-      const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
-      : default_subset_(subset_config.default_subset()),
-        fallback_policy_(subset_config.fallback_policy()),
-        metadata_fallback_policy_(subset_config.metadata_fallback_policy()),
-        enabled_(!subset_config.subset_selectors().empty()),
-        locality_weight_aware_(subset_config.locality_weight_aware()),
-        scale_locality_weight_(subset_config.scale_locality_weight()),
-        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
-    for (const auto& subset : subset_config.subset_selectors()) {
-      if (!subset.keys().empty()) {
-        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
-            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset(),
-            subset.single_host_per_subset()));
-      }
-    }
-  }
-  LoadBalancerSubsetInfoImpl()
-      : LoadBalancerSubsetInfoImpl(
-            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance()) {}
-
-  // Upstream::LoadBalancerSubsetInfo
-  bool isEnabled() const override { return enabled_; }
-  envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
-  fallbackPolicy() const override {
-    return fallback_policy_;
-  }
-  envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
-  metadataFallbackPolicy() const override {
-    return metadata_fallback_policy_;
-  }
-  const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
-  const std::vector<SubsetSelectorPtr>& subsetSelectors() const override {
-    return subset_selectors_;
-  }
-  bool localityWeightAware() const override { return locality_weight_aware_; }
-  bool scaleLocalityWeight() const override { return scale_locality_weight_; }
-  bool panicModeAny() const override { return panic_mode_any_; }
-  bool listAsAny() const override { return list_as_any_; }
-
-private:
-  const ProtobufWkt::Struct default_subset_;
-  std::vector<SubsetSelectorPtr> subset_selectors_;
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
-      fallback_policy_;
-  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
-      metadata_fallback_policy_;
-  const bool enabled_ : 1;
-  const bool locality_weight_aware_ : 1;
-  const bool scale_locality_weight_ : 1;
-  const bool panic_mode_any_ : 1;
-  const bool list_as_any_ : 1;
-};
-using DefaultLoadBalancerSubsetInfoImpl = ConstSingleton<LoadBalancerSubsetInfoImpl>;
 
 } // namespace Upstream
 } // namespace Envoy

@@ -82,19 +82,17 @@ OpenTelemetryFormatter::FormatBuilder::toFormatStringValue(const std::string& st
 
 ::opentelemetry::proto::common::v1::AnyValue OpenTelemetryFormatter::providersCallback(
     const std::vector<Formatter::FormatterProviderPtr>& providers,
-    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body, AccessLog::AccessLogType access_log_type) const {
+    const Formatter::HttpFormatterContext& context, const StreamInfo::StreamInfo& info) const {
   ASSERT(!providers.empty());
   ::opentelemetry::proto::common::v1::AnyValue output;
   std::vector<std::string> bits(providers.size());
-  std::transform(providers.begin(), providers.end(), bits.begin(),
-                 [&](const Formatter::FormatterProviderPtr& provider) {
-                   return provider
-                       ->format(request_headers, response_headers, response_trailers, stream_info,
-                                local_reply_body, access_log_type)
-                       .value_or(DefaultUnspecifiedValueString);
-                 });
+
+  std::transform(
+      providers.begin(), providers.end(), bits.begin(),
+      [&](const Formatter::FormatterProviderPtr& provider) {
+        return provider->formatWithContext(context, info).value_or(DefaultUnspecifiedValueString);
+      });
+
   output.set_string_value(absl::StrJoin(bits, ""));
   return output;
 }
@@ -126,14 +124,12 @@ OpenTelemetryFormatter::openTelemetryFormatListCallback(
   return output;
 }
 
-::opentelemetry::proto::common::v1::KeyValueList OpenTelemetryFormatter::format(
-    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body, AccessLog::AccessLogType access_log_type) const {
+::opentelemetry::proto::common::v1::KeyValueList
+OpenTelemetryFormatter::format(const Formatter::HttpFormatterContext& context,
+                               const StreamInfo::StreamInfo& info) const {
   OpenTelemetryFormatMapVisitor visitor{
       [&](const std::vector<Formatter::FormatterProviderPtr>& providers) {
-        return providersCallback(providers, request_headers, response_headers, response_trailers,
-                                 stream_info, local_reply_body, access_log_type);
+        return providersCallback(providers, context, info);
       },
       [&, this](const OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper& format_map) {
         return openTelemetryFormatMapCallback(format_map, visitor);

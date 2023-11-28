@@ -24,7 +24,7 @@ ProtobufTypes::MessagePtr CELFormatterFactory::createEmptyConfigProto() {
 
 std::string CELFormatterFactory::name() const { return "envoy.formatter.cel"; }
 
-REGISTER_FACTORY(CELFormatterFactory, CELFormatterFactory::CommandParserFactory);
+REGISTER_FACTORY(CELFormatterFactory, ::Envoy::Formatter::CommandParserFactory);
 
 } // namespace Formatter
 } // namespace Extensions

@@ -29,7 +29,7 @@ namespace Http {
 namespace {
 
 absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
-  if (HeaderUtility::schemeIsValid(forwarded_proto)) {
+  if (Utility::schemeIsValid(forwarded_proto)) {
     return forwarded_proto;
   }
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
@@ -207,6 +207,9 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lowercase_scheme")) {
+    request_headers.setScheme(absl::AsciiStrToLower(request_headers.getSchemeValue()));
+  }
 
   // At this point we can determine whether this is an internal or external request. The
   // determination of internal status uses the following:
@@ -295,9 +298,7 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
-      request_headers.removeEnvoyOriginalPath();
-    }
+    request_headers.removeEnvoyOriginalPath();
   }
 
   // Headers to be stripped from edge *and* intermediate-hop external requests.

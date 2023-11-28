@@ -1,25 +1,29 @@
 abstracts>=0.0.12
 aio.api.bazel
+aio.api.github>=0.2.5
 aiohttp>=3.8.1
+aioquic>=0.9.21
 cffi>=1.15.0
+clang-format==14.0.6
+clang-tidy==14.0.6
 colorama
 coloredlogs
 cryptography>=41.0.1
 dependatool>=0.2.2
-envoy.base.utils>=0.4.11
-envoy.code.check>=0.5.4
-envoy.dependency.check>=0.1.7
+envoy.base.utils>=0.5.0
+envoy.code.check>=0.5.8
+envoy.dependency.check>=0.1.10
 envoy.distribution.release>=0.0.9
 envoy.distribution.repo>=0.0.8
 envoy.distribution.verify>=0.0.11
-envoy.docs.sphinx_runner>=0.2.5
+envoy.docs.sphinx_runner>=0.2.9
 envoy.gpg.identity>=0.1.1
 envoy.gpg.sign>=0.2.0
 flake8>=6
 frozendict>=2.3.7
 gitpython
-google-cloud-storage
 gsutil
+icalendar
 jinja2
 multidict>=6.0.2
 orjson
@@ -32,12 +36,17 @@ pygithub
 pyreadline
 pyyaml
 setuptools
-slackclient
+slack_sdk
 sphinx>=7
+sphinxcontrib.googleanalytics
 thrift
 verboselogs
 yapf
 yarl>=1.7.2
 
-# This has packaging issues, so use the github tarball until resolved (https://github.com/sphinx-contrib/jquery/issues/15)
-https://github.com/sphinx-contrib/jquery/archive/refs/tags/v3.0.0.zip
+# Remove when https://github.com/sphinx-doc/sphinx/issues/11567 is finally resolved
+sphinxcontrib-applehelp==1.0.4
+sphinxcontrib-devhelp==1.0.2
+sphinxcontrib-htmlhelp==2.0.1
+sphinxcontrib-qthelp==1.0.3
+sphinxcontrib-serializinghtml==1.1.5

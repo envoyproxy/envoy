@@ -110,4 +110,20 @@ TEST_F(TokenBucketImplTest, ConsumeAndNextToken) {
   EXPECT_EQ(time_to_next_token, token_bucket.nextTokenAvailable());
 }
 
+// Validate that a minimal refresh time is 1 year.
+TEST_F(TokenBucketImplTest, YearlyMinRefillRate) {
+  constexpr uint64_t seconds_per_year = 365 * 24 * 60 * 60;
+  // Set the fill rate to be 2 years.
+  TokenBucketImpl token_bucket{1, time_system_, 1.0 / (seconds_per_year * 2)};
+
+  // Consume first token.
+  EXPECT_EQ(1, token_bucket.consume(1, false));
+
+  // Less than a year should still have no tokens.
+  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year - 1));
+  EXPECT_EQ(0, token_bucket.consume(1, false));
+  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year));
+  EXPECT_EQ(1, token_bucket.consume(1, false));
+}
+
 } // namespace Envoy

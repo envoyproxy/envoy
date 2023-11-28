@@ -56,6 +56,10 @@ class TestActiveQuicListener : public ActiveQuicListener {
   }
 };
 
+uint32_t testWorkerSelector(const Buffer::Instance&, uint32_t default_value) {
+  return default_value;
+}
+
 class TestActiveQuicListenerFactory : public ActiveQuicListenerFactory {
 public:
   using ActiveQuicListenerFactory::ActiveQuicListenerFactory;
@@ -75,7 +79,7 @@ protected:
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
         packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
-        proof_source_factory, std::move(cid_generator));
+        proof_source_factory, std::move(cid_generator), testWorkerSelector);
   }
 };
 
@@ -188,7 +192,10 @@ protected:
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Return(filter_chain_));
-    EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);
+    EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count * 2);
+    EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+        .Times(connection_count)
+        .WillRepeatedly(Return(true));
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Invoke([](Network::Connection& connection,
@@ -391,6 +398,28 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   readFromClientSockets();
 }
 
+class MockNonDispatchedUdpPacketHandler : public Network::NonDispatchedUdpPacketHandler {
+public:
+  MOCK_METHOD(void, handle, (uint32_t worker_index, const Network::UdpRecvData& packet));
+};
+
+TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
+  initialize();
+  MockNonDispatchedUdpPacketHandler mock_packet_forwarding;
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = mock_packet_forwarding;
+  quic_listener_->shutdownListener(options);
+  quic::QuicBufferedPacketStore* const buffered_packets =
+      quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
+  maybeConfigureMocks(/* connection_count = */ 0);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  EXPECT_CALL(mock_packet_forwarding, handle(_, _));
+  sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_EQ(0u, quic_dispatcher_->NumSessions());
+}
+
 TEST_P(ActiveQuicListenerTest, NormalizeTimeouts) {
   idle_timeout_ = 0.0005;      // 0.5ms
   handshake_timeout_ = 0.0009; // 0.9ms
@@ -495,6 +524,29 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 
   scoped_runtime_.mergeValues({{"quic.enabled", " true"}});
+  sendCHLO(quic::test::TestConnectionId(2));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
+  EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
+}
+
+TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
+  initialize();
+  maybeConfigureMocks(/* connection_count = */ 2);
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_reject_all"));
+  sendCHLO(quic::test::TestConnectionId(1));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
+
+  // Reject all packet.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_reject_all", true);
+  sendCHLO(quic::test::TestConnectionId(2));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // No new connection was created.
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
+
+  // Stop rejecting traffic.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_reject_all", false);
   sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);

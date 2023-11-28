@@ -1,10 +1,10 @@
 package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
+import io.envoyproxy.envoymobile.engine.JniLibrary
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.mockito.Mockito.mock
-import io.envoyproxy.envoymobile.engine.JniLibrary
 
 class EngineBuilderTest {
   private lateinit var engineBuilder: EngineBuilder
@@ -22,16 +22,6 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.logLevel).isEqualTo(LogLevel.DEBUG)
-  }
-
-  @Test
-  fun `specifying stats domain overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addGrpcStatsDomain("stats.envoyproxy.io")
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.grpcStatsDomain).isEqualTo("stats.envoyproxy.io")
   }
 
   @Test
@@ -121,7 +111,8 @@ class EngineBuilderTest {
     engineBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.h2ConnectionKeepaliveIdleIntervalMilliseconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.h2ConnectionKeepaliveIdleIntervalMilliseconds)
+      .isEqualTo(1234)
   }
 
   @Test
@@ -142,16 +133,6 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.maxConnectionsPerHost).isEqualTo(1234)
-  }
-
-  @Test
-  fun `specifying stats flush overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addStatsFlushSeconds(1234)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.statsFlushSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -207,22 +188,26 @@ class EngineBuilderTest {
   @Test
   fun `specifying xDS works`() {
     var xdsBuilder = XdsBuilder("fake_test_address", 0)
-    xdsBuilder.setJwtAuthenticationToken("my_jwt_token")
+    xdsBuilder
+      .addInitialStreamHeader("x-goog-api-key", "A1B2C3")
+      .addInitialStreamHeader("x-android-package", "com.google.myapp")
     xdsBuilder.setSslRootCerts("my_root_certs")
-    xdsBuilder.setSni("fake_test_address");
     xdsBuilder.addRuntimeDiscoveryService("some_rtds_resource")
-    xdsBuilder.addClusterDiscoveryService("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")
+    xdsBuilder.addClusterDiscoveryService(
+      "xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz"
+    )
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
     engineBuilder.setXds(xdsBuilder)
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.xdsAddress).isEqualTo("fake_test_address")
-    assertThat(engine.envoyConfiguration.xdsJwtToken).isEqualTo("my_jwt_token")
+    assertThat(engine.envoyConfiguration.xdsGrpcInitialMetadata)
+      .isEqualTo(mapOf("x-goog-api-key" to "A1B2C3", "x-android-package" to "com.google.myapp"))
     assertThat(engine.envoyConfiguration.xdsRootCerts).isEqualTo("my_root_certs")
-    assertThat(engine.envoyConfiguration.xdsSni).isEqualTo("fake_test_address")
     assertThat(engine.envoyConfiguration.rtdsResourceName).isEqualTo("some_rtds_resource")
-    assertThat(engine.envoyConfiguration.cdsResourcesLocator).isEqualTo("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")
+    assertThat(engine.envoyConfiguration.cdsResourcesLocator)
+      .isEqualTo("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")
   }
 
   @Test

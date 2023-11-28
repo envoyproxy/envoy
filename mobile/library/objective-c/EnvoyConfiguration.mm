@@ -67,8 +67,7 @@
 
 @implementation EnvoyConfiguration
 
-- (instancetype)initWithGrpcStatsDomain:(nullable NSString *)grpcStatsDomain
-                            connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
+- (instancetype)initWithConnectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
@@ -78,6 +77,8 @@
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                       enableHttp3:(BOOL)enableHttp3
+                                        quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
+                            quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -89,7 +90,6 @@
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
-                                statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
@@ -106,17 +106,15 @@
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks
                                            nodeId:(nullable NSString *)nodeId
                                        nodeRegion:(nullable NSString *)nodeRegion
                                          nodeZone:(nullable NSString *)nodeZone
                                       nodeSubZone:(nullable NSString *)nodeSubZone
                                  xdsServerAddress:(nullable NSString *)xdsServerAddress
                                     xdsServerPort:(UInt32)xdsServerPort
-                                      xdsJwtToken:(nullable NSString *)xdsJwtToken
-                       xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
+                           xdsGrpcInitialMetadata:
+                               (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
-                                           xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                         enableCds:(BOOL)enableCds
@@ -127,7 +125,6 @@
     return nil;
   }
 
-  self.grpcStatsDomain = grpcStatsDomain;
   self.connectTimeoutSeconds = connectTimeoutSeconds;
   self.dnsRefreshSeconds = dnsRefreshSeconds;
   self.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
@@ -138,6 +135,8 @@
   self.enableDNSCache = enableDNSCache;
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.enableHttp3 = enableHttp3;
+  self.quicHints = quicHints;
+  self.quicCanonicalSuffixes = quicCanonicalSuffixes;
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
@@ -149,7 +148,6 @@
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
   self.maxConnectionsPerHost = maxConnectionsPerHost;
-  self.statsFlushSeconds = statsFlushSeconds;
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
   self.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds;
   self.appVersion = appVersion;
@@ -159,17 +157,14 @@
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
-  self.statsSinks = statsSinks;
   self.nodeId = nodeId;
   self.nodeRegion = nodeRegion;
   self.nodeZone = nodeZone;
   self.nodeSubZone = nodeSubZone;
   self.xdsServerAddress = xdsServerAddress;
   self.xdsServerPort = xdsServerPort;
-  self.xdsJwtToken = xdsJwtToken;
-  self.xdsJwtTokenLifetimeSeconds = xdsJwtTokenLifetimeSeconds;
+  self.xdsGrpcInitialMetadata = xdsGrpcInitialMetadata;
   self.xdsSslRootCerts = xdsSslRootCerts;
-  self.xdsSni = xdsSni;
   self.rtdsResourceName = rtdsResourceName;
   self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
   self.cdsResourcesLocator = cdsResourcesLocator;
@@ -196,6 +191,12 @@
 
 #ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(self.enableHttp3);
+  for (NSString *host in self.quicHints) {
+    builder.addQuicHint([host toCXXString], [[self.quicHints objectForKey:host] intValue]);
+  }
+  for (NSString *suffix in self.quicCanonicalSuffixes) {
+    builder.addQuicCanonicalSuffix([suffix toCXXString]);
+  }
 #endif
 
   builder.enableGzipDecompression(self.enableGzipDecompression);
@@ -238,19 +239,6 @@
   builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
 
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-  if (self.statsSinks.count > 0) {
-    std::vector<std::string> sinks;
-    sinks.reserve(self.statsSinks.count);
-    for (NSString *sink in self.statsSinks) {
-      sinks.push_back([sink toCXXString]);
-    }
-    builder.addStatsSinks(std::move(sinks));
-  }
-  builder.addGrpcStatsDomain([self.grpcStatsDomain toCXXString]);
-  builder.addStatsFlushSeconds(self.statsFlushSeconds);
-#endif
-
   if (self.nodeRegion != nil) {
     builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
                             [self.nodeSubZone toCXXString]);
@@ -259,18 +247,15 @@
     builder.setNodeId([self.nodeId toCXXString]);
   }
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   if (self.xdsServerAddress != nil) {
     Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
-    if (self.xdsJwtToken != nil) {
-      xdsBuilder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
-                                           self.xdsJwtTokenLifetimeSeconds);
+    for (NSString *header in self.xdsGrpcInitialMetadata) {
+      xdsBuilder.addInitialStreamHeader(
+          [header toCXXString], [[self.xdsGrpcInitialMetadata objectForKey:header] toCXXString]);
     }
     if (self.xdsSslRootCerts != nil) {
       xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
-    }
-    if (self.xdsSni != nil) {
-      xdsBuilder.setSni([self.xdsSni toCXXString]);
     }
     if (self.rtdsResourceName != nil) {
       xdsBuilder.addRuntimeDiscoveryService([self.rtdsResourceName toCXXString],

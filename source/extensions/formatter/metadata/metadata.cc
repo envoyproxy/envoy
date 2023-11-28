@@ -65,8 +65,8 @@ MetadataFormatterCommandParser::parse(const std::string& command, const std::str
     std::string type, filter_namespace;
     std::vector<std::string> path;
 
-    ::Envoy::Formatter::SubstitutionFormatParser::parseSubcommand(subcommand, ':', type,
-                                                                  filter_namespace, path);
+    ::Envoy::Formatter::SubstitutionFormatUtils::parseSubcommand(subcommand, ':', type,
+                                                                 filter_namespace, path);
 
     auto provider = metadata_formatter_providers_.find(type);
     if (provider == metadata_formatter_providers_.end()) {
@@ -74,7 +74,8 @@ MetadataFormatterCommandParser::parse(const std::string& command, const std::str
     }
 
     // Return a pointer to formatter provider.
-    return provider->second(filter_namespace, path, max_length);
+    return std::make_unique<Envoy::Formatter::StreamInfoFormatter>(
+        provider->second(filter_namespace, path, max_length));
   }
   return nullptr;
 }

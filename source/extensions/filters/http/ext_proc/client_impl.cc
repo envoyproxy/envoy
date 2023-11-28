@@ -13,10 +13,10 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManage
 
 ExternalProcessorStreamPtr
 ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
-                                   const envoy::config::core::v3::GrpcService& grpc_service,
+                                   const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                    const StreamInfo::StreamInfo& stream_info) {
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
-      client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true));
+      client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true));
   return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, stream_info);
 }
 
@@ -75,6 +75,7 @@ void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTraile
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                                 const std::string& message) {
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
+  callbacks_.logGrpcStreamInfo();
   stream_closed_ = true;
   if (status == Grpc::Status::Ok) {
     callbacks_.onGrpcClose();

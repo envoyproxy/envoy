@@ -3,9 +3,11 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/matcher/matcher.h"
 
@@ -45,12 +47,13 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                                     Common::Tap::Sink* admin_streamer)
+                                     Common::Tap::Sink* admin_streamer, SinkContext context)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()) {
+
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
   ASSERT(sinks.size() == 1);
@@ -86,6 +89,33 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     sink_ = std::make_unique<FilePerTapSink>(sinks[0].file_per_tap());
     sink_to_use_ = sink_.get();
     break;
+  case ProtoOutputSink::OutputSinkTypeCase::kCustomSink: {
+    TapSinkFactory& tap_sink_factory =
+        Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
+
+    // extract message validation visitor from the context and use it to define config
+    ProtobufTypes::MessagePtr config;
+    using TsfContextRef =
+        std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>;
+    using HttpContextRef = std::reference_wrapper<Server::Configuration::FactoryContext>;
+    if (absl::holds_alternative<TsfContextRef>(context)) {
+      Server::Configuration::TransportSocketFactoryContext& tsf_context =
+          absl::get<TsfContextRef>(context).get();
+      config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
+                                                            tsf_context.messageValidationVisitor(),
+                                                            tap_sink_factory);
+    } else {
+      Server::Configuration::FactoryContext& http_context =
+          absl::get<HttpContextRef>(context).get();
+      config = Config::Utility::translateAnyToFactoryConfig(
+          sinks[0].custom_sink().typed_config(),
+          http_context.messageValidationContext().staticValidationVisitor(), tap_sink_factory);
+    }
+
+    sink_ = tap_sink_factory.createSinkPtr(*config, context);
+    sink_to_use_ = sink_.get();
+    break;
+  }
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc:
     PANIC("not implemented");
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::OUTPUT_SINK_TYPE_NOT_SET:

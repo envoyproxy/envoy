@@ -1,0 +1,253 @@
+name: mobile_release
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+  # Mondays at 1pm UTC (8am EST)
+  - cron: "0 13 * * 1"
+
+jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      pull-requests: read
+
+  android_release_artifacts:
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: android_release_artifacts
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    timeout-minutes: 120
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Build envoy.aar distributable'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      working-directory: mobile
+      run: |
+        version="0.5.0.$(date '+%Y%m%d')"
+        ./bazelw build \
+          --config=mobile-remote-release-clang \
+          --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+          --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a \
+          --define=pom_version="$version" \
+          --config=mobile-release-android \
+          --linkopt=-fuse-ld=lld \
+          //:android_dist
+    - name: 'Tar artifacts'
+      run: |
+        tar -czvf envoy_android_aar_sources.tar.gz \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
+      working-directory: mobile
+    - uses: actions/upload-artifact@v3
+      with:
+        name: envoy_android_aar_sources
+        path: mobile/envoy_android_aar_sources.tar.gz
+
+  android_release_deploy:
+    name: android_release_deploy
+    needs: android_release_artifacts
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - uses: actions/download-artifact@v3
+      with:
+        name: envoy_android_aar_sources
+        path: .
+    - name: Expand archive
+      run: |
+        tar -xvf envoy_android_aar_sources.tar.gz
+        mv bazel-bin/library/kotlin/io/envoyproxy/envoymobile/* .
+    - name: 'Configure gpg signing'
+      env:
+        GPG_KEY: ${{ secrets.EM_GPG_KEY }}
+        GPG_KEY_NAME: ${{ secrets.EM_GPG_KEY_NAME }}
+        GPG_PASSPHRASE: ${{ secrets.EM_GPG_PASSPHRASE }}
+      run: |
+        # https://github.com/keybase/keybase-issues/issues/2798
+        export GPG_TTY=$(tty)
+        # Import gpg keys and warm the passphrase to avoid the gpg
+        # passphrase prompt when initating a deploy
+        # `--pinentry-mode=loopback` could be needed to ensure we
+        # suppress the gpg prompt
+        echo $GPG_KEY | base64 --decode > signing-key
+        gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
+        shred signing-key
+
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy.aar
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-pom.xml
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-javadoc.jar
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-sources.jar
+    - name: 'Release to sonatype repository'
+      env:
+        READWRITE_USER: ${{ secrets.EM_SONATYPE_USER }}
+        READWRITE_API_KEY: ${{ secrets.EM_SONATYPE_PASSWORD }}
+        SONATYPE_PROFILE_ID: ${{ secrets.EM_SONATYPE_PROFILE_ID }}
+      run: |
+        version="0.5.0.$(date '+%Y%m%d')"
+        python mobile/ci/sonatype_nexus_upload.py \
+          --profile_id=$SONATYPE_PROFILE_ID \
+          --artifact_id=envoy \
+          --version=$version \
+          --files \
+            envoy.aar \
+            envoy-pom.xml \
+            envoy-sources.jar \
+            envoy-javadoc.jar \
+          --signed_files \
+            envoy.aar.asc \
+            envoy-pom.xml.asc \
+            envoy-sources.jar.asc \
+            envoy-javadoc.jar.asc
+
+  android_xds_release_artifacts:
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: android_xds_release_artifacts
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    timeout-minutes: 120
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Build envoy_xds.aar distributable'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      working-directory: mobile
+      run: |
+        # --define=envoy_mobile_xds=enabled must be defined last because
+        # --config=mobile-release-android has --define=envoy_mobile_xds=disabled
+        version="0.5.0.$(date '+%Y%m%d')"
+        ./bazelw build \
+          --config=mobile-remote-release-clang \
+          --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+          --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a \
+          --define=pom_version="$version" \
+          --config=mobile-release-android \
+          --define=envoy_mobile_xds=enabled \
+          --linkopt=-fuse-ld=lld \
+          //:android_xds_dist
+    - name: 'Tar artifacts'
+      run: |
+        tar -czvf envoy_xds_android_aar_sources.tar.gz \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy_xds.aar \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy_xds-pom.xml \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy_xds-sources.jar \
+            bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy_xds-javadoc.jar
+      working-directory: mobile
+    - uses: actions/upload-artifact@v3
+      with:
+        name: envoy_xds_android_aar_sources
+        path: mobile/envoy_xds_android_aar_sources.tar.gz
+
+  android_xds_release_deploy:
+    name: android_xds_release_deploy
+    needs: android_xds_release_artifacts
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - uses: actions/download-artifact@v3
+      with:
+        name: envoy_xds_android_aar_sources
+        path: .
+    - name: Expand archive
+      run: |
+        tar -xvf envoy_xds_android_aar_sources.tar.gz
+        mv bazel-bin/library/kotlin/io/envoyproxy/envoymobile/* .
+    - name: 'Configure gpg signing'
+      env:
+        GPG_KEY: ${{ secrets.EM_GPG_KEY }}
+        GPG_KEY_NAME: ${{ secrets.EM_GPG_KEY_NAME }}
+        GPG_PASSPHRASE: ${{ secrets.EM_GPG_PASSPHRASE }}
+      run: |
+        # https://github.com/keybase/keybase-issues/issues/2798
+        export GPG_TTY=$(tty)
+        # Import gpg keys and warm the passphrase to avoid the gpg
+        # passphrase prompt when initating a deploy
+        # `--pinentry-mode=loopback` could be needed to ensure we
+        # suppress the gpg prompt
+        echo $GPG_KEY | base64 --decode > signing-key
+        gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
+        shred signing-key
+
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy_xds.aar
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy_xds-pom.xml
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy_xds-javadoc.jar
+        gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy_xds-sources.jar
+    - name: 'Release to sonatype repository'
+      env:
+        READWRITE_USER: ${{ secrets.EM_SONATYPE_USER }}
+        READWRITE_API_KEY: ${{ secrets.EM_SONATYPE_PASSWORD }}
+        SONATYPE_PROFILE_ID: ${{ secrets.EM_SONATYPE_PROFILE_ID }}
+      run: |
+        version="0.5.0.$(date '+%Y%m%d')"
+        python mobile/ci/sonatype_nexus_upload.py \
+          --profile_id=$SONATYPE_PROFILE_ID \
+          --artifact_id=envoy-xds \
+          --version=$version \
+          --files \
+            envoy_xds.aar \
+            envoy_xds-pom.xml \
+            envoy_xds-sources.jar \
+            envoy_xds-javadoc.jar \
+          --signed_files \
+            envoy_xds.aar.asc \
+            envoy_xds-pom.xml.asc \
+            envoy_xds-sources.jar.asc \
+            envoy_xds-javadoc.jar.asc

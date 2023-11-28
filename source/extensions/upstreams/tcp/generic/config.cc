@@ -1,9 +1,11 @@
 #include "source/extensions/upstreams/tcp/generic/config.h"
 
 #include "envoy/stream_info/bool_accessor.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/http/codec_client.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/tcp_proxy/upstream.h"
 
 namespace Envoy {
@@ -46,6 +48,19 @@ bool GenericConnPoolFactory::disableTunnelingByFilterState(
 }
 
 REGISTER_FACTORY(GenericConnPoolFactory, TcpProxy::GenericConnPoolFactory);
+
+class DisableTunnelingObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override {
+    return std::string(TcpProxy::DisableTunnelingFilterStateKey);
+  }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<StreamInfo::BoolAccessorImpl>(data == "true");
+  }
+};
+
+REGISTER_FACTORY(DisableTunnelingObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 } // namespace Generic
 } // namespace Tcp

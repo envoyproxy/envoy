@@ -24,7 +24,9 @@ namespace Upstream {
 
 OriginalDstClusterHandle::~OriginalDstClusterHandle() {
   std::shared_ptr<OriginalDstCluster> cluster = std::move(cluster_);
-  cluster->dispatcher_.post([cluster]() mutable { cluster.reset(); });
+  cluster_.reset();
+  Event::Dispatcher& dispatcher = cluster->dispatcher_;
+  dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
 }
 
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
@@ -107,9 +109,8 @@ OriginalDstCluster::LoadBalancer::filterStateOverrideHost(LoadBalancerContext* c
     if (streamInfo == nullptr) {
       continue;
     }
-    const auto* dst_address =
-        streamInfo->filterState().getDataReadOnly<Network::DestinationAddress>(
-            Network::DestinationAddress::key());
+    const auto* dst_address = streamInfo->filterState().getDataReadOnly<Network::AddressObject>(
+        OriginalDstClusterFilterStateKey);
     if (dst_address) {
       return dst_address->address();
     }
@@ -200,13 +201,6 @@ OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster
       http_header_name_ = config_opt->http_header_name().empty()
                               ? Http::Headers::get().EnvoyOriginalDstHost
                               : Http::LowerCaseString(config_opt->http_header_name());
-    } else {
-      if (!config_opt->http_header_name().empty()) {
-        throw EnvoyException(fmt::format(
-            "ORIGINAL_DST cluster: invalid config http_header_name={} and use_http_header is "
-            "false. Set use_http_header to true if http_header_name is desired.",
-            config_opt->http_header_name()));
-      }
     }
     if (config_opt->has_metadata_key()) {
       metadata_key_ = Config::MetadataKey(config_opt->metadata_key());
@@ -214,9 +208,6 @@ OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster
     if (config_opt->has_upstream_port_override()) {
       port_override_ = config_opt->upstream_port_override().value();
     }
-  }
-  if (config.has_load_assignment()) {
-    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
@@ -324,21 +315,34 @@ void OriginalDstCluster::cleanup() {
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                              ClusterFactoryContext& context) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
                     "'CLUSTER_PROVIDED' is allowed with cluster type 'ORIGINAL_DST'",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
                     envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
   }
 
+  if (cluster.has_load_assignment()) {
+    return absl::InvalidArgumentError(
+        "ORIGINAL_DST clusters must have no load assignment configured");
+  }
+
+  if (!cluster.original_dst_lb_config().use_http_header() &&
+      !cluster.original_dst_lb_config().http_header_name().empty()) {
+    return absl::InvalidArgumentError(fmt::format(
+        "ORIGINAL_DST cluster: invalid config http_header_name={} and use_http_header is "
+        "false. Set use_http_header to true if http_header_name is desired.",
+        cluster.original_dst_lb_config().http_header_name()));
+  }
+
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster = std::make_shared<OriginalDstCluster>(cluster, context);
+  auto new_cluster = std::shared_ptr<OriginalDstCluster>(new OriginalDstCluster(cluster, context));
   auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(
       std::make_shared<OriginalDstClusterHandle>(new_cluster));
   return std::make_pair(new_cluster, std::move(lb));
@@ -348,6 +352,13 @@ OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::C
  * Static registration for the original dst cluster factory. @see RegisterFactory.
  */
 REGISTER_FACTORY(OriginalDstClusterFactory, ClusterFactory);
+
+class OriginalDstClusterFilterStateFactory : public Network::BaseAddressObjectFactory {
+public:
+  std::string name() const override { return std::string(OriginalDstClusterFilterStateKey); }
+};
+
+REGISTER_FACTORY(OriginalDstClusterFilterStateFactory, StreamInfo::FilterState::ObjectFactory);
 
 } // namespace Upstream
 } // namespace Envoy

@@ -1,6 +1,5 @@
 load("@build_bazel_rules_android//android:rules.bzl", "aar_import")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_framework_import")
-load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load(
     "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:defs.bzl",
     "project_options",
@@ -8,9 +7,15 @@ load(
     "xcode_schemes",
     "xcodeproj",
 )
+load("@envoy//tools/python:namespace.bzl", "envoy_py_namespace")
+load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
+
+envoy_py_namespace()
+
+exports_files(["VERSION"])
 
 alias(
     name = "ios_xcframework",
@@ -58,6 +63,11 @@ aar_import(
 alias(
     name = "android_dist",
     actual = "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_with_artifacts",
+)
+
+alias(
+    name = "android_xds_dist",
+    actual = "//library/kotlin/io/envoyproxy/envoymobile:envoy_xds_aar_with_artifacts",
 )
 
 define_kt_toolchain(

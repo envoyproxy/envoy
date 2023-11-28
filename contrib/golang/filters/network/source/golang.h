@@ -2,7 +2,6 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/ssl/connection.h"
@@ -11,8 +10,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/http/headers.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
@@ -27,7 +24,7 @@ namespace NetworkFilters {
 namespace Golang {
 
 /**
- * Configuration for the HTTP golang extension filter.
+ * Configuration for the Golang network filter.
  */
 class FilterConfig {
 public:
@@ -79,10 +76,16 @@ public:
   void close(Network::ConnectionCloseType close_type);
 
   Event::Dispatcher* dispatcher() { return dispatcher_; }
-  Upstream::ClusterManager& clusterManager() { return context_.clusterManager(); }
+  Upstream::ClusterManager& clusterManager() {
+    return context_.getServerFactoryContext().clusterManager();
+  }
 
   std::string getLocalAddrStr() const { return local_addr_; }
   std::string getRemoteAddrStr() const { return addr_; };
+
+  CAPIStatus setFilterState(absl::string_view key, absl::string_view value, int state_type,
+                            int life_span, int stream_sharing);
+  CAPIStatus getFilterState(absl::string_view key, GoString* value_str);
 
 private:
   Server::Configuration::FactoryContext& context_;
@@ -97,6 +100,8 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   std::string local_addr_{};
   std::string addr_{};
+
+  Thread::MutexBasicLockable mutex_{};
 };
 
 using FilterSharedPtr = std::shared_ptr<Filter>;
@@ -110,6 +115,15 @@ public:
   FilterWeakPtr filter_ptr_{};
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string str_value_;
+};
+
+class GoStringFilterState : public StreamInfo::FilterState::Object {
+public:
+  GoStringFilterState(absl::string_view value) : value_(value) {}
+  const std::string& value() const { return value_; }
+
+private:
+  const std::string value_;
 };
 
 } // namespace Golang

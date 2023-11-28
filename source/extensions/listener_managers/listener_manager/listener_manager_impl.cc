@@ -85,7 +85,19 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
   ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
+    const bool is_terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  filter #{}:", i);
+
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::Filter::ConfigTypeCase::kConfigDiscovery) {
+      ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
+      ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
+          proto_config.config_discovery(), proto_config.name(),
+          filter_chain_factory_context.getServerFactoryContext(), filter_chain_factory_context,
+          filter_chain_factory_context.clusterManager(), is_terminal, "network", nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
@@ -102,7 +114,7 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
         filters[i].name(), factory.name(), "network",
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.getServerFactoryContext()),
-        i == filters.size() - 1);
+        is_terminal);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
     ret.push_back(
@@ -145,7 +157,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         }
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.getServerFactoryContext(), context, false, "listener",
+          config_discovery, name, context.getServerFactoryContext(), context,
+          context.clusterManager(), false, "tcp-listener",
           createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
@@ -199,14 +212,68 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
   return ret;
 }
 
+Filter::QuicListenerFilterFactoriesList
+ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
+    const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+    Configuration::ListenerFactoryContext& context,
+    Filter::QuicListenerFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::QuicListenerFilterFactoriesList ret;
+
+  ret.reserve(filters.size());
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const auto& proto_config = filters[i];
+    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
+    // dynamic listener filter configuration
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      const envoy::config::core::v3::ExtensionConfigSource& config_discovery =
+          proto_config.config_discovery();
+      const std::string& name = proto_config.name();
+      if (config_discovery.apply_default_config_without_warming() &&
+          !config_discovery.has_default_config()) {
+        throw EnvoyException(fmt::format(
+            "Error: listener filter config {} applied without warming but has no default config.",
+            name));
+      }
+      for (absl::string_view type_url : config_discovery.type_urls()) {
+        absl::string_view factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+        if (Registry::FactoryRegistry<Server::Configuration::NamedQuicListenerFilterConfigFactory>::
+                getFactoryByType(factory_type_url) == nullptr) {
+          throw EnvoyException(fmt::format(
+              "Error: no listener factory found for a required type URL {}.", factory_type_url));
+        }
+      }
+      ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
+          config_discovery, name, context.getServerFactoryContext(), context,
+          context.clusterManager(), false, "quic-listener",
+          createListenerFilterMatcher(proto_config)));
+    } else {
+      ENVOY_LOG(debug, "  config: {}",
+                MessageUtil::getJsonStringFromMessageOrError(
+                    static_cast<const Protobuf::Message&>(proto_config.typed_config())));
+      // For static configuration, now see if there is a factory that will accept the config.
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::NamedQuicListenerFilterConfigFactory>(
+              proto_config);
+      const auto message = Config::Utility::translateToFactoryConfig(
+          proto_config, context.messageValidationVisitor(), factory);
+      const auto callback = factory.createListenerFilterFactoryFromProto(
+          *message, createListenerFilterMatcher(proto_config), context);
+      ret.push_back(
+          config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name()));
+    }
+  }
+  return ret;
+}
+
 Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createListenerFilterMatcher(
     const envoy::config::listener::v3::ListenerFilter& listener_filter) {
   if (!listener_filter.has_filter_disabled()) {
     return nullptr;
   }
-  return std::shared_ptr<Network::ListenerFilterMatcher>(
-      Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(
-          listener_filter.filter_disabled()));
+  return {Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(
+      listener_filter.filter_disabled())};
 }
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
@@ -437,18 +504,16 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
 void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                                                         const ListenerImpl& existing_listener) {
   bool same_socket_options = true;
-  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG)) {
-    if (new_listener.reusePort() != existing_listener.reusePort()) {
-      throw EnvoyException(fmt::format("Listener {}: reuse port cannot be changed during an update",
-                                       new_listener.name()));
-    }
+  if (new_listener.reusePort() != existing_listener.reusePort()) {
+    throw EnvoyException(fmt::format("Listener {}: reuse port cannot be changed during an update",
+                                     new_listener.name()));
+  }
 
-    same_socket_options = existing_listener.socketOptionsEqual(new_listener);
-    if (!same_socket_options && new_listener.reusePort() == false) {
-      throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
-                                       "when the reuse port isn't enabled",
-                                       new_listener.name()));
-    }
+  same_socket_options = existing_listener.socketOptionsEqual(new_listener);
+  if (!same_socket_options && new_listener.reusePort() == false) {
+    throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
+                                     "when the reuse port isn't enabled",
+                                     new_listener.name()));
   }
 
   if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
@@ -581,7 +646,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
   const uint64_t listener_tag = draining_it->listener_->listenerTag();
-  stopListener(*draining_it->listener_, [this, listener_tag]() {
+  stopListener(*draining_it->listener_, {}, [this, listener_tag]() {
     for (auto& listener : draining_listeners_) {
       if (listener.listener_->listenerTag() == listener_tag) {
         maybeCloseSocketsForListener(*listener.listener_);
@@ -690,7 +755,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
           }
         });
       },
-      server_.runtime());
+      server_.runtime(), server_.api().randomGenerator());
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
@@ -910,10 +975,11 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
 }
 
 void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
+                                       const Network::ExtraShutdownListenerOptions& options,
                                        std::function<void()> callback) {
   const auto workers_pending_stop = std::make_shared<std::atomic<uint64_t>>(workers_.size());
   for (const auto& worker : workers_) {
-    worker->stopListener(listener, [this, callback, workers_pending_stop]() {
+    worker->stopListener(listener, options, [this, callback, workers_pending_stop]() {
       if (--(*workers_pending_stop) == 0) {
         server_.dispatcher().post(callback);
       }
@@ -921,7 +987,8 @@ void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
   }
 }
 
-void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
+void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
+                                        const Network::ExtraShutdownListenerOptions& options) {
   stop_listeners_type_ = stop_listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     if (stop_listeners_type != StopListenersType::InboundOnly ||
@@ -936,7 +1003,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
       // Close the socket once all workers stopped accepting its connections.
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
-      stopListener(listener, [this, listener_tag]() {
+      stopListener(listener, options, [this, listener_tag]() {
         stats_.listener_stopped_.inc();
         for (auto& listener : active_listeners_) {
           if (listener->listenerTag() == listener_tag) {

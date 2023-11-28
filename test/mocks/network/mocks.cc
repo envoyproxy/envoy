@@ -130,6 +130,12 @@ MockListenerFilterManager::~MockListenerFilterManager() = default;
 MockFilterChain::MockFilterChain() = default;
 MockFilterChain::~MockFilterChain() = default;
 
+MockFilterChainInfo::MockFilterChainInfo() {
+  ON_CALL(*this, name()).WillByDefault(Invoke([this]() {
+    return absl::string_view{filter_chain_name_};
+  }));
+}
+
 MockFilterChainManager::MockFilterChainManager() = default;
 MockFilterChainManager::~MockFilterChainManager() = default;
 

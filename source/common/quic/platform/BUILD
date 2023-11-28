@@ -58,7 +58,11 @@ envoy_quiche_platform_impl_cc_library(
     name = "quiche_time_utils_impl_lib",
     srcs = ["quiche_time_utils_impl.cc"],
     hdrs = ["quiche_time_utils_impl.h"],
-    external_deps = ["abseil_base"],
+    external_deps = [
+        "abseil_base",
+        "abseil_optional",
+        "abseil_time",
+    ],
 )
 
 envoy_quiche_platform_impl_cc_library(
@@ -103,15 +107,10 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = [
         "quiche_iovec_impl.h",
     ],
-    external_deps = [
-        "abseil_base",
-        "abseil_hash",
-        "abseil_inlined_vector",
-        "abseil_memory",
-        "abseil_node_hash_map",
-        "abseil_node_hash_set",
-    ],
     tags = ["nofips"],
+    deps = [
+        "//envoy/common:base_includes",
+    ],
 )
 
 envoy_quiche_platform_impl_cc_library(

@@ -257,7 +257,9 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
           config, max_ejection_time,
           std::max(DEFAULT_MAX_EJECTION_TIME_MS, base_ejection_time_ms_)))),
       max_ejection_time_jitter_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
-          config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))) {}
+          config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
+      successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, successful_active_health_check_uneject_host, true)) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
@@ -291,7 +293,7 @@ DetectorImpl::create(Cluster& cluster, const envoy::config::cluster::v3::Outlier
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger, random));
 
   if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         "outlier detector's max_ejection_time cannot be smaller than base_ejection_time");
   }
   detector->initialize(cluster);
@@ -306,13 +308,11 @@ void DetectorImpl::initialize(Cluster& cluster) {
     }
   }
 
-  if (cluster.healthChecker() != nullptr) {
+  if (config_.successfulActiveHealthCheckUnejectHost() && cluster.healthChecker() != nullptr) {
     cluster.healthChecker()->addHostCheckCompleteCb([this](HostSharedPtr host, HealthTransition) {
       // If the host is ejected by outlier detection and active health check succeeds,
       // we should treat this host as healthy.
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.successful_active_health_check_uneject_host") &&
-          !host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+      if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
           host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
         unejectHost(host);
@@ -354,10 +354,6 @@ void DetectorImpl::armIntervalTimer() {
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
                                        MonotonicTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-    // Node seems to be healthy and was not ejected since the last check.
-    if (monitor->ejectTimeBackoff() != 0) {
-      monitor->ejectTimeBackoff()--;
-    }
     return;
   }
 
@@ -480,8 +476,11 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
   double ejected_percent = 100.0 * (ejections_active_helper_.value() + 1) / host_monitors_.size();
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
-  // Note: at-least one host is ejected, we ignore max ejection percentage when ejecting first host.
-  if ((ejections_active_helper_.value() == 0) || (ejected_percent <= max_ejection_percent)) {
+  bool should_eject = (ejected_percent <= max_ejection_percent);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_mep_on_first_eject")) {
+    should_eject = (ejections_active_helper_.value() == 0) || should_eject;
+  }
+  if (should_eject) {
     if (type == envoy::data::cluster::v3::CONSECUTIVE_5XX ||
         type == envoy::data::cluster::v3::SUCCESS_RATE) {
       // Deprecated counter, preserving old behaviour until it's removed.
@@ -594,7 +593,7 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
     FALLTHRU;
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
-    IS_ENVOY_BUG("unexpected non-consecutive errorr");
+    IS_ENVOY_BUG("unexpected non-consecutive error");
     return;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
     stats_.ejections_consecutive_5xx_.inc(); // Deprecated
@@ -756,6 +755,22 @@ void DetectorImpl::onIntervalTimer() {
 
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+
+  // Decrement time backoff for all hosts which have not been ejected.
+  for (auto host : host_monitors_) {
+    if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+      auto& monitor = host.second;
+      // Node is healthy and was not ejected since the last check.
+      if (monitor->lastUnejectionTime().has_value() &&
+          ((now - monitor->lastUnejectionTime().value()) >=
+           std::chrono::milliseconds(
+               runtime_.snapshot().getInteger(IntervalMsRuntime, config_.intervalMs())))) {
+        if (monitor->ejectTimeBackoff() != 0) {
+          monitor->ejectTimeBackoff()--;
+        }
+      }
+    }
+  }
 
   armIntervalTimer();
 }

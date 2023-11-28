@@ -41,8 +41,8 @@ namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
 OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
-  return Envoy::Server::createTestOptionsImpl("", api.fileSystem().fileReadToEnd(src.configPath()),
-                                              src.localAddressIpVersion());
+  return Envoy::Server::createTestOptionsImpl(
+      "", api.fileSystem().fileReadToEnd(src.configPath()).value(), src.localAddressIpVersion());
 }
 
 static std::vector<absl::string_view> unsuported_win32_configs = {
@@ -65,7 +65,7 @@ public:
       return api_->threadFactory();
     }));
     ON_CALL(file_system_, fileReadToEnd(_))
-        .WillByDefault(Invoke([&](const std::string& file) -> std::string {
+        .WillByDefault(Invoke([&](const std::string& file) -> absl::StatusOr<std::string> {
           return api_->fileSystem().fileReadToEnd(file);
         }));
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));

@@ -13,27 +13,44 @@
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/runtime/runtime_keys.h"
 
 namespace Envoy {
 namespace Network {
-
-const absl::string_view TcpListenerImpl::GlobalMaxCxRuntimeKey =
-    "overload.global_downstream_max_connections";
 
 bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
   // Enforce the global connection limit if necessary, immediately closing the accepted connection.
   if (ignore_global_conn_limit_) {
     return false;
   }
-
-  // If the connection limit is not set, don't limit the connections, but still track them.
-  // TODO(tonya11en): In integration tests, threadsafeSnapshot is necessary since the FakeUpstreams
-  // use a listener and do not run in a worker thread. In practice, this code path will always be
-  // run on a worker thread, but to prevent failed assertions in test environments, threadsafe
-  // snapshots must be used. This must be revisited.
-  const uint64_t global_cx_limit = runtime_.threadsafeSnapshot()->getInteger(
-      GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
-  return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
+  // TODO(nezdolik): deprecate `overload.global_downstream_max_connections` key once
+  // downstream connections monitor extension is stable.
+  if (track_global_cx_limit_in_overload_manager_) {
+    // Check if runtime flag `overload.global_downstream_max_connections` is configured
+    // simultaneously with downstream connections monitor in overload manager.
+    if (runtime_.threadsafeSnapshot()->get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
+      ENVOY_LOG_ONCE_MISC(
+          warn,
+          "Global downstream connections limits is configured via runtime key {} and in "
+          "{}. Using overload manager config.",
+          Runtime::Keys::GlobalMaxCxRuntimeKey,
+          Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections);
+    }
+    // Try to allocate resource within overload manager. We do it once here, instead of checking if
+    // it is possible to allocate resource in this method and then actually allocating it later in
+    // the code to avoid race conditions.
+    return !(overload_state_->tryAllocateResource(
+        Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1));
+  } else {
+    // If the connection limit is not set, don't limit the connections, but still track them.
+    // TODO(tonya11en): In integration tests, threadsafeSnapshot is necessary since the
+    // FakeUpstreams use a listener and do not run in a worker thread. In practice, this code path
+    // will always be run on a worker thread, but to prevent failed assertions in test environments,
+    // threadsafe snapshots must be used. This must be revisited.
+    const uint64_t global_cx_limit = runtime_.threadsafeSnapshot()->getInteger(
+        Runtime::Keys::GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
+    return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
+  }
 }
 
 void TcpListenerImpl::onSocketEvent(short flags) {
@@ -88,8 +105,9 @@ void TcpListenerImpl::onSocketEvent(short flags) {
                                                   local_address->ip()->version() ==
                                                       Address::IpVersion::v6);
 
-    cb_.onAccept(
-        std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
+    cb_.onAccept(std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address,
+                                                      remote_address, overload_state_,
+                                                      track_global_cx_limit_in_overload_manager_));
   }
 
   ENVOY_LOG_MISC(trace, "TcpListener accepted {} new connections.",
@@ -97,15 +115,22 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   cb_.recordConnectionsAcceptedOnSocketEvent(connections_accepted_from_kernel_count);
 }
 
-TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
+TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                  Runtime::Loader& runtime, SocketSharedPtr socket,
                                  TcpListenerCallbacks& cb, bool bind_to_port,
                                  bool ignore_global_conn_limit,
-                                 uint32_t max_connections_to_accept_per_socket_event)
+                                 uint32_t max_connections_to_accept_per_socket_event,
+                                 Server::ThreadLocalOverloadStateOptRef overload_state)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random), runtime_(runtime),
       bind_to_port_(bind_to_port), reject_fraction_(0.0),
       ignore_global_conn_limit_(ignore_global_conn_limit),
-      max_connections_to_accept_per_socket_event_(max_connections_to_accept_per_socket_event) {
+      max_connections_to_accept_per_socket_event_(max_connections_to_accept_per_socket_event),
+      overload_state_(overload_state),
+      track_global_cx_limit_in_overload_manager_(
+          overload_state_
+              ? overload_state_->isResourceMonitorEnabled(
+                    Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)
+              : false) {
   if (bind_to_port) {
     // Use level triggered mode to avoid potential loss of the trigger due to
     // transient accept errors or early termination due to accepting
@@ -140,6 +165,9 @@ void TcpListenerImpl::configureLoadShedPoints(
     Server::LoadShedPointProvider& load_shed_point_provider) {
   listener_accept_ =
       load_shed_point_provider.getLoadShedPoint("envoy.load_shed_points.tcp_listener_accept");
+  ENVOY_LOG_ONCE_MISC_IF(
+      trace, listener_accept_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.tcp_listener_accept is not found. Is it configured?");
 }
 
 } // namespace Network

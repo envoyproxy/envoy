@@ -236,6 +236,23 @@ TEST_F(TraceSegmentReporterTest, CallAsyncCallbackAndNothingTodo) {
   reporter_->onReceiveMessage(std::make_unique<skywalking::v3::Commands>());
 }
 
+TEST_F(TraceSegmentReporterTest, NoReportWithHighWatermark) {
+  setupTraceSegmentReporter("{}");
+
+  TracingContextPtr segment_context =
+      SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE");
+  SkyWalkingTestHelper::createSpanStore(segment_context, nullptr, "CHILD");
+
+  EXPECT_CALL(*mock_stream_ptr_, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(0);
+  reporter_->report(segment_context);
+
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+}
+
 } // namespace
 } // namespace SkyWalking
 } // namespace Tracers

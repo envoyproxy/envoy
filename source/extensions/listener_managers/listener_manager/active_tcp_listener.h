@@ -27,9 +27,11 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public Network::BalancedConnectionHandler {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
-                    Runtime::Loader& runtime, Network::SocketSharedPtr&& socket,
+                    Runtime::Loader& runtime, Random::RandomGenerator& random,
+                    Network::SocketSharedPtr&& socket,
                     Network::Address::InstanceConstSharedPtr& listen_address,
-                    Network::ConnectionBalancer& connection_balancer);
+                    Network::ConnectionBalancer& connection_balancer,
+                    ThreadLocalOverloadStateOptRef overload_state);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
                     Network::Address::InstanceConstSharedPtr& listen_address,
                     Network::ListenerConfig& config,
@@ -60,7 +62,9 @@ public:
 
   void pauseListening() override;
   void resumeListening() override;
-  void shutdownListener() override { listener_.reset(); }
+  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
+    listener_.reset();
+  }
 
   // Network::BalancedConnectionHandler
   uint64_t numConnections() const override { return num_listener_connections_; }

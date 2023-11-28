@@ -48,12 +48,12 @@ template <class T> struct OptRef {
   /**
    * Helper to convert a OptRef into a ref. Behavior if !has_value() is undefined.
    */
-  T& ref() const { return *ptr_; }
+  T& ref() const { return *ptr_; } // NOLINT(clang-analyzer-core.uninitialized.UndefReturn)
 
   /**
    * Helper to dereference an OptRef. Behavior if !has_value() is undefined.
    */
-  T& operator*() const { return *ptr_; }
+  T& operator*() const { return *ptr_; } // NOLINT(clang-analyzer-core.uninitialized.UndefReturn)
 
   /**
    * @return true if the object has a value.

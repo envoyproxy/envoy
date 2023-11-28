@@ -1,6 +1,6 @@
+load("@envoy_repo//:version.bzl", "VERSION")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":packages.bzl", "envoy_pkg_distros")
-load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
@@ -68,6 +68,7 @@ sh_binary(
         "$(location :distrotest.sh)",
         VERSION,
         "$(location :distros.yaml)",
+        "--rebuild",
     ],
     data = [
         ":distros.yaml",
@@ -97,14 +98,35 @@ label_flag(
 )
 
 genrule(
+    name = "multi_arch_debs",
+    outs = ["multiarch-debs.tar.gz"],
+    # To ensure the debs tarball is not extracted and kept as a tarball, it is
+    # placed into a 2nd archive.
+    cmd = """
+    tmpdir=$$(mktemp -d) \
+    && tmpdir2=$$(mktemp -d) \
+    && tar xf $(location :x64-packages) -C "$$tmpdir" \
+    && tar xf $(location :arm64-packages) -C "$$tmpdir" \
+    && rm "$${tmpdir}/signing.key" \
+    && mv "$${tmpdir}/deb/"* "$${tmpdir}" \
+    && rm -rf "$${tmpdir}/deb/" \
+    && tar cf $$tmpdir2/debs.tar.gz -C "$${tmpdir}" . \
+    && tar cf $@ -C "$${tmpdir2}" . \
+    """,
+    tools = [
+        ":arm64-packages",
+        ":x64-packages",
+    ],
+)
+
+genrule(
     name = "signed",
     outs = ["release.signed.tar.zst"],
     cmd = """
     # Sign the packages
     VERSION=%s \
     && $(location //tools/distribution:sign) \
-        "deb.x64:$(location :x64-packages)" \
-        "deb.arm64:$(location :arm64-packages)" \
+        "bin:$(location :multi_arch_debs)" \
         "x64:$(location :x64-release)" \
         "arm64:$(location :arm64-release)" \
         -m x64/envoy:bin/envoy-$${VERSION}-linux-x86_64 \
@@ -113,12 +135,11 @@ genrule(
         -m arm64/envoy-contrib:bin/envoy-contrib-$${VERSION}-linux-aarch_64 \
            --out $@
     """ % VERSION,
-    exec_tools = [
-        ":arm64-packages",
-        ":x64-packages",
+    tags = ["no-remote"],
+    tools = [
         ":arm64-release",
+        ":multi_arch_debs",
         ":x64-release",
         "//tools/distribution:sign",
     ],
-    tags = ["no-remote"],
 )

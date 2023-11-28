@@ -37,13 +37,8 @@ public class MainActivity extends Activity {
   private static final String REQUEST_PATH = "/ping";
   private static final String REQUEST_SCHEME_HTTP = "http";
   private static final String REQUEST_SCHEME_HTTPS = "https";
-  private static final Set<String> FILTERED_HEADERS = new HashSet<String>() {
-    {
-      add("server");
-      add("filter-demo");
-      add("x-envoy-upstream-service-time");
-    }
-  };
+  private static final Set<String> FILTERED_HEADERS =
+      Set.of("server", "filter-demo", "x-envoy-upstream-service-time");
 
   private Engine engine;
   private RecyclerView recyclerView;

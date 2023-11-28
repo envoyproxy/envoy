@@ -13,7 +13,8 @@ public:
   Http2HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const ConfigOverrides& config_overrides);
 
   ::Envoy::Http::HeaderValidator::ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
@@ -52,6 +53,30 @@ private:
   HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                                           const ::Envoy::Http::HeaderString& value);
 
+  // This method validates :path header value for HTTP/2 protocol using character set that includes
+  // characters either prohibited by https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC
+  // or where RFC is ambiguous.
+  //
+  // " < > [ ] ^ ` { } \ | # SPACE TAB and all extended ASCII
+  //
+  // NOTE: RFC-3986 is ambiguous about " < > [ ] ^ ` { } \ |
+  // # is only allowed as a fragment separator (and not allowed within the fragment)
+  // SPACE TAB and all extended ASCII are prohibited
+  //
+  // This method is called iff `envoy.uhv.allow_non_compliant_characters_in_path` is
+  // `true`, which is the default value. Note the default will be switched to `false` in the future
+  // for standard compliance.
+  HeaderValidator::HeaderValueValidationResult validatePathHeaderWithAdditionalCharactersHttp2(
+      const ::Envoy::Http::HeaderString& path_header_value);
+
+  // Same method as above but for the HTTP/3 protocol. It does not allow extended ASCII.
+  HeaderValidator::HeaderValueValidationResult validatePathHeaderWithAdditionalCharactersHttp3(
+      const ::Envoy::Http::HeaderString& path_header_value);
+
+  // Chooses path validation method based on the value of the override flag that affects the
+  // validation algorithm.
+  HeaderValidatorFunction getPathValidationMethod();
+
   const HeaderValidatorMap request_header_validator_map_;
 };
 
@@ -61,8 +86,9 @@ public:
   ServerHttp2HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
-      : Http2HeaderValidator(config, protocol, stats) {}
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const ConfigOverrides& config_overrides)
+      : Http2HeaderValidator(config, protocol, stats, config_overrides) {}
 
   ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override {
@@ -100,8 +126,9 @@ public:
   ClientHttp2HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
-      : Http2HeaderValidator(config, protocol, stats) {}
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const ConfigOverrides& config_overrides)
+      : Http2HeaderValidator(config, protocol, stats, config_overrides) {}
 
   ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override {

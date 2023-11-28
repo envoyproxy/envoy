@@ -4,6 +4,7 @@
 #include "envoy/config/dynamic_extension_config_provider.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "absl/types/optional.h"
 
@@ -25,6 +26,8 @@ using NetworkFilterFactoriesList = std::vector<FilterConfigProviderPtr<Network::
 // Listener filter config provider aliases
 using ListenerFilterFactoriesList =
     std::vector<FilterConfigProviderPtr<Network::ListenerFilterFactoryCb>>;
+using QuicListenerFilterFactoriesList =
+    std::vector<FilterConfigProviderPtr<Network::QuicListenerFilterFactoryCb>>;
 
 /**
  * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider
@@ -50,7 +53,8 @@ public:
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name,
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      bool last_filter_in_filter_chain, const std::string& filter_chain_type,
+      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) PURE;
 
   /**

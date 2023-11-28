@@ -527,17 +527,29 @@ void ConnectionImpl::StreamImpl::decodeData() {
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
+#ifndef ENVOY_ENABLE_UHV
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
 
-#ifndef ENVOY_ENABLE_UHV
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
+#else
+  // In UHV mode the :status header at this point can be malformed, as it is validated
+  // later on in the response_decoder_.decodeHeaders() call.
+  // Account for this here.
+  absl::optional<uint64_t> status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
+  if (!status_opt.has_value()) {
+    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
+    // request
+    response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
+    return;
+  }
+  const uint64_t status = status_opt.value();
 #endif
-
   // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that further
   // proxying is on an upgrade path.
+  // TODO(#29071) determine how to handle 101, since it is not supported by HTTP/2
   received_noninformational_headers_ =
       !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
 
@@ -649,9 +661,10 @@ ConnectionImpl::StreamDataFrameSource::SelectPayloadLength(size_t max_length) {
     if (stream_.local_end_stream_ && length == stream_.pending_send_data_->length()) {
       end_data = true;
       if (stream_.pending_trailers_to_encode_) {
-        send_fin_ = false;
         stream_.submitTrailers(*stream_.pending_trailers_to_encode_);
         stream_.pending_trailers_to_encode_.reset();
+      } else {
+        send_fin_ = true;
       }
     }
     return {static_cast<int64_t>(length), end_data};
@@ -1770,6 +1783,7 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_list_bytes = max_headers_kb * 1024;
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
+  og_options_.allow_different_host_and_authority = true;
 
 #ifdef ENVOY_ENABLE_UHV
   // UHV - disable header validations in oghttp2
@@ -1820,6 +1834,8 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb)
     : Http2Options(http2_options, max_headers_kb) {
   og_options_.perspective = http2::adapter::Perspective::kClient;
+  og_options_.remote_max_concurrent_streams =
+      ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS;
   // Temporarily disable initial max streams limit/protection, since we might want to create
   // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
   //
@@ -2056,6 +2072,9 @@ ServerConnectionImpl::ServerConnectionImpl(
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           "envoy.load_shed_points.http2_server_go_away_on_dispatch")) {
+  ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
+                    "found. Is it configured?");
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
   auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(

@@ -1,5 +1,8 @@
 name: mobile_format
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -14,87 +17,114 @@ jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     uses: ./.github/workflows/_env.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: read
 
   formatall:
     if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: format_all
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 45
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
-      env:
-        CLANG_FORMAT: /opt/llvm/bin/clang-format
-        BUILDIFIER_BIN: /usr/local/bin/buildifier
-        BUILDOZER_BIN: /usr/local/bin/buildozer
-        ENVOY_BAZEL_PREFIX: "@envoy"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run formatters'
-      run: cd mobile && ./tools/check_format.sh
+      run: |
+        cd mobile
+        ./tools/check_format.sh
+
   precommit:
     if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: precommit
     runs-on: macos-12
     timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: 'Install precommit'
       run: brew install pre-commit
     - name: 'Run precommit'
-      run: cd mobile && find mobile/* | pre-commit run --files
+      run: |
+        cd mobile
+        find mobile/* | pre-commit run --files
+
   swiftlint:
     if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: swift_lint
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 5
     container:
       image: ghcr.io/realm/swiftlint:0.50.3
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: 'Run Swift Lint (SwiftLint)'
       run: swiftlint lint --strict
       working-directory: mobile
+
   drstring:
     if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: drstring
     runs-on: macos-12
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: 'Run DrString'
       env:
         DEVELOPER_DIR: /Applications/Xcode_14.1.app
-      run: cd mobile && ./bazelw run @DrString//:drstring check
+      run: |
+        cd mobile
+        ./bazelw run --config=remote-ci @DrString//:drstring check
+
   kotlinlint:
     if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: kotlin_lint
     runs-on: macos-12
     timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
         distribution: zulu
-    - run: cd mobile && ./ci/mac_ci_setup.sh
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Run Kotlin Lint (Detekt)'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-ci-macos \
             //library/kotlin/io/envoyproxy/envoymobile:envoy_lib_lint \
             //examples/kotlin/hello_world:hello_envoy_kt_lint
     - name: 'Run Kotlin Formatter (ktlint)'
-      run: cd mobile && ./bazelw build kotlin_format
+      run: |
+        cd mobile
+        ./bazelw build --config=remote-ci kotlin_format

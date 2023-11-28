@@ -1071,6 +1071,9 @@ ServerConnectionImpl::ServerConnectionImpl(
       headers_with_underscores_action_(headers_with_underscores_action),
       abort_dispatch_(
           overload_manager.getLoadShedPoint("envoy.load_shed_points.http1_server_abort_dispatch")) {
+  ENVOY_LOG_ONCE_IF(trace, abort_dispatch_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.http1_server_abort_dispatch is not "
+                    "found. Is it configured?");
   owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
@@ -1111,6 +1114,11 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // This forces the behavior to be backwards compatible with the old codec behavior.
   // CONNECT "urls" are actually host:port so look like absolute URLs to the above checks.
   // Absolute URLS in CONNECT requests will be rejected below by the URL class validation.
+
+  /**
+   * @param scheme the scheme to validate
+   * @return bool true if the scheme is http.
+   */
   if (!codec_settings_.allow_absolute_url_ && !is_connect) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return okStatus();
@@ -1138,12 +1146,12 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
     } else {
       headers.setScheme(absolute_url.scheme());
     }
-    if (!HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+    if (!Utility::schemeIsValid(headers.getSchemeValue())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
       return codecProtocolError("http/1.1 protocol error: invalid scheme");
     }
-    if (codec_settings_.validate_scheme_ &&
-        absolute_url.scheme() == header_values.SchemeValues.Https && !connection().ssl()) {
+    if (codec_settings_.validate_scheme_ && Utility::schemeIsHttps(absolute_url.scheme()) &&
+        !connection().ssl()) {
       error_code_ = Http::Code::Forbidden;
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpsInPlaintext));
       return codecProtocolError("http/1.1 protocol error: https in the clear");

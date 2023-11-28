@@ -1,3 +1,5 @@
+#pragma once
+
 #import <Foundation/Foundation.h>
 
 // Interface for starting and managing a test server. Calls into to test_server.cc

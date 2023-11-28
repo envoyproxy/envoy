@@ -27,6 +27,8 @@ public:
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
 
+  EdsResourcesCacheOptRef edsResourcesCache() override { return absl::nullopt; }
+
   void onWriteable() override {}
   void onStreamEstablished() override {}
   void onEstablishmentFailure() override {}

@@ -27,17 +27,19 @@ type HttpCAPI interface {
 	// when unhandled panics are detected.
 	HttpSendPanicReply(r unsafe.Pointer, details string)
 	// experience api, memory unsafe
-	HttpGetHeader(r unsafe.Pointer, key *string, value *string)
+	HttpGetHeader(r unsafe.Pointer, key string) string
 	HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
-	HttpSetHeader(r unsafe.Pointer, key *string, value *string, add bool)
-	HttpRemoveHeader(r unsafe.Pointer, key *string)
+	HttpSetHeader(r unsafe.Pointer, key string, value string, add bool)
+	HttpRemoveHeader(r unsafe.Pointer, key string)
 
-	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
+	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte
+	HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64)
 	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	HttpSetBytesBufferHelper(r unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
 
 	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
-	HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool)
-	HttpRemoveTrailer(r unsafe.Pointer, key *string)
+	HttpSetTrailer(r unsafe.Pointer, key string, value string, add bool)
+	HttpRemoveTrailer(r unsafe.Pointer, key string)
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
@@ -49,9 +51,17 @@ type HttpCAPI interface {
 	HttpLogLevel() LogType
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+	HttpConfigFinalize(c unsafe.Pointer)
 
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	HttpGetStringFilterState(r unsafe.Pointer, key string) string
+
+	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
+
+	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
+	HttpIncrementMetric(c unsafe.Pointer, metricId uint32, offset int64)
+	HttpGetMetric(c unsafe.Pointer, metricId uint32) uint64
+	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
 }
 
 type NetworkCAPI interface {
@@ -63,9 +73,13 @@ type NetworkCAPI interface {
 	DownstreamFinalize(f unsafe.Pointer, reason int)
 	// DownstreamInfo gets the downstream connection info of infoType
 	DownstreamInfo(f unsafe.Pointer, infoType int) string
+	// GetFilterState gets the filter state of key
+	GetFilterState(f unsafe.Pointer, key string) string
+	// SetFilterState sets the filter state of key to value
+	SetFilterState(f unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 
 	// UpstreamConnect creates an envoy upstream connection to address
-	UpstreamConnect(libraryID string, addr string) unsafe.Pointer
+	UpstreamConnect(libraryID string, addr string, connID uint64) unsafe.Pointer
 	// UpstreamWrite writes buffer data into upstream connection.
 	UpstreamWrite(f unsafe.Pointer, bufferPtr unsafe.Pointer, bufferLen int, endStream int)
 	// UpstreamClose closes the upstream connection
@@ -74,4 +88,18 @@ type NetworkCAPI interface {
 	UpstreamFinalize(f unsafe.Pointer, reason int)
 	// UpstreamInfo gets the upstream connection info of infoType
 	UpstreamInfo(f unsafe.Pointer, infoType int) string
+}
+
+type CommonCAPI interface {
+	Log(level LogType, message string)
+	LogLevel() LogType
+}
+
+type commonCApiImpl struct{}
+
+var cAPI CommonCAPI = &commonCApiImpl{}
+
+// SetCommonCAPI for mock cAPI
+func SetCommonCAPI(api CommonCAPI) {
+	cAPI = api
 }

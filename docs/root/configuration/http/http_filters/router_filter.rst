@@ -436,7 +436,7 @@ Virtual Clusters
 ^^^^^^^^^^^^^^^^
 
 Virtual cluster statistics are output in the
-*vhost.<virtual host name>.vcluster.<virtual cluster name>.* namespace and include the following
+``vhost.<virtual host name>.vcluster.<virtual cluster name>.`` namespace and include the following
 statistics:
 
 .. csv-table::

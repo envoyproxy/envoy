@@ -37,18 +37,23 @@ def jvm_flags(lib_name):
         "-Djava.library.path=library/common/jni:test/common/jni",
         "-Denvoy_jni_library_name={}".format(lib_name),
         "-Xcheck:jni",
-    ]
+    ] + select({
+        "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],
+        "//conditions:default": [],
+    }) + select({
+        "@envoy//bazel:disable_envoy_mobile_xds": ["-Denvoy_jni_envoy_mobile_xds_disabled=true"],
+        "//conditions:default": [],
+    })
 
 # A basic macro to make it easier to declare and run kotlin tests which depend on a JNI lib
 # This will create the native .so binary (for linux) and a .jnilib (for macOS) look up
-def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = [], repository = "", exec_properties = {}):
-    lib_name = native_lib_name(native_deps[0])[3:]
+def envoy_mobile_jni_kt_test(name, srcs, native_lib_name, native_deps = [], deps = [], repository = "", exec_properties = {}):
     _internal_kt_test(
         name,
         srcs,
         deps,
         data = native_deps,
-        jvm_flags = jvm_flags(lib_name),
+        jvm_flags = jvm_flags(native_lib_name),
         repository = repository,
         exec_properties = exec_properties,
     )
@@ -73,8 +78,7 @@ def envoy_mobile_kt_test(name, srcs, deps = [], repository = "", exec_properties
     _internal_kt_test(name, srcs, deps, repository = repository, exec_properties = exec_properties)
 
 # A basic macro to run android based (robolectric) tests with native dependencies
-def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repository = "", exec_properties = {}):
-    lib_name = native_lib_name(native_deps[0])[3:]
+def envoy_mobile_android_test(name, srcs, native_lib_name, deps = [], native_deps = [], repository = "", exec_properties = {}):
     android_library(
         name = name + "_test_lib",
         custom_package = "io.envoyproxy.envoymobile.test",
@@ -111,6 +115,6 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repositor
         manifest = repository + "//bazel:test_manifest.xml",
         custom_package = "io.envoyproxy.envoymobile.tests",
         test_class = "io.envoyproxy.envoymobile.bazel.EnvoyMobileTestSuite",
-        jvm_flags = jvm_flags(lib_name),
+        jvm_flags = jvm_flags(native_lib_name),
         exec_properties = exec_properties,
     )

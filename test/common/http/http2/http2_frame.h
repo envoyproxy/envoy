@@ -121,7 +121,7 @@ public:
     Http11Required
   };
 
-  enum class ResponseStatus { Unknown, Ok, NotFound };
+  enum class ResponseStatus { Unknown, Ok, NotFound, InternalServerError };
 
   struct Header {
     Header(absl::string_view key, absl::string_view value) : key_(key), value_(value) {}
@@ -226,6 +226,7 @@ public:
     return false;
   }
   ResponseStatus responseStatus() const;
+  uint32_t streamId() const;
 
   // Copy HTTP2 header. The `header` parameter must at least be HeaderSize long.
   // Allocates payload size based on the value in the header.
@@ -239,7 +240,7 @@ public:
     if (data_.empty()) {
       return {};
     }
-    return std::string(reinterpret_cast<const char*>(data()), size());
+    return {reinterpret_cast<const char*>(data()), size()};
   }
 
   uint32_t payloadSize() const;
@@ -252,6 +253,13 @@ public:
   ConstIterator begin() const { return data_.begin(); }
   ConstIterator end() const { return data_.end(); }
   bool empty() const { return data_.empty(); }
+
+  void appendHeaderWithoutIndexing(const Header& header);
+  // This method updates payload length in the HTTP2 header based on the size of the data_
+  void adjustPayloadSize() {
+    ASSERT(size() >= HeaderSize);
+    setPayloadSize(size() - HeaderSize);
+  }
 
 private:
   void buildHeader(Type type, uint32_t payload_size = 0, uint8_t flags = 0, uint32_t stream_id = 0);
@@ -272,14 +280,7 @@ private:
   // Headers are directly encoded
   void appendStaticHeader(StaticHeaderIndex index);
   void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
-  void appendHeaderWithoutIndexing(const Header& header);
   void appendEmptyHeader();
-
-  // This method updates payload length in the HTTP2 header based on the size of the data_
-  void adjustPayloadSize() {
-    ASSERT(size() >= HeaderSize);
-    setPayloadSize(size() - HeaderSize);
-  }
 
   DataContainer data_;
 };

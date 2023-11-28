@@ -12,7 +12,9 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/admin/admin_factory_context.h"
 #include "source/server/listener_manager_factory.h"
+#include "source/server/overload_manager_impl.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
@@ -23,14 +25,15 @@ namespace Server {
 bool validateConfig(const Options& options,
                     const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
-                    Filesystem::Instance& file_system) {
+                    Filesystem::Instance& file_system,
+                    const ProcessContextOptRef& process_context) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
   TRY_ASSERT_MAIN_THREAD {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
-                              component_factory, thread_factory, file_system);
+                              component_factory, thread_factory, file_system, process_context);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
@@ -45,21 +48,21 @@ ValidationInstance::ValidationInstance(
     const Options& options, Event::TimeSystem& time_system,
     const Network::Address::InstanceConstSharedPtr& local_address, Stats::IsolatedStoreImpl& store,
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-    Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
+    Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+    const ProcessContextOptRef& process_context)
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
                                              !options.ignoreUnknownDynamicFields()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
-                                   random_generator_, bootstrap_)),
+                                   random_generator_, bootstrap_, process_context)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
-      mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
-      time_system_(time_system), server_contexts_(*this),
-      quic_stat_names_(stats_store_.symbolTable()) {
+      grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
+      router_context_(stats_store_.symbolTable()), time_system_(time_system),
+      server_contexts_(*this), quic_stat_names_(stats_store_.symbolTable()) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
@@ -87,8 +90,9 @@ void ValidationInstance::initialize(const Options& options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
   if (bootstrap_.has_application_log_config()) {
-    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
-    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+    THROW_IF_NOT_OK(
+        Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
+    THROW_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
   }
 
   // Inject regex engine to singleton.
@@ -108,19 +112,20 @@ void ValidationInstance::initialize(const Options& options,
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   Configuration::InitialImpl initial_config(bootstrap_);
-  initial_config.initAdminAccessLog(bootstrap_, *this);
+  AdminFactoryContext factory_context(*this);
+  initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
                           Config::ServerExtensionValues::get().VALIDATION_LISTENER)
                           .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
-  Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
-  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.remove_runtime_singleton", true)) {
-    runtime_ = std::move(runtime_ptr);
-  } else {
-    runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
-  }
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+  ENVOY_BUG(runtime_ != nullptr,
+            "Component factory should not return nullptr from createRuntime()");
+  drain_manager_ = component_factory.createDrainManager(*this);
+  ENVOY_BUG(drain_manager_ != nullptr,
+            "Component factory should not return nullptr from createDrainManager()");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());

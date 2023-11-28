@@ -166,7 +166,7 @@ index 00000000..1201542c
 +      with open("clang-asan-blocklist.txt", "w") as f:
 +        f.write("fun:*\n")
 +
-+    os.system('make -j{} V=1 PREFIX="{}" install'.format(os.cpu_count(), args.prefix))
++    os.system('"{}" -j{} V=1 PREFIX="{}" install'.format(os.environ["MAKE"], os.cpu_count(), args.prefix))
 +
 +def win_main():
 +    src_dir = os.path.dirname(os.path.realpath(__file__))

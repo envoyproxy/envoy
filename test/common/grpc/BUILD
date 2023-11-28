@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
@@ -38,6 +40,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -212,4 +215,30 @@ envoy_cc_test(
         "//source/common/grpc:buffered_message_ttl_manager_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "async_client_manager_benchmark",
+    srcs = ["async_client_manager_benchmark.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/api:api_lib",
+        "//source/common/grpc:async_client_manager_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "async_client_manager_benchmark_test",
+    timeout = "long",
+    benchmark_binary = "async_client_manager_benchmark",
 )

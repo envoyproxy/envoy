@@ -50,7 +50,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    shard_count = 4,
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -96,6 +95,7 @@ envoy_cc_test(
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/integration/filters:test_listener_filter_lib",
         "//test/integration/filters:test_network_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",

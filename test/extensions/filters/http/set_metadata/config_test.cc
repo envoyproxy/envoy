@@ -36,7 +36,31 @@ value:
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   SetMetadataConfig factory;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(SetMetadataFilterConfigTest, SimpleConfigServerContext) {
+  const std::string yaml = R"EOF(
+metadata_namespace: thenamespace
+value:
+  mynumber: 20
+  mylist: ["b"]
+  tags:
+    mytag1: 1
+  )EOF";
+
+  SetMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  SetMetadataConfig factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);

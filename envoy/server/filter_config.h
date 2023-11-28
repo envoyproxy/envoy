@@ -77,6 +77,32 @@ public:
 };
 
 /**
+ * Implemented by each QUIC listener filter and registered via Registry::registerFactory()
+ * or the convenience class RegisterFactory.
+ */
+class NamedQuicListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
+public:
+  ~NamedQuicListenerFilterConfigFactory() override = default;
+
+  /**
+   * Create a particular listener filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
+   * of general error or a Json::Exception if the json configuration is erroneous. The returned
+   * callback should always be initialized.
+   * @param config supplies the general protobuf configuration for the filter.
+   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled.
+   * @param context supplies the filter's context.
+   * @return Network::QuicListenerFilterFactoryCb the factory creation function.
+   */
+  virtual Network::QuicListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& config,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      ListenerFactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.filters.quic_listener"; }
+};
+
+/**
  * Implemented by filter factories that require more options to process the protocol used by the
  * upstream cluster.
  */
@@ -150,8 +176,9 @@ public:
    * unable to produce a factory with the provided parameters, it should throw an EnvoyException in
    * the case of general error. The returned callback should always be initialized.
    */
-  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                CommonFactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               UpstreamFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.filters.upstream_network"; }
 
@@ -227,7 +254,7 @@ public:
     auto config_types = TypedFactory::configTypes();
 
     if (auto message = createEmptyRouteConfigProto(); message != nullptr) {
-      config_types.insert(message->GetDescriptor()->full_name());
+      config_types.insert(createReflectableMessage(*message)->GetDescriptor()->full_name());
     }
 
     return config_types;
@@ -252,9 +279,10 @@ public:
    * configuration.
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
-   * @return Http::FilterFactoryCb the factory creation function.
+   * @return  absl::StatusOr<Http::FilterFactoryCb> the factory creation function or an error if
+   * creation fails.
    */
-  virtual Http::FilterFactoryCb
+  virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
@@ -289,9 +317,9 @@ public:
    * @param context supplies the filter's context.
    * @return Http::FilterFactoryCb the factory creation function.
    */
-  virtual Http::FilterFactoryCb
+  virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
-                               Server::Configuration::UpstreamHttpFactoryContext& context) PURE;
+                               Server::Configuration::UpstreamFactoryContext& context) PURE;
 };
 
 } // namespace Configuration

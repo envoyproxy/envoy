@@ -79,6 +79,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "extra_extensions_test",
+    size = "large",
     srcs = ["extra_extensions_test.cc"],
     deps = [
         "//test/test_common:environment_lib",
@@ -102,6 +103,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "check_extensions_against_registry_test",
+    size = "large",
     srcs = ["check_extensions_against_registry_test.cc"],
     data = [
         "//source/extensions:extensions_metadata.yaml",

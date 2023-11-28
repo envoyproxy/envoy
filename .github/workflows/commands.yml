@@ -2,14 +2,15 @@ name: commands
 
 on:
   issue_comment:
-    types: [created]
+    types:
+    - created
 
 permissions:
   contents: read
 
 jobs:
   retest:
-    if: |
+    if: >-
       ${{
          github.event.issue.pull_request
          && github.repository == 'envoyproxy/envoy'
@@ -21,7 +22,10 @@ jobs:
     permissions:
       pull-requests: write
       actions: write
+      checks: read
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.0.10
+    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.1.8
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        azp_org: cncf
+        azp_token: ${{ secrets.AZP_TOKEN }}

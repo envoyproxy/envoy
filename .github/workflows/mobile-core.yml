@@ -1,5 +1,8 @@
 name: mobile_core
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -14,31 +17,35 @@ jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     uses: ./.github/workflows/_env.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: read
 
   unittests:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: unit_tests
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 120
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
-    - uses: actions/checkout@v3
-    - name: Ensure no listener leaks
-      run: rm source/extensions/listener_managers/listener_manager/listener_manager_impl.h
+    - uses: actions/checkout@v4
+    - name: Avoid dependencies leaking back in
+      run: rm source/extensions/listener_managers/listener_manager/listener_manager_impl.h source/common/quic/http_datagram_handler.h
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw test \
+        cd mobile
+        ./bazelw test \
             --build_tests_only \
             --action_env=LD_LIBRARY_PATH \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
-            --test_output=all \
-            --define envoy_mobile_listener=disabled \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --config=mobile-remote-ci \
             //test/common/...

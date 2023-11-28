@@ -35,7 +35,7 @@ absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) c
 absl::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) const {
   std::string value = Envoy::Http::Utility::parseCookieValue(map, cookie_);
   if (!value.empty()) {
-    return absl::optional<std::string>(std::move(value));
+    return {std::move(value)};
   }
   return absl::nullopt;
 }
@@ -150,7 +150,7 @@ void HeaderToMetadataFilter::setEncoderFilterCallbacks(
   encoder_callbacks_ = &callbacks;
 }
 
-bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta_namespace,
+bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::string& meta_namespace,
                                          const std::string& key, std::string value, ValueType type,
                                          ValueEncode encode) const {
   ProtobufWkt::Value val;
@@ -196,15 +196,8 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
   }
 
-  // Have we seen this namespace before?
-  auto namespace_iter = map.find(meta_namespace);
-  if (namespace_iter == map.end()) {
-    map[meta_namespace] = ProtobufWkt::Struct();
-    namespace_iter = map.find(meta_namespace);
-  }
-
-  auto& keyval = namespace_iter->second;
-  (*keyval.mutable_fields())[key] = val;
+  auto& keyval = struct_map[meta_namespace];
+  (*keyval.mutable_fields())[key] = std::move(val);
 
   return true;
 }

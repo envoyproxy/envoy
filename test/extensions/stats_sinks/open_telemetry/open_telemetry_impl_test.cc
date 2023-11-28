@@ -38,12 +38,14 @@ public:
   const OtlpOptionsSharedPtr otlpOptions(bool report_counters_as_deltas = false,
                                          bool report_histograms_as_deltas = false,
                                          bool emit_tags_as_attributes = true,
-                                         bool use_tag_extracted_name = true) {
+                                         bool use_tag_extracted_name = true,
+                                         const std::string& stat_prefix = "") {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
     sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
     sink_config.mutable_emit_tags_as_attributes()->set_value(emit_tags_as_attributes);
     sink_config.mutable_use_tag_extracted_name()->set_value(use_tag_extracted_name);
+    sink_config.set_prefix(stat_prefix);
 
     return std::make_shared<OtlpOptions>(sink_config);
   }
@@ -62,6 +64,18 @@ public:
     snapshot_.counters_.push_back({delta, *counter_storage_.back()});
   }
 
+  void addHostCounterToSnapshot(const std::string& name, uint64_t delta, uint64_t value) {
+    Stats::PrimitiveCounter counter;
+    counter.add(value - delta);
+    counter.latch();
+    counter.add(delta);
+    Stats::PrimitiveCounterSnapshot s(counter);
+    s.setName(std::string(name));
+    s.setTagExtractedName(getTagExtractedName(name));
+    s.setTags({{"counter_key", "counter_val"}});
+    snapshot_.host_counters_.push_back(s);
+  }
+
   void addGaugeToSnapshot(const std::string& name, uint64_t value, bool used = true) {
     gauge_storage_.emplace_back(std::make_unique<NiceMock<Stats::MockGauge>>());
     gauge_storage_.back()->name_ = name;
@@ -71,6 +85,16 @@ public:
     gauge_storage_.back()->setTags({{"gauge_key", "gauge_val"}});
 
     snapshot_.gauges_.push_back(*gauge_storage_.back());
+  }
+
+  void addHostGaugeToSnapshot(const std::string& name, uint64_t value) {
+    Stats::PrimitiveGauge gauge;
+    gauge.add(value);
+    Stats::PrimitiveGaugeSnapshot s(gauge);
+    s.setName(std::string(name));
+    s.setTagExtractedName(getTagExtractedName(name));
+    s.setTags({{"gauge_key", "gauge_val"}});
+    snapshot_.host_gauges_.push_back(s);
   }
 
   void addHistogramToSnapshot(const std::string& name, bool is_delta = false, bool used = true) {
@@ -214,11 +238,13 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
   OtlpMetricsFlusherImpl flusher(otlpOptions());
 
   addCounterToSnapshot("test_counter", 1, 1);
+  addHostCounterToSnapshot("test_host_counter", 2, 3);
   addGaugeToSnapshot("test_gauge", 1);
+  addHostGaugeToSnapshot("test_host_gauge", 4);
   addHistogramToSnapshot("test_histogram");
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
-  expectMetricsCount(metrics, 3);
+  expectMetricsCount(metrics, 5);
 
   {
     const auto metric = metricAt(0, metrics);
@@ -228,19 +254,49 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
 
   {
     const auto metric = metricAt(1, metrics);
+    expectGauge(metric, getTagExtractedName("test_host_gauge"), 4);
+    expectAttributes(metric.gauge().data_points()[0].attributes(), "gauge_key", "gauge_val");
+  }
+
+  {
+    const auto metric = metricAt(2, metrics);
     expectSum(metric, getTagExtractedName("test_counter"), 1, false);
     expectAttributes(metric.sum().data_points()[0].attributes(), "counter_key", "counter_val");
   }
 
   {
-    const auto metric = metricAt(2, metrics);
+    const auto metric = metricAt(3, metrics);
+    expectSum(metric, getTagExtractedName("test_host_counter"), 3, false);
+    expectAttributes(metric.sum().data_points()[0].attributes(), "counter_key", "counter_val");
+  }
+
+  {
+    const auto metric = metricAt(4, metrics);
     expectHistogram(metric, getTagExtractedName("test_histogram"), false);
     expectAttributes(metric.histogram().data_points()[0].attributes(), "hist_key", "hist_val");
   }
 
   gauge_storage_.back()->used_ = false;
   metrics = flusher.flush(snapshot_);
-  expectMetricsCount(metrics, 2);
+  expectMetricsCount(metrics, 4);
+}
+
+TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix"));
+
+  addCounterToSnapshot("test_counter", 1, 1);
+  addHostCounterToSnapshot("test_host_counter", 1, 1);
+  addGaugeToSnapshot("test_gauge", 1);
+  addGaugeToSnapshot("test_host_gauge", 1);
+  addHistogramToSnapshot("test_histogram");
+
+  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
+  expectMetricsCount(metrics, 5);
+  expectGauge(metricAt(0, metrics), getTagExtractedName("prefix.test_gauge"), 1);
+  expectGauge(metricAt(1, metrics), getTagExtractedName("prefix.test_host_gauge"), 1);
+  expectSum(metricAt(2, metrics), getTagExtractedName("prefix.test_counter"), 1, false);
+  expectSum(metricAt(3, metrics), getTagExtractedName("prefix.test_host_counter"), 1, false);
+  expectHistogram(metricAt(4, metrics), getTagExtractedName("prefix.test_histogram"), false);
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithNoTaggedName) {
@@ -291,11 +347,15 @@ TEST_F(OtlpMetricsFlusherTests, GaugeMetric) {
 
   addGaugeToSnapshot("test_gauge1", 1);
   addGaugeToSnapshot("test_gauge2", 2);
+  addHostGaugeToSnapshot("test_host_gauge1", 3);
+  addHostGaugeToSnapshot("test_host_gauge2", 4);
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
-  expectMetricsCount(metrics, 2);
+  expectMetricsCount(metrics, 4);
   expectGauge(metricAt(0, metrics), getTagExtractedName("test_gauge1"), 1);
   expectGauge(metricAt(1, metrics), getTagExtractedName("test_gauge2"), 2);
+  expectGauge(metricAt(2, metrics), getTagExtractedName("test_host_gauge1"), 3);
+  expectGauge(metricAt(3, metrics), getTagExtractedName("test_host_gauge2"), 4);
 }
 
 TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
@@ -303,11 +363,15 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
 
   addCounterToSnapshot("test_counter1", 1, 1);
   addCounterToSnapshot("test_counter2", 2, 3);
+  addHostCounterToSnapshot("test_host_counter1", 2, 4);
+  addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
-  expectMetricsCount(metrics, 2);
+  expectMetricsCount(metrics, 4);
   expectSum(metricAt(0, metrics), getTagExtractedName("test_counter1"), 1, false);
   expectSum(metricAt(1, metrics), getTagExtractedName("test_counter2"), 3, false);
+  expectSum(metricAt(2, metrics), getTagExtractedName("test_host_counter1"), 4, false);
+  expectSum(metricAt(3, metrics), getTagExtractedName("test_host_counter2"), 10, false);
 }
 
 TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
@@ -315,11 +379,15 @@ TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
 
   addCounterToSnapshot("test_counter1", 1, 1);
   addCounterToSnapshot("test_counter2", 2, 3);
+  addHostCounterToSnapshot("test_host_counter1", 2, 4);
+  addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
-  expectMetricsCount(metrics, 2);
+  expectMetricsCount(metrics, 4);
   expectSum(metricAt(0, metrics), getTagExtractedName("test_counter1"), 1, true);
   expectSum(metricAt(1, metrics), getTagExtractedName("test_counter2"), 2, true);
+  expectSum(metricAt(2, metrics), getTagExtractedName("test_host_counter1"), 2, true);
+  expectSum(metricAt(3, metrics), getTagExtractedName("test_host_counter2"), 5, true);
 }
 
 TEST_F(OtlpMetricsFlusherTests, CumulativeHistogramMetric) {

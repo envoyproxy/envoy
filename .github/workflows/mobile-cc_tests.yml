@@ -1,5 +1,8 @@
 name: mobile_cc_tests
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -14,18 +17,23 @@ jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     uses: ./.github/workflows/_env.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: read
 
   cctests:
     if: ${{ needs.env.outputs.mobile_cc_tests == 'true' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: cc_tests
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 120
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - env:
@@ -33,9 +41,9 @@ jobs:
       name: 'Run tests'
         # Regression test using the new API listener. TODO(#2711) clean up.
       run: |
-        cd mobile && ./bazelw test \
+        cd mobile
+        ./bazelw test \
             --action_env=LD_LIBRARY_PATH \
-            --test_output=all \
             --copt=-DUSE_API_LISTENER \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --config=mobile-remote-ci \
             //test/cc/...

@@ -91,12 +91,14 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
-  origin_ = headers.getInline(origin_handle.handle());
-  if (origin_ == nullptr || origin_->value().empty()) {
+  const Http::HeaderEntry* origin = headers.getInline(origin_handle.handle());
+  if (origin == nullptr || origin->value().empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (!isOriginAllowed(origin_->value())) {
+  latched_origin_ = std::string(origin->value().getStringView());
+
+  if (!isOriginAllowed(origin->value())) {
     config_->stats().origin_invalid_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -121,7 +123,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}})};
 
   response_headers->setInline(access_control_allow_origin_handle.handle(),
-                              origin_->value().getStringView());
+                              origin->value().getStringView());
 
   if (allowCredentials()) {
     response_headers->setReferenceInline(access_control_allow_credentials_handle.handle(),
@@ -173,7 +175,7 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& hea
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.setInline(access_control_allow_origin_handle.handle(), origin_->value().getStringView());
+  headers.setInline(access_control_allow_origin_handle.handle(), latched_origin_);
   if (allowCredentials()) {
     headers.setReferenceInline(access_control_allow_credentials_handle.handle(),
                                Http::CustomHeaders::get().CORSValues.True);

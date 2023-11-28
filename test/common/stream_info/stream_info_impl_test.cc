@@ -37,9 +37,11 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
-    ASSERT_TRUE(sizeof(stream_info) == 840 || sizeof(stream_info) == 856 ||
-                sizeof(stream_info) == 888 || sizeof(stream_info) == 776 ||
-                sizeof(stream_info) == 728 || sizeof(stream_info) == 744)
+    ASSERT_TRUE(
+        sizeof(stream_info) == 840 || sizeof(stream_info) == 856 || sizeof(stream_info) == 888 ||
+        sizeof(stream_info) == 776 || sizeof(stream_info) == 728 || sizeof(stream_info) == 744 ||
+        sizeof(stream_info) == 680 || sizeof(stream_info) == 696 || sizeof(stream_info) == 688 ||
+        sizeof(stream_info) == 720 || sizeof(stream_info) == 704)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -166,7 +168,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(Http::Protocol::Http10, stream_info.protocol().value());
 
     EXPECT_FALSE(stream_info.responseCode());
-    stream_info.response_code_ = 200;
+    stream_info.setResponseCode(200);
     ASSERT_TRUE(stream_info.responseCode());
     EXPECT_EQ(200, stream_info.responseCode().value());
 
@@ -281,7 +283,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.addPacketsRetransmitted(1);
 
   // setFrom
-  s1.setRouteName("foo");
   s1.setVirtualClusterName(absl::optional<std::string>("bar"));
   s1.setResponseCode(200);
   s1.setResponseCodeDetails("OK");
@@ -302,7 +303,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setStreamIdProvider(
       std::make_shared<StreamIdProviderImpl>("a121e9e1-feae-4136-9e0e-6fac343d56c9"));
   s1.setTraceReason(Tracing::Reason::ClientForced);
-  s1.setFilterChainName("foobar");
   s1.setAttemptCount(5);
   s1.setDownstreamTransportFailureReason("error");
   s1.addBytesSent(1);
@@ -358,7 +358,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.getStreamIdProvider().value().get().toStringView().value(),
             s2.getStreamIdProvider().value().get().toStringView().value());
   EXPECT_EQ(s1.traceReason(), s2.traceReason());
-  EXPECT_EQ(s1.filterChainName(), s2.filterChainName());
   EXPECT_EQ(s1.attemptCount(), s2.attemptCount());
   EXPECT_EQ(s1.getUpstreamBytesMeter(), s2.getUpstreamBytesMeter());
   EXPECT_EQ(s1.bytesSent(), s2.bytesSent());

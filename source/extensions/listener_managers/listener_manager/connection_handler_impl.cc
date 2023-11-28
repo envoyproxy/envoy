@@ -8,6 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/event/deferred_task.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/listener_managers/listener_manager/active_tcp_listener.h"
@@ -35,7 +36,8 @@ void ConnectionHandlerImpl::decNumConnections() {
 }
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                                        Network::ListenerConfig& config, Runtime::Loader& runtime) {
+                                        Network::ListenerConfig& config, Runtime::Loader& runtime,
+                                        Random::RandomGenerator& random) {
   if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
@@ -82,9 +84,11 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       details->addActiveListener(
           config, address, listener_reject_fraction_, disable_listeners_,
           std::make_unique<ActiveTcpListener>(
-              *this, config, runtime,
+              *this, config, runtime, random,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
-              address, config.connectionBalancer(*address)),
+              address, config.connectionBalancer(*address),
+              overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
+                                : absl::nullopt),
           overload_manager_);
     }
   } else {
@@ -241,13 +245,15 @@ void ConnectionHandlerImpl::removeFilterChains(
   Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
-void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
+void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag,
+                                          const Network::ExtraShutdownListenerOptions& options) {
   if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
-    iter->second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
-        listener.shutdownListener();
-      }
-    });
+    iter->second->invokeListenerMethod(
+        [options](Network::ConnectionHandler::ActiveListener& listener) {
+          if (listener.listener() != nullptr) {
+            listener.shutdownListener(options);
+          }
+        });
   }
 }
 
@@ -255,7 +261,7 @@ void ConnectionHandlerImpl::stopListeners() {
   for (auto& iter : listener_map_by_tag_) {
     iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
       if (listener.listener() != nullptr) {
-        listener.shutdownListener();
+        listener.shutdownListener({});
       }
     });
   }
@@ -345,6 +351,16 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
   return absl::nullopt;
 }
 
+Network::ListenerPtr ConnectionHandlerImpl::createListener(
+    Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, const Network::ListenerConfig& config,
+    Server::ThreadLocalOverloadStateOptRef overload_state) {
+  return std::make_unique<Network::TcpListenerImpl>(
+      dispatcher(), random, runtime, std::move(socket), cb, config.bindToPort(),
+      config.ignoreGlobalConnLimit(), config.maxConnectionsToAcceptPerSocketEvent(),
+      overload_state);
+}
+
 Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
   // Only Ip address can be restored to original address and redirect.
@@ -355,8 +371,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
       listener_it != tcp_listener_map_by_address_.end() &&
       listener_it->second->listener_->listener() != nullptr) {
-    return Network::BalancedConnectionHandlerOptRef(
-        listener_it->second->tcpListener().value().get());
+    return {listener_it->second->tcpListener().value().get()};
   }
 
   OptRef<ConnectionHandlerImpl::PerAddressActiveListenerDetails> details;

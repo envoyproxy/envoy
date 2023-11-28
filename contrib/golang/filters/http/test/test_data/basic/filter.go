@@ -16,7 +16,6 @@ type filter struct {
 	callbacks       api.FilterCallbackHandler
 	req_body_length uint64
 	query_params    url.Values
-	protocol        string
 	scheme          string
 	method          string
 	path            string
@@ -55,7 +54,6 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 	f.req_body_length = 0
 
-	f.protocol = header.Protocol()
 	f.scheme = header.Scheme()
 	f.method = header.Method()
 	f.path = header.Path()
@@ -82,6 +80,7 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
 	body := fmt.Sprintf(msg, a...)
+	f.callbacks.Log(api.Error, fmt.Sprintf("test failed: %s", body))
 	f.callbacks.SendLocalReply(500, body, nil, 0, "")
 	return api.LocalReply
 }
@@ -105,6 +104,24 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.callbacks.Log(api.Warn, "log test")
 	f.callbacks.Log(api.Error, "log test")
 	f.callbacks.Log(api.Critical, "log test")
+
+	api.LogTrace("log test")
+	api.LogDebug("log test")
+	api.LogInfo("log test")
+	api.LogWarn("log test")
+	api.LogError("log test")
+	api.LogCritical("log test")
+
+	api.LogTracef("log test %v", endStream)
+	api.LogDebugf("log test %v", endStream)
+	api.LogInfof("log test %v", endStream)
+	api.LogWarnf("log test %v", endStream)
+	api.LogErrorf("log test %v", endStream)
+	api.LogCriticalf("log test %v", endStream)
+
+	if f.callbacks.LogLevel() != api.GetLogLevel() {
+		return f.fail("log level mismatch")
+	}
 
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
@@ -169,6 +186,30 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return f.fail("Values return unexpected data %v", hdrs)
 	}
 
+	if found {
+		upperCase, _ := header.Get("X-Test-Header-0")
+		if upperCase != origin {
+			return f.fail("Get should be case-insensitive")
+		}
+		upperCaseHdrs := header.Values("X-Test-Header-0")
+		if hdrs[0] != upperCaseHdrs[0] {
+			return f.fail("Values should be case-insensitive")
+		}
+	}
+
+	header.Add("UpperCase", "header")
+	if hdr, _ := header.Get("uppercase"); hdr != "header" {
+		return f.fail("Add should be case-insensitive")
+	}
+	header.Set("UpperCase", "header")
+	if hdr, _ := header.Get("uppercase"); hdr != "header" {
+		return f.fail("Set should be case-insensitive")
+	}
+	header.Del("UpperCase")
+	if hdr, _ := header.Get("uppercase"); hdr != "" {
+		return f.fail("Del should be case-insensitive")
+	}
+
 	header.Add("existed-header", "bar")
 	header.Add("newly-added-header", "foo")
 	header.Add("newly-added-header", "bar")
@@ -199,6 +240,11 @@ func (f *filter) decodeData(buffer api.BufferInstance, endStream bool) api.Statu
 	f.req_body_length += uint64(buffer.Len())
 	if buffer.Len() != 0 {
 		data := buffer.String()
+		if string(buffer.Bytes()) != data {
+			return f.sendLocalReply(fmt.Sprintf("data in bytes: %s vs data in string: %s",
+				string(buffer.Bytes()), data))
+		}
+
 		buffer.SetString(strings.ToUpper(data))
 		buffer.AppendString("_append")
 		buffer.PrependString("prepend_")
@@ -233,6 +279,28 @@ func (f *filter) decodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 		trailers.Add("x-test-trailer-2", "bar")
 	}
 
+	upperCase, _ := trailers.Get("X-Test-Trailer-0")
+	if upperCase != "bar" {
+		return f.fail("Get should be case-insensitive")
+	}
+	upperCaseHdrs := trailers.Values("X-Test-Trailer-0")
+	if upperCaseHdrs[0] != "bar" {
+		return f.fail("Values should be case-insensitive")
+	}
+
+	trailers.Add("UpperCase", "trailers")
+	if hdr, _ := trailers.Get("uppercase"); hdr != "trailers" {
+		return f.fail("Add should be case-insensitive")
+	}
+	trailers.Set("UpperCase", "trailers")
+	if hdr, _ := trailers.Get("uppercase"); hdr != "trailers" {
+		return f.fail("Set should be case-insensitive")
+	}
+	trailers.Del("UpperCase")
+	if hdr, _ := trailers.Get("uppercase"); hdr != "" {
+		return f.fail("Del should be case-insensitive")
+	}
+
 	if f.panic == "decode-trailer" {
 		badcode()
 	}
@@ -256,7 +324,7 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
 		header.Set("rsp-response-code-details", details)
 	}
-	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamHostAddress(); ok {
+	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamRemoteAddress(); ok {
 		header.Set("rsp-upstream-host", upstream_host_address)
 	}
 	if upstream_cluster_name, ok := f.callbacks.StreamInfo().UpstreamClusterName(); ok {
@@ -436,6 +504,10 @@ func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 		status := f.encodeTrailers(trailers)
 		return status
 	}
+}
+
+func (f *filter) OnLog() {
+	api.LogError("call log in OnLog")
 }
 
 func (f *filter) OnDestroy(reason api.DestroyReason) {

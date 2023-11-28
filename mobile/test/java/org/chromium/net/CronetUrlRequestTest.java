@@ -1769,8 +1769,8 @@ public class CronetUrlRequestTest {
                    callback.mError.getMessage());
   }
 
-  private void throwOrCancel(FailureType failureType, ResponseStep failureStep,
-                             boolean expectResponseInfo, boolean expectError) {
+  private TestUrlRequestCallback throwOrCancel(FailureType failureType, ResponseStep failureStep,
+                                               boolean expectError) {
     if (Log.isLoggable("TESTING", Log.VERBOSE)) {
       Log.v("TESTING", "Testing " + failureType + " during " + failureStep);
     }
@@ -1790,7 +1790,6 @@ public class CronetUrlRequestTest {
       assertEquals(ResponseStep.ON_FAILED, callback.mResponseStep);
     }
     assertTrue(urlRequest.isDone());
-    assertEquals(expectResponseInfo, callback.mResponseInfo != null);
     assertEquals(expectError, callback.mError != null);
     assertEquals(expectError, callback.mOnErrorCalled);
     // When failureType is FailureType.CANCEL_ASYNC_WITHOUT_PAUSE and failureStep is
@@ -1803,6 +1802,13 @@ public class CronetUrlRequestTest {
                        failureType == FailureType.CANCEL_ASYNC_WITHOUT_PAUSE,
                    callback.mOnCanceledCalled);
     }
+    return callback;
+  }
+
+  private void throwOrCancel(FailureType failureType, ResponseStep failureStep,
+                             boolean expectResponseInfo, boolean expectError) {
+    TestUrlRequestCallback callback = throwOrCancel(failureType, failureStep, expectError);
+    assertEquals(expectResponseInfo, callback.mResponseInfo != null);
   }
 
   @Test
@@ -1811,20 +1817,17 @@ public class CronetUrlRequestTest {
   public void testFailures() throws Exception {
     throwOrCancel(FailureType.CANCEL_SYNC, ResponseStep.ON_RECEIVED_REDIRECT, false, false);
     throwOrCancel(FailureType.CANCEL_ASYNC, ResponseStep.ON_RECEIVED_REDIRECT, false, false);
-    throwOrCancel(FailureType.CANCEL_ASYNC_WITHOUT_PAUSE, ResponseStep.ON_RECEIVED_REDIRECT, false,
-                  false);
+    throwOrCancel(FailureType.CANCEL_ASYNC_WITHOUT_PAUSE, ResponseStep.ON_RECEIVED_REDIRECT, false);
     throwOrCancel(FailureType.THROW_SYNC, ResponseStep.ON_RECEIVED_REDIRECT, false, true);
 
     throwOrCancel(FailureType.CANCEL_SYNC, ResponseStep.ON_RESPONSE_STARTED, true, false);
     throwOrCancel(FailureType.CANCEL_ASYNC, ResponseStep.ON_RESPONSE_STARTED, true, false);
-    throwOrCancel(FailureType.CANCEL_ASYNC_WITHOUT_PAUSE, ResponseStep.ON_RESPONSE_STARTED, true,
-                  false);
+    throwOrCancel(FailureType.CANCEL_ASYNC_WITHOUT_PAUSE, ResponseStep.ON_RESPONSE_STARTED, false);
     throwOrCancel(FailureType.THROW_SYNC, ResponseStep.ON_RESPONSE_STARTED, true, true);
 
     throwOrCancel(FailureType.CANCEL_SYNC, ResponseStep.ON_READ_COMPLETED, true, false);
     throwOrCancel(FailureType.CANCEL_ASYNC, ResponseStep.ON_READ_COMPLETED, true, false);
-    throwOrCancel(FailureType.CANCEL_ASYNC_WITHOUT_PAUSE, ResponseStep.ON_READ_COMPLETED, true,
-                  false);
+    throwOrCancel(FailureType.CANCEL_ASYNC_WITHOUT_PAUSE, ResponseStep.ON_READ_COMPLETED, false);
     throwOrCancel(FailureType.THROW_SYNC, ResponseStep.ON_READ_COMPLETED, true, true);
   }
 

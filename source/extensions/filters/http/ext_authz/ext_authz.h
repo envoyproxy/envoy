@@ -60,10 +60,11 @@ public:
                const std::string& stats_prefix, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
+        failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
 
-        // `pack_as_bytes_` should be true when configured with an http service because there is no
+        // `pack_as_bytes_` should be true when configured with the HTTP service because there is no
         // difference to where the body is written in http requests, and a value of false here will
         // cause non UTF-8 body content to be changed when it doesn't need to.
         pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
@@ -87,8 +88,15 @@ public:
                                      config.metadata_context_namespaces().end()),
         typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
                                            config.typed_metadata_context_namespaces().end()),
+        route_metadata_context_namespaces_(config.route_metadata_context_namespaces().begin(),
+                                           config.route_metadata_context_namespaces().end()),
+        route_typed_metadata_context_namespaces_(
+            config.route_typed_metadata_context_namespaces().begin(),
+            config.route_typed_metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
+        charge_cluster_response_stats_(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -133,6 +141,8 @@ public:
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
+  bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
+
   bool clearRouteCache() const { return clear_route_cache_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
@@ -164,6 +174,14 @@ public:
     return typed_metadata_context_namespaces_;
   }
 
+  const std::vector<std::string>& routeMetadataContextNamespaces() {
+    return route_metadata_context_namespaces_;
+  }
+
+  const std::vector<std::string>& routeTypedMetadataContextNamespaces() {
+    return route_typed_metadata_context_namespaces_;
+  }
+
   const ExtAuthzFilterStats& stats() const { return stats_; }
 
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
@@ -173,6 +191,8 @@ public:
   bool includePeerCertificate() const { return include_peer_certificate_; }
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
+
+  bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
   const Filters::Common::ExtAuthz::MatcherSharedPtr& requestHeaderMatchers() const {
     return request_header_matchers_;
@@ -205,6 +225,7 @@ private:
 
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
+  const bool failure_mode_allow_header_add_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
@@ -223,9 +244,12 @@ private:
 
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;
+  const std::vector<std::string> route_metadata_context_namespaces_;
+  const std::vector<std::string> route_typed_metadata_context_namespaces_;
 
   const bool include_peer_certificate_;
   const bool include_tls_session_;
+  const bool charge_cluster_response_stats_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
@@ -256,9 +280,17 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
-        disable_request_body_buffering_(config.has_check_settings() &&
-                                        config.check_settings().disable_request_body_buffering()),
-        disabled_(config.disabled()) {}
+        check_settings_(config.has_check_settings()
+                            ? config.check_settings()
+                            : envoy::extensions::filters::http::ext_authz::v3::CheckSettings()),
+        disabled_(config.disabled()) {
+    if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
+        config.check_settings().has_with_request_body()) {
+      ExceptionUtil::throwEnvoyException(
+          "Invalid configuration for check_settings. Only one of disable_request_body_buffering or "
+          "with_request_body can be set.");
+    }
+  }
 
   void merge(const FilterConfigPerRoute& other);
 
@@ -271,13 +303,15 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  bool disableRequestBodyBuffering() const { return disable_request_body_buffering_; }
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings checkSettings() const {
+    return check_settings_;
+  }
 
 private:
-  // We save the context extensions as a protobuf map instead of an std::map as this allows us to
+  // We save the context extensions as a protobuf map instead of a std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
-  bool disable_request_body_buffering_;
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   bool disabled_;
 };
 
@@ -319,12 +353,12 @@ private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
-  bool isBufferFull() const;
+  bool isBufferFull(uint64_t num_bytes_processing) const;
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
     const bool skip_check_;
-    const bool skip_request_body_buffering_;
+    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   };
   PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
@@ -335,7 +369,7 @@ private:
 
   // FilterReturn is used to capture what the return code should be to the filter chain.
   // if this filter is either in the middle of calling the service or the result is denied then
-  // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
+  // the filter chain should stop. Otherwise, the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
 
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);

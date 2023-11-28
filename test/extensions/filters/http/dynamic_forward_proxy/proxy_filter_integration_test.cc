@@ -230,11 +230,12 @@ typed_config:
     }
   }
 
-  void requestWithUnknownDomainTest(const std::string& typed_dns_resolver_config = "") {
+  void requestWithUnknownDomainTest(const std::string& typed_dns_resolver_config = "",
+                                    const std::string& hostname = "doesnotexist.example.com") {
     useAccessLog("%RESPONSE_CODE_DETAILS%");
     initializeWithArgs(1024, 1024, "", typed_dns_resolver_config);
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    default_request_headers_.setHost("doesnotexist.example.com");
+    default_request_headers_.setHost(hostname);
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
@@ -349,6 +350,13 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknownDomainTest(); }
+
+// TODO(yanavlasov) Enable per #26642
+#ifndef ENVOY_ENABLE_UHV
+TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
+  requestWithUnknownDomainTest("", "\x00\x00.google.com");
+}
+#endif
 
 // Do a sanity check using the getaddrinfo() resolver.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainGetAddrInfoResolver) {

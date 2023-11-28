@@ -6,6 +6,7 @@
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/http/header_validators/envoy_default/config_overrides.h"
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
 #include "absl/container/node_hash_map.h"
@@ -25,7 +26,8 @@ public:
   HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const ConfigOverrides& config_overrides);
   virtual ~HeaderValidator() = default;
 
   using HeaderEntryValidationResult = ::Envoy::Http::HeaderValidator::RejectResult;
@@ -163,9 +165,52 @@ protected:
    */
   void sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& header_map);
 
+  /*
+   * Validate the :path pseudo header using specific allowed character set.
+   */
+  HeaderValueValidationResult
+  validatePathHeaderCharacterSet(const ::Envoy::Http::HeaderString& value,
+                                 const std::array<uint32_t, 8>& allowed_path_chracters,
+                                 const std::array<uint32_t, 8>& allowed_query_fragment_characters);
+
+  // URL-encode additional characters in URL path. This method is called iff
+  // `envoy.uhv.allow_non_compliant_characters_in_path` is true.
+  // Encoded characters:
+  //
+  // " < > ^ ` { } | TAB space extended-ASCII
+  // This method is provided for backward compatibility with Envoy's pre header validator
+  // behavior. See comments in the HeaderValidatorConfigOverrides declaration above for more
+  // information.
+  void encodeAdditionalCharactersInPath(::Envoy::Http::RequestHeaderMap& header_map);
+  /**
+   * Check if the :path header contains a fragment. If the fragment is found it is stripped from
+   * the :path.
+   */
+  void sanitizePathWithFragment(::Envoy::Http::RequestHeaderMap& header_map);
+
+  /**
+   * Decode percent-encoded slash characters based on configuration.
+   */
+  PathNormalizer::PathNormalizationResult
+  sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_map);
+
+  /**
+   * Transform URL path according to configuration (i.e. apply path normalization).
+   */
+  PathNormalizer::PathNormalizationResult
+  transformUrlPath(::Envoy::Http::RequestHeaderMap& header_map);
+
+  /**
+   * Check for presence of %00 sequence based on configuration.
+   * Reject request if %00 sequence was found.
+   */
+  HeaderValueValidationResult
+  checkForPercent00InUrlPath(const ::Envoy::Http::RequestHeaderMap& header_map);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;
+  const ConfigOverrides config_overrides_;
   const ::Envoy::Http::HeaderValues& header_values_;
   ::Envoy::Http::HeaderValidatorStats& stats_;
   const PathNormalizer path_normalizer_;

@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
@@ -209,7 +210,9 @@ public:
                                            Ssl::ContextManager& context_manager,
                                            const std::string& san_to_match);
 
-  static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(absl::string_view config);
+  static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(
+      const ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
+          config);
 };
 
 // A set of connection callbacks which tracks connection state.

@@ -24,48 +24,86 @@ public:
   LeastRequestIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
     // Create 3 different upstream server for stateful session test.
     setUpstreamCount(3);
+  }
 
-    // Update endpoints of default cluster `cluster_0` to 3 different fake upstreams.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
-      ASSERT(cluster_0->name() == "cluster_0");
-      auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+  void initializeConfig(bool legacy_api = false, bool disable_lagacy_api_conversion = false) {
+    if (disable_lagacy_api_conversion) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.convert_legacy_lb_config",
+                                        "false");
+    }
 
-      constexpr absl::string_view endpoints_yaml = R"EOF(
-        lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: {}
-                port_value: 0
-        - endpoint:
-            address:
-              socket_address:
-                address: {}
-                port_value: 0
-        - endpoint:
-            address:
-              socket_address:
-                address: {}
-                port_value: 0
-      )EOF";
+    config_helper_.addConfigModifier(
+        [legacy_api](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+          ASSERT(cluster_0->name() == "cluster_0");
+          auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
 
-      const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
-      TestUtility::loadFromYaml(
-          fmt::format(endpoints_yaml, local_address, local_address, local_address), *endpoint);
+          constexpr absl::string_view endpoints_yaml = R"EOF(
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          )EOF";
 
-      auto* policy = cluster_0->mutable_load_balancing_policy();
+          const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
+          TestUtility::loadFromYaml(
+              fmt::format(endpoints_yaml, local_address, local_address, local_address), *endpoint);
 
-      const std::string policy_yaml = R"EOF(
-        policies:
-        - typed_extension_config:
-            name: envoy.load_balancing_policies.least_request
-            typed_config:
-                "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest
-       )EOF";
+          // If legacy API is used, set the LB policy by the old way.
+          if (legacy_api) {
+            cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster::LEAST_REQUEST);
+            return;
+          }
 
-      TestUtility::loadFromYaml(policy_yaml, *policy);
-    });
+          auto* policy = cluster_0->mutable_load_balancing_policy();
+
+          const std::string policy_yaml = R"EOF(
+          policies:
+          - typed_extension_config:
+              name: envoy.load_balancing_policies.least_request
+              typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest
+          )EOF";
+
+          TestUtility::loadFromYaml(policy_yaml, *policy);
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void runNormalLoadBalancing() {
+    for (uint64_t i = 0; i < 8; i++) {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+
+      Http::TestRequestHeaderMapImpl request_headers{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "example.com"}};
+
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2});
+      ASSERT(upstream_index.has_value());
+
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
+
+      cleanupUpstreamAndDownstream();
+    }
   }
 };
 
@@ -74,28 +112,18 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LeastRequestIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(LeastRequestIntegrationTest, NormalLoadBalancing) {
-  initialize();
+  initializeConfig();
+  runNormalLoadBalancing();
+}
 
-  for (uint64_t i = 0; i < 8; i++) {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
+TEST_P(LeastRequestIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
+  initializeConfig(true);
+  runNormalLoadBalancing();
+}
 
-    Http::TestRequestHeaderMapImpl request_headers{
-        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "example.com"}};
-
-    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
-
-    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2});
-    ASSERT(upstream_index.has_value());
-
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-
-    ASSERT_TRUE(response->waitForEndStream());
-
-    EXPECT_TRUE(upstream_request_->complete());
-    EXPECT_TRUE(response->complete());
-
-    cleanupUpstreamAndDownstream();
-  }
+TEST_P(LeastRequestIntegrationTest, NormalLoadBalancingWithLegacyAPIAndDisableAPIConversion) {
+  initializeConfig(true, true);
+  runNormalLoadBalancing();
 }
 
 } // namespace

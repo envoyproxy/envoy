@@ -20,7 +20,7 @@ package network
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -58,16 +58,30 @@ var (
 	configIDGenerator uint64
 	configCache       = &sync.Map{} // uint64 -> *anypb.Any
 
+	upstreamConnIDGenerator uint64
+
 	libraryID string
 )
 
+// wrap the UpstreamFilter to ensure that the runtime.finalizer can be triggered
+// regardless of whether there is a circular reference in the UpstreamFilter.
+type upstreamConnWrapper struct {
+	api.UpstreamFilter
+	finalizer *int
+}
+
 func CreateUpstreamConn(addr string, filter api.UpstreamFilter) {
-	h := uint64(uintptr(cgoAPI.UpstreamConnect(libraryID, addr)))
-	// TODO: handle error
-	_ = UpstreamFilters.StoreFilter(h, filter)
+	conn := &upstreamConnWrapper{
+		UpstreamFilter: filter,
+		finalizer:      new(int),
+	}
+	connID := atomic.AddUint64(&upstreamConnIDGenerator, 1)
+	_ = UpstreamFilters.StoreFilterByConnID(connID, conn)
+
+	h := cgoAPI.UpstreamConnect(libraryID, addr, connID)
 
 	// NP: make sure filter will be deleted.
-	runtime.SetFinalizer(filter, func(f api.UpstreamFilter) {
+	runtime.SetFinalizer(conn.finalizer, func(_ *int) {
 		cgoAPI.UpstreamFinalize(unsafe.Pointer(uintptr(h)), api.NormalFinalize)
 	})
 }
@@ -101,6 +115,11 @@ func envoyGoFilterOnDownstreamConnection(wrapper unsafe.Pointer, pluginNamePtr u
 		writeFunc: cgoAPI.DownstreamWrite,
 		closeFunc: cgoAPI.DownstreamClose,
 		infoFunc:  cgoAPI.DownstreamInfo,
+		state: &filterState{
+			wrapper: wrapper,
+			setFunc: cgoAPI.SetFilterState,
+			getFunc: cgoAPI.GetFilterState,
+		},
 	}
 	filter := filterFactory.CreateFilter(cb)
 
@@ -110,7 +129,10 @@ func envoyGoFilterOnDownstreamConnection(wrapper unsafe.Pointer, pluginNamePtr u
 	})
 
 	// TODO: handle error
-	_ = DownstreamFilters.StoreFilter(uint64(uintptr(wrapper)), filter)
+	_ = DownstreamFilters.StoreFilter(uint64(uintptr(wrapper)), &downstreamFilterWrapper{
+		filter: filter,
+		cb:     cb,
+	})
 
 	return uint64(filter.OnNewConnection())
 }
@@ -161,28 +183,39 @@ func envoyGoFilterOnDownstreamWrite(wrapper unsafe.Pointer, dataSize uint64, dat
 	return uint64(filter.OnWrite(buf, endOfStream == 1))
 }
 
+//export envoyGoFilterOnSemaDec
+func envoyGoFilterOnSemaDec(wrapper unsafe.Pointer) {
+	w := DownstreamFilters.GetFilterWrapper(uint64(uintptr(wrapper)))
+	if atomic.CompareAndSwapInt32(&w.cb.waitingOnEnvoy, 1, 0) {
+		w.cb.sema.Done()
+	}
+}
+
 //export envoyGoFilterOnUpstreamConnectionReady
-func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer) {
+func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer, connID uint64) {
 	cb := &connectionCallback{
 		wrapper:   wrapper,
 		writeFunc: cgoAPI.UpstreamWrite,
 		closeFunc: cgoAPI.UpstreamClose,
 		infoFunc:  cgoAPI.UpstreamInfo,
 	}
-	filter := UpstreamFilters.GetFilter(uint64(uintptr(wrapper)))
+	// switch filter from idMap to wrapperMap
+	filter := UpstreamFilters.GetFilterByConnID(connID)
+	UpstreamFilters.DeleteFilterByConnID(connID)
+	UpstreamFilters.StoreFilterByWrapper(uint64(uintptr(wrapper)), filter)
 	filter.OnPoolReady(cb)
 }
 
 //export envoyGoFilterOnUpstreamConnectionFailure
-func envoyGoFilterOnUpstreamConnectionFailure(wrapper unsafe.Pointer, reason int) {
-	filter := UpstreamFilters.GetFilter(uint64(uintptr(wrapper)))
+func envoyGoFilterOnUpstreamConnectionFailure(wrapper unsafe.Pointer, reason int, connID uint64) {
+	filter := UpstreamFilters.GetFilterByConnID(connID)
+	UpstreamFilters.DeleteFilterByConnID(connID)
 	filter.OnPoolFailure(api.PoolFailureReason(reason), "")
-	UpstreamFilters.DeleteFilter(uint64(uintptr(wrapper)))
 }
 
 //export envoyGoFilterOnUpstreamData
 func envoyGoFilterOnUpstreamData(wrapper unsafe.Pointer, dataSize uint64, dataPtr uint64, sliceNum int, endOfStream int) {
-	filter := UpstreamFilters.GetFilter(uint64(uintptr(wrapper)))
+	filter := UpstreamFilters.GetFilterByWrapper(uint64(uintptr(wrapper)))
 
 	var buf []byte
 
@@ -200,19 +233,24 @@ func envoyGoFilterOnUpstreamData(wrapper unsafe.Pointer, dataSize uint64, dataPt
 
 //export envoyGoFilterOnUpstreamEvent
 func envoyGoFilterOnUpstreamEvent(wrapper unsafe.Pointer, event int) {
-	filter := UpstreamFilters.GetFilter(uint64(uintptr(wrapper)))
+	filter := UpstreamFilters.GetFilterByWrapper(uint64(uintptr(wrapper)))
 	e := api.ConnectionEvent(event)
 	filter.OnEvent(e)
 	if e == api.LocalClose || e == api.RemoteClose {
-		UpstreamFilters.DeleteFilter(uint64(uintptr(wrapper)))
+		UpstreamFilters.DeleteFilterByWrapper(uint64(uintptr(wrapper)))
 	}
 }
 
-type DownstreamFilterMap struct {
-	m sync.Map // uint64 -> DownstreamFilter
+type downstreamFilterWrapper struct {
+	filter api.DownstreamFilter
+	cb     *connectionCallback
 }
 
-func (f *DownstreamFilterMap) StoreFilter(key uint64, filter api.DownstreamFilter) error {
+type DownstreamFilterMap struct {
+	m sync.Map // uint64 -> *downstreamFilterWrapper
+}
+
+func (f *DownstreamFilterMap) StoreFilter(key uint64, filter *downstreamFilterWrapper) error {
 	if _, loaded := f.m.LoadOrStore(key, filter); loaded {
 		return ErrDupRequestKey
 	}
@@ -220,8 +258,16 @@ func (f *DownstreamFilterMap) StoreFilter(key uint64, filter api.DownstreamFilte
 }
 
 func (f *DownstreamFilterMap) GetFilter(key uint64) api.DownstreamFilter {
+	w := f.GetFilterWrapper(key)
+	if w != nil {
+		return w.filter
+	}
+	return nil
+}
+
+func (f *DownstreamFilterMap) GetFilterWrapper(key uint64) *downstreamFilterWrapper {
 	if v, ok := f.m.Load(key); ok {
-		return v.(api.DownstreamFilter)
+		return v.(*downstreamFilterWrapper)
 	}
 	return nil
 }
@@ -238,30 +284,53 @@ func (f *DownstreamFilterMap) Clear() {
 }
 
 type UpstreamFilterMap struct {
-	m sync.Map // uint64 -> UpstreamFilter
+	idMap      sync.Map // upstreamConnID(uint) -> UpstreamFilter
+	wrapperMap sync.Map // wrapper(uint64) -> UpstreamFilter
 }
 
-func (f *UpstreamFilterMap) StoreFilter(key uint64, filter api.UpstreamFilter) error {
-	if _, loaded := f.m.LoadOrStore(key, filter); loaded {
+func (f *UpstreamFilterMap) StoreFilterByConnID(key uint64, filter api.UpstreamFilter) error {
+	if _, loaded := f.idMap.LoadOrStore(key, filter); loaded {
 		return ErrDupRequestKey
 	}
 	return nil
 }
 
-func (f *UpstreamFilterMap) GetFilter(key uint64) api.UpstreamFilter {
-	if v, ok := f.m.Load(key); ok {
+func (f *UpstreamFilterMap) StoreFilterByWrapper(key uint64, filter api.UpstreamFilter) error {
+	if _, loaded := f.wrapperMap.LoadOrStore(key, filter); loaded {
+		return ErrDupRequestKey
+	}
+	return nil
+}
+
+func (f *UpstreamFilterMap) GetFilterByConnID(key uint64) api.UpstreamFilter {
+	if v, ok := f.idMap.Load(key); ok {
 		return v.(api.UpstreamFilter)
 	}
 	return nil
 }
 
-func (f *UpstreamFilterMap) DeleteFilter(key uint64) {
-	f.m.Delete(key)
+func (f *UpstreamFilterMap) GetFilterByWrapper(key uint64) api.UpstreamFilter {
+	if v, ok := f.wrapperMap.Load(key); ok {
+		return v.(api.UpstreamFilter)
+	}
+	return nil
+}
+
+func (f *UpstreamFilterMap) DeleteFilterByConnID(key uint64) {
+	f.idMap.Delete(key)
+}
+
+func (f *UpstreamFilterMap) DeleteFilterByWrapper(key uint64) {
+	f.wrapperMap.Delete(key)
 }
 
 func (f *UpstreamFilterMap) Clear() {
-	f.m.Range(func(key, _ interface{}) bool {
-		f.m.Delete(key)
+	f.idMap.Range(func(key, _ interface{}) bool {
+		f.idMap.Delete(key)
+		return true
+	})
+	f.wrapperMap.Range(func(key, _ interface{}) bool {
+		f.wrapperMap.Delete(key)
 		return true
 	})
 }

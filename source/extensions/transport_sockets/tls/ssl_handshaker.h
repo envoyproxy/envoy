@@ -59,7 +59,7 @@ public:
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
   Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
   Ssl::ValidateResultCallbackPtr createValidateResultCallback() override;
-  void onCertificateValidationCompleted(bool succeeded) override;
+  void onCertificateValidationCompleted(bool succeeded, bool async) override;
   Ssl::ValidateStatus certificateValidationResult() const override {
     return cert_validation_result_;
   }
@@ -106,7 +106,7 @@ public:
 private:
   Ssl::HandshakeCallbacks* handshake_callbacks_;
 
-  Ssl::SocketState state_;
+  Ssl::SocketState state_{Ssl::SocketState::PreHandshake};
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
 };
 
