@@ -17,14 +17,6 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-#include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
-#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
-#include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
-#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
-#include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
-#endif
-
 #include "source/common/http/matching/inputs.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
@@ -482,63 +474,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     brotli_filter->set_name("envoy.filters.http.decompressor");
     brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  auto* compressor_filter = hcm->add_http_filters();
-  compressor_filter->set_name("envoy.filters.http.compressor");
-  envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_config;
-  extension_config.mutable_extension_config()->set_name("composite");
-  envoy::extensions::filters::http::composite::v3::Composite composite_config;
-  extension_config.mutable_extension_config()->mutable_typed_config()->PackFrom(composite_config);
-  auto* matcher_tree = extension_config.mutable_xds_matcher()->mutable_matcher_tree();
-  auto* matcher_input = matcher_tree->mutable_input();
-  matcher_input->set_name("request-headers");
-  envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_header_match_input;
-  request_header_match_input.set_header_name("x-envoy-mobile-compression");
-  matcher_input->mutable_typed_config()->PackFrom(request_header_match_input);
-  auto* exact_match_map = matcher_tree->mutable_exact_match_map()->mutable_map();
-  ::xds::type::matcher::v3::Matcher_OnMatch on_gzip_match;
-  auto* on_gzip_match_action = on_gzip_match.mutable_action();
-  on_gzip_match_action->set_name("composite-action");
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction execute_gzip_filter_action;
-  envoy::extensions::compression::gzip::compressor::v3::Gzip gzip_config;
-  gzip_config.mutable_window_bits()->set_value(15);
-  envoy::extensions::filters::http::compressor::v3::Compressor gzip_compressor_config;
-  gzip_compressor_config.mutable_compressor_library()->set_name("gzip");
-  gzip_compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(
-      gzip_config);
-  auto* gzip_common_request =
-      gzip_compressor_config.mutable_request_direction_config()->mutable_common_config();
-  gzip_common_request->mutable_enabled()->mutable_default_value()->set_value(true);
-  auto* gzip_common_response =
-      gzip_compressor_config.mutable_response_direction_config()->mutable_common_config();
-  gzip_common_response->mutable_enabled()->mutable_default_value()->set_value(false);
-  execute_gzip_filter_action.mutable_typed_config()->set_name("envoy.filters.http.compressor");
-  execute_gzip_filter_action.mutable_typed_config()->mutable_typed_config()->PackFrom(
-      gzip_compressor_config);
-  on_gzip_match_action->mutable_typed_config()->PackFrom(execute_gzip_filter_action);
-  (*exact_match_map)["gzip"] = on_gzip_match;
-  ::xds::type::matcher::v3::Matcher_OnMatch on_brotli_match;
-  auto* on_brotli_match_action = on_brotli_match.mutable_action();
-  on_brotli_match_action->set_name("composite-action");
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction execute_brotli_filter_action;
-  envoy::extensions::compression::brotli::compressor::v3::Brotli brotli_config;
-  envoy::extensions::filters::http::compressor::v3::Compressor brotli_compressor_config;
-  brotli_compressor_config.mutable_compressor_library()->set_name("text_optimized");
-  brotli_compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(
-      brotli_config);
-  auto* brotli_common_request =
-      brotli_compressor_config.mutable_request_direction_config()->mutable_common_config();
-  brotli_common_request->mutable_enabled()->mutable_default_value()->set_value(true);
-  auto* brotli_common_response =
-      brotli_compressor_config.mutable_response_direction_config()->mutable_common_config();
-  brotli_common_response->mutable_enabled()->mutable_default_value()->set_value(false);
-  execute_brotli_filter_action.mutable_typed_config()->set_name("envoy.filters.http.compressor");
-  execute_brotli_filter_action.mutable_typed_config()->mutable_typed_config()->PackFrom(
-      brotli_compressor_config);
-  on_brotli_match_action->mutable_typed_config()->PackFrom(execute_brotli_filter_action);
-  (*exact_match_map)["brotli"] = on_brotli_match;
-  compressor_filter->mutable_typed_config()->PackFrom(extension_config);
-#endif
   if (socket_tagging_filter_) {
     envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
     auto* tag_filter = hcm->add_http_filters();
