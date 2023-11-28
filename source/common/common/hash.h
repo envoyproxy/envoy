@@ -36,6 +36,13 @@ public:
    * src/google/protobuf/generated_message_util.cc literally just treats
    * a float the same as int32 for serialization purposes.
    *
+   * enums are excluded because they're not needed; if they were to be
+   * supported later they should have a separate function because enum
+   * sizes are implementation-specific.
+   *
+   * bools have a specialization in hash.cc because they too have
+   * implementation-specific sizes.
+   *
    * @param input supplies the value to hash.
    * @param seed supplies the hash seed which defaults to 0.
    * See https://github.com/Cyan4973/xxHash for details.
