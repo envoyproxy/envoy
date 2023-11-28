@@ -130,6 +130,8 @@ new_features:
   change: |
     Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to
     authenticate user credentials in the HTTP Authentication heaer defined in `RFC7617 <https://tools.ietf.org/html/rfc7617>`_.
+    Added :ref:`the credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`,
+    which can be used to inject credentials into the HTTP headers.
 - area: upstream
   change: |
     Added :ref:`enable_full_scan <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
