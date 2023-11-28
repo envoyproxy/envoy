@@ -88,6 +88,12 @@ public:
   }
 };
 
+// Explicit specialization for bool because its size may be implementation dependent.
+template <> inline uint64_t HashUtil::xxHash64Value(bool input, uint64_t seed) {
+  char b = input ? 1 : 0;
+  return XXH64(&b, sizeof(b), seed);
+}
+
 /**
  * From
  * (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc).
