@@ -6,7 +6,6 @@
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/xds_resource.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
