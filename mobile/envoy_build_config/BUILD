@@ -61,7 +61,9 @@ envoy_cc_library(
         "@envoy",
     ) + envoy_select_envoy_mobile_request_compression(
         [
-            "@envoy//source/extensions/filters/http/composite:config",
+            "@envoy//source/extensions/compression/brotli/compressor:config",
+            "@envoy//source/extensions/compression/gzip/compressor:config",
+            "@envoy//source/extensions/filters/http/compressor:config",
         ],
         "@envoy",
     ) + envoy_select_envoy_mobile_listener(

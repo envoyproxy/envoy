@@ -1,8 +1,9 @@
 #include "extension_registry.h"
 
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-#include "source/extensions/filters/http/composite/action.h"
-#include "source/extensions/filters/http/composite/config.h"
+#include "source/extensions/compression/brotli/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/filters/http/compressor/config.h"
 #endif
 
 #include "source/common/http/match_delegate/config.h"
@@ -211,8 +212,9 @@ void ExtensionRegistry::registerFactories() {
 
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   // These are factories required for request decompression.
-  Extensions::HttpFilters::Composite::forceRegisterCompositeFilterFactory();
-  Extensions::HttpFilters::Composite::forceRegisterExecuteFilterActionFactory();
+  Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
+  Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
+  Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
 #endif
 
 #ifdef ENVOY_MOBILE_XDS
