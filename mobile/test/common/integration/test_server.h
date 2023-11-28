@@ -9,6 +9,8 @@
 #include "test/integration/autonomous_upstream.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 
+#include "tools/cpp/runfiles/runfiles.h"
+
 namespace Envoy {
 
 enum class TestServerType {
@@ -31,6 +33,7 @@ private:
   ProcessWide process_wide;
   Thread::MutexBasicLockable lock;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{time_system_};
+  std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles_;
 
   Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
       testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
