@@ -417,6 +417,34 @@ public:
       : QuicHttpIntegrationTestBase(GetParam(), ConfigHelper::quicHttpProxyConfig()) {}
 };
 
+class QuicHttpPrivateKeyProviderAsyncIntegrationTest
+    : public QuicHttpIntegrationTestBase,
+      public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  QuicHttpPrivateKeyProviderAsyncIntegrationTest()
+      : QuicHttpIntegrationTestBase(GetParam(), ConfigHelper::quicHttpProxyConfig()) {}
+
+  void initialize() override {
+    enable_test_private_key_provider_ = true;
+    test_private_key_provider_sync_mode_ = false;
+    QuicHttpIntegrationTestBase::initialize();
+  }
+};
+
+class QuicHttpPrivateKeyProviderSyncIntegrationTest
+    : public QuicHttpIntegrationTestBase,
+      public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  QuicHttpPrivateKeyProviderSyncIntegrationTest()
+      : QuicHttpIntegrationTestBase(GetParam(), ConfigHelper::quicHttpProxyConfig()) {}
+
+  void initialize() override {
+    enable_test_private_key_provider_ = true;
+    test_private_key_provider_sync_mode_ = true;
+    QuicHttpIntegrationTestBase::initialize();
+  }
+};
+
 class QuicHttpMultiAddressesIntegrationTest
     : public QuicHttpIntegrationTestBase,
       public testing::TestWithParam<Network::Address::IpVersion> {
@@ -526,7 +554,14 @@ public:
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
-
+INSTANTIATE_TEST_SUITE_P(QuicHttpPrivateKeyProviderSyncIntegrationTest,
+                         QuicHttpPrivateKeyProviderSyncIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(QuicHttpPrivateKeyProviderAsyncIntegrationTest,
+                         QuicHttpPrivateKeyProviderAsyncIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(QuicHttpMultiAddressesIntegrationTest,
                          QuicHttpMultiAddressesIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -695,6 +730,16 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
 
 // Ensure multiple quic connections work, regardless of platform BPF support
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
+  testMultipleQuicConnections();
+}
+
+// Ensure multiple quic connections work, regardless of platform BPF support
+TEST_P(QuicHttpPrivateKeyProviderSyncIntegrationTest, MultipleQuicConnectionsDefaultMode) {
+  testMultipleQuicConnections();
+}
+
+// Ensure multiple quic connections work, regardless of platform BPF support
+TEST_P(QuicHttpPrivateKeyProviderAsyncIntegrationTest, MultipleQuicConnectionsDefaultMode) {
   testMultipleQuicConnections();
 }
 

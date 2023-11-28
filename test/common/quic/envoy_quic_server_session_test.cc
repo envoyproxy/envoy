@@ -11,6 +11,7 @@
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/server_codec_impl.h"
+#include "source/extensions/quic/crypto_stream/envoy_tls_server_handshaker.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/quic/test_proof_source.h"
@@ -88,14 +89,16 @@ private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
 };
 
-class TestEnvoyQuicTlsServerHandshaker : public quic::TlsServerHandshaker,
+class TestEnvoyQuicTlsServerHandshaker : public EnvoyTlsServerHandshaker,
                                          public ProofSourceDetailsSetter {
 public:
   ~TestEnvoyQuicTlsServerHandshaker() override = default;
 
-  TestEnvoyQuicTlsServerHandshaker(quic::QuicSession* session,
-                                   const quic::QuicCryptoServerConfig& crypto_config)
-      : quic::TlsServerHandshaker(session, &crypto_config),
+  TestEnvoyQuicTlsServerHandshaker(
+      quic::QuicSession* session, const quic::QuicCryptoServerConfig& crypto_config,
+      OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
+      Envoy::Event::Dispatcher& dispatcher)
+      : EnvoyTlsServerHandshaker(session, &crypto_config, transport_socket_factory, dispatcher),
         params_(new quic::QuicCryptoNegotiatedParameters) {
     params_->cipher_suite = 1;
   }
@@ -123,14 +126,15 @@ public:
       const quic::QuicCryptoServerConfig* crypto_config,
       quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
       quic::QuicCryptoServerStreamBase::Helper* helper,
-      OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
-      Event::Dispatcher& /*dispatcher*/) override {
+      OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
+      Event::Dispatcher& dispatcher) override {
     switch (session->connection()->version().handshake_protocol) {
     case quic::PROTOCOL_QUIC_CRYPTO:
       return std::make_unique<TestQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
                                                           session, helper);
     case quic::PROTOCOL_TLS1_3:
-      return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
+      return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(
+          session, *crypto_config, transport_socket_factory, dispatcher);
     case quic::PROTOCOL_UNSUPPORTED:
       ASSERT(false, "Unknown handshake protocol");
     }

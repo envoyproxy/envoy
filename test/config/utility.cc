@@ -1320,7 +1320,9 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 }
 
 void ConfigHelper::addQuicDownstreamTransportSocketConfig(
-    bool enable_early_data, std::vector<absl::string_view> custom_alpns) {
+    bool enable_early_data, std::vector<absl::string_view> custom_alpns,
+    bool with_test_private_key_provider,
+    bool test_private_key_provider_sync_mode) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1332,7 +1334,7 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(
       bootstrap_,
       [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
-                      true);
+                      true, with_test_private_key_provider, test_private_key_provider_sync_mode);
         for (absl::string_view alpn : custom_alpns) {
           common_tls_context.add_alpn_protocols(alpn);
         }
@@ -1453,7 +1455,7 @@ void ConfigHelper::initializeTlsKeyLog(
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
-    bool http3) {
+    bool http3, bool with_test_private_key_provider, bool test_private_key_provider_sync_mode) {
   if (!http3) {
     // If it's HTTP/3, leave it empty as QUIC will derive the supported ALPNs from QUIC version by
     // default.
@@ -1510,8 +1512,21 @@ void ConfigHelper::initializeTls(
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
-    tls_certificate->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    if (!with_test_private_key_provider) {
+      tls_certificate->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    } else {
+      tls_certificate->mutable_private_key_provider()->set_provider_name("test");
+      ProtobufWkt::Struct message;
+      std::string sync_mode = test_private_key_provider_sync_mode ? "true" : "false";
+      MessageUtil::loadFromJson(
+          "{\"private_key_file\":\"" +
+              TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem") +
+              "\", \"expected_operation\":\"sign\", \"mode\":\"rsa\", \"sync_mode\":" + sync_mode +
+              "}",
+          message);
+      tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(message);
+    }
     if (options.rsa_cert_ocsp_staple_) {
       tls_certificate->mutable_ocsp_staple()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/server_ocsp_resp.der"));

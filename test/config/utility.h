@@ -160,7 +160,9 @@ public:
   static void
   initializeTls(const ServerSslOptions& options,
                 envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context,
-                bool http3);
+                bool http3,
+                bool with_test_private_key_provider = false,
+                bool test_private_key_provider_sync_mode = false);
 
   static void initializeTlsKeyLog(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
@@ -338,7 +340,9 @@ public:
 
   // Add the default SSL configuration for QUIC downstream.
   void addQuicDownstreamTransportSocketConfig(bool enable_early_data,
-                                              std::vector<absl::string_view> custom_alpns);
+                                              std::vector<absl::string_view> custom_alpns,
+                                              bool with_test_private_key_provider = false,
+                                              bool test_private_key_provider_sync_mode = false);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.

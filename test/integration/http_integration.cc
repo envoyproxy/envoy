@@ -372,7 +372,8 @@ void HttpIntegrationTest::initialize() {
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
-  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_, custom_alpns_);
+  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_, custom_alpns_,
+                                                        enable_test_private_key_provider_);
 
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"}, test_server_);

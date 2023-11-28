@@ -2401,6 +2401,7 @@ envoy_cc_test(
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
+        "//test/extensions/transport_sockets/tls:test_private_key_method_provider_test_lib",
         ":http_integration_lib",
         ":socket_interface_swap_lib",
         "//source/common/quic:client_connection_factory_lib",
