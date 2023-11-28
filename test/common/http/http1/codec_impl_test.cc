@@ -4879,7 +4879,7 @@ TEST_P(Http1ServerConnectionImplTest, ObsFold) {
   }
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
-                           "Multiline-Header: foo\r\n  bar\r\n"
+                           "Multi-Line-Header: foo\r\n  bar\r\n"
                            "\r\n");
   auto status = codec_->dispatch(buffer);
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
@@ -4903,7 +4903,7 @@ TEST_P(Http1ClientConnectionImplTest, ObsFold) {
   }
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
-                             "Multiline-Header: foo\r\n  bar\r\n"
+                             "Multi-Line-Header: foo\r\n  bar\r\n"
                              "Content-Length: 0\r\n"
                              "\r\n");
 
