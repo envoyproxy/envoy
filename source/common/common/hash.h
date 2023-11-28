@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
 
 #include "source/common/common/macros.h"
 #include "source/common/common/safe_memcpy.h"
@@ -24,6 +25,44 @@ public:
    */
   static uint64_t xxHash64(absl::string_view input, uint64_t seed = 0) {
     return XXH64(input.data(), input.size(), seed);
+  }
+
+  /**
+   * Return 64-bit hash from deterministically serializing a value in
+   * an endian-independent way and hashing it with the xxHash algorithm.
+   *
+   * Floats and doubles are just done as endian-adjusted raw bytes the same
+   * as integers; this is on par with what protobuf serialization does.
+   * src/google/protobuf/generated_message_util.cc literally just treats
+   * a float the same as int32 for serialization purposes.
+   *
+   * @param input supplies the value to hash.
+   * @param seed supplies the hash seed which defaults to 0.
+   * See https://github.com/Cyan4973/xxHash for details.
+   */
+  template <typename ValueType, std::enable_if_t<std::is_scalar_v<ValueType>, bool> = true>
+  static uint64_t xxHash64Value(ValueType input, uint64_t seed = 0) {
+    if (absl::little_endian::IsLittleEndian()) {
+      return XXH64(reinterpret_cast<const char*>(&input), sizeof(input), seed);
+    } else {
+      char buf[sizeof(input)];
+      const char* p = reinterpret_cast<const char*>(&input);
+      for (size_t i = 0; i < sizeof(input); i++) {
+        buf[i] = p[sizeof(input) - i - 1];
+      }
+      return XXH64(buf, sizeof(input), seed);
+    }
+  }
+  // Explicit specialization for bool because its size may be implementation dependent.
+  template <> uint64_t xxHash64Value(bool input, uint64_t seed) {
+    char b = input ? 1 : 0;
+    return XXH64(&b, 1, seed);
+  }
+  // Explicit specialization for enums because their size may be implementation dependent.
+  template <typename T, std::enable_if_t<std::is_enum_v<T>, bool> = true>
+  uint64_t xxHash64Value(T input, uint64_t seed) {
+    uint32_t value = static_cast<uint32_t>(input);
+    return xxHash64Value(value, seed);
   }
 
   /**
