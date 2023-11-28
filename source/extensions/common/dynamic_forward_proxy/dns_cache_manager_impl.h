@@ -15,7 +15,9 @@ namespace DynamicForwardProxy {
 
 class DnsCacheManagerImpl : public DnsCacheManager, public Singleton::Instance {
 public:
-  DnsCacheManagerImpl(Server::Configuration::FactoryContextBase& context) : context_(context) {}
+  DnsCacheManagerImpl(Server::Configuration::FactoryContextBase& context,
+                      ProtobufMessage::ValidationVisitor& visitor)
+      : context_(context), visitor_(visitor) {}
 
   // DnsCacheManager
   DnsCacheSharedPtr getCache(
@@ -33,18 +35,21 @@ private:
   };
 
   Server::FactoryContextBaseImpl context_;
+  ProtobufMessage::ValidationVisitor& visitor_;
   absl::flat_hash_map<std::string, ActiveCache> caches_;
 };
 
 class DnsCacheManagerFactoryImpl : public DnsCacheManagerFactory {
 public:
-  DnsCacheManagerFactoryImpl(Server::Configuration::FactoryContextBase& context)
-      : context_(context) {}
+  DnsCacheManagerFactoryImpl(Server::Configuration::FactoryContextBase& context,
+                             ProtobufMessage::ValidationVisitor& visitor)
+      : context_(context), visitor_(visitor) {}
 
   DnsCacheManagerSharedPtr get() override;
 
 private:
   Server::FactoryContextBaseImpl context_;
+  ProtobufMessage::ValidationVisitor& visitor_;
 };
 
 } // namespace DynamicForwardProxy

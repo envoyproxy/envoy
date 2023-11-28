@@ -445,7 +445,7 @@ ConnectivityManagerSharedPtr ConnectivityManagerFactory::get() {
   return context_.singletonManager().getTyped<ConnectivityManagerImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager), [&] {
         Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory{
-            context_};
+            context_, visitor_};
         return std::make_shared<ConnectivityManagerImpl>(context_.clusterManager(),
                                                          cache_manager_factory.get());
       });

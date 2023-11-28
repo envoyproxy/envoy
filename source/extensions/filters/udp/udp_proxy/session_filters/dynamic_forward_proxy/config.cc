@@ -20,7 +20,7 @@ FilterFactoryCb DynamicForwardProxyNetworkFilterConfigFactory::createFilterFacto
     const FilterConfig& proto_config, Server::Configuration::FactoryContext& context) {
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context);
+      context.getServerFactoryContext(), context.messageValidationVisitor());
   ProxyFilterConfigSharedPtr filter_config(
       std::make_shared<ProxyFilterConfig>(proto_config, cache_manager_factory, context));
 

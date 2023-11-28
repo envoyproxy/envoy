@@ -17,7 +17,7 @@ namespace Common {
 namespace DynamicForwardProxy {
 
 absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
-    Server::Configuration::FactoryContextBase& context,
+    Server::Configuration::FactoryContextBase& context, ProtobufMessage::ValidationVisitor& visitor,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
   const uint32_t max_hosts = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024);
   if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts) {
@@ -26,11 +26,11 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
         config.name(), config.preresolve_hostnames().size(), max_hosts));
   }
 
-  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(context, config));
+  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(context, visitor, config));
 }
 
 DnsCacheImpl::DnsCacheImpl(
-    Server::Configuration::FactoryContextBase& context,
+    Server::Configuration::FactoryContextBase& context, ProtobufMessage::ValidationVisitor& visitor,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(context.mainThreadDispatcher()), config_(config),
       random_generator_(context.api().randomGenerator()),
@@ -44,8 +44,7 @@ DnsCacheImpl::DnsCacheImpl(
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       min_refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_min_refresh_rate, 5000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
-      file_system_(context.api().fileSystem()),
-      validation_visitor_(context.messageValidationVisitor()),
+      file_system_(context.api().fileSystem()), validation_visitor_(visitor),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });

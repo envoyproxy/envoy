@@ -91,7 +91,10 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
           ASSERT(Thread::MainThread::isMainOrTestThread());
 
           connectivity_manager_ =
-              Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
+              Network::ConnectivityManagerFactory{
+                  server_->serverFactoryContext(),
+                  server_->serverFactoryContext().messageValidationVisitor()}
+                  .get();
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);

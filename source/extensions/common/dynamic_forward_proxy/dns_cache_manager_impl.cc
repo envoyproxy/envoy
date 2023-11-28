@@ -46,7 +46,7 @@ DnsCacheSharedPtr DnsCacheManagerImpl::lookUpCacheByName(absl::string_view cache
 DnsCacheManagerSharedPtr DnsCacheManagerFactoryImpl::get() {
   return context_.singletonManager().getTyped<DnsCacheManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(dns_cache_manager),
-      [this] { return std::make_shared<DnsCacheManagerImpl>(context_); });
+      [this] { return std::make_shared<DnsCacheManagerImpl>(context_, visitor_); });
 }
 
 } // namespace DynamicForwardProxy
