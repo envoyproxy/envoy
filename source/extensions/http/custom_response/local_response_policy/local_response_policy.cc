@@ -3,6 +3,7 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/enum_to_int.h"
+#include "source/common/config/config_factory_context.h"
 #include "source/common/config/datasource.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -19,19 +20,25 @@ namespace CustomResponse {
 LocalResponsePolicy::LocalResponsePolicy(
     const envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy&
         config,
-    Server::Configuration::CommonFactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context)
     : local_body_{config.has_body() ? absl::optional<std::string>(Config::DataSource::read(
                                           config.body(), true, context.api()))
                                     : absl::optional<std::string>{}},
-      formatter_(config.has_body_format()
-                     ? Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-                           config.body_format(), context)
-                     : nullptr),
       status_code_{config.has_status_code()
                        ? absl::optional<Envoy::Http::Code>(
                              static_cast<Envoy::Http::Code>(config.status_code().value()))
                        : absl::optional<Envoy::Http::Code>{}},
-      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {}
+      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {
+
+  // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
+  // of server context should not be used here directly. But this is bug is not introduced
+  // by this PR and will be fixed in the future.
+  Config::ConfigFactoryContextImpl config_context(context, context.messageValidationVisitor());
+  if (config.has_body_format()) {
+    formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config.body_format(),
+                                                                           config_context);
+  }
+}
 
 // TODO(pradeepcrao): investigate if this code can be made common with
 // Envoy::LocalReply::BodyFormatter for consistent behavior.
