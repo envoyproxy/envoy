@@ -62,6 +62,9 @@ public:
   std::unique_ptr<Envoy::Server::OverloadManager> createOverloadManager() override {
     return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
   }
+  std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view) override {
+    return nullptr;
+  }
 };
 
 EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImplBase>&& options)

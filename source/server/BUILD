@@ -417,7 +417,6 @@ envoy_cc_library(
     deps = [
         ":api_listener_lib",
         ":configuration_lib",
-        ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_factory_lib",
         ":regex_engine_lib",
@@ -479,6 +478,7 @@ envoy_cc_library(
     srcs = ["instance_impl.cc"],
     hdrs = ["instance_impl.h"],
     deps = [
+        ":guarddog_lib",
         ":server_base_lib",
         "//source/common/memory:heap_shrinker_lib",
         "//source/server:overload_manager_lib",
