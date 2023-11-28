@@ -214,35 +214,11 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
     }
   }
 
-  // Update cluster DROP_OVERLOAD configuration.
-  if (cluster_load_assignment.has_policy()) {
-    auto policy = cluster_load_assignment.policy();
-    if (policy.drop_overloads().size() > 0) {
-      if (policy.drop_overloads().size() > 1) {
-        return absl::InvalidArgumentError(
-          fmt::format(" Only one drop_overload category configuration is supported. This EDS has {} configured",
-                     policy.drop_overloads().size()));
-      } else {
-        auto drop_percentage = policy.drop_overloads(0).drop_percentage();
-        float denominator;
-        switch (drop_percentage.denominator()) {
-          case envoy::type::v3::FractionalPercent::HUNDRED:
-            denominator = 100;
-            break;
-          case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
-            denominator = 10000;
-            break;
-          case envoy::type::v3::FractionalPercent::MILLION:
-            denominator = 1000000;
-            break;
-          default:
-            return absl::InvalidArgumentError(
-                fmt::format(" Reject the config due to drop_overload denominator is not configured"));
-        }
-        float drop_overload = float(drop_percentage.numerator()) / denominator;
-        setDropOverload(UnitFloat(drop_overload));
-      }
-    }
+  // Drop overload configuration parsing.
+  if (!parseDropOverloadConfig(cluster_load_assignment)) {
+    return absl::InvalidArgumentError(
+        fmt::format(" Cluster {} drop_overloads configuration is wrong",
+                    cluster_load_assignment.cluster_name()));
   }
 
   // Pause LEDS messages until the EDS config is finished processing.

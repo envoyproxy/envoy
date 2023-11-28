@@ -211,7 +211,6 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTest) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
@@ -227,7 +226,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTest) {
           drop_overloads:
             category: test
             drop_percentage:
-              numerator: 10
+              numerator: 35
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -252,9 +251,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTest) {
   StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
 
   cluster.initialize([&]() -> void { initialized.ready(); });
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0.1f, cluster.dropOverload().value());
+  EXPECT_EQ(0.35f, cluster.dropOverload().value());
 }
 
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {

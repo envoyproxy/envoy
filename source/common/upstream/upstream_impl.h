@@ -1248,6 +1248,9 @@ protected:
 
   virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
 
+  bool parseDropOverloadConfig(
+      const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
+
   // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
   // register with this init manager are expected to be for implementations of SdsApi (see
   // SdsApi::init_target_).
@@ -1286,6 +1289,7 @@ private:
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
   UnitFloat drop_overload_{0};
+  static constexpr int kDropOverloadSize = 1;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

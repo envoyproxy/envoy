@@ -434,8 +434,7 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostMapConstSharedPtr map,
-                                UnitFloat drop_overload);
+                                HostMapConstSharedPtr map, UnitFloat drop_overload);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
@@ -617,7 +616,7 @@ private:
       // Drain any connection pools associated with the hosts filtered by the predicate.
       void drainConnPools(DrainConnectionsHostPredicate predicate,
                           ConnectionPool::DrainBehavior behavior);
-      UnitFloat dropOverload() const override { return drop_overload_;}
+      UnitFloat dropOverload() const override { return drop_overload_; }
       void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
 
     private:

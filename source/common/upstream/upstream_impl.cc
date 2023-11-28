@@ -1521,36 +1521,10 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         info_->endpointStats().membership_degraded_.set(degraded_hosts);
         info_->endpointStats().membership_excluded_.set(excluded_hosts);
       });
-
-  if (cluster.load_assignment().has_policy()) {
-    auto policy = cluster.load_assignment().policy();
-    if (policy.drop_overloads().size() > 0) {
-      if (policy.drop_overloads().size() > 1) {
-        throwEnvoyExceptionOrPanic(
-            fmt::format("Only one drop_overload category configuration is supported. This cluster {} has {} configured",
-                      cluster.name(), policy.drop_overloads().size()));
-      } else {
-        auto drop_percentage = policy.drop_overloads(0).drop_percentage();
-        float denominator;
-        switch (drop_percentage.denominator()) {
-          case envoy::type::v3::FractionalPercent::HUNDRED:
-            denominator = 100;
-            break;
-          case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
-            denominator = 10000;
-            break;
-          case envoy::type::v3::FractionalPercent::MILLION:
-            denominator = 1000000;
-            break;
-          default:
-            throwEnvoyExceptionOrPanic(
-                fmt::format("DROP_OVERLOAD denominator config is missing in the cluster {}.",
-                            cluster.name()));
-            break;
-        }
-        drop_overload_ = UnitFloat(float(drop_percentage.numerator()) / (denominator));
-      }
-    }
+  // Drop overload configuration parsing.
+  if (!parseDropOverloadConfig(cluster.load_assignment())) {
+    throwEnvoyExceptionOrPanic(
+        fmt::format(" Cluster {} drop_overloads configuration is wrong", cluster.name()));
   }
 }
 
@@ -1669,6 +1643,39 @@ void ClusterImplBase::finishInitialization() {
   if (snapped_callback != nullptr) {
     snapped_callback();
   }
+}
+
+bool ClusterImplBase::parseDropOverloadConfig(
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+  if (!cluster_load_assignment.has_policy()) {
+    return true;
+  }
+  auto policy = cluster_load_assignment.policy();
+  if (policy.drop_overloads().size() == 0) {
+    return true;
+    ;
+  }
+  if (policy.drop_overloads().size() > kDropOverloadSize) {
+    return false;
+  }
+
+  auto drop_percentage = policy.drop_overloads(0).drop_percentage();
+  float denominator;
+  switch (drop_percentage.denominator()) {
+  case envoy::type::v3::FractionalPercent::HUNDRED:
+    denominator = 100;
+    break;
+  case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
+    denominator = 10000;
+    break;
+  case envoy::type::v3::FractionalPercent::MILLION:
+    denominator = 1000000;
+    break;
+  default:
+    return false;
+  }
+  drop_overload_ = UnitFloat(float(drop_percentage.numerator()) / (denominator));
+  return true;
 }
 
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {

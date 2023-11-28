@@ -74,6 +74,7 @@ public:
   std::vector<HostSharedPtr> hosts() { return *hosts_; };
   UnitFloat dropOverload() const override { return drop_overload_; }
   void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
+
 protected:
   PrioritySetImpl priority_set_;
   HealthCheckerSharedPtr health_checker_;

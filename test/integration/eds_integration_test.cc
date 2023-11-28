@@ -114,8 +114,10 @@ public:
     if (endpoint_setting.drop_overload_numerator.has_value()) {
       auto* drop_overload = cluster_load_assignment.mutable_policy()->add_drop_overloads();
       drop_overload->set_category("test");
-      drop_overload->mutable_drop_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-      drop_overload->mutable_drop_percentage()->set_numerator(endpoint_setting.drop_overload_numerator.value());
+      drop_overload->mutable_drop_percentage()->set_denominator(
+          envoy::type::v3::FractionalPercent::HUNDRED);
+      drop_overload->mutable_drop_percentage()->set_numerator(
+          endpoint_setting.drop_overload_numerator.value());
     }
 
     auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
@@ -926,13 +928,9 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
 }
 
 // Test EDS cluster DROP_OVERLOAD configuration.
-TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterNoDrop) {
-  dropOverloadTest(0, "200");
-}
+TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterNoDrop) { dropOverloadTest(0, "200"); }
 
-TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterAllDrop) {
-  dropOverloadTest(100, "503");
-}
+TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterAllDrop) { dropOverloadTest(100, "503"); }
 
 } // namespace
 } // namespace Envoy
