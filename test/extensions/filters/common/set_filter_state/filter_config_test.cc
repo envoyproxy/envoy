@@ -51,13 +51,12 @@ public:
       TestUtility::loadFromYaml(value, proto_value);
       proto_values.push_back(proto_value);
     }
-    Server::GenericFactoryContextImpl generic_context(context_);
     config_ = std::make_shared<Config>(
         Protobuf::RepeatedPtrField<FilterStateValueProto>(proto_values.begin(), proto_values.end()),
-        life_span, generic_context);
+        life_span, context_);
   }
   void update() { config_->updateFilterState({&header_map_}, info_); }
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   Http::TestRequestHeaderMapImpl header_map_{{"test-header", "test-value"}};
   NiceMock<StreamInfo::MockStreamInfo> info_;
   ConfigSharedPtr config_;

@@ -38,6 +38,7 @@ public:
   void runFilter(const std::string& yaml_config) {
     envoy::extensions::filters::http::set_filter_state::v3::Config proto_config;
     TestUtility::loadFromYaml(yaml_config, proto_config);
+
     auto config = std::make_shared<Filters::Common::SetFilterState::Config>(
         proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
         context_);
@@ -48,7 +49,7 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   Http::TestRequestHeaderMapImpl headers_{{"test-header", "test-value"}};
   NiceMock<StreamInfo::MockStreamInfo> info_;
 };

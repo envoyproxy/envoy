@@ -16,7 +16,8 @@ namespace DynamicForwardProxy {
 
 class DnsCacheManagerImpl : public DnsCacheManager, public Singleton::Instance {
 public:
-  DnsCacheManagerImpl(Server::GenericFactoryContextImpl context) : context_(context) {}
+  DnsCacheManagerImpl(const Server::Configuration::GenericFactoryContext& context)
+      : context_(context) {}
 
   // DnsCacheManager
   DnsCacheSharedPtr getCache(

@@ -24,9 +24,6 @@ class SubstitutionFormatStringUtils {
 public:
   /**
    * Generate a formatter object from config SubstitutionFormatString.
-   * TODO(wbpcode): use value semantics for context to ensure all FactoryContext could be
-   * converted to GenericFactoryContextImpl to avoid introducing too much noise.
-   * This will be cleaned up in a follow up PR.
    */
   template <class FormatterContext = HttpFormatterContext>
   static FormatterBasePtr<FormatterContext>

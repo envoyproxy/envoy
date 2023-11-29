@@ -17,7 +17,7 @@ namespace Common {
 namespace DynamicForwardProxy {
 
 absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
-    Server::GenericFactoryContextImpl context,
+    const Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
   const uint32_t max_hosts = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024);
   if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts) {
@@ -37,8 +37,7 @@ DnsCacheImpl::DnsCacheImpl(
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext())),
       tls_slot_(context.serverFactoryContext().threadLocal()),
-      scope_(context.serverFactoryContext().scope().createScope(
-          fmt::format("dns_cache.{}.", config.name()))),
+      scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(*scope_, context.serverFactoryContext().runtime(), config.name(),
                         config.dns_cache_circuit_breaker()),
