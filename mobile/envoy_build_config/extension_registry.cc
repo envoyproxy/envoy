@@ -9,7 +9,9 @@
 #include "source/common/upstream/default_local_address_selector_factory.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/extensions/compression/brotli/compressor/config.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
@@ -205,7 +207,9 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
 #endif
 
-  // TODO(alyssawilk) figure out why this is needed.
+  // TODO(alyssawilk) figure out why these are needed.
+  Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
+  Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
   Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
 
 #ifdef ENVOY_MOBILE_XDS
