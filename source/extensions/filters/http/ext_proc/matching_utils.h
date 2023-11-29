@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
@@ -25,10 +26,10 @@ public:
   // parsed from it.
   struct ExpressionPtrWithExpr {
     ExpressionPtrWithExpr(const google::api::expr::v1alpha1::Expr& expr,
-                          const Filters::Common::Expr::ExpressionPtr&& expr_ptr)
-        : expr_(std::move(expr)), expression_ptr_(std::move(expr_ptr)){};
+                          Filters::Common::Expr::Expression* expr_ptr)
+        : expr_(expr), expression_ptr_(std::move(expr_ptr)){};
     const google::api::expr::v1alpha1::Expr& expr_;
-    const Filters::Common::Expr::ExpressionPtr& expression_ptr_;
+    Filters::Common::Expr::ExpressionPtr expression_ptr_;
   };
 
   bool hasRequestExpr() const { return !request_expr_.empty(); };
@@ -49,11 +50,11 @@ public:
   evaluateAttributes(const Filters::Common::Expr::ActivationPtr& activation,
                      const absl::flat_hash_map<std::string, ExpressionPtrWithExpr>& expr) const {
     absl::optional<ProtobufWkt::Struct> proto;
-    if (expr.size() > 0) {
+    if (!expr.empty()) {
       proto.emplace(ProtobufWkt::Struct{});
       for (const auto& hash_entry : expr) {
         ProtobufWkt::Arena arena;
-        std::cout << "expression_ptr_: ";
+        std::cout << "expression_ptr_ in evaluateAttributes: ";
         std::cout << hash_entry.second.expression_ptr_.get() << std::endl;
         const auto result = hash_entry.second.expression_ptr_.get()->Evaluate(*activation, &arena);
         if (!result.ok()) {
@@ -86,6 +87,11 @@ public:
     }
 
     return proto;
+  }
+
+  // TODO: delete
+  const ExpressionPtrWithExpr& getExprPtr(std::string matcher) const {
+    return request_expr_.at(matcher);
   }
 
 private:

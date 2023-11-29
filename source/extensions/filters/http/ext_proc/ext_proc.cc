@@ -201,7 +201,8 @@ void Filter::onDestroy() {
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                                      absl::optional<ProtobufWkt::Struct> proto) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -219,6 +220,9 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
+  if (proto.has_value()) {
+    (*headers_req->mutable_attributes())[FilterName] = proto.value();
+  }
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -241,6 +245,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     if (config_->hasRequestExpr()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
                                                                     &headers, nullptr, nullptr);
+      std::cout << "expression_ptr_ in decodeHeaders: ";
+      std::cout << config_->getExprPtr("request.path").expression_ptr_.get() << std::endl;
       proto = config_->evaluateRequestAttributes(std::move(activation_ptr));
     }
 

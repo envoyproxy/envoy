@@ -92,7 +92,9 @@ envoy_cc_library(
         ],
     }),
     deps = [
+        "//envoy/http:header_map_interface",
         "//source/common/protobuf",
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
     ] + select(
         {

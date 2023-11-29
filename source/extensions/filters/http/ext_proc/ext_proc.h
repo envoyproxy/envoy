@@ -127,7 +127,8 @@ public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-               const std::string& stats_prefix)
+               const std::string& stats_prefix,
+               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
@@ -183,6 +184,11 @@ public:
   bool hasRequestExpr() const { return expression_manager_.hasRequestExpr(); }
 
   bool hasResponseExpr() const { return expression_manager_.hasResponseExpr(); }
+
+  // TODO: delete
+  const ExpressionManager::ExpressionPtrWithExpr& getExprPtr(std::string matcher) {
+    return expression_manager_.getExprPtr(matcher);
+  }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,

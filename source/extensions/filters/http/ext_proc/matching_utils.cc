@@ -5,9 +5,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-absl::flat_hash_map<std::string, ExpressionPtrWithExpr>
+absl::flat_hash_map<std::string, ExpressionManager::ExpressionPtrWithExpr>
 ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const {
-  absl::flat_hash_map<std::string, ExpressionPtrWithExpr> expressions;
+  absl::flat_hash_map<std::string, ExpressionManager::ExpressionPtrWithExpr> expressions;
 #if defined(USE_CEL_PARSER)
   for (const auto& matcher : matchers) {
     auto parse_status = google::api::expr::parser::Parse(matcher);
@@ -16,12 +16,14 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
                            parse_status.status().ToString());
     }
     const auto parse_status_expr = parse_status.value().expr();
-    const auto expression =
+    auto expression =
         Extensions::Filters::Common::Expr::createExpression(builder_->builder(), parse_status_expr);
-    const ExpressionPtrWithExpr expr(parse_status_expr, std::move(expression));
-    std::cout << "expression_ptr_: ";
+    ExpressionPtrWithExpr expr(parse_status_expr, expression.get());
+    std::cout << "expression_ptr_ after construction: ";
     std::cout << expr.expression_ptr_.get() << std::endl;
     expressions.try_emplace(matcher, std::move(expr));
+    std::cout << "expression_ptr_ after placing in container: ";
+    std::cout << expressions.at(matcher).expression_ptr_.get() << std::endl;
   }
 #else
   ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."
