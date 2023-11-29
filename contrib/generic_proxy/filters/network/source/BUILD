@@ -185,6 +185,7 @@ envoy_cc_library(
     ],
     deps = [
         "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
+        "//envoy/common:pure_lib",
         "//envoy/tracing:trace_context_interface",
     ],
 )
