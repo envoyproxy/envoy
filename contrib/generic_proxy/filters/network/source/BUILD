@@ -183,6 +183,11 @@ envoy_cc_library(
     hdrs = [
         "tracing.h",
     ],
+    external_deps = [
+        "abseil_strings",
+        "abseil_optional",
+        "abseil_status",
+    ],
     deps = [
         "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
         "//envoy/common:pure_lib",
