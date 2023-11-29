@@ -466,7 +466,8 @@ private:
 
   struct ActiveReadFilter : public virtual ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
     ActiveReadFilter(ActiveSession& parent, ReadFilterSharedPtr filter, bool is_read_write_filter)
-        : parent_(parent), read_filter_(std::move(filter)), is_read_write_filter_(is_read_write_filter) {}
+        : parent_(parent), read_filter_(std::move(filter)),
+          is_read_write_filter_(is_read_write_filter) {}
 
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
@@ -486,7 +487,8 @@ private:
 
   struct ActiveWriteFilter : public virtual WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
     ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter, bool is_read_write_filter)
-        : parent_(parent), write_filter_(std::move(filter)), is_read_write_filter_(is_read_write_filter) {}
+        : parent_(parent), write_filter_(std::move(filter)),
+          is_read_write_filter_(is_read_write_filter) {}
 
     // SessionFilters::WriteFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
@@ -569,6 +571,7 @@ private:
     };
 
   protected:
+    void onSessionComplete();
     void fillSessionStreamInfo();
 
     /**
@@ -600,9 +603,6 @@ private:
     uint64_t session_id_;
     std::list<ActiveReadFilterPtr> read_filters_;
     std::list<ActiveWriteFilterPtr> write_filters_;
-
-    private:
-      void onSessionComplete();
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;

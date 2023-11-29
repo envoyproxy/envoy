@@ -319,6 +319,18 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   }
 }
 
+void UdpProxyFilter::ActiveSession::onSessionComplete() {
+  for (auto& active_read_filter : read_filters_) {
+    active_read_filter->read_filter_->onSessionComplete();
+  }
+
+  for (auto& active_write_filter : write_filters_) {
+    if (!active_write_filter->is_read_write_filter_) {
+      active_write_filter->write_filter_->onSessionComplete();
+    }
+  }
+}
+
 void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
   ProtobufWkt::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
@@ -641,18 +653,6 @@ void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_d
     session_stats_.downstream_sess_tx_bytes_ += tx_buffer_length;
     cluster_.filter_.config_->stats().downstream_sess_tx_datagrams_.inc();
     ++session_stats_.downstream_sess_tx_datagrams_;
-  }
-}
-
-void UdpProxyFilter::ActiveSession::onSessionComplete() {
-  for (auto& active_read_filter : read_filters_) {
-    active_read_filter->read_filter_->onSessionComplete();
-  }
-
-  for (auto& active_write_filter : write_filters_) {
-    if (!active_write_filter->is_read_write_filter_) {
-      active_write_filter->write_filter_->onSessionComplete();
-    }
   }
 }
 
