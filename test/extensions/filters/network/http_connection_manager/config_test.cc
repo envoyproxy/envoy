@@ -212,7 +212,7 @@ http_filters:
 
 #ifdef ENVOY_ENABLE_QUIC
   {
-    EXPECT_CALL(context_, isQuicListener()).WillOnce(Return(false));
+    EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(false));
 
     EXPECT_THROW_WITH_MESSAGE(
         HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
@@ -222,7 +222,7 @@ http_filters:
         EnvoyException, "HTTP/3 codec configured on non-QUIC listener.");
   }
   {
-    EXPECT_CALL(context_, isQuicListener()).WillOnce(Return(true));
+    EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(true));
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                        date_provider_, route_config_provider_manager_,
                                        scoped_routes_config_provider_manager_, tracer_manager_,
@@ -259,7 +259,7 @@ http_filters:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_, isQuicListener()).WillOnce(Return(true));
+  EXPECT_CALL(listener_info_, isQuic()).WillOnce(Return(true));
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,

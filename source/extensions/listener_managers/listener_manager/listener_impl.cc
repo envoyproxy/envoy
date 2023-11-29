@@ -229,7 +229,7 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const Network::ListenerInfoConstSharedPtr& listener_info,
+    const std::shared_ptr<const ListenerInfoImpl>& listener_info,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : server_(server), listener_info_(listener_info), global_scope_(server.stats().createScope("")),
       listener_scope_(
@@ -291,7 +291,6 @@ ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
-bool ListenerFactoryContextBaseImpl::isQuicListener() const { return listener_info_->isQuic(); }
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { return server_.initManager(); }
@@ -329,7 +328,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
-          parent.server_, validation_visitor_, config, this, *this,
+          parent.server_, validation_visitor_, config, listener_info_, *this,
           parent_.factory_->createDrainManager(config.drain_type()))),
       reuse_port_(getReusePortOrDefault(parent_.server_, config, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config.name() +
@@ -461,7 +460,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       udp_listener_config_(origin.udp_listener_config_),
       connection_balancers_(origin.connection_balancers_),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
-          origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
+          origin.listener_factory_context_->listener_factory_context_base_, *this)),
       filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
           addresses_, origin.listener_factory_context_->parentFactoryContext(), initManager(),
           *origin.filter_chain_manager_)),
@@ -864,12 +863,11 @@ void ListenerImpl::buildProxyProtocolListenerFilter(
 PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config_message,
-    const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl,
+    const std::shared_ptr<const ListenerInfoImpl> listener_info, ListenerImpl& listener_impl,
     DrainManagerPtr drain_manager)
     : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-          server, validation_visitor, listener_impl.listenerInfo(), config_message,
-          std::move(drain_manager))),
-      listener_config_(listener_config), listener_impl_(listener_impl) {}
+          server, validation_visitor, listener_info, config_message, std::move(drain_manager))),
+      listener_impl_(listener_impl) {}
 
 AccessLog::AccessLogManager& PerListenerFactoryContextImpl::accessLogManager() {
   return listener_factory_context_base_->accessLogManager();
@@ -921,9 +919,6 @@ const Network::ListenerInfo& PerListenerFactoryContextImpl::listenerInfo() const
   return listener_factory_context_base_->listenerInfo();
 }
 TimeSource& PerListenerFactoryContextImpl::timeSource() { return api().timeSource(); }
-const Network::ListenerConfig& PerListenerFactoryContextImpl::listenerConfig() const {
-  return *listener_config_;
-}
 ProtobufMessage::ValidationContext& PerListenerFactoryContextImpl::messageValidationContext() {
   return getServerFactoryContext().messageValidationContext();
 }
@@ -947,9 +942,6 @@ PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
-}
-bool PerListenerFactoryContextImpl::isQuicListener() const {
-  return listener_factory_context_base_->isQuicListener();
 }
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 

@@ -164,12 +164,10 @@ public:
   virtual bool isQuic() const PURE;
 };
 
-using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;
-
 /**
  * A configuration for an individual listener.
  */
-class ListenerConfig {
+class ListenerConfig : public ListenerInfo {
 public:
   virtual ~ListenerConfig() = default;
 
@@ -238,11 +236,6 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
-
-  /**
-   * @return ListenerInfoConstSharedPtr description of the listener.
-   */
-  virtual const ListenerInfoConstSharedPtr listenerInfo() const PURE;
 
   /**
    * @return the UDP configuration for the listener IFF it is a UDP listener.

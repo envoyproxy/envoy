@@ -46,6 +46,18 @@ class ListenerFilterWithDataFuzzer : public Network::ListenerConfig,
 public:
   ListenerFilterWithDataFuzzer();
 
+  // Network::ListenerInfo
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return metadata_.proto_metadata_;
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return metadata_.typed_metadata_;
+  }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
+  }
+  bool isQuic() const override { return false; }
+
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
@@ -63,7 +75,6 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  const Network::ListenerInfoConstSharedPtr listenerInfo() const override { return listener_info_; }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -114,7 +125,7 @@ private:
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
   bool connection_established_{};
-  std::shared_ptr<Network::ListenerInfo> listener_info_{nullptr};
+  Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
 };
 
 } // namespace ListenerFilters

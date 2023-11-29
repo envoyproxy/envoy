@@ -65,7 +65,7 @@ public:
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr), listener_info_(nullptr) {
+        init_manager_(nullptr) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -84,6 +84,18 @@ public:
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
+  // Network::ListenerInfo
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return metadata_.proto_metadata_;
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return metadata_.typed_metadata_;
+  }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
+  }
+  bool isQuic() const override { return false; }
+
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
@@ -101,7 +113,6 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  const Network::ListenerInfoConstSharedPtr listenerInfo() const override { return listener_info_; }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -225,7 +236,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
-  std::shared_ptr<Network::ListenerInfo> listener_info_;
+  Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
 };
 
 // Parameterize the listener socket address version.
@@ -1969,7 +1980,7 @@ public:
             socket_->connectionInfoProvider().localAddress()->ip()->port())),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr), listener_info_(nullptr) {
+        init_manager_(nullptr) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -1996,6 +2007,17 @@ public:
           return true;
         }));
   }
+  // Network::ListenerInfo
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return metadata_.proto_metadata_;
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return metadata_.typed_metadata_;
+  }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
+  }
+  bool isQuic() const override { return false; }
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
@@ -2014,7 +2036,6 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  const Network::ListenerInfoConstSharedPtr listenerInfo() const override { return listener_info_; }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -2098,7 +2119,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
-  std::shared_ptr<Network::ListenerInfo> listener_info_;
+  Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
 };
 
 // Parameterize the listener socket address version.
