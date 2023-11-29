@@ -241,7 +241,7 @@ Please note that if adding a runtime guarded feature, your [release notes](chang
   need only be reviewed by a maintainer, or senior extension maintainer.
 * It is also generally expected that a "domain expert" for the code the PR touches should review the
   PR. This person does not necessarily need to have commit access.
-* For new extensions and features, at least one of the approvals should be *from an
+* For new extensions (contrib or otherwise) and features, at least one of the approvals should be *from an
   organization different from the PR author.* E.g., if Lyft authors a PR, at least one approver
   should be from an organization other than Lyft. This helps us make sure that we aren't putting
   organization specific shortcuts into the code. This is not required for less
@@ -249,6 +249,7 @@ Please note that if adding a runtime guarded feature, your [release notes](chang
   HTTP/3 changes are largely exempt from cross-company approvals as all of the
   area experts work at a single company, but HTTP/3 changes which impact general
   functionality still merit a cross-company check.
+* contrib extensions do not need senior maintainer or maintainer review, simply a rubber stamp to merge.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
 * Please make sure that the PR title, commit message, and description are updated if the PR changes
