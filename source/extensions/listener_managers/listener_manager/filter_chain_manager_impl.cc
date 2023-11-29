@@ -179,10 +179,6 @@ PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
 
 Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
 
-bool PerFilterChainFactoryContextImpl::isQuicListener() const {
-  return parent_context_.isQuicListener();
-}
-
 FilterChainManagerImpl::FilterChainManagerImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
     Configuration::FactoryContext& factory_context, Init::Manager& init_manager,

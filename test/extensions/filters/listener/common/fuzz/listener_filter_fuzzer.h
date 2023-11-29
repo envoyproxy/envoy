@@ -63,7 +63,7 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  const Network::ListenerInfoConstSharedPtr listenerInfo() const override { return listener_info_; }
+  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -114,7 +114,7 @@ private:
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
   bool connection_established_{};
-  std::shared_ptr<Network::ListenerInfo> listener_info_{nullptr};
+  NiceMock<Network::MockListenerInfo> listener_info_;
 };
 
 } // namespace ListenerFilters

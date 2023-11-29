@@ -5786,7 +5786,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
             parent_context.processContext().has_value());
   EXPECT_EQ(&listener_factory_context->getTransportSocketFactoryContext(),
             &parent_context.getTransportSocketFactoryContext());
-  EXPECT_EQ(listener_factory_context->isQuicListener(), parent_context.isQuicListener());
 
   // Unit test ListenerFactoryContextBaseImpl for coverage.
   EXPECT_EQ(&parent_context.timeSource(), &listener_factory_context->api().timeSource());

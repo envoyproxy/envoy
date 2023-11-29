@@ -466,6 +466,14 @@ public:
   envoy::config::listener::v3::UdpListenerConfig config_;
 };
 
+class MockListenerInfo : public ListenerInfo {
+public:
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
+  MOCK_METHOD(bool, isQuic, (), (const));
+};
+
 class MockListenerConfig : public ListenerConfig {
 public:
   MockListenerConfig();
@@ -495,12 +503,12 @@ public:
     return empty_access_logs_;
   }
 
-  const Network::ListenerInfoConstSharedPtr listenerInfo() const override { return listener_info_; }
+  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   std::vector<ListenSocketFactoryPtr> socket_factories_;
   SocketSharedPtr socket_;
-  Network::ListenerInfoConstSharedPtr listener_info_;
+  testing::NiceMock<MockListenerInfo> listener_info_;
   Stats::IsolatedStoreImpl store_;
   std::string name_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
@@ -725,14 +733,6 @@ public:
                        [to_version](auto version) { return to_version == version; });
   }
   const std::vector<Address::IpVersion> versions_;
-};
-
-class MockListenerInfo : public ListenerInfo {
-public:
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
-  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
-  MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
-  MOCK_METHOD(bool, isQuic, (), (const));
 };
 
 } // namespace Network

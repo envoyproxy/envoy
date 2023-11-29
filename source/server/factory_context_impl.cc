@@ -9,7 +9,7 @@ FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        Stats::Scope& global_scope, Stats::Scope& listener_scope,
                                        bool is_quic)
     : server_(server), drain_decision_(drain_decision), global_scope_(global_scope),
-      listener_scope_(listener_scope), is_quic_(is_quic) {}
+      listener_scope_(listener_scope), listener_info_(is_quic) {}
 
 AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -48,10 +48,9 @@ Configuration::TransportSocketFactoryContext&
 FactoryContextImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
-const Network::ListenerInfo& FactoryContextImpl::listenerInfo() const { PANIC("not implemented"); }
+const Network::ListenerInfo& FactoryContextImpl::listenerInfo() const { return listener_info_; }
 Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
 Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
-bool FactoryContextImpl::isQuicListener() const { return is_quic_; }
 
 } // namespace Server
 } // namespace Envoy

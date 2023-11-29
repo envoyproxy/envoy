@@ -63,7 +63,6 @@ public:
   }
   Stats::Scope& scope() override { return *scope_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
-  bool isQuicListener() const override { return false; }
   const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Always use the static validation visitor for the admin handler.

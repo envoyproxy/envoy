@@ -373,8 +373,7 @@ private:
     AdminListener(AdminImpl& parent, Stats::Scope& listener_scope)
         : parent_(parent), name_("admin"), scope_(listener_scope),
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", scope_)),
-          init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_),
-          listener_info_(std::make_shared<EmptyListenerInfo>()) {}
+          init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
@@ -390,9 +389,7 @@ private:
     Stats::Scope& listenerScope() override { return scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    const Network::ListenerInfoConstSharedPtr listenerInfo() const override {
-      return listener_info_;
-    }
+    const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
@@ -417,10 +414,10 @@ private:
     BasicResourceLimitImpl open_connections_;
 
   private:
+    const EmptyListenerInfo listener_info_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
-    const Network::ListenerInfoConstSharedPtr listener_info_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
