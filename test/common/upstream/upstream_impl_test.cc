@@ -211,7 +211,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-TEST_P(StrictDnsParamTest, DropOverLoadConfigTest) {
+TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasic) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -227,31 +227,14 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTest) {
             category: test
             drop_percentage:
               numerator: 35
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
+              denominator: MILLION
   )EOF";
-  EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(Network::DnsResolver::ResolutionStatus::Success,
-           TestUtility::makeDnsResponse(std::get<2>(GetParam())));
-        return nullptr;
-      }));
-
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
   StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
-
-  cluster.initialize([&]() -> void { initialized.ready(); });
-  EXPECT_EQ(0.35f, cluster.dropOverload().value());
+  EXPECT_EQ(0.000035f, cluster.dropOverload().value());
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
@@ -271,13 +254,6 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
             drop_percentage:
               numerator: 35
               denominator: 4
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
@@ -308,13 +284,6 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
             - category: bar
               drop_percentage:
                 numerator: 10
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
@@ -323,7 +292,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
       false);
   EXPECT_THROW_WITH_MESSAGE(
       StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
-      "Cluster drop_overloads config has more than one category: 2");
+      "Cluster drop_overloads config has 2 categories. Envoy only support one.");
 }
 
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {

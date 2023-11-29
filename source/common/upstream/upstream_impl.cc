@@ -1656,7 +1656,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   }
   if (policy.drop_overloads().size() > kDropOverloadSize) {
     return absl::InvalidArgumentError(fmt::format(
-        "Cluster drop_overloads config has more than one category: {}", policy.drop_overloads().size()));
+        "Cluster drop_overloads config has {} categories. Envoy only support one.", policy.drop_overloads().size()));
   }
 
   const auto drop_percentage = policy.drop_overloads(0).drop_percentage();
