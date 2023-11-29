@@ -250,6 +250,11 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
   return seed;
 }
 
+// Converts from type urls OR descriptor full names to descriptor full names.
+// Type urls are as used in envoy yaml config, e.g.
+// "type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig"
+// becomes
+// "envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig"
 absl::string_view typeUrlToDescriptorFullName(absl::string_view url) {
   const size_t pos = url.rfind('/');
   if (pos != absl::string_view::npos) {
