@@ -58,7 +58,6 @@ envoy_cc_library(
         "abseil_symbolize",
     ],
     deps = [
-        ":all_extensions_lib",
         ":envoy_main_common_lib",
         ":platform_impl_lib",
         ":scm_impl_lib",
@@ -251,6 +250,7 @@ envoy_cc_library(
     }),
     deps = select({
         "//bazel:windows_x86_64": [
+            ":all_extensions_lib",
             ":main_common_lib",
             "//source/common/buffer:buffer_lib",
             "//source/common/common:assert_lib",
