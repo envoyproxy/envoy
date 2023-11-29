@@ -1,7 +1,7 @@
 #include "source/server/generic_factory_context.h"
 
 namespace Envoy {
-namespace Config {
+namespace Server {
 
 GenericFactoryContextImpl::GenericFactoryContextImpl(
     Server::Configuration::ServerFactoryContext& server_context,
@@ -33,5 +33,5 @@ ProtobufMessage::ValidationVisitor& GenericFactoryContextImpl::messageValidation
 Stats::Scope& GenericFactoryContextImpl::scope() const { return scope_; }
 Init::Manager& GenericFactoryContextImpl::initManager() const { return init_manager_; }
 
-} // namespace Config
+} // namespace Server
 } // namespace Envoy
