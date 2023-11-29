@@ -47,7 +47,3 @@ message SingleFields {
   float f = 9;
   FooEnum e = 10;
 };
-
-//message WithAny {
-//  Any any = 1;
-//};
