@@ -249,7 +249,8 @@ Please note that if adding a runtime guarded feature, your [release notes](chang
   HTTP/3 changes are largely exempt from cross-company approvals as all of the
   area experts work at a single company, but HTTP/3 changes which impact general
   functionality still merit a cross-company check.
-* contrib extensions do not need senior maintainer or maintainer review, simply a rubber stamp to merge.
+* contrib extensions do not need senior maintainer or maintainer review only contrib owner review and
+  a maintainer stamp to merge.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
 * Please make sure that the PR title, commit message, and description are updated if the PR changes
