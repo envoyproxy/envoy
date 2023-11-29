@@ -604,7 +604,6 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
 void ConnectionImpl::setFailureReason(absl::string_view failure_reason) {
   if (!transport_socket_->failureReason().empty()) {
     failure_reason_ = absl::StrCat(failure_reason, ". ", transport_socket_->failureReason());
-    stream_info_.setDownstreamTransportFailureReason(failure_reason_);
   } else {
     failure_reason_ = std::string(failure_reason);
   }
