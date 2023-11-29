@@ -139,7 +139,18 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-  return DeterministicProtoHash::hash(message);
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
+    return DeterministicProtoHash::hash(message);
+  } else {
+    std::string text_format;
+    Protobuf::TextFormat::Printer printer;
+    printer.SetExpandAny(true);
+    printer.SetUseFieldNumber(true);
+    printer.SetSingleLineMode(true);
+    printer.SetHideUnknownFields(true);
+    printer.PrintToString(message, &text_format);
+    return HashUtil::xxHash64(text_format);
+  }
 #else
   return HashUtil::xxHash64(message.SerializeAsString());
 #endif
