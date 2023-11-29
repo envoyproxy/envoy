@@ -20,6 +20,8 @@ public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext() override;
 
+  const Network::ListenerConfig& listenerConfig() const override { return listener_config_; }
+  MOCK_METHOD(const Network::ListenerConfig&, listenerConfig_, (), (const));
   MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
   MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
@@ -39,6 +41,7 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(OptRef<Server::Admin>, admin, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
+  MOCK_METHOD(bool, isQuicListener, (), (const));
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
@@ -75,6 +78,8 @@ public:
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
+
+  Network::MockListenerConfig listener_config_;
 };
 } // namespace Configuration
 } // namespace Server

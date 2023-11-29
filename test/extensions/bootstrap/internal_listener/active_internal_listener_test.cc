@@ -271,7 +271,8 @@ public:
                                    ? std::make_shared<Network::NopConnectionBalancerImpl>()
                                    : connection_balancer),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
-          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit) {
+          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit),
+          listener_info_(nullptr) {
       socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
@@ -291,18 +292,6 @@ public:
       Network::InternalListenerRegistry& internalListenerRegistry() override { return registry_; }
       Network::InternalListenerRegistry& registry_;
     };
-
-    // Network::ListenerInfo
-    const envoy::config::core::v3::Metadata& metadata() const override {
-      return metadata_.proto_metadata_;
-    }
-    const Envoy::Config::TypedMetadata& typedMetadata() const override {
-      return metadata_.typed_metadata_;
-    }
-    envoy::config::core::v3::TrafficDirection direction() const override {
-      return envoy::config::core::v3::UNSPECIFIED;
-    }
-    bool isQuic() const override { return false; }
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override {
@@ -334,6 +323,9 @@ public:
       } else {
         return *internal_listener_config_;
       }
+    }
+    const Network::ListenerInfoConstSharedPtr listenerInfo() const override {
+      return listener_info_;
     }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return *connection_balancer_;
@@ -370,7 +362,7 @@ public:
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
-    Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
+    std::shared_ptr<Network::ListenerInfo> listener_info_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;

@@ -241,6 +241,11 @@ public:
   virtual bool healthCheckFailed() PURE;
 
   /**
+   * @return bool if these filters are created under the scope of a Quic listener.
+   */
+  virtual bool isQuicListener() const PURE;
+
+  /**
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;
@@ -294,7 +299,13 @@ public:
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
  * and connections. It can be used to create ListenerFilterChain.
  */
-class ListenerFactoryContext : public virtual FactoryContext {};
+class ListenerFactoryContext : public virtual FactoryContext {
+public:
+  /**
+   * Give access to the listener configuration
+   */
+  virtual const Network::ListenerConfig& listenerConfig() const PURE;
+};
 
 /**
  * FactoryContext for ProtocolOptionsFactory.

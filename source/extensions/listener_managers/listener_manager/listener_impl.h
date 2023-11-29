@@ -118,28 +118,6 @@ private:
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
 
-class ListenerInfoImpl : public Network::ListenerInfo {
-public:
-  explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener config)
-      : config_(config), typed_metadata_(config_.metadata()),
-        is_quic_(config.udp_listener_config().has_quic_options()) {}
-  // Allow access to the underlying protobuf as an internal detail.
-  const envoy::config::listener::v3::Listener& config() const { return config_; }
-  // Network::ListenerInfo
-  const envoy::config::core::v3::Metadata& metadata() const override { return config_.metadata(); }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return config_.traffic_direction();
-  }
-  bool isQuic() const override { return is_quic_; }
-
-private:
-  const envoy::config::listener::v3::Listener config_;
-  const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
-      typed_metadata_;
-  const bool is_quic_;
-};
-
 /**
  * The common functionality shared by PerListenerFilterFactoryContexts and
  * PerFilterChainFactoryFactoryContexts.
@@ -149,7 +127,7 @@ class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContex
 public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 const std::shared_ptr<const ListenerInfoImpl>& listener_info,
+                                 const Network::ListenerInfoConstSharedPtr& listener_info,
                                  const envoy::config::listener::v3::Listener& config,
                                  Server::DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -180,6 +158,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
   // DrainDecision
   bool drainClose() const override {
@@ -193,7 +172,7 @@ public:
 
 private:
   Envoy::Server::Instance& server_;
-  const std::shared_ptr<const ListenerInfoImpl> listener_info_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
   Stats::ScopeSharedPtr global_scope_;
   Stats::ScopeSharedPtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
@@ -210,14 +189,14 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                const std::shared_ptr<const ListenerInfoImpl> listener_info,
+                                const Network::ListenerConfig* listener_config,
                                 ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
 
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
-      ListenerImpl& listener_impl)
+      const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl)
       : listener_factory_context_base_(listener_factory_context_base),
-        listener_impl_(listener_impl) {}
+        listener_config_(listener_config), listener_impl_(listener_impl) {}
 
   // FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -249,6 +228,10 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
+
+  // ListenerFactoryContext
+  const Network::ListenerConfig& listenerConfig() const override;
 
   ListenerFactoryContextBaseImpl& parentFactoryContext() { return *listener_factory_context_base_; }
   friend class ListenerImpl;
@@ -257,6 +240,28 @@ private:
   std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base_;
   const Network::ListenerConfig* listener_config_;
   ListenerImpl& listener_impl_;
+};
+
+class ListenerInfoImpl : public Network::ListenerInfo {
+public:
+  explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener config)
+      : config_(config), typed_metadata_(config_.metadata()),
+        is_quic_(config.udp_listener_config().has_quic_options()) {}
+  // Allow access to the underlying protobuf as an internal detail.
+  const envoy::config::listener::v3::Listener& config() const { return config_; }
+  // Network::ListenerInfo
+  const envoy::config::core::v3::Metadata& metadata() const override { return config_.metadata(); }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return config_.traffic_direction();
+  }
+  bool isQuic() const override { return is_quic_; }
+
+private:
+  const envoy::config::listener::v3::Listener config_;
+  const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
+      typed_metadata_;
+  const bool is_quic_;
 };
 
 /**
@@ -342,18 +347,6 @@ public:
   // Check whether a new listener has duplicated listening address this listener.
   bool hasDuplicatedAddress(const ListenerImpl& other) const;
 
-  // Network::ListenerInfo
-  const envoy::config::core::v3::Metadata& metadata() const override {
-    return listener_info_->metadata();
-  }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override {
-    return listener_info_->typedMetadata();
-  }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return listener_info_->direction();
-  }
-  bool isQuic() const override { return listener_info_->isQuic(); }
-
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
@@ -401,6 +394,7 @@ public:
   }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
+  const Network::ListenerInfoConstSharedPtr listenerInfo() const override { return listener_info_; }
 
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {

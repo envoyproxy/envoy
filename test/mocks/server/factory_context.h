@@ -39,9 +39,12 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(OptRef<Server::Admin>, admin, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
+  MOCK_METHOD(bool, isQuicListener, (), (const));
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
+
+  MOCK_METHOD(const Network::ListenerConfig&, listenerConfig, (), (const));
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
@@ -77,7 +80,6 @@ public:
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
-  testing::NiceMock<Network::MockListenerInfo> listener_info_;
 };
 
 class MockUpstreamFactoryContext : public UpstreamFactoryContext {
