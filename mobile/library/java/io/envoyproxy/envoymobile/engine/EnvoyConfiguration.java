@@ -108,10 +108,8 @@ public class EnvoyConfiguration {
    *     known to speak QUIC.
    * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
-   *     compression.
    * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
-   *     compression.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableInterfaceBinding                        whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2

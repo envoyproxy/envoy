@@ -41,7 +41,7 @@ envoy_cc_library(
         "//source/common/stats:thread_local_store_lib",
         "//source/server:drain_manager_lib",
         "//source/server:listener_hooks_lib",
-        "//source/server:options_lib",
+        "//source/server:options_base",
         "//source/server:server_base_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
@@ -61,6 +61,7 @@ envoy_cc_library(
         ":envoy_main_common_lib",
         ":platform_impl_lib",
         ":scm_impl_lib",
+        "//source/server:options_lib",
     ],
 )
 
@@ -85,7 +86,7 @@ envoy_cc_library(
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
-        "//source/server:options_lib",
+        "//source/server:options_base",
         "//source/server:server_base_lib",
     ] + envoy_select_signal_trace([
         "//source/common/signal:sigaction_lib",
@@ -113,6 +114,7 @@ envoy_cc_library(
         "//source/common/grpc:google_grpc_context_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:options_lib",
         "//source/server/config_validation:server_lib",
     ] + envoy_select_signal_trace([
         "//source/common/signal:sigaction_lib",
@@ -130,6 +132,7 @@ envoy_cc_library(
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
+        "//source/server:options_lib",
     ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
 
@@ -265,6 +268,7 @@ envoy_cc_library(
             "//source/common/common:thread_lib",
             "//source/common/common:win32_event_logger_impl_lib",
             "//source/common/event:signal_lib",
+            "//source/server:options_lib",
         ],
         "//conditions:default": [],
     }),

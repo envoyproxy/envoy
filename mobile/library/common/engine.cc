@@ -26,21 +26,21 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
-  auto options = std::make_unique<Envoy::OptionsImpl>();
+  auto options = std::make_unique<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
   if (!log_level.empty()) {
-    options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
+    ENVOY_BUG(options->setLogLevel(log_level.c_str()).ok(), "invalid log level");
   }
   options->setConcurrency(1);
   return run(std::move(options));
 }
 
-envoy_status_t Engine::run(std::unique_ptr<Envoy::OptionsImpl>&& options) {
+envoy_status_t Engine::run(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
   main_thread_ = std::thread(&Engine::main, this, std::move(options));
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
+envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {

@@ -222,7 +222,7 @@ public:
   listeners(ListenerState state = ListenerState::ACTIVE) override;
   uint64_t numConnections() const override;
   bool removeListener(const std::string& listener_name) override;
-  void startWorkers(GuardDog& guard_dog, std::function<void()> callback) override;
+  void startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) override;
   void stopListeners(StopListenersType stop_listeners_type,
                      const Network::ExtraShutdownListenerOptions& options) override;
   void stopWorkers() override;

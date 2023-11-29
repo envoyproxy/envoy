@@ -51,7 +51,6 @@
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/configuration_impl.h"
-#include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
@@ -778,10 +777,8 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-      *stats_store_.rootScope(), config_.mainThreadWatchdogConfig(), *api_, "main_thread");
-  worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-      *stats_store_.rootScope(), config_.workerWatchdogConfig(), *api_, "workers");
+  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
+  worker_guard_dog_ = maybeCreateGuardDog("workers");
 }
 
 void InstanceBase::onClusterManagerPrimaryInitializationComplete() {
@@ -823,7 +820,7 @@ void InstanceBase::onRuntimeReady() {
 
 void InstanceBase::startWorkers() {
   // The callback will be called after workers are started.
-  listener_manager_->startWorkers(*worker_guard_dog_, [this]() {
+  listener_manager_->startWorkers(makeOptRefFromPtr(worker_guard_dog_.get()), [this]() {
     if (isShutdown()) {
       return;
     }
@@ -950,12 +947,17 @@ void InstanceBase::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
-                                                         "main_thread", *dispatcher_);
+  WatchDogSharedPtr watchdog;
+  if (main_thread_guard_dog_) {
+    watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                      "main_thread", *dispatcher_);
+  }
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
-  main_thread_guard_dog_->stopWatching(watchdog);
+  if (main_thread_guard_dog_) {
+    main_thread_guard_dog_->stopWatching(watchdog);
+  }
   watchdog.reset();
 
   terminate();

@@ -233,8 +233,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "options_lib",
-    srcs = ["options_impl.cc"] + select({
+    name = "options_base",
+    srcs = ["options_impl_base.cc"] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_ppc": ["options_impl_platform_linux.cc"],
@@ -242,7 +242,7 @@ envoy_cc_library(
         "//conditions:default": ["options_impl_platform_default.cc"],
     }),
     hdrs = [
-        "options_impl.h",
+        "options_impl_base.h",
         "options_impl_platform.h",
     ] + select({
         "//bazel:linux_x86_64": ["options_impl_platform_linux.h"],
@@ -251,9 +251,6 @@ envoy_cc_library(
         "//bazel:linux_mips64": ["options_impl_platform_linux.h"],
         "//conditions:default": [],
     }),
-    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
-    copts = ["-DHAVE_LONG_LONG"],
-    external_deps = ["tclap"],
     deps = [
         "//envoy/network:address_interface",
         "//envoy/registry",
@@ -266,6 +263,31 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:tag_utility_lib",
         "//source/common/version:version_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "options_lib",
+    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
+    srcs = ["options_impl.cc"],
+    hdrs = ["options_impl.h"],
+    copts = ["-DHAVE_LONG_LONG"],
+    external_deps = ["tclap"],
+    deps = [
+        ":options_base",
+        "//envoy/network:address_interface",
+        "//envoy/registry",
+        "//envoy/server:options_interface",
+        "//envoy/stats:stats_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:macros",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/stats:tag_utility_lib",
+        "//source/common/version:version_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -395,7 +417,6 @@ envoy_cc_library(
     deps = [
         ":api_listener_lib",
         ":configuration_lib",
-        ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_factory_lib",
         ":regex_engine_lib",
@@ -457,6 +478,7 @@ envoy_cc_library(
     srcs = ["instance_impl.cc"],
     hdrs = ["instance_impl.h"],
     deps = [
+        ":guarddog_lib",
         ":server_base_lib",
         "//source/common/memory:heap_shrinker_lib",
         "//source/server:overload_manager_lib",

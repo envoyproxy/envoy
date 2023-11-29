@@ -297,11 +297,13 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
     result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
 
     if (result != nullptr) {
-      ENVOY_LOG_FIRST_N(warn, 10,
-                        "No per filter config is found by filter config name and fallback to use "
-                        "filter canonical name. This is deprecated and will be forbidden very "
-                        "soon. Please use the filter config name to index per filter config. See "
-                        "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+      ENVOY_LOG_FIRST_N(
+          warn, 10,
+          "No per filter config is found by filter config name \"{}\" and fallback to use "
+          "filter canonical name \"{}\". This is deprecated and will be forbidden very "
+          "soon. Please use the filter config name to index per filter config. See "
+          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
+          filter_context_.config_name, filter_context_.filter_name);
     }
   }
   return result;
@@ -328,12 +330,14 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
   }
 
   current_route->traversePerFilterConfig(
-      filter_context_.filter_name, [&cb](const Router::RouteSpecificFilterConfig& config) {
-        ENVOY_LOG_FIRST_N(warn, 10,
-                          "No per filter config is found by filter config name and fallback to use "
-                          "filter canonical name. This is deprecated and will be forbidden very "
-                          "soon. Please use the filter config name to index per filter config. See "
-                          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+      filter_context_.filter_name, [&cb, this](const Router::RouteSpecificFilterConfig& config) {
+        ENVOY_LOG_FIRST_N(
+            warn, 10,
+            "No per filter config is found by filter config name \"{}\" and fallback to use "
+            "filter canonical name \"{}\". This is deprecated and will be forbidden very "
+            "soon. Please use the filter config name to index per filter config. See "
+            "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
+            filter_context_.config_name, filter_context_.filter_name);
         cb(config);
       });
 }
