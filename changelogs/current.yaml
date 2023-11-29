@@ -163,6 +163,10 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a sampler for the OpenTelemetry tracer.
+- area: CEL-attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``connection.transport_failure_reason``
+    for looking up connection transport failure reason.
 - area: ext_authz
   change: |
     New config parameter :ref:`charge_cluster_response_stats
