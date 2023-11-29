@@ -43,6 +43,7 @@ public:
   DnsCacheManagerFactoryImpl(Server::Configuration::ServerFactoryContext& server_context,
                              ProtobufMessage::ValidationVisitor& validation_visitor)
       : context_(server_context, validation_visitor) {}
+  DnsCacheManagerFactoryImpl(Server::GenericFactoryContextImpl context) : context_(context) {}
 
   DnsCacheManagerSharedPtr get() override;
 
