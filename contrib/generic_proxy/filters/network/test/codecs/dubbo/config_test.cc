@@ -88,8 +88,8 @@ TEST(DubboRequestTest, DubboRequestTest) {
       attachment_size++;
       return true;
     });
-    // Version is not part of attachments. So there are only 4 attachments.
-    EXPECT_EQ(4, attachment_size);
+    // Version is not part of attachments. So there are only 2 attachments.
+    EXPECT_EQ(2, attachment_size);
   }
 }
 
