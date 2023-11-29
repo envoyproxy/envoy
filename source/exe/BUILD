@@ -33,7 +33,7 @@ envoy_cc_binary(
 )
 
 envoy_cc_library(
-    name = "envoy_common_lib",
+    name = "all_extensions_lib",
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/network:utility_lib",
@@ -58,6 +58,7 @@ envoy_cc_library(
         "abseil_symbolize",
     ],
     deps = [
+        ":all_extensions_lib",
         ":envoy_main_common_lib",
         ":platform_impl_lib",
         ":scm_impl_lib",
@@ -103,7 +104,6 @@ envoy_cc_library(
         "main_common.h",
     ],
     deps = [
-        ":envoy_common_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
         ":stripped_main_base_lib",
@@ -124,6 +124,7 @@ envoy_cc_library(
     name = "envoy_main_common_lib",
     deps = [
         ":main_common_lib",
+        ":all_extensions_lib",
         # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
         # Envoy requires them.
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
