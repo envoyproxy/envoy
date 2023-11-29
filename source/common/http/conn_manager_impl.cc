@@ -1184,6 +1184,8 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 // modifications which may themselves affect route selection.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
                                                         bool end_stream) {
+  filter_manager_.streamInfo().downstreamTiming().onLastDownstreamHeaderRxByteReceived(
+      connection_manager_.dispatcher_->timeSource());
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *headers);
   ScopeTrackerScopeState scope(this,
