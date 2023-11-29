@@ -49,7 +49,7 @@ class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy
 public:
   // Create a DnsCacheImpl or return a failed status;
   static absl::StatusOr<std::shared_ptr<DnsCacheImpl>> createDnsCacheImpl(
-      Server::Configuration::GenericFactoryContextImpl context,
+      Server::GenericFactoryContextImpl context,
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
 
   ~DnsCacheImpl() override;
