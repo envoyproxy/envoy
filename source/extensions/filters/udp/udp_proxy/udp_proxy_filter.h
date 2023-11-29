@@ -465,8 +465,8 @@ private:
   class ClusterInfo;
 
   struct ActiveReadFilter : public virtual ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
-    ActiveReadFilter(ActiveSession& parent, ReadFilterSharedPtr filter)
-        : parent_(parent), read_filter_(std::move(filter)) {}
+    ActiveReadFilter(ActiveSession& parent, ReadFilterSharedPtr filter, bool is_read_write_filter)
+        : parent_(parent), read_filter_(std::move(filter)), is_read_write_filter_(is_read_write_filter) {}
 
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
@@ -479,13 +479,14 @@ private:
     ActiveSession& parent_;
     ReadFilterSharedPtr read_filter_;
     bool initialized_{false};
+    const bool is_read_write_filter_;
   };
 
   using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
 
   struct ActiveWriteFilter : public virtual WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
-    ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter)
-        : parent_(parent), write_filter_(std::move(filter)) {}
+    ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter, bool is_read_write_filter)
+        : parent_(parent), write_filter_(std::move(filter)), is_read_write_filter_(is_read_write_filter) {}
 
     // SessionFilters::WriteFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
@@ -496,6 +497,7 @@ private:
 
     ActiveSession& parent_;
     WriteFilterSharedPtr write_filter_;
+    const bool is_read_write_filter_;
   };
 
   using ActiveWriteFilterPtr = std::unique_ptr<ActiveWriteFilter>;
@@ -545,23 +547,23 @@ private:
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {
-      ActiveReadFilterPtr wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
+      ActiveReadFilterPtr wrapper = std::make_unique<ActiveReadFilter>(*this, filter, false);
       filter->initializeReadFilterCallbacks(*wrapper);
       LinkedList::moveIntoListBack(std::move(wrapper), read_filters_);
     };
 
     void addWriteFilter(WriteFilterSharedPtr filter) override {
-      ActiveWriteFilterPtr wrapper = std::make_unique<ActiveWriteFilter>(*this, filter);
+      ActiveWriteFilterPtr wrapper = std::make_unique<ActiveWriteFilter>(*this, filter, false);
       filter->initializeWriteFilterCallbacks(*wrapper);
       LinkedList::moveIntoList(std::move(wrapper), write_filters_);
     };
 
     void addFilter(FilterSharedPtr filter) override {
-      ActiveReadFilterPtr read_wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
+      ActiveReadFilterPtr read_wrapper = std::make_unique<ActiveReadFilter>(*this, filter, true);
       filter->initializeReadFilterCallbacks(*read_wrapper);
       LinkedList::moveIntoListBack(std::move(read_wrapper), read_filters_);
 
-      ActiveWriteFilterPtr write_wrapper = std::make_unique<ActiveWriteFilter>(*this, filter);
+      ActiveWriteFilterPtr write_wrapper = std::make_unique<ActiveWriteFilter>(*this, filter, true);
       filter->initializeWriteFilterCallbacks(*write_wrapper);
       LinkedList::moveIntoList(std::move(write_wrapper), write_filters_);
     };
@@ -598,6 +600,9 @@ private:
     uint64_t session_id_;
     std::list<ActiveReadFilterPtr> read_filters_;
     std::list<ActiveWriteFilterPtr> write_filters_;
+
+    private:
+      void onSessionComplete();
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
