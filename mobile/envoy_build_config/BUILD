@@ -32,7 +32,6 @@ envoy_cc_library(
         "@envoy//source/extensions/compression/gzip/decompressor:config",
         "@envoy//source/extensions/filters/http/alternate_protocols_cache:config",
         "@envoy//source/extensions/filters/http/buffer:config",
-        "@envoy//source/extensions/filters/http/compressor:config",
         "@envoy//source/extensions/filters/http/decompressor:config",
         "@envoy//source/extensions/filters/http/dynamic_forward_proxy:config",
         "@envoy//source/extensions/filters/http/router:config",
