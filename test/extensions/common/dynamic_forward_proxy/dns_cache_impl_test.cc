@@ -1573,7 +1573,7 @@ TEST(DnsCacheManagerImplTest, TestLifetime) {
   std::unique_ptr<DnsCacheManagerImpl> cache_manager;
 
   {
-    Server::FactoryContextBaseImpl scoped_context(context);
+    Server::GenericFactoryContextImpl scoped_context(context);
     cache_manager = std::make_unique<DnsCacheManagerImpl>(scoped_context);
   }
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
