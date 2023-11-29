@@ -54,9 +54,15 @@ public:
   virtual const std::string& hostRewrite() const PURE;
 
   /**
-   * @return  whether or not to buffer and sign the payload.
+   * @return whether or not to buffer and sign the payload.
    */
   virtual bool useUnsignedPayload() const PURE;
+
+  /**
+   * @return the signing algorithm, either aws_sigv4 or aws_sigv4a
+   */
+  virtual const std::string& signingAlgorithm() const PURE;
+
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -67,17 +73,20 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
-                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload);
+                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload,
+                   const std::string& signing_algorithm);
 
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
   const std::string& hostRewrite() const override;
   bool useUnsignedPayload() const override;
+  const std::string& signingAlgorithm() const override;
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
   std::string host_rewrite_;
+  std::string signing_algorithm_;
   const bool use_unsigned_payload_;
 };
 
