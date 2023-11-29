@@ -17,8 +17,8 @@ namespace DeterministicProtoHash {
 //
 // If this is used as part of making a hash table, it may result in
 // collisions if unknown fields are present and are not ignored by the
-// corresponding comparer. A MessageDifferencer can be configured either
-// way.
+// corresponding comparator. A `MessageDifferencer` can be configured to
+// ignore unknown fields, or not to.
 uint64_t hash(const Protobuf::Message& message);
 
 } // namespace DeterministicProtoHash
