@@ -213,5 +213,8 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.
+- area: stream info
+  change: |
+    Added time spent reading request headers to ``DownstreamTiming`.
 
 deprecated:
