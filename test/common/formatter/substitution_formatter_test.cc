@@ -865,7 +865,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
   {
     StreamInfoFormatter upstream_connection_pool_callback_duration_format(
-        "UPSTREAM_CONNECTION_POOL_CALLBACK_DURATION");
+        "UPSTREAM_CONNECTION_POOL_READY_DURATION");
     EXPECT_EQ(absl::nullopt,
               upstream_connection_pool_callback_duration_format.formatWithContext({}, stream_info));
     EXPECT_THAT(
@@ -875,7 +875,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_connection_pool_callback_duration_format(
-        "UPSTREAM_CONNECTION_POOL_CALLBACK_DURATION");
+        "UPSTREAM_CONNECTION_POOL_READY_DURATION");
     EXPECT_CALL(time_system, monotonicTime)
         .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
     upstream_timing.recordConnectionPoolCallbackLatency(

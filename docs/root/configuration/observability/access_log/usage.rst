@@ -448,9 +448,9 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
-%UPSTREAM_CONNECTION_POOL_CALLBACK_DURATION%
+%UPSTREAM_CONNECTION_POOL_READY_DURATION%
   HTTP/TCP
-    Total duration in milliseconds from when the upstream request was created to when the connection pool callbacks.
+    Total duration in milliseconds from when the upstream request was created to when the connection pool is ready.
 
   UDP
     Not implemented ("-").
