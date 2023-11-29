@@ -1248,7 +1248,7 @@ protected:
 
   virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
 
-  bool parseDropOverloadConfig(
+  absl::Status parseDropOverloadConfig(
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
   // This init manager is shared via TransportSocketFactoryContext. The initialization targets that

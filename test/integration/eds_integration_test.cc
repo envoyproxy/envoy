@@ -206,7 +206,7 @@ public:
 
   void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, nullptr); }
 
-  void dropOverloadTest(uint32_t numerator, std::string status) {
+  void dropOverloadTest(uint32_t numerator, const std::string& status) {
     autonomous_upstream_ = true;
 
     initializeTest(false);

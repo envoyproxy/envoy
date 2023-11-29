@@ -1522,9 +1522,9 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         info_->endpointStats().membership_excluded_.set(excluded_hosts);
       });
   // Drop overload configuration parsing.
-  if (!parseDropOverloadConfig(cluster.load_assignment())) {
-    throwEnvoyExceptionOrPanic(
-        fmt::format(" Cluster {} drop_overloads configuration is wrong", cluster.name()));
+  absl::Status status = parseDropOverloadConfig(cluster.load_assignment());
+  if (!status.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(status.message()));
   }
 }
 
@@ -1645,22 +1645,26 @@ void ClusterImplBase::finishInitialization() {
   }
 }
 
-bool ClusterImplBase::parseDropOverloadConfig(
+absl::Status ClusterImplBase::parseDropOverloadConfig(
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+  // Initialize drop_overload_ to zero by default. drop_overload functionality will
+  // not kick in when it is zero.
+  drop_overload_ = UnitFloat(0);
+
   if (!cluster_load_assignment.has_policy()) {
-    return true;
+    return absl::OkStatus();
   }
   auto policy = cluster_load_assignment.policy();
   if (policy.drop_overloads().size() == 0) {
-    return true;
-    ;
+    return absl::OkStatus();
   }
   if (policy.drop_overloads().size() > kDropOverloadSize) {
-    return false;
+    return absl::InvalidArgumentError(fmt::format(
+        "Cluster drop_overloads config has more than one category: {}", policy.drop_overloads().size()));
   }
 
-  auto drop_percentage = policy.drop_overloads(0).drop_percentage();
-  float denominator;
+  const auto drop_percentage = policy.drop_overloads(0).drop_percentage();
+  float denominator = 100;
   switch (drop_percentage.denominator()) {
   case envoy::type::v3::FractionalPercent::HUNDRED:
     denominator = 100;
@@ -1672,10 +1676,12 @@ bool ClusterImplBase::parseDropOverloadConfig(
     denominator = 1000000;
     break;
   default:
-    return false;
+    return absl::InvalidArgumentError(fmt::format(
+        "Cluster drop_overloads config denominator setting is invalid : {}. Valid range 0~2.",
+        drop_percentage.denominator()));
   }
   drop_overload_ = UnitFloat(float(drop_percentage.numerator()) / (denominator));
-  return true;
+  return absl::OkStatus();
 }
 
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {

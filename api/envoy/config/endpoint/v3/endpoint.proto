@@ -75,10 +75,8 @@ message ClusterLoadAssignment {
     //    "lb"_drop = 20%  // 50% of the remaining 'actual' load, which is 40%.
     //    actual_outgoing_load = 20% // remaining after applying all categories.
     //
-    // The configuration is used by both gRPC and Envoy.
-    // Specific for Envoy, there are issues to support multiple categories at same time. It is
-    // decided to only support one category at this moment. If there are more than one category
-    // configured for Envoy, the configuration will be rejected.
+    // Envoy supports only one element and will NACK if more than one element is present.
+    // Other xDS-capable data planes will not necessarily have this limitation.
     repeated DropOverload drop_overloads = 2;
 
     // Priority levels and localities are considered overprovisioned with this

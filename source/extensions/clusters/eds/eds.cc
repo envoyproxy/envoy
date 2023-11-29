@@ -215,10 +215,9 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   }
 
   // Drop overload configuration parsing.
-  if (!parseDropOverloadConfig(cluster_load_assignment)) {
-    return absl::InvalidArgumentError(
-        fmt::format(" Cluster {} drop_overloads configuration is wrong",
-                    cluster_load_assignment.cluster_name()));
+  absl::Status status = parseDropOverloadConfig(cluster_load_assignment);
+  if (!status.ok()) {
+    return status;
   }
 
   // Pause LEDS messages until the EDS config is finished processing.
