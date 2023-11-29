@@ -40,7 +40,7 @@ public:
    * supported later they should have a separate function because enum
    * sizes are implementation-specific.
    *
-   * bools have a specialization in hash.cc because they too have
+   * bools have an inlined specialization below because they too have
    * implementation-specific sizes.
    *
    * @param input supplies the value to hash.
