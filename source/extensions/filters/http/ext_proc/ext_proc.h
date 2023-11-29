@@ -21,7 +21,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
@@ -122,13 +121,12 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
-class FilterConfig : public Logger::Loggable<Logger::Id::ext_proc> {
+class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-               const std::string& stats_prefix,
-               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder)
+               const std::string& stats_prefix)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
@@ -138,9 +136,7 @@ public:
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
-        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
-        builder_(builder), request_expr_(initExpressions(config.request_attributes())),
-        response_expr_(initExpressions(config.response_attributes())) {}
+        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -170,16 +166,6 @@ public:
 
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
-  const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
-  requestExpr() const {
-    return request_expr_;
-  }
-
-  const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
-  responseExpr() const {
-    return response_expr_;
-  }
-
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -196,9 +182,6 @@ private:
     }
     return header_matchers;
   }
-
-  absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
-  initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const;
 
   const bool failure_mode_allow_;
   const bool disable_clear_route_cache_;
@@ -218,13 +201,6 @@ private:
   const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
-
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
-
-  const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
-      request_expr_;
-  const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
-      response_expr_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -324,13 +300,7 @@ private:
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      absl::optional<ProtobufWkt::Struct> proto);
-
-  const absl::optional<ProtobufWkt::Struct> evaluateAttributes(
-      Filters::Common::Expr::ActivationPtr activation,
-      const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
-          expr);
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
