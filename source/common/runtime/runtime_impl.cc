@@ -425,7 +425,11 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   }
 
   Filesystem::Directory directory(path);
-  for (const Filesystem::DirectoryEntry& entry : directory) {
+  Filesystem::DirectoryIteratorImpl it = directory.begin();
+  RELEASE_ASSERT(it.status().ok(), it.status().ToString());
+  for (; it != directory.end(); ++it) {
+    RELEASE_ASSERT(it.status().ok(), it.status().ToString());
+    Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
     if (prefix.empty()) {
@@ -474,6 +478,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 #endif
     }
   }
+  RELEASE_ASSERT(it.status().ok(), it.status().ToString());
 }
 
 ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)
