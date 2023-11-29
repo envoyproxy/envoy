@@ -244,9 +244,8 @@ Please note that if adding a runtime guarded feature, your [release notes](chang
 * For new extensions (contrib or otherwise) and features, at least one of the approvals should be *from an
   organization different from the PR author.* E.g., if Lyft authors a PR, at least one approver
   should be from an organization other than Lyft. This helps us make sure that we aren't putting
-  organization specific shortcuts into the code. This is not required for less
-  contentious PRs like test-only changes, simple refactors, and bug fixes.
-  HTTP/3 changes are largely exempt from cross-company approvals as all of the
+  organization specific shortcuts into the code.
+  new HTTP/3 features are largely exempt from cross-company approvals as all of the
   area experts work at a single company, but HTTP/3 changes which impact general
   functionality still merit a cross-company check.
 * contrib extensions do not need senior maintainer or maintainer review only contrib owner review and
