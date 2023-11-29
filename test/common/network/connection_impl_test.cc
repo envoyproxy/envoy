@@ -483,6 +483,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::move(mocks.transport_socket_), stream_info_);
+
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
   Stats::MockCounter timeout_counter;
   EXPECT_CALL(timeout_counter, inc());
