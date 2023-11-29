@@ -11,7 +11,6 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/compression/brotli/compressor/config.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
-#include "source/extensions/compression/gzip/compressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
@@ -208,7 +207,6 @@ void ExtensionRegistry::registerFactories() {
 
   // TODO(alyssawilk) figure out why these are needed.
   Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
-  Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
 
 #ifdef ENVOY_MOBILE_XDS
   // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile
