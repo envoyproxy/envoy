@@ -320,7 +320,6 @@ message JwtProvider {
   // This header is only reserved for jwt claim; any other value will be overwritten.
   repeated JwtClaimToHeader claim_to_headers = 15;
 
-  // [#not-implemented-hide:]
   // Clears route cache in order to allow JWT token to correctly affect
   // routing decisions. Filter clears all cached routes when:
   //

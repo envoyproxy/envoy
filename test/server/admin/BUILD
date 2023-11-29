@@ -21,11 +21,21 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "admin_factory_context_test",
+    srcs = ["admin_factory_context_test.cc"],
+    deps = [
+        "//source/server/admin:admin_factory_context",
+        "//test/mocks/server:instance_mocks",
+    ],
+)
+
 envoy_cc_test_library(
     name = "admin_instance_lib",
     srcs = envoy_select_admin_functionality(["admin_instance.cc"]),
     hdrs = envoy_select_admin_functionality(["admin_instance.h"]),
     deps = [
+        "//source/server:configuration_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:instance_mocks",

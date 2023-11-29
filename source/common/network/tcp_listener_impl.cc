@@ -13,12 +13,10 @@
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/runtime/runtime_keys.h"
 
 namespace Envoy {
 namespace Network {
-
-const absl::string_view TcpListenerImpl::GlobalMaxCxRuntimeKey =
-    "overload.global_downstream_max_connections";
 
 bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
   // Enforce the global connection limit if necessary, immediately closing the accepted connection.
@@ -30,12 +28,12 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
   if (track_global_cx_limit_in_overload_manager_) {
     // Check if runtime flag `overload.global_downstream_max_connections` is configured
     // simultaneously with downstream connections monitor in overload manager.
-    if (runtime_.threadsafeSnapshot()->get(GlobalMaxCxRuntimeKey)) {
+    if (runtime_.threadsafeSnapshot()->get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
       ENVOY_LOG_ONCE_MISC(
           warn,
           "Global downstream connections limits is configured via runtime key {} and in "
           "{}. Using overload manager config.",
-          GlobalMaxCxRuntimeKey,
+          Runtime::Keys::GlobalMaxCxRuntimeKey,
           Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections);
     }
     // Try to allocate resource within overload manager. We do it once here, instead of checking if
@@ -50,7 +48,7 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     // will always be run on a worker thread, but to prevent failed assertions in test environments,
     // threadsafe snapshots must be used. This must be revisited.
     const uint64_t global_cx_limit = runtime_.threadsafeSnapshot()->getInteger(
-        GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
+        Runtime::Keys::GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
     return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
   }
 }
@@ -117,7 +115,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   cb_.recordConnectionsAcceptedOnSocketEvent(connections_accepted_from_kernel_count);
 }
 
-TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
+TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                  Runtime::Loader& runtime, SocketSharedPtr socket,
                                  TcpListenerCallbacks& cb, bool bind_to_port,
                                  bool ignore_global_conn_limit,

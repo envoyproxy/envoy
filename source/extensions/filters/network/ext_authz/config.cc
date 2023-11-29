@@ -30,9 +30,10 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
   THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(proto_config));
   return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config,
           timeout_ms](Network::FilterManager& filter_manager) -> void {
-    auto async_client_factory =
-        context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-            grpc_service, context.scope(), true);
+    auto async_client_factory = context.getServerFactoryContext()
+                                    .clusterManager()
+                                    .grpcAsyncClientManager()
+                                    .factoryForGrpcService(grpc_service, context.scope(), true);
 
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
         async_client_factory->createUncachedRawAsyncClient(),

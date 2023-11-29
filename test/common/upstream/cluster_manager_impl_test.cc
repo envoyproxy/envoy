@@ -4768,7 +4768,7 @@ public:
   std::string name() const override { return "envoy.test.filter"; }
 };
 
-// Verify that configured upstream filters are added to client connections.
+// Verify that configured upstream network filters are added to client connections.
 TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
   TestUpstreamNetworkFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(

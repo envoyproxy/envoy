@@ -27,8 +27,7 @@ TEST(HeaderMutationsTest, BasicRemove) {
         {":authority", "host"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
     EXPECT_EQ("", headers.get_("flag-header"));
     EXPECT_EQ("", headers.get_("another-flag-header"));
     EXPECT_EQ("not-flag-header-value", headers.get_("not-flag-header"));
@@ -75,8 +74,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     // Original 'flag-header' is removed and no new value is appended because there is no
     // 'another-flag-header'.
@@ -91,8 +89,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     // Original 'flag-header' is removed and the new value is appended.
     EXPECT_EQ("another-flag-header-value", headers.get_("flag-header"));
@@ -105,8 +102,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(2, headers.get(Http::LowerCaseString("flag-header-2")).size());
   }
@@ -116,8 +112,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-2")).size());
   }
@@ -128,8 +123,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-3")).size());
   }
@@ -140,8 +134,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-3")).size());
     EXPECT_EQ("flag-header-3-value-old", headers.get_("flag-header-3"));
@@ -154,8 +147,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-4")).size());
     EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
@@ -166,8 +158,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-4")).size());
     EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
@@ -184,8 +175,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     // 'flag-header' is removed and new 'flag-header' is added.
     EXPECT_EQ("another-flag-header-value", headers.get_("flag-header"));
@@ -221,8 +211,7 @@ TEST(HeaderMutationsTest, KeepEmptyValue) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
 
     // Original 'flag-header' is removed and empty value is appended.
     EXPECT_EQ(2, headers.size());
@@ -253,8 +242,7 @@ TEST(HeaderMutationsTest, BasicOrder) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
     EXPECT_EQ("", headers.get_("flag-header"));
     EXPECT_EQ(0, headers.get(Http::LowerCaseString("flag-header")).size());
   }
@@ -279,8 +267,7 @@ TEST(HeaderMutationsTest, BasicOrder) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
-                              stream_info);
+    mutations.evaluateHeaders(headers, {&headers}, stream_info);
     EXPECT_EQ("another-flag-header-value", headers.get_("flag-header"));
   }
 }

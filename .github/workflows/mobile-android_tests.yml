@@ -35,7 +35,7 @@ jobs:
     - name: Pre-cleanup
       # Using the defaults in
       # https://github.com/envoyproxy/toolshed/blob/main/gh-actions/diskspace/action.yml.
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.7
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.8
     - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
@@ -69,7 +69,7 @@ jobs:
     - name: Pre-cleanup
       # Using the defaults in
       # https://github.com/envoyproxy/toolshed/blob/main/gh-actions/diskspace/action.yml.
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.7
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.1.8
     - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy

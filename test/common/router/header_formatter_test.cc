@@ -10,7 +10,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/router/header_formatter.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
@@ -720,8 +719,8 @@ response_headers_to_remove: ["x-nope"]
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
   EXPECT_CALL(stream_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
 
-  resp_header_parser->evaluateHeaders(response_header_map, request_header_map, response_header_map,
-                                      stream_info);
+  resp_header_parser->evaluateHeaders(response_header_map,
+                                      {&request_header_map, &response_header_map}, stream_info);
   EXPECT_TRUE(response_header_map.has("x-client-ip"));
   EXPECT_TRUE(response_header_map.has("x-client-ip-port"));
   EXPECT_TRUE(response_header_map.has("x-request-start-multiple"));

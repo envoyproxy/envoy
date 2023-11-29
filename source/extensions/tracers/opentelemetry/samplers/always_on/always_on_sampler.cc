@@ -12,12 +12,11 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-SamplingResult
-AlwaysOnSampler::shouldSample(const absl::optional<SpanContext> parent_context,
-                              const std::string& /*trace_id*/, const std::string& /*name*/,
-                              ::opentelemetry::proto::trace::v1::Span::SpanKind /*kind*/,
-                              const std::map<std::string, std::string>& /*attributes*/,
-                              const std::vector<SpanContext>& /*links*/) {
+SamplingResult AlwaysOnSampler::shouldSample(const absl::optional<SpanContext> parent_context,
+                                             const std::string& /*trace_id*/,
+                                             const std::string& /*name*/, OTelSpanKind /*kind*/,
+                                             OptRef<const Tracing::TraceContext> /*trace_context*/,
+                                             const std::vector<SpanContext>& /*links*/) {
   SamplingResult result;
   result.decision = Decision::RECORD_AND_SAMPLE;
   if (parent_context.has_value()) {

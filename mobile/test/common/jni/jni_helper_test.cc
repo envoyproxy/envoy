@@ -87,6 +87,28 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_newObjectArray(JNIEnv* env, jcl
   return jni_helper.newObjectArray(length, element_class, initial_element).release();
 }
 
+#define DEFINE_JNI_GET_ARRAY_ELEMENTS(JAVA_TYPE, JNI_TYPE, VALUE)                                  \
+  extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \
+      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_get##JAVA_TYPE##ArrayElements(              \
+          JNIEnv* env, jclass, JNI_TYPE array) {                                                   \
+    Envoy::JNI::JniHelper jni_helper(env);                                                         \
+    auto array_elements = jni_helper.get##JAVA_TYPE##ArrayElements(array, nullptr);                \
+    jsize length = jni_helper.getArrayLength(array);                                               \
+    for (size_t i = 0; i < length; i++) {                                                          \
+      array_elements.get()[i] = VALUE;                                                             \
+    }                                                                                              \
+    return array;                                                                                  \
+  }
+
+DEFINE_JNI_GET_ARRAY_ELEMENTS(Byte, jbyteArray, 123)
+DEFINE_JNI_GET_ARRAY_ELEMENTS(Char, jcharArray, 'a')
+DEFINE_JNI_GET_ARRAY_ELEMENTS(Short, jshortArray, 123)
+DEFINE_JNI_GET_ARRAY_ELEMENTS(Int, jintArray, 123)
+DEFINE_JNI_GET_ARRAY_ELEMENTS(Long, jlongArray, 123)
+DEFINE_JNI_GET_ARRAY_ELEMENTS(Float, jfloatArray, 3.14)
+DEFINE_JNI_GET_ARRAY_ELEMENTS(Double, jdoubleArray, 3.14)
+DEFINE_JNI_GET_ARRAY_ELEMENTS(Boolean, jbooleanArray, true)
+
 extern "C" JNIEXPORT jobject JNICALL
 Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getObjectArrayElement(JNIEnv* env, jclass,
                                                                        jobjectArray array,
@@ -102,6 +124,24 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_setObjectArrayElement(JNIEnv* e
   Envoy::JNI::JniHelper jni_helper(env);
   jni_helper.setObjectArrayElement(array, index, value);
 }
+
+#define DEFINE_JNI_SET_ARRAY_REGION(JAVA_TYPE, JNI_TYPE)                                           \
+  extern "C" JNIEXPORT void JNICALL                                                                \
+      Java_io_envoyproxy_envoymobile_jni_JniHelperTest_set##JAVA_TYPE##ArrayRegion(                \
+          JNIEnv* env, jclass, JNI_TYPE array, jsize start, jsize length, JNI_TYPE buffer) {       \
+    Envoy::JNI::JniHelper jni_helper(env);                                                         \
+    auto c_buffer = jni_helper.get##JAVA_TYPE##ArrayElements(buffer, nullptr);                     \
+    env->Set##JAVA_TYPE##ArrayRegion(array, start, length, c_buffer.get());                        \
+  }
+
+DEFINE_JNI_SET_ARRAY_REGION(Byte, jbyteArray)
+DEFINE_JNI_SET_ARRAY_REGION(Char, jcharArray)
+DEFINE_JNI_SET_ARRAY_REGION(Short, jshortArray)
+DEFINE_JNI_SET_ARRAY_REGION(Int, jintArray)
+DEFINE_JNI_SET_ARRAY_REGION(Long, jlongArray)
+DEFINE_JNI_SET_ARRAY_REGION(Float, jfloatArray)
+DEFINE_JNI_SET_ARRAY_REGION(Double, jdoubleArray)
+DEFINE_JNI_SET_ARRAY_REGION(Boolean, jbooleanArray)
 
 #define DEFINE_JNI_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                \
   extern "C" JNIEXPORT JNI_TYPE JNICALL                                                            \

@@ -80,7 +80,7 @@ public:
   CrashFilterFactory() : DualFactoryBase("crash-filter") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::CrashFilterConfig& proto_config, const std::string&,
       DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<CrashFilterConfig>(

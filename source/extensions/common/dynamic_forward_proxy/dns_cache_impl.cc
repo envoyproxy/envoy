@@ -9,6 +9,7 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,7 +59,13 @@ DnsCacheImpl::DnsCacheImpl(
     // cache to load an entry. Further if this particular resolution fails all the is lost is the
     // potential optimization of having the entry be preresolved the first time a true consumer of
     // this DNS cache asks for it.
-    startCacheLoad(hostname.address(), hostname.port_value(), false);
+    const std::string host =
+        (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns"))
+            ? DnsHostInfo::normalizeHostForDfp(hostname.address(), hostname.port_value())
+            : hostname.address();
+    ENVOY_LOG(debug, "DNS pre-resolve starting for host {}", host);
+    startCacheLoad(host, hostname.port_value(), false);
   }
 }
 
@@ -298,8 +305,8 @@ void DnsCacheImpl::forceRefreshHosts() {
 }
 
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
-  ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
-            host_info.host_info_->resolvedHost(), host_info.port_);
+  ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}' timeout='{}'",
+            host, host_info.host_info_->resolvedHost(), host_info.port_, timeout_interval_.count());
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();

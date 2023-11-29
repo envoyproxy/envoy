@@ -297,11 +297,13 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
     result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
 
     if (result != nullptr) {
-      ENVOY_LOG_FIRST_N(warn, 10,
-                        "No per filter config is found by filter config name and fallback to use "
-                        "filter canonical name. This is deprecated and will be forbidden very "
-                        "soon. Please use the filter config name to index per filter config. See "
-                        "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+      ENVOY_LOG_FIRST_N(
+          warn, 10,
+          "No per filter config is found by filter config name \"{}\" and fallback to use "
+          "filter canonical name \"{}\". This is deprecated and will be forbidden very "
+          "soon. Please use the filter config name to index per filter config. See "
+          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
+          filter_context_.config_name, filter_context_.filter_name);
     }
   }
   return result;
@@ -328,12 +330,14 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
   }
 
   current_route->traversePerFilterConfig(
-      filter_context_.filter_name, [&cb](const Router::RouteSpecificFilterConfig& config) {
-        ENVOY_LOG_FIRST_N(warn, 10,
-                          "No per filter config is found by filter config name and fallback to use "
-                          "filter canonical name. This is deprecated and will be forbidden very "
-                          "soon. Please use the filter config name to index per filter config. See "
-                          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+      filter_context_.filter_name, [&cb, this](const Router::RouteSpecificFilterConfig& config) {
+        ENVOY_LOG_FIRST_N(
+            warn, 10,
+            "No per filter config is found by filter config name \"{}\" and fallback to use "
+            "filter canonical name \"{}\". This is deprecated and will be forbidden very "
+            "soon. Please use the filter config name to index per filter config. See "
+            "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
+            filter_context_.config_name, filter_context_.filter_name);
         cb(config);
       });
 }
@@ -366,6 +370,21 @@ ResponseHeaderMapOptRef ActiveStreamFilterBase::responseHeaders() {
 }
 ResponseTrailerMapOptRef ActiveStreamFilterBase::responseTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers();
+}
+
+void ActiveStreamFilterBase::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  if (!streamInfo().filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey)) {
+    streamInfo().filterState()->setData(
+        LocalReplyFilterStateKey,
+        std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 bool ActiveStreamDecoderFilter::canContinue() {
@@ -480,7 +499,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+  ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
@@ -843,7 +862,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
     if (state_.decoder_filter_chain_aborted_) {
       // If the decoder filter chain has been aborted, then either:
       // 1. This filter has sent a local reply from decode metadata.
-      // 2. This filter is the terminal http filter, and an upstream filter has sent a local reply.
+      // 2. This filter is the terminal http filter, and an upstream HTTP filter has sent a local
+      // reply.
       ASSERT((status == FilterMetadataStatus::StopIterationForLocalReply) ||
              (std::next(entry) == decoder_filters_.end()));
       executeLocalReplyIfPrepared();
@@ -1535,8 +1555,8 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  // This filter chain options is only used for the downstream filter chains for now. So, try to
-  // set valid initial route only when the downstream callbacks is available.
+  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
+  // to set valid initial route only when the downstream callbacks is available.
   FilterChainOptionsImpl options(
       filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
   filter_chain_factory_.createFilterChain(*this, false, options);
@@ -1722,7 +1742,8 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+
+  ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {

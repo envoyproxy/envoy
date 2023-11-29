@@ -58,7 +58,8 @@ public:
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
   }
 
-  void expectVerifyStatus(Status expected_status, Http::RequestHeaderMap& headers) {
+  void expectVerifyStatus(Status expected_status, Http::RequestHeaderMap& headers,
+                          bool expect_clear_route = false) {
     std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
       ASSERT_EQ(status, expected_status);
     };
@@ -68,8 +69,10 @@ public:
     };
     initTokenExtractor();
     auto tokens = extractor_->extract(headers);
+    bool clear_route = false;
     auth_->verify(headers, parent_span_, std::move(tokens), std::move(set_extracted_jwt_data_cb),
-                  std::move(on_complete_cb));
+                  std::move(on_complete_cb), [&clear_route] { clear_route = true; });
+    EXPECT_EQ(expect_clear_route, clear_route);
   }
 
   void initTokenExtractor() {
@@ -161,6 +164,29 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
 
   ASSERT_EQ(headers.get_("x-jwt-claim-object-key"),
             Envoy::Base64::encode(expected_json.data(), expected_json.size()));
+}
+
+// This test verifies whether the claim is successfully added to header or not
+TEST_F(AuthenticatorTest, TestClaimToHeaderWithClearRouteCache) {
+  TestUtility::loadFromYaml(ClaimToHeadersConfig, proto_config_);
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  {
+    Http::TestRequestHeaderMapImpl headers{
+        {"Authorization", "Bearer " + std::string(NestedGoodToken)}};
+    expectVerifyStatus(Status::Ok, headers, true);
+    EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    expectVerifyStatus(Status::Ok, headers, false);
+    EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
+  }
 }
 
 // This test verifies when wrong claim is passed in claim_to_headers
@@ -854,7 +880,8 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auto tokens = extractor_->extract(headers);
   // callback should not be called.
   std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
-  auth_->verify(headers, parent_span_, std::move(tokens), nullptr, std::move(on_complete_cb));
+  auth_->verify(headers, parent_span_, std::move(tokens), nullptr, std::move(on_complete_cb),
+                nullptr);
 
   // Destroy the authenticating process.
   auth_->onDestroy();
@@ -1013,7 +1040,7 @@ public:
     };
     auto tokens = extractor_->extract(headers);
     auth_->verify(headers, parent_span_, std::move(tokens), set_extracted_jwt_data_cb,
-                  on_complete_cb);
+                  on_complete_cb, nullptr);
   }
 
   ::google::jwt_verify::JwksPtr jwks_;

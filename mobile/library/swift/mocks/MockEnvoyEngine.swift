@@ -18,7 +18,6 @@ final class MockEnvoyEngine: NSObject {
   /// Closure called when `recordCounterInc(_:tags:count:)` is called.
   static var onRecordCounter: (
     (_ elements: String, _ tags: [String: String], _ count: UInt) -> Void)?
-  static var onFlushStats: (() -> Void)?
 }
 
 extension MockEnvoyEngine: EnvoyEngine {
@@ -43,10 +42,6 @@ extension MockEnvoyEngine: EnvoyEngine {
   func recordCounterInc(_ elements: String, tags: [String: String], count: UInt) -> Int32 {
     MockEnvoyEngine.onRecordCounter?(elements, tags, count)
     return kEnvoySuccess
-  }
-
-  func flushStats() {
-    MockEnvoyEngine.onFlushStats?()
   }
 
   func dumpStats() -> String {

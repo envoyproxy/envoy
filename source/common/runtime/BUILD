@@ -10,6 +10,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "runtime_keys_lib",
+    srcs = [
+        "runtime_keys.cc",
+    ],
+    hdrs = [
+        "runtime_keys.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "runtime_features_lib",
     srcs = [
         "runtime_features.cc",
