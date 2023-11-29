@@ -915,12 +915,12 @@ EngineSharedPtr EngineBuilder::build() {
   Engine* engine = new Engine(envoy_engine);
 
   if (auto cast_engine = reinterpret_cast<Envoy::Engine*>(envoy_engine)) {
-    auto options = std::make_unique<Envoy::OptionsImpl>();
+    auto options = std::make_unique<Envoy::OptionsImplBase>();
     std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
     if (bootstrap) {
       options->setConfigProto(std::move(bootstrap));
     }
-    options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_)));
+    ENVOY_BUG(options->setLogLevel(logLevelToString(log_level_)).ok(), "invalid log level");
     options->setConcurrency(1);
     cast_engine->run(std::move(options));
   }
