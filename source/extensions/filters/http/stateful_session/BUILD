@@ -33,10 +33,10 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         "//envoy/registry",
-        "//source/common/config:config_factory_context_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/stateful_session:stateful_session_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/stateful_session/v3:pkg_cc_proto",
     ],
 )

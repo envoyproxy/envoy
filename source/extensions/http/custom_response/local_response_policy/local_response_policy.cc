@@ -3,7 +3,6 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/enum_to_int.h"
-#include "source/common/config/config_factory_context.h"
 #include "source/common/config/datasource.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -12,6 +11,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/custom_response_filter.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,10 +33,10 @@ LocalResponsePolicy::LocalResponsePolicy(
   // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
   // of server context should not be used here directly. But this is bug is not introduced
   // by this PR and will be fixed in the future.
-  Config::ConfigFactoryContextImpl config_context(context, context.messageValidationVisitor());
+  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
   if (config.has_body_format()) {
     formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config.body_format(),
-                                                                           config_context);
+                                                                           generic_context);
   }
 }
 

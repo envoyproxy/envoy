@@ -10,7 +10,7 @@ namespace Cookie {
 
 Envoy::Http::SessionStateFactorySharedPtr
 CookieBasedSessionStateFactoryConfig::createSessionStateFactory(
-    const Protobuf::Message& config, Server::Configuration::ConfigFactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::GenericFactoryContext& context) {
 
   const auto& proto_config = MessageUtil::downcastAndValidate<const CookieBasedSessionStateProto&>(
       config, context.messageValidationVisitor());

@@ -25,7 +25,6 @@ envoy_cc_extension(
         "//envoy/server:filter_config_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:enum_to_int",
-        "//source/common/config:config_factory_context_lib",
         "//source/common/config:datasource_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/formatter:substitution_formatter_lib",
@@ -38,6 +37,7 @@ envoy_cc_extension(
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/custom_response:custom_response_filter",
         "//source/extensions/filters/http/custom_response:policy_interface",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/http/custom_response/local_response_policy/v3:pkg_cc_proto",
     ],
 )

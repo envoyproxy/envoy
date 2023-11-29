@@ -195,24 +195,37 @@ public:
 };
 
 /**
- * Factory context for configuration parsing and initiation. This context contains server factory
- * context reference and a validation visitor from uncertain context (server, listener, cluster or
- * others).
+ * Generic factory context for multiple scenarios. This context provides a server factory context
+ * reference and other resources. Note that except for server factory context, other resources are
+ * not guaranteed to be available for the entire server lifetime. For example, context powered by a
+ * listener is only available for the lifetime of the listener.
  */
-class ConfigFactoryContext {
+class GenericFactoryContext {
 public:
-  virtual ~ConfigFactoryContext() = default;
+  virtual ~GenericFactoryContext() = default;
 
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server and provides
    *         access to the server's resources.
    */
-  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+
+  /**
+   * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   */
+  virtual Init::Manager& initManager() const PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   */
+  virtual Stats::Scope& scope() const PURE;
 };
 
 /**

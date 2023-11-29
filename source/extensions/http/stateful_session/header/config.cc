@@ -10,7 +10,7 @@ namespace Header {
 
 Envoy::Http::SessionStateFactorySharedPtr
 HeaderBasedSessionStateFactoryConfig::createSessionStateFactory(
-    const Protobuf::Message& config, Server::Configuration::ConfigFactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::GenericFactoryContext& context) {
 
   const auto& proto_config = MessageUtil::downcastAndValidate<const HeaderBasedSessionStateProto&>(
       config, context.messageValidationVisitor());

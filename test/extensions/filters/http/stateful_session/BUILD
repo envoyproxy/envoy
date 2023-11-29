@@ -18,8 +18,8 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.stateful_session"],
     deps = [
-        "//source/common/config:config_factory_context_lib",
         "//source/extensions/filters/http/stateful_session:config",
+        "//source/server:generic_factory_context_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stateful_session_mock",

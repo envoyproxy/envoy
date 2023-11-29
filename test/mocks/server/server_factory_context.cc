@@ -40,10 +40,12 @@ MockServerFactoryContext::~MockServerFactoryContext() = default;
 MockStatsConfig::MockStatsConfig() = default;
 MockStatsConfig::~MockStatsConfig() = default;
 
-MockConfigFactoryContext::~MockConfigFactoryContext() = default;
+MockGenericFactoryContext::~MockGenericFactoryContext() = default;
 
-MockConfigFactoryContext::MockConfigFactoryContext() {
-  ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+MockGenericFactoryContext::MockGenericFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(*store_.rootScope()));
+  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }

@@ -7,12 +7,12 @@
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/server/factory_context.h"
 
-#include "source/common/config/config_factory_context.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -25,10 +25,10 @@ public:
   /**
    * Generate a formatter object from config SubstitutionFormatString.
    */
-  template <class FormatterContext = HttpFormatterContext, class FactoryContext>
+  template <class FormatterContext = HttpFormatterContext>
   static FormatterBasePtr<FormatterContext>
   fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
-                  FactoryContext& context) {
+                  const Server::Configuration::GenericFactoryContext& context) {
     // Instantiate formatter extensions.
     std::vector<CommandParserBasePtr<FormatterContext>> commands;
     for (const auto& formatter : config.formatters()) {
@@ -39,8 +39,7 @@ public:
       }
       auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
           formatter.typed_config(), context.messageValidationVisitor(), *factory);
-      auto parser =
-          factory->createCommandParserFromProto(*typed_config, context.getServerFactoryContext());
+      auto parser = factory->createCommandParserFromProto(*typed_config, context);
       if (!parser) {
         throwEnvoyExceptionOrPanic(
             absl::StrCat("Failed to create command parser: ", formatter.name()));
@@ -60,7 +59,7 @@ public:
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
       return std::make_unique<FormatterBaseImpl<FormatterContext>>(
           Config::DataSource::read(config.text_format_source(), true,
-                                   context.getServerFactoryContext().api()),
+                                   context.serverFactoryContext().api()),
           config.omit_empty_values(), commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::FORMAT_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;

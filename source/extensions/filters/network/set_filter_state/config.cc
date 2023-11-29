@@ -7,9 +7,9 @@
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/config/config_factory_context.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/common/factory_base.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,10 +34,10 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::set_filter_state::v3::Config& proto_config,
       Server::Configuration::FactoryContext& context) override {
-    Envoy::Config::ConfigFactoryContextImpl config_context(context);
+    Server::GenericFactoryContextImpl generic_context(context);
     auto filter_config(std::make_shared<Filters::Common::SetFilterState::Config>(
         proto_config.on_new_connection(), StreamInfo::FilterState::LifeSpan::Connection,
-        config_context));
+        generic_context));
     return [filter_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<SetFilterState>(filter_config));
     };
