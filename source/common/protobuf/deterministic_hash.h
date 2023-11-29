@@ -14,6 +14,11 @@ namespace DeterministicProtoHash {
 // Ignoring unknown fields was chosen as the implementation because the
 // TextFormat-based hashing this replaces was explicitly ignoring unknown
 // fields.
+//
+// If this is used as part of making a hash table, it may result in
+// collisions if unknown fields are present and are not ignored by the
+// corresponding comparer. A MessageDifferencer can be configured either
+// way.
 uint64_t hash(const Protobuf::Message& message);
 
 } // namespace DeterministicProtoHash

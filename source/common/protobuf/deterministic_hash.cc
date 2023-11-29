@@ -262,6 +262,8 @@ std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const ProtobufWkt::Any
   const Protobuf::Descriptor* descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
           typeUrlToDescriptorFullName(any.type_url()));
+  // If the type name refers to an unknown type, we treat it the same as other
+  // unknown fields - not including its contents in the hash.
   if (descriptor == nullptr) {
     return nullptr;
   }
