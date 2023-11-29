@@ -106,7 +106,7 @@ envoy_cc_library(
         ":envoy_quic_proof_source_base_lib",
         ":envoy_quic_utils_lib",
         ":quic_io_handle_wrapper_lib",
-        ":quic_transport_socket_factory_lib",
+        ":quic_server_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
@@ -295,9 +295,9 @@ envoy_cc_library(
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
+        ":quic_client_transport_socket_factory_lib",
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
-        ":quic_transport_socket_factory_lib",
         "//envoy/http:http_server_properties_cache_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
@@ -436,11 +436,51 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_transport_socket_factory_lib",
-    srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_verifier_lib",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/server:transport_socket_config_interface",
+        "//envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_server_transport_socket_factory_lib",
+    srcs = ["quic_server_transport_socket_factory.cc"],
+    hdrs = ["quic_server_transport_socket_factory.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_proof_verifier_lib",
+        ":quic_transport_socket_factory_lib",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/server:transport_socket_config_interface",
+        "//envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+    alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "quic_client_transport_socket_factory_lib",
+    srcs = ["quic_client_transport_socket_factory.cc"],
+    hdrs = ["quic_client_transport_socket_factory.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_proof_verifier_lib",
+        ":quic_transport_socket_factory_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:context_config_interface",
@@ -467,7 +507,7 @@ envoy_cc_library(
         "//bazel:boringssl_disabled": [],
         "//conditions:default": [
             ":client_codec_lib",
-            ":quic_transport_socket_factory_lib",
+            ":quic_client_transport_socket_factory_lib",
             "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",
         ],
     }),
@@ -497,7 +537,7 @@ envoy_cc_library(
         "//bazel:boringssl_fips": [],
         "//bazel:boringssl_disabled": [],
         "//conditions:default": [
-            ":quic_transport_socket_factory_lib",
+            ":quic_server_transport_socket_factory_lib",
             ":server_codec_lib",
             "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
             "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",

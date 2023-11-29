@@ -1,4 +1,4 @@
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
