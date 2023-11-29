@@ -20,7 +20,7 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
-#include "source/extensions/listener_managers/listener_manager/filter_chain_factory_context_callback.h"
+#include "source/common/tcp/listener_manager/filter_chain_factory_context_callback.h"
 #include "source/server/factory_context_impl.h"
 
 #include "absl/container/flat_hash_map.h"

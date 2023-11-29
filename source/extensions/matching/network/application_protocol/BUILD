@@ -15,6 +15,7 @@ envoy_cc_extension(
     # legacy test usage
     extra_visibility = [
         "//test/integration:__subpackages__",
+        "//test/common/tcp:__subpackages__",
     ],
     deps = [
         "//envoy/http:filter_interface",

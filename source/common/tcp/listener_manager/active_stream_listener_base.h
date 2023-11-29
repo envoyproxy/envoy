@@ -15,7 +15,7 @@
 
 #include "source/common/common/linked_object.h"
 #include "source/common/formatter/http_specific_formatter.h"
-#include "source/extensions/listener_managers/listener_manager/active_tcp_socket.h"
+#include "source/common/tcp/listener_manager/active_tcp_socket.h"
 #include "source/server/active_listener_base.h"
 
 namespace Envoy {

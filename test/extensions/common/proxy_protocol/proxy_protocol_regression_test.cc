@@ -5,9 +5,9 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/tcp/listener_manager/connection_handler_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"

@@ -1,4 +1,4 @@
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/common/tcp/listener_manager/connection_handler_impl.h"
 
 #include <chrono>
 
@@ -11,7 +11,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/listener_managers/listener_manager/active_tcp_listener.h"
+#include "source/common/tcp/listener_manager/active_tcp_listener.h"
 #include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
