@@ -1647,10 +1647,6 @@ void ClusterImplBase::finishInitialization() {
 
 absl::Status ClusterImplBase::parseDropOverloadConfig(
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
-  // Initialize drop_overload_ to zero by default. drop_overload functionality will
-  // not kick in when it is zero.
-  drop_overload_ = UnitFloat(0);
-
   if (!cluster_load_assignment.has_policy()) {
     return absl::OkStatus();
   }

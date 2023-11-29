@@ -1276,7 +1276,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
       }
 
       // Set drop_overload config for thread_local_cluster. This is thread safe since
-      // TLS data structure will only be read and  written by worker threads.
+      // it is only read and  written by worker threads.
       if (cluster_manager->thread_local_clusters_[info->name()]) {
         cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(
             cm_cluster.cluster().dropOverload());
