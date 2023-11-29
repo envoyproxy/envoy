@@ -61,7 +61,9 @@ ActiveStream::ActiveStream(Filter& parent, StreamRequestPtr request)
   if (decision.traced) {
     stream_info_.setTraceReason(decision.reason);
   }
-  active_span_ = tracer->startSpan(*this, *request_stream_, stream_info_, decision);
+
+  TraceContextBridge trace_context{*request_stream_};
+  active_span_ = tracer->startSpan(*this, trace_context, stream_info_, decision);
 }
 
 Tracing::OperationName ActiveStream::operationName() const {
@@ -286,8 +288,8 @@ void ActiveStream::completeRequest() {
   parent_.stats_.request_active_.dec();
 
   if (active_span_) {
-    Tracing::TracerUtility::finalizeSpan(*active_span_, *request_stream_, stream_info_, *this,
-                                         false);
+    TraceContextBridge trace_context{*request_stream_};
+    Tracing::TracerUtility::finalizeSpan(*active_span_, trace_context, stream_info_, *this, false);
   }
 
   for (const auto& access_log : parent_.config_->accessLogs()) {
