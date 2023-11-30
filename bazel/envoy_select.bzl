@@ -59,13 +59,6 @@ def envoy_select_static_extension_registration(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Selects the given values if Envoy Mobile request compression is enabled in the current build.
-def envoy_select_envoy_mobile_request_compression(xs, repository = ""):
-    return select({
-        repository + "//bazel:disable_envoy_mobile_request_compression": [],
-        "//conditions:default": xs,
-    })
-
 # Selects the given values if the Envoy Mobile listener is enabled in the current build.
 def envoy_select_envoy_mobile_listener(xs, repository = ""):
     return select({

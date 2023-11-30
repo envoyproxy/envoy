@@ -25,6 +25,10 @@ namespace {
 template <typename T> constexpr T maybeOverride(absl::string_view /*name*/, T val) { return val; }
 
 template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val) {
+  if (name == "quic_reloadable_flag_quic_limit_sending_max_streams2") {
+    // Causes CI failures for RetryStreamingCancelDueToBufferOverflow
+    return false;
+  }
   if (name == "quic_reloadable_flag_quic_disable_version_draft_29") {
     // Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by
     // default.

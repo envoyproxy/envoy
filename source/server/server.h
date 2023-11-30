@@ -256,6 +256,7 @@ public:
 
   virtual void maybeCreateHeapShrinker() PURE;
   virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
+  virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
 
   void run() override;
 
@@ -320,6 +321,9 @@ public:
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
+
+protected:
+  const Configuration::MainImpl& config() { return config_; }
 
 private:
   Network::DnsResolverSharedPtr getOrCreateDnsResolver();

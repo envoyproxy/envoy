@@ -114,26 +114,18 @@ uint64_t fractionalPercentDenominatorToInt(
 
 } // namespace ProtobufPercentHelper
 
-MissingFieldException::MissingFieldException(const std::string& message)
-    : EnvoyException(message) {}
-
-ProtoValidationException::ProtoValidationException(const std::string& message)
-    : EnvoyException(message) {
-  ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
-}
-
 void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_name,
                                                     const Protobuf::Message& message) {
   std::string error =
       fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString());
-  throwExceptionOrPanic(MissingFieldException, error);
+  throwEnvoyExceptionOrPanic(error);
 }
 
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
   std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
                                   message.DebugString());
-  throwExceptionOrPanic(ProtoValidationException, error);
+  throwEnvoyExceptionOrPanic(error);
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
@@ -728,7 +720,7 @@ absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
 void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
   const auto result = validateDurationNoThrow(duration, max_seconds_value);
   if (!result.ok()) {
-    throwExceptionOrPanic(DurationUtil::OutOfRangeException, std::string(result.message()));
+    throwEnvoyExceptionOrPanic(std::string(result.message()));
   }
 }
 

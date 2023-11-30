@@ -15,6 +15,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
+#include "source/common/grpc/codec.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
@@ -294,7 +295,7 @@ std::string Common::typeUrl(const std::string& qualified_name) {
 
 void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   std::array<char, 5> header;
-  header[0] = 0; // flags
+  header[0] = GRPC_FH_DEFAULT; // flags
   const uint32_t nsize = htonl(buffer.length());
   safeMemcpyUnsafeDst(&header[1], &nsize);
   buffer.prepend(absl::string_view(&header[0], 5));

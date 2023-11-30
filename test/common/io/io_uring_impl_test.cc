@@ -59,26 +59,26 @@ class IoUringImplParamTest
     : public IoUringImplTest,
       public testing::WithParamInterface<std::function<IoUringResult(IoUring&, os_fd_t)>> {};
 
-INSTANTIATE_TEST_SUITE_P(InvalidPrepareMethodParamsTest, IoUringImplParamTest,
-                         testing::Values(
-                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
-                               return uring.prepareAccept(fd, nullptr, nullptr, nullptr);
-                             },
-                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
-                               auto address =
-                                   std::make_shared<Network::Address::EnvoyInternalInstance>(
-                                       "test");
-                               return uring.prepareConnect(fd, address, nullptr);
-                             },
-                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
-                               return uring.prepareReadv(fd, nullptr, 0, 0, nullptr);
-                             },
-                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
-                               return uring.prepareWritev(fd, nullptr, 0, 0, nullptr);
-                             },
-                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
-                               return uring.prepareClose(fd, nullptr);
-                             }));
+INSTANTIATE_TEST_SUITE_P(
+    InvalidPrepareMethodParamsTest, IoUringImplParamTest,
+    testing::Values(
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          return uring.prepareAccept(fd, nullptr, nullptr, nullptr);
+        },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          auto address = std::make_shared<Network::Address::EnvoyInternalInstance>("test");
+          return uring.prepareConnect(fd, address, nullptr);
+        },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          return uring.prepareReadv(fd, nullptr, 0, 0, nullptr);
+        },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          return uring.prepareWritev(fd, nullptr, 0, 0, nullptr);
+        },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult { return uring.prepareClose(fd, nullptr); },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          return uring.prepareShutdown(fd, 0, nullptr);
+        }));
 
 TEST_P(IoUringImplParamTest, InvalidParams) {
   os_fd_t fd;
