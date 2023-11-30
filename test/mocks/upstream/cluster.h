@@ -31,6 +31,7 @@ public:
   std::shared_ptr<MockClusterInfo> info_{new ::testing::NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  UnitFloat drop_overload_{0};
 };
 } // namespace Upstream
 } // namespace Envoy
