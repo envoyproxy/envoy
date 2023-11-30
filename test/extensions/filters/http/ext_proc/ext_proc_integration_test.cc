@@ -3315,11 +3315,11 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_request_attributes()->Add("request.path");
-  /* proto_config_.mutable_request_attributes()->Add("request.method"); */
-  /* proto_config_.mutable_request_attributes()->Add("request.scheme"); */
-  /* proto_config_.mutable_request_attributes()->Add("connection.mtls"); */
-  /* proto_config_.mutable_response_attributes()->Add("response.code"); */
-  /* proto_config_.mutable_response_attributes()->Add("response.code_details"); */
+  proto_config_.mutable_request_attributes()->Add("request.method");
+  proto_config_.mutable_request_attributes()->Add("request.scheme");
+  proto_config_.mutable_request_attributes()->Add("connection.mtls");
+  proto_config_.mutable_response_attributes()->Add("response.code");
+  proto_config_.mutable_response_attributes()->Add("response.code_details");
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -3329,25 +3329,22 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
         EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
-        /* EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET"); */
-        /* EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http"); */
-        /* EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false); */
+        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
+        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
+        EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
         return true;
       });
 
   handleUpstreamRequest();
 
-  processResponseHeadersMessage(*grpc_upstreams_[0], false,
-                                [](const HttpHeaders& /* req*/, HeadersResponse&) {
-                                  /* EXPECT_EQ(req.attributes().size(), 1); */
-                                  /* auto proto_struct =
-                                   * req.attributes().at("envoy.filters.http.ext_proc"); */
-                                  /* EXPECT_EQ(proto_struct.fields().at("response.code").string_value(),
-                                   * "200"); */
-                                  /* EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(),
-                                   * "via_upstream"); */
-                                  return true;
-                                });
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& req, HeadersResponse&) {
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("response.code").string_value(), "200");
+        EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(), "via_upstream");
+        return true;
+      });
 
   verifyDownstreamResponse(*response, 200);
 }

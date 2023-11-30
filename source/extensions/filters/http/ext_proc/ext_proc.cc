@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
-#include <typeinfo>
-
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
 #include "source/common/http/utility.h"
@@ -244,12 +242,10 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
     absl::optional<Envoy::ProtobufWkt::Struct> proto;
-    if (config().hasRequestExpr()) {
+    if (config_->expressionManager().hasRequestExpr()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
                                                                     &headers, nullptr, nullptr);
-      ExpressionManager::printExprPtrAndType(config().getExprPtr("request.path"),
-                                             "in decodeHeaders");
-      proto = config().evaluateRequestAttributes(std::move(activation_ptr));
+      proto = config_->expressionManager().evaluateRequestAttributes(std::move(activation_ptr));
     }
 
     status = onHeaders(decoding_state_, headers, end_stream, proto);
@@ -531,10 +527,10 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
     absl::optional<Envoy::ProtobufWkt::Struct> proto;
-    if (config_->hasResponseExpr()) {
+    if (config_->expressionManager().hasResponseExpr()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
                                                                     nullptr, &headers, nullptr);
-      proto = config_->evaluateResponseAttributes(std::move(activation_ptr));
+      proto = config_->expressionManager().evaluateResponseAttributes(std::move(activation_ptr));
     }
 
     status = onHeaders(encoding_state_, headers, end_stream, proto);

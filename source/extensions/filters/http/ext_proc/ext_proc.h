@@ -141,15 +141,7 @@ public:
             MatchingUtils::initHeaderMatchers(config.forward_rules().allowed_headers())),
         disallowed_headers_(
             MatchingUtils::initHeaderMatchers(config.forward_rules().disallowed_headers())),
-        expression_manager_(builder, config.request_attributes(), config.response_attributes()) {
-    printExprPtrAndType("in FilterConfig constructor");
-  }
-
-  // TODO delete
-  void printExprPtrAndType(std::string location) {
-    expression_manager_.printExprPtrAndType(expression_manager_.getExprPtr("request.path"),
-                                            location);
-  }
+        expression_manager_(builder, config.request_attributes(), config.response_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -179,24 +171,7 @@ public:
 
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
-  const absl::optional<ProtobufWkt::Struct>
-  evaluateRequestAttributes(const Filters::Common::Expr::ActivationPtr& activation) const {
-    return expression_manager_.evaluateRequestAttributes(std::move(activation));
-  }
-
-  const absl::optional<ProtobufWkt::Struct>
-  evaluateResponseAttributes(const Filters::Common::Expr::ActivationPtr& activation) const {
-    return expression_manager_.evaluateResponseAttributes(std::move(activation));
-  }
-
-  bool hasRequestExpr() const { return expression_manager_.hasRequestExpr(); }
-
-  bool hasResponseExpr() const { return expression_manager_.hasResponseExpr(); }
-
-  // TODO: delete
-  const ExpressionManager::ExpressionPtrWithExpr& getExprPtr(std::string matcher) const {
-    return expression_manager_.getExprPtr(matcher);
-  }
+  const ExpressionManager& expressionManager() const { return expression_manager_; }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -271,9 +246,7 @@ public:
       : config_(config), client_(std::move(client)), stats_(config->stats()),
         grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
         decoding_state_(*this, config->processingMode()),
-        encoding_state_(*this, config->processingMode()) {
-    config_->printExprPtrAndType("in Filter constructor");
-  }
+        encoding_state_(*this, config->processingMode()) {}
 
   const FilterConfig& config() const { return *config_; }
 
