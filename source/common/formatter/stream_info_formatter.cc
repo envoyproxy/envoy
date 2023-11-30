@@ -1432,8 +1432,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, const absl::optional<size_t>&) {
               return std::make_unique<StreamInfoDurationFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    absl::optional<std::chrono::nanoseconds> result;
+                  [](const StreamInfo::StreamInfo& stream_info)
+                      -> absl::optional<std::chrono::nanoseconds> {
                     if (auto upstream_info = stream_info.upstreamInfo();
                         upstream_info.has_value()) {
                       if (auto connection_pool_callback_latency =
@@ -1442,10 +1442,10 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                   .upstreamTiming()
                                   .connectionPoolCallbackLatency();
                           connection_pool_callback_latency.has_value()) {
-                        result = connection_pool_callback_latency;
+                        return connection_pool_callback_latency;
                       }
                     }
-                    return result;
+                    return absl::nullopt;
                   });
             }}},
       });
