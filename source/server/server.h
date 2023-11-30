@@ -44,7 +44,6 @@
 #endif
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/overload_manager_impl.h"
 #include "source/server/worker_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -192,12 +191,15 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   Api::Api& api() override { return server_.api(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
+  OverloadManager& overloadManager() override { return server_.overloadManager(); }
+  bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
@@ -246,6 +248,8 @@ public:
   ~InstanceBase() override;
 
   virtual void maybeCreateHeapShrinker() PURE;
+  virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
+  virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
 
   void run() override;
 
@@ -310,6 +314,9 @@ public:
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
+
+protected:
+  const Configuration::MainImpl& config() { return config_; }
 
 private:
   Network::DnsResolverSharedPtr getOrCreateDnsResolver();
@@ -391,7 +398,7 @@ private:
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
-  std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  std::unique_ptr<OverloadManager> overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;

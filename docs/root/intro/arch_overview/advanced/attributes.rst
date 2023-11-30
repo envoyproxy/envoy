@@ -120,6 +120,7 @@ RBAC):
    connection.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the downstream TLS connection
    connection.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the downstream TLS connection
    connection.sha256_peer_certificate_digest, SHA256 digest of the peer certificate in the downstream TLS connection if present
+   connection.transport_failure_reason, string, The transport failure reason e.g. certificate validation failed
 
 The following additional attributes are available upon the downstream connection termination:
 

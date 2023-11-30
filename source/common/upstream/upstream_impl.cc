@@ -354,7 +354,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
                                                                                  false);
   }
-  return local_address_selector_factory->createLocalAddressSelector(
+  auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       parseBindConfig(
           bind_config, cluster_name,
           buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
@@ -362,6 +362,8 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{}))),
       cluster_name);
+  THROW_IF_STATUS_NOT_OK(selector_or_error, throw);
+  return selector_or_error.value();
 }
 
 } // namespace

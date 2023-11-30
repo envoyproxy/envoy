@@ -9,18 +9,19 @@ namespace {
 constexpr absl::string_view kDefaultLocalAddressSelectorName =
     "envoy.upstream.local_address_selector.default_local_address_selector";
 
-void validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_local_addresses,
-              absl::optional<std::string> cluster_name) {
+absl::Status
+validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_local_addresses,
+         absl::optional<std::string> cluster_name) {
 
   if (upstream_local_addresses.empty()) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("{}'s upstream binding config has no valid source address.",
                     !(cluster_name.has_value()) ? "Bootstrap"
                                                 : fmt::format("Cluster {}", cluster_name.value())));
   }
 
   if (upstream_local_addresses.size() > 2) {
-    throwEnvoyExceptionOrPanic(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "{}'s upstream binding config has more than one extra/additional source addresses. Only "
         "one extra/additional source can be supported in BindConfig's "
         "extra_source_addresses/additional_source_addresses field",
@@ -42,7 +43,7 @@ void validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstre
 
     if (upstream_local_addresses[0].address_->ip()->version() ==
         upstream_local_addresses[1].address_->ip()->version()) {
-      throwEnvoyExceptionOrPanic(fmt::format(
+      return absl::InvalidArgumentError(fmt::format(
           "{}'s upstream binding config has two same IP version source addresses. Only two "
           "different IP version source addresses can be supported in BindConfig's source_address "
           "and extra_source_addresses/additional_source_addresses fields",
@@ -50,6 +51,7 @@ void validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstre
                                       : fmt::format("Cluster {}", cluster_name.value())));
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace
@@ -58,11 +60,14 @@ std::string DefaultUpstreamLocalAddressSelectorFactory::name() const {
   return std::string(kDefaultLocalAddressSelectorName);
 }
 
-UpstreamLocalAddressSelectorConstSharedPtr
+absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
 DefaultUpstreamLocalAddressSelectorFactory::createLocalAddressSelector(
     std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
     absl::optional<std::string> cluster_name) const {
-  validate(upstream_local_addresses, cluster_name);
+  absl::Status status = validate(upstream_local_addresses, cluster_name);
+  if (!status.ok()) {
+    return status;
+  }
   return std::make_shared<DefaultUpstreamLocalAddressSelector>(std::move(upstream_local_addresses));
 }
 

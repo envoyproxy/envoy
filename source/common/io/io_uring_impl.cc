@@ -181,6 +181,36 @@ IoUringResult IoUringImpl::prepareClose(os_fd_t fd, Request* user_data) {
   return IoUringResult::Ok;
 }
 
+IoUringResult IoUringImpl::prepareCancel(Request* cancelling_user_data, Request* user_data) {
+  ENVOY_LOG(trace, "prepare cancels for user data = {}", fmt::ptr(cancelling_user_data));
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare cancel for user data = {}", fmt::ptr(cancelling_user_data));
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_cancel(sqe, cancelling_user_data, 0);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareShutdown(os_fd_t fd, int how, Request* user_data) {
+  ENVOY_LOG(trace, "prepare shutdown for fd = {}, how = {}", fd, how);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare shutdown for fd = {}", fd);
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_shutdown(sqe, fd, how);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
 IoUringResult IoUringImpl::submit() {
   int res = io_uring_submit(&ring_);
   RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");

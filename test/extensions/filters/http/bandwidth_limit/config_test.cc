@@ -24,8 +24,8 @@ TEST(Factory, GlobalEmptyConfig) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
-  auto callback = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_CALL(context.server_factory_context_.dispatcher_, createTimer_(_)).Times(0);
+  auto callback = factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   callback(filter_callback);

@@ -81,16 +81,31 @@ public:
   const Http::RequestHeaderMap& requestHeaders() const;
 
   /**
+   * @return false if no request headers are available.
+   */
+  bool hasRequestHeaders() const { return request_headers_ != nullptr; }
+
+  /**
    * @return const Http::ResponseHeaderMap& the response headers. Empty respnose header map if
    * no response headers are available.
    */
   const Http::ResponseHeaderMap& responseHeaders() const;
 
   /**
+   * @return false if no response headers are available.
+   */
+  bool hasResponseHeaders() const { return response_headers_ != nullptr; }
+
+  /**
    * @return const Http::ResponseTrailerMap& the response trailers. Empty response trailer map
    * if no response trailers are available.
    */
   const Http::ResponseTrailerMap& responseTrailers() const;
+
+  /**
+   * @return false if no response trailers are available.
+   */
+  bool hasResponseTrailers() const { return response_trailers_ != nullptr; }
 
   /**
    * @return absl::string_view the local reply body. Empty if no local reply body.

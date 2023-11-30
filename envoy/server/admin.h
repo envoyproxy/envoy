@@ -62,7 +62,7 @@ public:
    *
    * @param The query name/value map.
    */
-  virtual Http::Utility::QueryParams queryParams() const PURE;
+  virtual Http::Utility::QueryParamsMulti queryParams() const PURE;
 };
 
 /**
@@ -233,15 +233,12 @@ public:
   /**
    * Expose this Admin console as an HTTP server.
    * @param access_logs access_logs list of file loggers to write the HTTP request log to.
-   * @param address_out_path file path to write the listening socket's address to.
    * @param address network address to bind and listen on.
-   * @param listener_scope stats scope for the listener being started,
+   * @param socket_options socket options to apply to the listening socket.
    */
-  virtual void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
-                                 const std::string& address_out_path,
+  virtual void startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
                                  Network::Address::InstanceConstSharedPtr address,
-                                 const Network::Socket::OptionsSharedPtr& socket_options,
-                                 Stats::ScopeSharedPtr&& listener_scope) PURE;
+                                 Network::Socket::OptionsSharedPtr socket_options) PURE;
 
   /**
    * Executes an admin request with the specified query params. Note: this must
