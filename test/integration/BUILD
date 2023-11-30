@@ -2373,6 +2373,7 @@ envoy_cc_test(
             "//source/common/quic:quic_client_factory_lib",
             "//source/common/quic:quic_client_transport_socket_factory_lib",
             "//source/common/quic:quic_server_factory_lib",
+            "//source/common/quic:quic_server_transport_socket_factory_lib",
             "//test/integration/filters:pause_filter_for_quic_lib",
         ],
     }),

@@ -105,6 +105,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_proof_source_base_lib",
         ":envoy_quic_utils_lib",
+        ":quic_client_transport_socket_factory_lib",
         ":quic_io_handle_wrapper_lib",
         ":quic_server_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
@@ -297,6 +298,7 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         ":quic_client_transport_socket_factory_lib",
         ":quic_filter_manager_connection_lib",
+        ":quic_server_transport_socket_factory_lib",
         ":quic_stat_names_lib",
         "//envoy/http:http_server_properties_cache_interface",
         "//source/common/buffer:buffer_lib",
@@ -508,6 +510,7 @@ envoy_cc_library(
         "//conditions:default": [
             ":client_codec_lib",
             ":quic_client_transport_socket_factory_lib",
+            ":quic_server_transport_socket_factory_lib",
             "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",
         ],
     }),
@@ -537,6 +540,7 @@ envoy_cc_library(
         "//bazel:boringssl_fips": [],
         "//bazel:boringssl_disabled": [],
         "//conditions:default": [
+            ":quic_client_transport_socket_factory_lib",
             ":quic_server_transport_socket_factory_lib",
             ":server_codec_lib",
             "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
