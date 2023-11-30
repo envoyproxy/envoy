@@ -22,7 +22,7 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
                            parse_status.status().ToString());
     }
 
-    auto iter = expr_list_.emplace_back(parse_status.value());
+    auto& iter = expr_list_.emplace_back(parse_status.value());
 
     Filters::Common::Expr::ExpressionPtr expression =
         Extensions::Filters::Common::Expr::createExpression(builder_->builder(), iter.expr());
