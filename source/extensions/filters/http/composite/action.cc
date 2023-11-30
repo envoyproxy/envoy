@@ -39,7 +39,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   }
 
   if (callback == nullptr) {
-    throwEnvoyExceptionOrPanic("Failed to get filter factory creation function");
+    throw EnvoyException("Failed to get filter factory creation function");
   }
 
   return [cb = std::move(callback)]() -> Matcher::ActionPtr {

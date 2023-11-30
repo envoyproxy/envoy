@@ -147,9 +147,9 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   if (!bootstrap) {
     result = run_engine(engine, string_config, string_log_level);
   } else {
-    auto options = std::make_unique<Envoy::OptionsImpl>();
+    auto options = std::make_unique<Envoy::OptionsImplBase>();
     options->setConfigProto(std::move(bootstrap));
-    options->setLogLevel(options->parseAndValidateLogLevel(string_log_level));
+    ENVOY_BUG(options->setLogLevel(string_log_level).ok(), "invalid log level");
     options->setConcurrency(1);
     result = reinterpret_cast<Envoy::Engine*>(engine)->run(std::move(options));
   }

@@ -28,7 +28,6 @@ load(
     _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
     _envoy_select_enable_yaml = "envoy_select_enable_yaml",
     _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
-    _envoy_select_envoy_mobile_request_compression = "envoy_select_envoy_mobile_request_compression",
     _envoy_select_envoy_mobile_xds = "envoy_select_envoy_mobile_xds",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
@@ -234,7 +233,6 @@ envoy_select_admin_html = _envoy_select_admin_html
 envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_static_extension_registration = _envoy_select_static_extension_registration
-envoy_select_envoy_mobile_request_compression = _envoy_select_envoy_mobile_request_compression
 envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
 envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
 envoy_select_boringssl = _envoy_select_boringssl
