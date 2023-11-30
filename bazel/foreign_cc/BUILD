@@ -70,6 +70,7 @@ make(
     out_static_libs = [
         "liblz4.a",
     ],
+    tags = ["skip_on_windows"],
     targets = [
         "lib",
         "install",

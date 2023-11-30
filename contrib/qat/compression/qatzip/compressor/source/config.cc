@@ -6,6 +6,7 @@ namespace Compression {
 namespace Qatzip {
 namespace Compressor {
 
+#ifndef QAT_DISABLED
 namespace {
 
 // Default qatzip chunk size.
@@ -109,6 +110,7 @@ QatzipCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
     Server::Configuration::FactoryContext& context) {
   return std::make_unique<QatzipCompressorFactory>(proto_config, context);
 }
+#endif
 
 /**
  * Static registration for the qatzip compressor library. @see NamedCompressorLibraryConfigFactory.

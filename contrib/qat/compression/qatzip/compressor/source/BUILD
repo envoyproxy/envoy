@@ -32,6 +32,7 @@ configure_make(
     out_static_libs = [
         "libqatzip.a",
     ],
+    tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
     deps = [
@@ -57,11 +58,23 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    defines = select({
+        "//bazel:linux_x86_64": [
+        ],
+        "//conditions:default": [
+            "QAT_DISABLED=1",
+        ],
+    }),
     deps = [
-        ":compressor_lib",
         "//envoy/compression/compressor:compressor_config_interface",
         "//envoy/compression/compressor:compressor_factory_interface",
         "//source/common/http:headers_lib",
         "@envoy_api//contrib/envoy/extensions/compression/qatzip/compressor/v3alpha:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:linux_x86_64": [
+            ":compressor_lib",
+        ],
+        "//conditions:default": [
+        ],
+    }),
 )
