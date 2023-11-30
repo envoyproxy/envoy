@@ -4864,5 +4864,70 @@ TEST_P(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
+// When receiving header value with obsolete line folding, `obs-fold` should be replaced by SP.
+// This is http-parser's behavior. BalsaParser does not support obsolete line folding and rejects
+// such messages (also permitted by the specification). See RFC9110 Section 5.5:
+// https://www.rfc-editor.org/rfc/rfc9110.html#name-field-values.
+TEST_P(Http1ServerConnectionImplTest, ObsFold) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "GET"},
+      {"multi-line-header", "foo  bar"},
+  };
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  } else {
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+  }
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           "Multi-Line-Header: foo\r\n  bar\r\n"
+                           "\r\n");
+  auto status = codec_->dispatch(buffer);
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_FORMAT");
+  } else {
+    EXPECT_TRUE(status.ok());
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ObsFold) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":status", "200"},
+      {"multi-line-header", "foo  bar"},
+      {"content-length", "0"},
+  };
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+  }
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "Multi-Line-Header: foo\r\n  bar\r\n"
+                             "Content-Length: 0\r\n"
+                             "\r\n");
+
+  auto status = codec_->dispatch(response);
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_FORMAT");
+  } else {
+    EXPECT_TRUE(status.ok());
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

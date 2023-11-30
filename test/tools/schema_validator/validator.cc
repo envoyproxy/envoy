@@ -83,8 +83,7 @@ public:
   bool skipValidation() override { return false; }
   void onDeprecatedField(absl::string_view description, bool) override {
     if (options_.failOnDeprecated()) {
-      throw ProtobufMessage::DeprecatedProtoFieldException(
-          absl::StrCat("Failing due to deprecated field: ", description));
+      throw EnvoyException(absl::StrCat("Failing due to deprecated field: ", description));
     }
   }
   void onWorkInProgress(absl::string_view description) override {
