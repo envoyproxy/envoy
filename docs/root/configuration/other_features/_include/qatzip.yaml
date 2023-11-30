@@ -1,0 +1,5 @@
+compressor_library:
+  name: text_optimized
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.compression.qatzip.compressor.v3alpha.Qatzip
+    hardware_buffer_size: "SZ_8K"
