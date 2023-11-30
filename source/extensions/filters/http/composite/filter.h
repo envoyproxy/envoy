@@ -85,6 +85,9 @@ public:
 private:
   friend FactoryCallbacksWrapper;
 
+  void updateFilterState(Http::StreamFilterCallbacks* callback, const std::string& filter_name,
+                         const std::string& action_name);
+
   Event::Dispatcher& dispatcher_;
   // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
   // serve to surface an easier to understand error, as attempting to insert a filter at a later

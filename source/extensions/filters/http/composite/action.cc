@@ -15,6 +15,8 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
 
+  std::string name = composite_action.typed_config().name();
+
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           composite_action.typed_config());
@@ -42,8 +44,8 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     throwEnvoyExceptionOrPanic("Failed to get filter factory creation function");
   }
 
-  return [cb = std::move(callback)]() -> Matcher::ActionPtr {
-    return std::make_unique<ExecuteFilterAction>(cb);
+  return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
+    return std::make_unique<ExecuteFilterAction>(cb, n);
   };
 }
 

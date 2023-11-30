@@ -1,13 +1,47 @@
 #include "source/extensions/filters/http/composite/filter.h"
 
+#include <map>
+#include <vector>
+
 #include "envoy/http/filter.h"
 
 #include "source/common/common/stl_helpers.h"
+#include "source/common/json/json_loader.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
+
+constexpr absl::string_view MatchedActionsFilterStateKey =
+    "envoy.extensions.filters.http.composite.matched_actions";
+
+class MatchedActionInfoType : public StreamInfo::FilterState::Object {
+public:
+  MatchedActionInfoType() {}
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
+
+  absl::optional<std::string> serializeAsString() const override {
+    return Json::Factory::loadFromProtobufStruct(*buildProtoStruct().get())->asJsonString();
+  }
+
+  void setFilterAction(const std::string& filter, const std::string& action) {
+    actions[filter] = action;
+  }
+
+private:
+  std::unique_ptr<ProtobufWkt::Struct> buildProtoStruct() const {
+    auto message = std::make_unique<ProtobufWkt::Struct>();
+    auto& fields = *message->mutable_fields();
+    for (const auto& p : actions) {
+      fields[p.first] = ValueUtil::stringValue(p.second);
+    }
+    return message;
+  }
+
+  std::map<std::string, std::string> actions;
+};
 
 namespace {
 // Helper that returns `filter->func(args...)` if the filter is not null, returning `rval`
@@ -119,6 +153,23 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 
   // TODO(snowp): Make it possible for onMatchCallback to fail the stream by issuing a local reply,
   // either directly or via some return status.
+}
+
+void Filter::updateFilterState(Http::StreamFilterCallbacks* callback,
+                               const std::string& filter_name, const std::string& action_name) {
+
+  auto* info = callback->streamInfo().filterState()->getDataMutable<MatchedActionInfoType>(
+      MatchedActionsFilterStateKey);
+  if (info != nullptr) {
+    info->setFilterAction(filter_name, action_name);
+  } else {
+    auto info = std::make_shared<MatchedActionInfoType>();
+    info->setFilterAction(filter_name, action_name);
+
+    callback->streamInfo().filterState()->setData(MatchedActionsFilterStateKey, info,
+                                                  StreamInfo::FilterState::StateType::Mutable,
+                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
 }
 
 Http::FilterHeadersStatus
