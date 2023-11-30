@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <typeinfo>
+
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
 #include "source/common/http/utility.h"
@@ -242,12 +244,12 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
     absl::optional<Envoy::ProtobufWkt::Struct> proto;
-    if (config_->hasRequestExpr()) {
+    if (config().hasRequestExpr()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
                                                                     &headers, nullptr, nullptr);
-      std::cout << "expression_ptr_ in decodeHeaders: ";
-      std::cout << config_->getExprPtr("request.path").expression_ptr_.get() << std::endl;
-      proto = config_->evaluateRequestAttributes(std::move(activation_ptr));
+      ExpressionManager::printExprPtrAndType(config().getExprPtr("request.path"),
+                                             "in decodeHeaders");
+      proto = config().evaluateRequestAttributes(std::move(activation_ptr));
     }
 
     status = onHeaders(decoding_state_, headers, end_stream, proto);

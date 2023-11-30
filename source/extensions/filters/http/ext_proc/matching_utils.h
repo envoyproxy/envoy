@@ -1,5 +1,7 @@
 #pragma once
 
+#include <typeinfo>
+
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
@@ -20,7 +22,9 @@ public:
                     const Protobuf::RepeatedPtrField<std::string>& request_matchers,
                     const Protobuf::RepeatedPtrField<std::string>& response_matchers)
       : builder_(builder), request_expr_(initExpressions(request_matchers)),
-        response_expr_(initExpressions(response_matchers)){};
+        response_expr_(initExpressions(response_matchers)) {
+    printExprPtrAndType(*request_expr_.at("request.path"), "in ExpressionManager constructor");
+  };
 
   // This struct exists because the lifetime of the api expr must exceed expressions
   // parsed from it.
@@ -28,9 +32,22 @@ public:
     ExpressionPtrWithExpr(const google::api::expr::v1alpha1::Expr& expr,
                           Filters::Common::Expr::Expression* expr_ptr)
         : expr_(expr), expression_ptr_(std::move(expr_ptr)){};
+    ~ExpressionPtrWithExpr() {
+      std::cout << "!!!!!! ExpressionPtrWithExpr is being destructed !!!!!!" << std::endl;
+    };
     const google::api::expr::v1alpha1::Expr& expr_;
     Filters::Common::Expr::ExpressionPtr expression_ptr_;
   };
+
+  static void printExprPtrAndType(const ExpressionPtrWithExpr& expr, std::string location) {
+    std::cout << "expression_ptr_ address " << location << ": " << expr.expression_ptr_.get()
+              << std::endl;
+    auto& val = *expr.expression_ptr_.get();
+    std::cout << "expression_ptr_ type " << location << ": " << typeid(val).name() << std::endl;
+    std::cout << "expr_ address " << location << ": " << &expr.expr_ << std::endl;
+    std::cout << "expr_ type " << location << ": " << typeid(expr.expr_).name() << std::endl;
+    std::cout << "----------------------------------------------------------" << std::endl;
+  }
 
   bool hasRequestExpr() const { return !request_expr_.empty(); };
 
@@ -46,17 +63,16 @@ public:
     return evaluateAttributes(activation, response_expr_);
   }
 
-  const absl::optional<ProtobufWkt::Struct>
-  evaluateAttributes(const Filters::Common::Expr::ActivationPtr& activation,
-                     const absl::flat_hash_map<std::string, ExpressionPtrWithExpr>& expr) const {
+  static const absl::optional<ProtobufWkt::Struct> evaluateAttributes(
+      const Filters::Common::Expr::ActivationPtr& activation,
+      const absl::flat_hash_map<std::string, std::unique_ptr<ExpressionPtrWithExpr>>& expr) {
     absl::optional<ProtobufWkt::Struct> proto;
     if (!expr.empty()) {
       proto.emplace(ProtobufWkt::Struct{});
       for (const auto& hash_entry : expr) {
         ProtobufWkt::Arena arena;
-        std::cout << "expression_ptr_ in evaluateAttributes: ";
-        std::cout << hash_entry.second.expression_ptr_.get() << std::endl;
-        const auto result = hash_entry.second.expression_ptr_.get()->Evaluate(*activation, &arena);
+        printExprPtrAndType(*hash_entry.second, "in evaluateAttributes");
+        const auto result = hash_entry.second->expression_ptr_.get()->Evaluate(*activation, &arena);
         if (!result.ok()) {
           // TODO: Stats?
           continue;
@@ -91,17 +107,17 @@ public:
 
   // TODO: delete
   const ExpressionPtrWithExpr& getExprPtr(std::string matcher) const {
-    return request_expr_.at(matcher);
+    return *request_expr_.at(matcher);
   }
 
 private:
-  absl::flat_hash_map<std::string, ExpressionPtrWithExpr>
+  absl::flat_hash_map<std::string, std::unique_ptr<ExpressionPtrWithExpr>>
   initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const;
 
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
 
-  const absl::flat_hash_map<std::string, ExpressionPtrWithExpr> request_expr_;
-  const absl::flat_hash_map<std::string, ExpressionPtrWithExpr> response_expr_;
+  const absl::flat_hash_map<std::string, std::unique_ptr<ExpressionPtrWithExpr>> request_expr_;
+  const absl::flat_hash_map<std::string, std::unique_ptr<ExpressionPtrWithExpr>> response_expr_;
 };
 
 class MatchingUtils : public Logger::Loggable<Logger::Id::ext_proc> {

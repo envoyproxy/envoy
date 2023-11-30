@@ -1,13 +1,17 @@
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 
+#include <memory>
+#include <typeinfo>
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-absl::flat_hash_map<std::string, ExpressionManager::ExpressionPtrWithExpr>
+absl::flat_hash_map<std::string, std::unique_ptr<ExpressionManager::ExpressionPtrWithExpr>>
 ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const {
-  absl::flat_hash_map<std::string, ExpressionManager::ExpressionPtrWithExpr> expressions;
+  absl::flat_hash_map<std::string, std::unique_ptr<ExpressionManager::ExpressionPtrWithExpr>>
+      expressions;
 #if defined(USE_CEL_PARSER)
   for (const auto& matcher : matchers) {
     auto parse_status = google::api::expr::parser::Parse(matcher);
@@ -15,15 +19,19 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
       throw EnvoyException("Unable to parse descriptor expression: " +
                            parse_status.status().ToString());
     }
-    const auto parse_status_expr = parse_status.value().expr();
-    auto expression =
+    const google::api::expr::v1alpha1::Expr& parse_status_expr = parse_status.value().expr();
+    const Filters::Common::Expr::ExpressionPtr& expression =
         Extensions::Filters::Common::Expr::createExpression(builder_->builder(), parse_status_expr);
-    ExpressionPtrWithExpr expr(parse_status_expr, expression.get());
-    std::cout << "expression_ptr_ after construction: ";
-    std::cout << expr.expression_ptr_.get() << std::endl;
+    std::unique_ptr<ExpressionPtrWithExpr> expr =
+        std::make_unique<ExpressionPtrWithExpr>(parse_status_expr, std::move(expression.get()));
+    if (matcher == "request.path") {
+      ExpressionManager::printExprPtrAndType(*expr, "after construction");
+    }
     expressions.try_emplace(matcher, std::move(expr));
-    std::cout << "expression_ptr_ after placing in container: ";
-    std::cout << expressions.at(matcher).expression_ptr_.get() << std::endl;
+    if (matcher == "request.path") {
+      ExpressionManager::printExprPtrAndType(*expressions.at(matcher),
+                                             "after placing in container");
+    }
   }
 #else
   ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."

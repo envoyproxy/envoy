@@ -141,7 +141,15 @@ public:
             MatchingUtils::initHeaderMatchers(config.forward_rules().allowed_headers())),
         disallowed_headers_(
             MatchingUtils::initHeaderMatchers(config.forward_rules().disallowed_headers())),
-        expression_manager_(builder, config.request_attributes(), config.response_attributes()) {}
+        expression_manager_(builder, config.request_attributes(), config.response_attributes()) {
+    printExprPtrAndType("in FilterConfig constructor");
+  }
+
+  // TODO delete
+  void printExprPtrAndType(std::string location) {
+    expression_manager_.printExprPtrAndType(expression_manager_.getExprPtr("request.path"),
+                                            location);
+  }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -186,7 +194,7 @@ public:
   bool hasResponseExpr() const { return expression_manager_.hasResponseExpr(); }
 
   // TODO: delete
-  const ExpressionManager::ExpressionPtrWithExpr& getExprPtr(std::string matcher) {
+  const ExpressionManager::ExpressionPtrWithExpr& getExprPtr(std::string matcher) const {
     return expression_manager_.getExprPtr(matcher);
   }
 
@@ -263,7 +271,9 @@ public:
       : config_(config), client_(std::move(client)), stats_(config->stats()),
         grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
         decoding_state_(*this, config->processingMode()),
-        encoding_state_(*this, config->processingMode()) {}
+        encoding_state_(*this, config->processingMode()) {
+    config_->printExprPtrAndType("in Filter constructor");
+  }
 
   const FilterConfig& config() const { return *config_; }
 
