@@ -69,10 +69,14 @@ public:
   }
 
   NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
-                      const Network::Socket::OptionsSharedPtr& options)
-      : ListenSocketImpl(std::move(io_handle), address) {
+                      const Network::Socket::OptionsSharedPtr& options,
+                      uint32_t initial_file_events = Event::FileReadyType::Read |
+                                                     Event::FileReadyType::Write)
+      : ListenSocketImpl(std::move(io_handle), address), initial_file_events_(initial_file_events) {
     setListenSocketOptions(options);
   }
+
+  uint32_t initialFileEvents() const { return initial_file_events_; }
 
   Socket::Type socketType() const override { return T::type; }
 
@@ -110,6 +114,12 @@ public:
   }
 
 protected:
+  // Usually a socket when initialized starts listening for ready-to-read or ready-to-write events;
+  // for a QUIC socket during hot restart this is undesirable as the old instance needs to receive
+  // all packets, so in that case initial_file_events_ is initialized to zero, and enableFileEvents
+  // is called when draining of the old instance completes.
+  uint32_t initial_file_events_ = Event::FileReadyType::Read | Event::FileReadyType::Write;
+
   void setPrebindSocketOptions() {
     // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as
     // on Linux and later BSD socket stacks.

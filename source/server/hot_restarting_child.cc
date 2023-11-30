@@ -154,8 +154,25 @@ void HotRestartingChild::registerUdpForwardingListener(
   udp_forwarding_context_.registerListener(address, listener_config);
 }
 
+void HotRestartingChild::whenDrainComplete(absl::string_view addr,
+                                           absl::AnyInvocable<void()> action) {
+  if (restart_epoch_ == 0 || parent_terminated_) {
+    action();
+  } else {
+    on_drained_actions_.try_emplace(addr, std::move(action));
+  }
+}
+
+void HotRestartingChild::allDrainsImplicitlyComplete() {
+  for (auto& drain_action : on_drained_actions_) {
+    std::move(drain_action.second)();
+  }
+  on_drained_actions_.clear();
+}
+
 absl::optional<HotRestart::AdminShutdownResponse>
 HotRestartingChild::sendParentAdminShutdownRequest() {
+  allDrainsImplicitlyComplete();
   if (restart_epoch_ == 0 || parent_terminated_) {
     return absl::nullopt;
   }

@@ -36,7 +36,8 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
       config_(config, false) {
   socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
+      Event::PlatformDefaultTriggerType,
+      std::dynamic_pointer_cast<UdpListenSocket>(socket)->initialFileEvents());
 }
 
 UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }

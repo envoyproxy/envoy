@@ -50,6 +50,7 @@ public:
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
                                      std::shared_ptr<Network::UdpListenerConfig> listener_config);
+  void whenDrainComplete(absl::string_view addr, absl::AnyInvocable<void()> action);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
@@ -60,6 +61,8 @@ public:
 protected:
   void onSocketEventUdpForwarding();
   void onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data);
+  // When call to terminate parent is sent, or parent is already terminated,
+  void allDrainsImplicitlyComplete();
 
 private:
   friend class HotRestartUdpForwardingTestHelper;
@@ -69,6 +72,7 @@ private:
   sockaddr_un parent_address_udp_forwarding_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};
   Stats::StatName hot_restart_generation_stat_name_;
+  absl::flat_hash_map<std::string, absl::AnyInvocable<void()>> on_drained_actions_;
   Event::FileEventPtr socket_event_udp_forwarding_;
   UdpForwardingContext udp_forwarding_context_;
 };

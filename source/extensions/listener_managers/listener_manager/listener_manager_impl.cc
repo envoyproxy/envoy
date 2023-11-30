@@ -320,7 +320,13 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       if (socket_type == Network::Socket::Type::Stream) {
         return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
       } else {
-        return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
+        auto socket = std::make_shared<Network::UdpListenSocket>(
+            std::move(io_handle), address, options, /* initial_file_events= */ 0);
+        server_.hotRestart().whenDrainComplete(addr, [socket]() {
+          socket->ioHandle().enableFileEvents(Event::FileReadyType::Read |
+                                              Event::FileReadyType::Write);
+        });
+        return socket;
       }
     }
   }

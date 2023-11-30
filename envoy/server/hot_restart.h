@@ -62,6 +62,17 @@ public:
   virtual void
   registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
                                 std::shared_ptr<Network::UdpListenerConfig> listener_config) PURE;
+
+  /**
+   * Calls a function on the child instance when an address is fully drained in the parent
+   * instance.
+   * @param addr The string representation of the address which, when drained in the
+   *             parent instance, the action will be performed.
+   * @param action The function to be called when the parent instance has drained the address
+   *               or has been terminated.
+   */
+  virtual void whenDrainComplete(absl::string_view addr, absl::AnyInvocable<void()> action) PURE;
+
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a
    * new child has begun. The hot restart implementation needs to be created early to deal with
