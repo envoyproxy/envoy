@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ostream>
+
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -23,7 +25,8 @@ struct CacheEntryUsability {
    */
   Seconds age = Seconds::max();
   /**
-   * Remaining freshness lifetime.
+   * Remaining freshness lifetime--how long from now until the response is stale. (If the response
+   * is already stale, `ttl` should be negative.)
    */
   Seconds ttl = Seconds::max();
 
@@ -39,11 +42,24 @@ struct CacheEntryUsability {
 enum class RequestCacheability {
   // This request is eligible for serving from cache, and for having its response stored.
   Cacheable,
-  // Don't respond to this requst from cache, or store its response into cache.
+  // Don't respond to this request from cache, or store its response into cache.
   Bypass,
-  // This request is eligible for serving from cache, but its response must not be stored.
+  // This request is eligible for serving from cache, but its response must not be stored. (E.g.
+  // requests with "Cache-Control: no-store").
   NoStore,
 };
+
+inline std::ostream& operator<<(std::ostream& os, RequestCacheability cacheability) {
+  switch (cacheability) {
+    using enum RequestCacheability;
+  case Cacheable:
+    return os << "Cacheable";
+  case Bypass:
+    return os << "Bypass";
+  case NoStore:
+    return os << "NoStore";
+  }
+}
 
 enum class ResponseCacheability {
   // Don't store this response in cache.
@@ -56,6 +72,18 @@ enum class ResponseCacheability {
   // future response is cacheable, it will overwrite this "uncacheable" entry.)
   MarkUncacheable,
 };
+
+inline std::ostream& operator<<(std::ostream& os, ResponseCacheability cacheability) {
+  switch (cacheability) {
+    using enum ResponseCacheability;
+  case DoNotStore:
+    return os << "DoNotStore";
+  case StoreFullResponse:
+    return os << "StoreFullResponse";
+  case MarkUncacheable:
+    return os << "MarkUncacheable";
+  }
+}
 
 // Create cache key, calculate cache content freshness and
 // response cacheability. This can be a straight RFC compliant implementation
