@@ -51,16 +51,16 @@ public:
       typename ValueType,
       std::enable_if_t<std::is_scalar_v<ValueType> && !std::is_enum_v<ValueType>, bool> = true>
   static uint64_t xxHash64Value(ValueType input, uint64_t seed = 0) {
-    if (absl::little_endian::IsLittleEndian()) {
-      return XXH64(reinterpret_cast<const char*>(&input), sizeof(input), seed);
-    } else {
-      char buf[sizeof(input)];
-      const char* p = reinterpret_cast<const char*>(&input);
-      for (size_t i = 0; i < sizeof(input); i++) {
-        buf[i] = p[sizeof(input) - i - 1];
-      }
-      return XXH64(buf, sizeof(input), seed);
+#if defined(ABSL_IS_LITTLE_ENDIAN)
+    return XXH64(reinterpret_cast<const char*>(&input), sizeof(input), seed);
+#else
+    char buf[sizeof(input)];
+    const char* p = reinterpret_cast<const char*>(&input);
+    for (size_t i = 0; i < sizeof(input); i++) {
+      buf[i] = p[sizeof(input) - i - 1];
     }
+    return XXH64(buf, sizeof(input), seed);
+#endif
   }
 
   /**
