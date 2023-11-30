@@ -88,7 +88,7 @@ public:
    * @param active indicates
    */
   static void renderEndpointTableRow(Buffer::Instance& response, const Admin::UrlHandler& handler,
-                                     OptRef<const Http::Utility::QueryParams> query, int index,
+                                     OptRef<const Http::Utility::QueryParamsMulti> query, int index,
                                      bool submit_on_change, bool active);
 
   /**
@@ -110,7 +110,7 @@ private:
   static void renderHandlerParam(Buffer::Instance& response, absl::string_view id,
                                  absl::string_view name, absl::string_view path,
                                  Admin::ParamDescriptor::Type type,
-                                 OptRef<const Http::Utility::QueryParams> query,
+                                 OptRef<const Http::Utility::QueryParamsMulti> query,
                                  const std::vector<absl::string_view>& enum_choices,
                                  bool submit_on_change);
 };

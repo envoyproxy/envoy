@@ -119,7 +119,7 @@ configure_make(
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
-        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+        "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
     },
     lib_source = "@net_colm_open_source_colm//:all",
     out_binaries = ["colm"],
@@ -141,7 +141,7 @@ configure_make(
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
-        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+        "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
     },
     lib_source = "@net_colm_open_source_ragel//:all",
     out_binaries = ["ragel"],

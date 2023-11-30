@@ -2,12 +2,10 @@
 -dontwarn kotlin.**
 -dontwarn org.jetbrains.annotations.NotNull
 -dontwarn org.jetbrains.annotations.Nullable
--dontwarn com.google.protobuf.**
 
 -dontnote android.support.**
 -dontnote kotlin.**
 -dontnote com.google.devtools.build.android.**
--dontnote com.google.protobuf.**
 
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;

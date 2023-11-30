@@ -5,7 +5,6 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.validate.h"
 
-#include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
@@ -30,7 +29,7 @@ private:
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
-      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 
   Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(

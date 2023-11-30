@@ -104,7 +104,7 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.expand_agnostic_stream_lifetime`` and legacy code paths.
 - area: http
   change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
+    removed ``envoy.reloadable_features.sanitize_original_path`` and legacy code paths.
 - area: maglev
   change: |
     Removed ``envoy.reloadable_features.allow_compact_maglev`` and legacy code paths.
@@ -163,6 +163,10 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a sampler for the OpenTelemetry tracer.
+- area: CEL-attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``connection.transport_failure_reason``
+    for looking up connection transport failure reason.
 - area: ext_authz
   change: |
     New config parameter :ref:`charge_cluster_response_stats
@@ -203,12 +207,8 @@ new_features:
 - area: tracing
   change: |
     Provide initial span attributes to a sampler used in the OpenTelemetry tracer.
-- area: ext_proc
+- area: tracing
   change: |
-    implemented
-    :ref:`request_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.request_attributes>`
-    and
-    :ref:`response_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.response_attributes>`
-    config APIs to enable sending and receiving attributes from/to the external processing server.
+    Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.
 
 deprecated:

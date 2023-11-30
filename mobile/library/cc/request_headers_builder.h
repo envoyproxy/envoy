@@ -10,12 +10,6 @@
 namespace Envoy {
 namespace Platform {
 
-// Available algorithms to compress requests.
-enum CompressionAlgorithm {
-  Gzip,
-  Brotli,
-};
-
 class RequestHeaders;
 struct RetryPolicy;
 
@@ -26,7 +20,6 @@ public:
   RequestHeadersBuilder(RequestMethod request_method, absl::string_view url);
 
   RequestHeadersBuilder& addRetryPolicy(const RetryPolicy& retry_policy);
-  RequestHeadersBuilder& enableRequestCompression(CompressionAlgorithm algorithm);
 
   RequestHeaders build() const;
 
