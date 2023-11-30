@@ -142,6 +142,7 @@ envoy_quiche_platform_impl_cc_library(
         ":quiche_logging_impl_lib",
         "//source/common/buffer:buffer_lib",
         "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
+        "@com_github_google_quiche//:quiche_common_callbacks",
     ],
 )
 

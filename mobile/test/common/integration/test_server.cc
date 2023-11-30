@@ -16,9 +16,9 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
   certs->mutable_certificate_chain()->set_filename(
-      "../envoy/test/config/integration/certs/upstreamcert.pem");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
   certs->mutable_private_key()->set_filename(
-      "../envoy/test/config/integration/certs/upstreamkey.pem");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
   envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
   quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
 
@@ -36,12 +36,12 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
   certs->mutable_certificate_chain()->set_filename(
-      "../envoy/test/config/integration/certs/upstreamcert.pem");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
   certs->mutable_private_key()->set_filename(
-      "../envoy/test/config/integration/certs/upstreamkey.pem");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
   auto* ctx = tls_context.mutable_common_tls_context()->mutable_validation_context();
   ctx->mutable_trusted_ca()->set_filename(
-      "../envoy/test/config/integration/certs/upstreamcacert.pem");
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context);
@@ -54,6 +54,13 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
 TestServer::TestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),
       version_(Network::Address::IpVersion::v4), upstream_config_(time_system_), port_(0) {
+  std::string runfiles_error;
+  runfiles_ = std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles>{
+      bazel::tools::cpp::runfiles::Runfiles::CreateForTest(&runfiles_error)};
+  RELEASE_ASSERT(TestEnvironment::getOptionalEnvVar("NORUNFILES").has_value() ||
+                     runfiles_ != nullptr,
+                 runfiles_error);
+  TestEnvironment::setRunfiles(runfiles_.get());
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));

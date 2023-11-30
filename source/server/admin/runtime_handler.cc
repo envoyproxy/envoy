@@ -17,7 +17,7 @@ RuntimeHandler::RuntimeHandler(Server::Instance& server) : HandlerContextBase(se
 
 Http::Code RuntimeHandler::handlerRuntime(Http::ResponseHeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream& admin_stream) {
-  const Http::Utility::QueryParams params = admin_stream.queryParams();
+  const Http::Utility::QueryParamsMulti params = admin_stream.queryParams();
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
   // TODO(jsedgwick): Use proto to structure this output instead of arbitrary JSON.
@@ -79,15 +79,17 @@ Http::Code RuntimeHandler::handlerRuntime(Http::ResponseHeaderMap& response_head
 Http::Code RuntimeHandler::handlerRuntimeModify(Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) {
-  Http::Utility::QueryParams params = admin_stream.queryParams();
-  if (params.empty()) {
+  Http::Utility::QueryParamsMulti params = admin_stream.queryParams();
+  if (params.data().empty()) {
     response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
     response.add("       or send the parameters as form values\n");
     response.add("use an empty value to remove a previously added override");
     return Http::Code::BadRequest;
   }
   absl::node_hash_map<std::string, std::string> overrides;
-  overrides.insert(params.begin(), params.end());
+  for (const auto& it : params.data()) {
+    overrides.insert({it.first, it.second[0]});
+  }
   TRY_ASSERT_MAIN_THREAD { server_.runtime().mergeValues(overrides); }
   END_TRY
   catch (const EnvoyException& e) {

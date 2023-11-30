@@ -19,9 +19,64 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/transport_sockets/alts:config",
+        "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "alts_channel_pool_test",
+    srcs = ["alts_channel_pool_test.cc"],
+    extension_names = ["envoy.transport_sockets.alts"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//source/extensions/transport_sockets/alts:alts_channel_pool",
+        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_grpc_grpc//:grpc++",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "alts_proxy_test",
+    srcs = ["alts_proxy_test.cc"],
+    extension_names = ["envoy.transport_sockets.alts"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//source/extensions/transport_sockets/alts:alts_proxy",
+        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "alts_tsi_handshaker_test",
+    srcs = ["alts_tsi_handshaker_test.cc"],
+    extension_names = ["envoy.transport_sockets.alts"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//source/extensions/transport_sockets/alts:alts_proxy",
+        "//source/extensions/transport_sockets/alts:alts_tsi_handshaker",
+        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -41,9 +96,20 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.alts"],
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//envoy/network:address_interface",
+        "//source/extensions/transport_sockets/alts:alts_proxy",
+        "//source/extensions/transport_sockets/alts:alts_tsi_handshaker",
+        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
         "//source/extensions/transport_sockets/alts:tsi_handshaker",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -51,12 +117,20 @@ envoy_extension_cc_test(
     name = "tsi_socket_test",
     srcs = ["tsi_socket_test.cc"],
     extension_names = ["envoy.transport_sockets.alts"],
+    external_deps = [
+        "grpc",
+    ],
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//envoy/network:address_interface",
+        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
         "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -76,9 +150,7 @@ envoy_extension_cc_test(
     srcs = envoy_select_google_grpc(["alts_integration_test.cc"]),
     extension_names = ["envoy.transport_sockets.alts"],
     external_deps = [
-        "grpc_alts_fake_handshaker_server",
-        "grpc_alts_handshaker_proto",
-        "grpc_alts_transport_security_common_proto",
+        "grpc",
     ],
     deps = [
         "//source/common/common:utility_lib",
@@ -87,12 +159,14 @@ envoy_extension_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/transport_sockets/alts:config",
+        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
         "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:decode_dynamic_metadata_filter_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
     ],

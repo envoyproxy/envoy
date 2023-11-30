@@ -172,6 +172,7 @@ proto_library(
         "//envoy/extensions/filters/http/compressor/v3:pkg",
         "//envoy/extensions/filters/http/connect_grpc_bridge/v3:pkg",
         "//envoy/extensions/filters/http/cors/v3:pkg",
+        "//envoy/extensions/filters/http/credential_injector/v3:pkg",
         "//envoy/extensions/filters/http/csrf/v3:pkg",
         "//envoy/extensions/filters/http/custom_response/v3:pkg",
         "//envoy/extensions/filters/http/decompressor/v3:pkg",
@@ -263,6 +264,8 @@ proto_library(
         "//envoy/extensions/http/original_ip_detection/xff/v3:pkg",
         "//envoy/extensions/http/stateful_session/cookie/v3:pkg",
         "//envoy/extensions/http/stateful_session/header/v3:pkg",
+        "//envoy/extensions/injected_credentials/generic/v3:pkg",
+        "//envoy/extensions/injected_credentials/oauth2/v3:pkg",
         "//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
@@ -364,9 +367,9 @@ proto_library(
     name = "xds_protos",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_cncf_udpa//xds/core/v3:pkg",
-        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
-        "@com_github_cncf_udpa//xds/type/v3:pkg",
+        "@com_github_cncf_xds//xds/core/v3:pkg",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg",
+        "@com_github_cncf_xds//xds/type/v3:pkg",
     ],
 )
 
