@@ -120,7 +120,7 @@ private:
 
 class ListenerInfoImpl : public Network::ListenerInfo {
 public:
-  explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener config)
+  explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener& config)
       : config_(config), typed_metadata_(config_.metadata()),
         is_quic_(config.udp_listener_config().has_quic_options()) {}
   // Allow access to the underlying protobuf as an internal detail.
