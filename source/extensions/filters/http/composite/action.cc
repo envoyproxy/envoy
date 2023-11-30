@@ -16,14 +16,13 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
       config, validation_visitor);
 
   if (composite_action.has_dynamic_config() && composite_action.has_typed_config()) {
-    throwEnvoyExceptionOrPanic(
+    throw EnvoyException(
         fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
   }
 
   if (composite_action.has_dynamic_config()) {
     if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
-      throwEnvoyExceptionOrPanic(
-          fmt::format("Failed to get factory context or server factory context."));
+      throw EnvoyException(fmt::format("Failed to get factory context or server factory context."));
     }
     // Create a dynamic filter config provider and register it with the server factory context.
     auto config_discovery = composite_action.dynamic_config().config_discovery();
