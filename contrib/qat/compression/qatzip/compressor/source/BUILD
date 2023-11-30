@@ -28,6 +28,7 @@ configure_make(
     out_static_libs = [
         "libqatzip.a",
     ],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
     deps = [
         "//bazel/foreign_cc:lz4",
