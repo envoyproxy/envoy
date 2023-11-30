@@ -169,8 +169,8 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
 }
 
 bool MetadataCredentialsProviderBase::useHttpAsyncClient() {
-  return !Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials");
+  return Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials");
 }
 
 bool CredentialsFileCredentialsProvider::needsRefresh() {

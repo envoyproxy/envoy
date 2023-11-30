@@ -298,6 +298,8 @@ public:
       : api_(Api::createApiForTest(time_system_)), raw_metadata_fetcher_(new MockMetadataFetcher) {}
 
   void setupProvider() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
         *api_, context_,
@@ -1123,8 +1125,6 @@ public:
       : api_(Api::createApiForTest(time_system_)) {}
 
   void setupProvider() {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials", "true"}});
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
         *api_, absl::nullopt,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
@@ -1439,6 +1439,8 @@ public:
   }
 
   void setupProvider() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<TaskRoleCredentialsProvider>(
         *api_, context_,
@@ -1828,8 +1830,6 @@ public:
   }
 
   void setupProvider() {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials", "true"}});
     provider_ = std::make_shared<TaskRoleCredentialsProvider>(
         *api_, absl::nullopt,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
