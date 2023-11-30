@@ -94,7 +94,7 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   };
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  ExecuteFilterAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -115,7 +115,7 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   };
 
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
-  ExecuteFilterAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -138,7 +138,7 @@ TEST_F(FilterTest, StreamFilterDelegation) {
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
-  ExecuteFilterAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback, "actionName");
   filter_.onMatchCallback(action);
 
   expectDelegatedDecoding(*stream_filter);
@@ -158,7 +158,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
     cb.addStreamFilter(stream_filter);
   };
 
-  ExecuteFilterAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -176,7 +176,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
     cb.addStreamDecoderFilter(decoder_filter);
   };
 
-  ExecuteFilterAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -194,7 +194,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
     cb.addStreamEncoderFilter(encode_filter);
   };
 
-  ExecuteFilterAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -216,7 +216,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
     cb.addAccessLogHandler(access_log_2);
   };
 
-  ExecuteFilterAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(*encode_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
