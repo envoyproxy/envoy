@@ -570,7 +570,30 @@ TEST_P(UdpTunnelingIntegrationTest, TwoConsecutiveDownstreamSessions) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, IdleTimeout) {
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, "0.5s"};
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%RESPONSE_FLAGS%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          "0.5s",
+                          session_access_log_config};
   setup(config);
 
   const std::string datagram = "hello";
@@ -582,6 +605,8 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeout) {
   test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
   ASSERT_TRUE(upstream_request_->waitForReset());
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("SI"));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {

@@ -276,13 +276,12 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                              Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                              const Upstream::HostConstSharedPtr& host)
     : cluster_(cluster), addresses_(std::move(addresses)), host_(host),
+      session_id_(next_global_session_id_++),
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       udp_session_info_(
           StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(),
-                                     std::make_shared<Network::ConnectionInfoSetterImpl>(
-                                         addresses_.local_, addresses_.peer_))),
-      session_id_(next_global_session_id_++) {
+                                     CreateDownstreamConnectionInfoProvider())) {
   udp_session_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
   cluster_.filter_.config_->stats().downstream_sess_active_.inc();
@@ -315,6 +314,14 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
       access_log->log({}, udp_session_info_);
     }
   }
+}
+
+std::shared_ptr<Network::ConnectionInfoSetterImpl>
+UdpProxyFilter::ActiveSession::CreateDownstreamConnectionInfoProvider() {
+  auto downstream_connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
+      addresses_.local_, addresses_.peer_);
+  downstream_connection_info_provider->setConnectionID(session_id_);
+  return downstream_connection_info_provider;
 }
 
 void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
@@ -999,6 +1006,7 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamData(Buffer::Instance& da
 void UdpProxyFilter::TunnelingActiveSession::onIdleTimer() {
   ENVOY_LOG(debug, "session idle timeout: downstream={} local={}", addresses_.peer_->asStringView(),
             addresses_.local_->asStringView());
+  udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
   cluster_.filter_.config_->stats().idle_timeout_.inc();
   upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
   cluster_.removeSession(this);
