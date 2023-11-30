@@ -26,7 +26,7 @@ If enabled, the Qatzip compressor will:
 - create Threadlocal Qat session context for each worker thread
 
 When a new http request comes, one worker thread will process it using its Qat session context and send the data needed to be compressed to
-Qat hardware. 
+Qat hardware.
 
 Installing and using QATzip
 ---------------------------

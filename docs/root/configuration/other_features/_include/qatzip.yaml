@@ -38,7 +38,7 @@ static_resources:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
- 
+
   clusters:
   - name: service
     connect_timeout: 0.25s
@@ -58,4 +58,3 @@ admin:
     socket_address:
       address: 0.0.0.0
       port_value: 9901
-
