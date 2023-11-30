@@ -785,14 +785,14 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesC
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, TeSanitization) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
   autonomous_upstream_ = true;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
 
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    default_request_headers_.setTE("gzip");
-  } else {
-    return;
-  }
+  default_request_headers_.setTE("gzip");
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

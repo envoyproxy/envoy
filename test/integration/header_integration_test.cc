@@ -1341,8 +1341,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
                                    });
 }
 
-// Validates TE header was forwarded if it contains a supported value
-// It is now treated as the hop by hop header it is.
+// Validates legacy TE handling: TE header is forwarded if it contains a supported value
 TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "false");
   initializeFilter(HeaderMode::Append, false);
@@ -1377,7 +1376,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
       });
 }
 
-// Validates TE header was stripped if it contains an unsupported value
+// Validates legacy TE handling: that TE header stripped if it contains an unsupported value.
 TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "false");
   initializeFilter(HeaderMode::Append, false);
