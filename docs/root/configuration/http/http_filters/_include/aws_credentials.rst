@@ -14,7 +14,7 @@ secret access key (the session token is optional).
 3. Either EC2 instance metadata or ECS task metadata. For EC2 instance metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and
    ``Token`` are used, and credentials are cached for 1 hour. For ECS task metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and
    ``Token`` are used, and credentials are cached for 1 hour or until they expire (according to the field ``Expiration``). Note that the
-   latest update on AWS credentials provider utility provides option to use http async client functionality instead of libcurl to fetch the
+   latest update on AWS credentials provider utility provides an option to use http async client functionality instead of libcurl to fetch the
    credentials. This behavior can be changed by setting ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to ``true``.
    The usage of libcurl is on the deprecation path and will be removed soon. To fetch the credentials from either EC2 instance
    metadata or ECS task metadata a static cluster is required pointing towards the credentials provider. The static cluster name has to be
