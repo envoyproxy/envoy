@@ -66,7 +66,7 @@ private:
   bool do_framing_{};
   Grpc::Context& context_;
   bool upgrade_protobuf_{};
-  bool upgrade_query_parameters_{};
+  bool ignore_query_parameters_{};
 };
 
 } // namespace GrpcHttp1Bridge
