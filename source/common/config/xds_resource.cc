@@ -129,9 +129,9 @@ void decodeQueryParams(absl::string_view query_params,
   }
 }
 
-void decodeFragment(
-    absl::string_view fragment,
-    Protobuf::RepeatedPtrField<xds::core::v3::ResourceLocator::Directive>& directives) {
+absl::Status
+decodeFragment(absl::string_view fragment,
+               Protobuf::RepeatedPtrField<xds::core::v3::ResourceLocator::Directive>& directives) {
   const std::vector<absl::string_view> fragment_components = absl::StrSplit(fragment, ',');
   for (const absl::string_view& fragment_component : fragment_components) {
     if (absl::StartsWith(fragment_component, "alt=")) {
@@ -140,17 +140,20 @@ void decodeFragment(
     } else if (absl::StartsWith(fragment_component, "entry=")) {
       directives.Add()->set_entry(PercentEncoding::decode(fragment_component.substr(6)));
     } else {
-      throwEnvoyExceptionOrPanic(fmt::format("Unknown fragment component {}", fragment_component));
-      ;
+      return absl::InvalidArgumentError(
+          fmt::format("Unknown fragment component {}", fragment_component));
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace
 
-absl::StatusOr<xds::core::v3::ResourceName> XdsResourceIdentifier::decodeUrn(absl::string_view resource_urn) {
+absl::StatusOr<xds::core::v3::ResourceName>
+XdsResourceIdentifier::decodeUrn(absl::string_view resource_urn) {
   if (!hasXdsTpScheme(resource_urn)) {
-    absl::InvalidArgumentError(fmt::format("{} does not have an xdstp: scheme", resource_urn));
+    return absl::InvalidArgumentError(
+        fmt::format("{} does not have an xdstp: scheme", resource_urn));
   }
   absl::string_view host, path;
   Http::Utility::extractHostPathFromUri(resource_urn, host, path);
@@ -161,8 +164,8 @@ absl::StatusOr<xds::core::v3::ResourceName> XdsResourceIdentifier::decodeUrn(abs
     decodeQueryParams(path.substr(query_params_start), *decoded_resource_name.mutable_context());
     path = path.substr(0, query_params_start);
   }
-  status = decodePath(path, decoded_resource_name.mutable_resource_type(),
-             *decoded_resource_name.mutable_id());
+  auto status = decodePath(path, decoded_resource_name.mutable_resource_type(),
+                           *decoded_resource_name.mutable_id());
   if (!status.ok()) {
     return status;
   }
@@ -175,7 +178,8 @@ xds::core::v3::ResourceLocator XdsResourceIdentifier::decodeUrl(absl::string_vie
   xds::core::v3::ResourceLocator decoded_resource_locator;
   const size_t fragment_start = path.find('#');
   if (fragment_start != absl::string_view::npos) {
-    decodeFragment(path.substr(fragment_start + 1), *decoded_resource_locator.mutable_directives());
+    THROW_IF_NOT_OK(decodeFragment(path.substr(fragment_start + 1),
+                                   *decoded_resource_locator.mutable_directives()));
     path = path.substr(0, fragment_start);
   }
   if (hasXdsTpScheme(resource_url)) {
@@ -199,7 +203,7 @@ xds::core::v3::ResourceLocator XdsResourceIdentifier::decodeUrl(absl::string_vie
     path = path.substr(0, query_params_start);
   }
   THROW_IF_NOT_OK(decodePath(path, decoded_resource_locator.mutable_resource_type(),
-             *decoded_resource_locator.mutable_id()));
+                             *decoded_resource_locator.mutable_id()));
   return decoded_resource_locator;
 }
 

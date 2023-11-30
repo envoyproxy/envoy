@@ -174,6 +174,7 @@ envoy_cc_library(
         ":custom_config_validators_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",
+        ":xds_resource_lib",
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",
         "//envoy/config:xds_config_tracker_interface",
