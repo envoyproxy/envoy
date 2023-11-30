@@ -1184,10 +1184,14 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 // modifications which may themselves affect route selection.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
                                                         bool end_stream) {
-  filter_manager_.streamInfo().downstreamTiming().onLastDownstreamHeaderRxByteReceived(
-      connection_manager_.dispatcher_->timeSource());
-  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
+  ENVOY_STREAM_LOG(trace, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *headers);
+  // We only want to record this when reading the headers the first time, not when recreating
+  // a stream.
+  if (!filter_manager_.remoteDecodeComplete()) {
+    filter_manager_.streamInfo().downstreamTiming().onLastDownstreamHeaderRxByteReceived(
+        connection_manager_.dispatcher_->timeSource());
+  }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
