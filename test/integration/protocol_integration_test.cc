@@ -1095,6 +1095,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("507", response->headers().getStatusValue());
   test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
+  cleanupUpstreamAndDownstream();
 }
 
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
