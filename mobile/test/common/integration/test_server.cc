@@ -99,7 +99,7 @@ void TestServer::startTestServer(TestServerType test_server_type) {
     test_server_ = IntegrationTestServer::create(config_path, Network::Address::IpVersion::v4,
                                                  nullptr, nullptr, {}, time_system_, *api_);
     test_server_->waitUntilListenersReady();
-    ENVOY_LOG_MISC(debug, "Proxy now running");
+    ENVOY_LOG_MISC(debug, "Http proxy is now running");
     return;
   }
   case TestServerType::HTTPS_PROXY: {
@@ -108,7 +108,7 @@ void TestServer::startTestServer(TestServerType test_server_type) {
     test_server_ = IntegrationTestServer::create(config_path, Network::Address::IpVersion::v4,
                                                  nullptr, nullptr, {}, time_system_, *api_);
     test_server_->waitUntilListenersReady();
-    ENVOY_LOG_MISC(debug, "Proxy now running");
+    ENVOY_LOG_MISC(debug, "Https proxy is now running");
     return;
   }
   }
