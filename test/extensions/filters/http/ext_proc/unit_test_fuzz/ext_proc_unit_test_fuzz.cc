@@ -71,8 +71,7 @@ DEFINE_PROTO_FUZZER(
 
   try {
     config = std::make_shared<ExternalProcessing::FilterConfig>(
-        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(),
-        "ext_proc_prefix",
+        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "",
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)));
   } catch (const EnvoyException& e) {
