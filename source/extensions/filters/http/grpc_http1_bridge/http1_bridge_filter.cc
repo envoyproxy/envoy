@@ -22,7 +22,7 @@ namespace GrpcHttp1Bridge {
 // Some client requests' URLs may contain query params. gRPC upstream servers can not
 // handle these requests, and may return error such as "unknown method". So we remove
 // query params here.
-void Http1BridgeFilter::removeQueryParams(Http::RequestHeaderMap& headers) {
+void Http1BridgeFilter::ignoreQueryParams(Http::RequestHeaderMap& headers) {
   absl::string_view path = headers.Path()->value().getStringView();
   size_t pos = path.find("?");
   if (pos != absl::string_view::npos) {
@@ -49,7 +49,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
     do_bridging_ = true;
   }
 
-  if (do_briging_ && ignored_query_parameters_) {
+  if (do_briging_ && ignore_query_parameters_) {
     ignoreQueryParams(headers);
   }
   return Http::FilterHeadersStatus::Continue;
