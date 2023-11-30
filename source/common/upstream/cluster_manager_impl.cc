@@ -1211,16 +1211,16 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 
   pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
 
+  auto drop_overload = cm_cluster.cluster().dropOverload();
   // Populate the cluster initialization object based on this update.
   ClusterInitializationObjectConstSharedPtr cluster_initialization_object =
-      addOrUpdateClusterInitializationObjectIfSupported(params, cm_cluster.cluster().info(),
-                                                        load_balancer_factory, host_map,
-                                                        cm_cluster.cluster().dropOverload());
+      addOrUpdateClusterInitializationObjectIfSupported(
+          params, cm_cluster.cluster().info(), load_balancer_factory, host_map, drop_overload);
 
-  tls_.runOnAllThreads([&cm_cluster, info = cm_cluster.cluster().info(), params = std::move(params),
+  tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
                         add_or_update_cluster, load_balancer_factory, map = std::move(host_map),
-                        cluster_initialization_object = std::move(cluster_initialization_object)](
-                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+                        cluster_initialization_object = std::move(cluster_initialization_object),
+                        drop_overload](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     ASSERT(cluster_manager.has_value(),
            "Expected the ThreadLocalClusterManager to be set during ClusterManagerImpl creation.");
 
@@ -1276,11 +1276,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
             cluster_manager->thread_local_clusters_.size());
       }
 
-      // Set drop_overload config for thread_local_cluster. This is thread safe since
-      // it is only read and  written by worker threads.
       if (cluster_manager->thread_local_clusters_[info->name()]) {
-        cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(
-            cm_cluster.cluster().dropOverload());
+        cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(drop_overload);
       }
       for (const auto& per_priority : params.per_priority_update_params_) {
         cluster_manager->updateClusterMembership(
