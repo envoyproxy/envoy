@@ -13,8 +13,7 @@ namespace AwsRequestSigningFilter {
 
 FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
                                    const std::string& stats_prefix, Stats::Scope& scope,
-                                   const std::string& host_rewrite, bool use_unsigned_payload
-                                  )
+                                   const std::string& host_rewrite, bool use_unsigned_payload)
     : signer_(std::move(signer)), stats_(Filter::generateStats(stats_prefix, scope)),
       host_rewrite_(host_rewrite), use_unsigned_payload_{use_unsigned_payload} {}
 

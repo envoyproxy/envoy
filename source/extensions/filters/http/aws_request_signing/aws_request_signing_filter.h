@@ -59,7 +59,6 @@ public:
    * @return whether or not to buffer and sign the payload.
    */
   virtual bool useUnsignedPayload() const PURE;
-
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -70,8 +69,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
-                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload
-                   );
+                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload);
 
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
