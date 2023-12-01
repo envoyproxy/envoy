@@ -56,10 +56,6 @@
 #include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
-#if defined(TCMALLOC)
-#include "tcmalloc/malloc_extension.h"
-#endif
-
 namespace Envoy {
 namespace Server {
 
