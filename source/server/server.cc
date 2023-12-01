@@ -35,7 +35,6 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
-#include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
@@ -107,7 +106,8 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false),
+      memory_allocator_(api_->threadFactory()) {
   std::function set_up_logger = [&] {
     TRY_ASSERT_MAIN_THREAD {
       file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
@@ -864,14 +864,9 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 }
 
 void InstanceImpl::configureBackgroundMemoryRelease() {
-#if defined(TCMALLOC)
   uint64_t background_release_rate_bytes_per_second =
       bootstrap_.memory_allocator_manager().background_release_rate_bytes_per_second();
-  tcmalloc::MallocExtension::SetBackgroundReleaseRate(
-      tcmalloc::MallocExtension::BytesPerSecond{background_release_rate_bytes_per_second});
-  ENVOY_LOG(info, "configured tcmalloc with background release rate: {} bytes per second",
-            background_release_rate_bytes_per_second);
-#endif
+  memory_allocator_.configureBackgroundMemoryRelease(background_release_rate_bytes_per_second);
 }
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,

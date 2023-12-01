@@ -33,6 +33,7 @@
 #include "source/common/http/context_impl.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/memory/heap_shrinker.h"
+#include "source/common/memory/stats.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
@@ -403,6 +404,8 @@ private:
   Regex::EnginePtr regex_engine_;
 
   bool stats_flush_in_progress_ : 1;
+
+  Memory::Allocator memory_allocator_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

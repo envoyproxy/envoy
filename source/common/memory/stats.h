@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "source/common/common/thread.h"
+
 namespace Envoy {
 namespace Memory {
 
@@ -49,6 +51,28 @@ public:
    * Log detailed stats about current memory allocation. Intended for debugging purposes.
    */
   static void dumpStatsToLog();
+};
+
+class Allocator {
+public:
+  Allocator(Thread::ThreadFactory& thread_factory) : thread_factory_(thread_factory){};
+
+  ~Allocator() {
+    if (tcmalloc_thread_ != nullptr) {
+      tcmalloc_thread_->join();
+    }
+  }
+  /**
+   * Configures tcmalloc release rate from the page heap. If `background_release_rate`
+   * is passed as `0`, not heap memory will be release in background.
+   *
+   * @param background_release_rate memory release rate in bytes per second.
+   */
+  void configureBackgroundMemoryRelease(const uint64_t background_release_rate);
+
+private:
+  Thread::ThreadFactory& thread_factory_;
+  Thread::ThreadPtr tcmalloc_thread_;
 };
 
 } // namespace Memory

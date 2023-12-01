@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
 #if defined(TCMALLOC)
@@ -44,6 +45,22 @@ uint64_t Stats::totalPhysicalBytes() {
 
 void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", tcmalloc::MallocExtension::GetStats());
+}
+
+void Allocator::configureBackgroundMemoryRelease(const uint64_t background_release_rate) {
+  ASSERT(!tcmalloc_thread_);
+  if (background_release_rate > 0) {
+    tcmalloc::MallocExtension::SetBackgroundReleaseRate(
+        tcmalloc::MallocExtension::BytesPerSecond{background_release_rate});
+    ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second",
+                   background_release_rate);
+    // This routine needs to be invoked for background memory release to be operative.
+    // `ProcessBackgroundActions` routine needs to be invoked for background memory release to be
+    // operative. https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h#L635
+    tcmalloc_thread_ = thread_factory_.createThread(
+        []() -> void { tcmalloc::MallocExtension::ProcessBackgroundActions(); },
+        Thread::Options{"TcmallocProcessBackgroundActions"});
+  }
 }
 
 } // namespace Memory
@@ -100,6 +117,23 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", buffer.get());
 }
 
+}
+
+void configureBackgroundMemoryRelease(const uint64_t background_release_rate) {
+  RELEASE_ASSERT(!tcmalloc_thread_);
+  if (background_release_rate > 0) {
+    MallocExtension::instance()->SetBackgroundReleaseRate(
+        MallocExtension::instance()->BytesPerSecond{background_release_rate});
+    ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second",
+                   background_release_rate);
+    // `ProcessBackgroundActions` routine needs to be invoked for background memory release to be
+    // operative. https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h#L635
+    tcmalloc_thread_ = thread_factory_.createThread(
+        []() -> void { MallocExtension::instance()->ProcessBackgroundActions(); },
+        Thread::Options{"TcmallocProcessBackgroundActions"});
+  }
+}
+
 } // namespace Memory
 } // namespace Envoy
 
@@ -115,6 +149,7 @@ uint64_t Stats::totalPageHeapUnmapped() { return 0; }
 uint64_t Stats::totalPageHeapFree() { return 0; }
 uint64_t Stats::totalPhysicalBytes() { return 0; }
 void Stats::dumpStatsToLog() {}
+void Allocator::configureBackgroundMemoryRelease() {}
 
 } // namespace Memory
 } // namespace Envoy
