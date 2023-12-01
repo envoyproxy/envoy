@@ -743,7 +743,6 @@ public:
   COUNTER(upstream_rq_cancelled)                                                                   \
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
-  COUNTER(upstream_rq_drop_overload)                                                               \
   COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
@@ -772,11 +771,13 @@ public:
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
- * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
- * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped and
+ * upstream_rq_drop_overload. These are latched by LoadStatsReporter, independent of the normal
+ * stats sink flushing.
  */
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
-  COUNTER(upstream_rq_dropped)
+  COUNTER(upstream_rq_dropped)                                                                     \
+  COUNTER(upstream_rq_drop_overload)
 
 /**
  * Cluster circuit breakers gauges. Note that we do not generate a stats

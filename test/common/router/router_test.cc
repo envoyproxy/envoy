@@ -796,7 +796,7 @@ TEST_F(RouterTest, DropOverloadPassed) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
-  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
                     .counter("upstream_rq_drop_overload")
                     .value());
   EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
@@ -822,7 +822,7 @@ TEST_F(RouterTest, DropOverloadDropped) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
                     .counter("upstream_rq_drop_overload")
                     .value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));

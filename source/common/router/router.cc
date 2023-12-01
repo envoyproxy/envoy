@@ -578,7 +578,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           },
           absl::nullopt, StreamInfo::ResponseCodeDetails::get().DropOverload);
 
-      cluster_->trafficStats()->upstream_rq_drop_overload_.inc();
+      cluster_->loadReportStats().upstream_rq_drop_overload_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
