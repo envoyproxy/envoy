@@ -218,7 +218,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
                            .get(Http::LowerCaseString("x-geo-city"))[0]
                            ->value()
                            .getStringView());
-  EXPECT_EQ("England", upstream_request_->headers()
+  EXPECT_EQ("ENG", upstream_request_->headers()
                            .get(Http::LowerCaseString("x-geo-region"))[0]
                            ->value()
                            .getStringView());
