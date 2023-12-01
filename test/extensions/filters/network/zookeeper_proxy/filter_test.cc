@@ -742,7 +742,7 @@ TEST_F(ZooKeeperFilterTest, DisableErrorBudgetCalculation) {
   std::chrono::milliseconds default_latency_threshold(200);
   LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(true, true, false, false, default_latency_threshold, latency_threshold_overrides);
+  initialize(true, true, true, false, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
             ErrorBudgetResponseType::None);
