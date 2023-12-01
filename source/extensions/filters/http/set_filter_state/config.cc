@@ -25,7 +25,7 @@ Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& 
 
 Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext& context) {
 
   Server::GenericFactoryContextImpl generic_context(context);
 
