@@ -120,8 +120,8 @@ private:
 class SigV4ASignerImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SigV4ASignerImpl(absl::string_view service_name, absl::string_view region,
-             const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-             const AwsSigV4HeaderExclusionVector& matcher_config)
+                   const CredentialsProviderSharedPtr& credentials_provider,
+                   TimeSource& time_source, const AwsSigV4HeaderExclusionVector& matcher_config)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
         time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {

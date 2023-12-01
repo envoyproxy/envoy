@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
+#include <elf.h>
+
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
@@ -9,15 +11,14 @@
 #include "source/extensions/common/aws/signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 #include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
-#include <elf.h>
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
-SigningAlgorithm
-getSigningAlgorithm(const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config) {
+SigningAlgorithm getSigningAlgorithm(
+    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config) {
   using namespace envoy::extensions::filters::http::aws_request_signing::v3;
   auto& logger = Logger::Registry::getLog(Logger::Id::filter);
 
@@ -49,23 +50,19 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
 
-  if(getSigningAlgorithm(config)==SigningAlgorithm::SigV4A)
-  {
-      signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-      config.service_name(), config.region(), credentials_provider,
-      server_context.mainThreadDispatcher().timeSource(), matcher_config);
-  }
-  else
-  {
-      signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
-      config.service_name(), config.region(), credentials_provider,
-      server_context.mainThreadDispatcher().timeSource(), matcher_config);
+  if (getSigningAlgorithm(config) == SigningAlgorithm::SigV4A) {
+    signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
+        config.service_name(), config.region(), credentials_provider,
+        server_context.mainThreadDispatcher().timeSource(), matcher_config);
+  } else {
+    signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
+        config.service_name(), config.region(), credentials_provider,
+        server_context.mainThreadDispatcher().timeSource(), matcher_config);
   }
 
   auto filter_config =
       std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, context.scope(),
-                                         config.host_rewrite(), config.use_unsigned_payload()
-                                         );
+                                         config.host_rewrite(), config.use_unsigned_payload());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamDecoderFilter(filter);
@@ -84,26 +81,22 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
       per_route_config.aws_request_signing().match_excluded_headers().end());
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
 
-  if(getSigningAlgorithm(per_route_config.aws_request_signing())==SigningAlgorithm::SigV4A)
-  {
-      signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-      per_route_config.aws_request_signing().service_name(),
-      per_route_config.aws_request_signing().region(), credentials_provider,
-      context.mainThreadDispatcher().timeSource(), matcher_config);
-  }
-  else
-  {
-      signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
-      per_route_config.aws_request_signing().service_name(),
-      per_route_config.aws_request_signing().region(), credentials_provider,
-      context.mainThreadDispatcher().timeSource(), matcher_config);
+  if (getSigningAlgorithm(per_route_config.aws_request_signing()) == SigningAlgorithm::SigV4A) {
+    signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
+        per_route_config.aws_request_signing().service_name(),
+        per_route_config.aws_request_signing().region(), credentials_provider,
+        context.mainThreadDispatcher().timeSource(), matcher_config);
+  } else {
+    signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
+        per_route_config.aws_request_signing().service_name(),
+        per_route_config.aws_request_signing().region(), credentials_provider,
+        context.mainThreadDispatcher().timeSource(), matcher_config);
   }
 
   return std::make_shared<const FilterConfigImpl>(
       std::move(signer), per_route_config.stat_prefix(), context.scope(),
       per_route_config.aws_request_signing().host_rewrite(),
-      per_route_config.aws_request_signing().use_unsigned_payload()
-      );
+      per_route_config.aws_request_signing().use_unsigned_payload());
 }
 
 /**
