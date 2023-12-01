@@ -1872,12 +1872,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
                                                       : Http::Headers::get().SchemeValues.Https);
         }
 
-        saved_headers->iterate(
-            [&downstream_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-              downstream_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
-                                         Http::LowerCaseString(header.value().getStringView()));
-              return Http::HeaderMap::Iterate::Continue;
-            });
+        Http::RequestHeaderMapImpl::copyFrom(downstream_headers, *saved_headers);
       });
 
   // Replace the original host, scheme and path.
