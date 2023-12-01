@@ -528,9 +528,9 @@ static void ios_track_event(envoy_map map, const void *context) {
   [self startObservingLifecycleNotifications];
 
   @try {
-    auto options = std::make_unique<Envoy::OptionsImpl>();
+    auto options = std::make_unique<Envoy::OptionsImplBase>();
     options->setConfigProto(std::move(bootstrap));
-    options->setLogLevel(options->parseAndValidateLogLevel(logLevel.UTF8String));
+    ENVOY_BUG(options->setLogLevel(logLevel.UTF8String).ok(), "invalid log level");
     options->setConcurrency(1);
     return reinterpret_cast<Envoy::Engine *>(_engineHandle)->run(std::move(options));
   } @catch (NSException *exception) {

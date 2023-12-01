@@ -527,7 +527,7 @@ public:
         // Similarly, local replies should always contain this.
         const auto status = Utility::getResponseStatusOrNullopt(*headers);
         // The only 1xx header that may be provided to encodeHeaders() is a 101 upgrade,
-        // guaranteed by the codec parsers. See include/envoy/http/filter.h.
+        // guaranteed by the codec parsers. See envoy/http/filter.h.
         if (!status.has_value() || (CodeUtility::is1xx(status.value()) &&
                                     status.value() != enumToInt(Http::Code::SwitchingProtocols))) {
           headers->setReferenceKey(Headers::get().Status, "200");
@@ -594,11 +594,8 @@ using FuzzStreamPtr = std::unique_ptr<FuzzStream>;
 DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   try {
     TestUtility::validate(input);
-  } catch (const ProtoValidationException& e) {
-    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
-    return;
-  } catch (const Envoy::ProtobufMessage::DeprecatedProtoFieldException& e) {
-    ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
+  } catch (const Envoy::EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
 

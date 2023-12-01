@@ -1,3 +1,7 @@
+-dontwarn com.google.protobuf.**
+
+-dontnote com.google.protobuf.**
+
 -keep class com.google.protobuf.** {
    *;
 }
