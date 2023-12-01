@@ -89,10 +89,6 @@ public:
     generic_active_listener_->incNumConnections();
     generic_accepted_socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     EXPECT_CALL(*generic_accepted_socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
-
-    // Senseless calls to make the coverage CI happy.
-    const_cast<const ActiveTcpSocket*>(generic_active_listener_->sockets().begin()->get())
-        ->dynamicMetadata();
   }
 
   void initializeWithFilter() {
@@ -483,9 +479,12 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
 
   // get the ActiveTcpSocket pointer before unlink() removed from the link-list.
   ActiveTcpSocket* tcp_socket = generic_active_listener_->sockets().front().get();
+
+  // Senseless calls to make the coverage CI happy.
+  const_cast<const ActiveTcpSocket*>(tcp_socket)->dynamicMetadata();
+
   // trigger the onTimeout event manually, since the timer is fake.
   generic_active_listener_->sockets().front()->onTimeout();
-
   EXPECT_EQ(server_name,
             tcp_socket->streamInfo()->downstreamAddressProvider().requestedServerName());
 }
