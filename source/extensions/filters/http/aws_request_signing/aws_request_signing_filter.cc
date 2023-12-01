@@ -13,10 +13,10 @@ namespace AwsRequestSigningFilter {
 
 FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
                                    const std::string& stats_prefix, Stats::Scope& scope,
-                                   const std::string& host_rewrite, bool use_unsigned_payload,
-                                   const std::string& signing_algorithm)
+                                   const std::string& host_rewrite, bool use_unsigned_payload
+                                  )
     : signer_(std::move(signer)), stats_(Filter::generateStats(stats_prefix, scope)),
-      host_rewrite_(host_rewrite), signing_algorithm_(signing_algorithm), use_unsigned_payload_{use_unsigned_payload} {}
+      host_rewrite_(host_rewrite), use_unsigned_payload_{use_unsigned_payload} {}
 
 Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
 
@@ -26,7 +26,6 @@ FilterStats& FilterConfigImpl::stats() { return stats_; }
 
 const std::string& FilterConfigImpl::hostRewrite() const { return host_rewrite_; }
 bool FilterConfigImpl::useUnsignedPayload() const { return use_unsigned_payload_; }
-const std::string& FilterConfigImpl::signingAlgorithm() const { return signing_algorithm_; }
 
 FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + "aws_request_signing.";
@@ -38,7 +37,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   const auto& host_rewrite = config.hostRewrite();
   const bool use_unsigned_payload = config.useUnsignedPayload();
-  const auto& signing_algorithm = config.signingAlgorithm();
 
   if (!host_rewrite.empty()) {
     headers.setHost(host_rewrite);
@@ -49,11 +47,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  if (!signing_algorithm.empty()){
-    ENVOY_LOG(debug, "got signing algorithm: {}",
-              signing_algorithm);
-  }
-  
   TRY_NEEDS_AUDIT {
     ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
               use_unsigned_payload);
