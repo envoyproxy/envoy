@@ -5,4 +5,4 @@ Cluster specifier
   :glob:
   :maxdepth: 2
 
-  ../../../extensions/router/cluster_specifiers/lua/v3/*
+  ../../extensions/router/cluster_specifiers/*/v3/*
