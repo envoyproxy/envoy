@@ -68,18 +68,7 @@ public:
 
   Envoy::Compression::Compressor::CompressorFactoryPtr
   createCompressorFactoryFromProto(const Protobuf::Message& proto_config,
-                                   Server::Configuration::FactoryContext& context) override {
-
-    const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip config =
-        MessageUtil::downcastAndValidate<
-            const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip&>(
-            proto_config, context.messageValidationVisitor());
-#ifdef QAT_DISABLED
-    throw EnvoyException("X86_64 architecture is required for QAT.");
-#else
-    return createCompressorFactoryFromProtoTyped(config, context);
-#endif
-  }
+                                   Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip>();
