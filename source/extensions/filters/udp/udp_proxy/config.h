@@ -151,6 +151,12 @@ public:
   const FilterChainFactory& sessionFilterFactory() const override { return *this; };
   bool hasSessionFilters() const override { return !filter_factories_.empty(); }
   const UdpTunnelingConfigPtr& tunnelingConfig() const override { return tunneling_config_; };
+  bool flushAccessLogOnTunnelConnected() const override {
+    return flush_access_log_on_tunnel_connected_;
+  }
+  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const override {
+    return access_log_flush_interval_;
+  }
   Random::RandomGenerator& randomGenerator() const override { return random_generator_; }
 
   // FilterChainFactory
@@ -174,6 +180,8 @@ private:
   const std::chrono::milliseconds session_timeout_;
   const bool use_original_src_ip_;
   const bool use_per_packet_load_balancing_;
+  bool flush_access_log_on_tunnel_connected_;
+  absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;

@@ -2825,6 +2825,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         "@com_google_absl//absl/functional:any_invocable",

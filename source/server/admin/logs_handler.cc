@@ -39,7 +39,7 @@ std::vector<absl::string_view> LogsHandler::levelStrings() {
 
 Http::Code LogsHandler::handlerLogging(Http::ResponseHeaderMap&, Buffer::Instance& response,
                                        AdminStream& admin_stream) {
-  Http::Utility::QueryParams query_params = admin_stream.queryParams();
+  Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
 
   Http::Code rc = Http::Code::OK;
   const absl::Status status = changeLogLevel(query_params);
@@ -82,31 +82,31 @@ Http::Code LogsHandler::handlerReopenLogs(Http::ResponseHeaderMap&, Buffer::Inst
   return Http::Code::OK;
 }
 
-absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
+absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params) {
   // "level" and "paths" will be set to the empty string when this is invoked
   // from HTML without setting them, so clean out empty values.
-  auto level = params.find("level");
-  if (level != params.end() && level->second.empty()) {
-    params.erase(level);
-    level = params.end();
+  auto level = params.getFirstValue("level");
+  if (level.has_value() && level.value().empty()) {
+    params.remove("level");
+    level = std::nullopt;
   }
-  auto paths = params.find("paths");
-  if (paths != params.end() && paths->second.empty()) {
-    params.erase(paths);
-    paths = params.end();
+  auto paths = params.getFirstValue("paths");
+  if (paths.has_value() && paths.value().empty()) {
+    params.remove("paths");
+    paths = std::nullopt;
   }
 
-  if (params.empty()) {
+  if (params.data().empty()) {
     return absl::OkStatus();
   }
 
-  if (params.size() != 1) {
+  if (params.data().size() != 1) {
     return absl::InvalidArgumentError("invalid number of parameters");
   }
 
-  if (level != params.end()) {
+  if (level.has_value()) {
     // Change all log levels.
-    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level->second);
+    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level.value());
     if (!level_to_use.ok()) {
       return level_to_use.status();
     }
@@ -121,10 +121,10 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
   std::vector<std::pair<absl::string_view, int>> glob_levels;
   const bool use_fine_grain_logger = Logger::Context::useFineGrainLogger();
 
-  if (paths != params.end()) {
+  if (paths.has_value()) {
     // Bulk change log level by name:level pairs, separated by comma.
     std::vector<absl::string_view> pairs =
-        absl::StrSplit(paths->second, ',', absl::SkipWhitespace());
+        absl::StrSplit(paths.value(), ',', absl::SkipWhitespace());
     for (const auto& name_level : pairs) {
       const std::pair<absl::string_view, absl::string_view> name_level_pair =
           absl::StrSplit(name_level, absl::MaxSplits(':', 1), absl::SkipWhitespace());
@@ -151,14 +151,14 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
     // they may be empty. There's a legacy non-HTML-accessible mechanism to
     // set a single logger to a level, which we'll handle now. In this scenario,
     // "level" and "paths" will not be populated.
-    if (params.size() != 1) {
+    if (params.data().size() != 1) {
       return absl::InvalidArgumentError("invalid number of parameters");
     }
 
     // Change particular log level by name.
-    const auto it = params.begin();
+    const auto it = params.data().begin();
     const std::string& key = it->first;
-    const std::string& value = it->second;
+    const std::string& value = it->second[0];
 
     const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(value);
     if (!level_to_use.ok()) {
