@@ -17,7 +17,31 @@ using InlineHandle = Http::CustomInlineHeaderRegistry::Handle<
  */
 class TraceContextHandler {
 public:
+  /**
+   * Contruct a handler with the given key. Note that the key will be lowercased and copied.
+   * @param key the key of the handler.
+   */
   TraceContextHandler(absl::string_view key);
+
+  /**
+   * Get the key of the handler.
+   * @return absl::string_view the key of the handler. Note that the key is lowercased.
+   */
+  absl::string_view key() const { return key_.get(); }
+
+  /**
+   * Erase the key/value pair from the trace context.
+   * @param trace_context the trace context to erase the key/value pair.
+   */
+  void erase(TraceContext& trace_context) const;
+
+  /**
+   * Get the value from the trace context by the key.
+   * @param trace_context the trace context to get the value.
+   * @return absl::optional<absl::string_view> the value of the key. If the key is not found, then
+   * absl::nullopt will be returned.
+   */
+  absl::optional<absl::string_view> get(const TraceContext& trace_context) const;
 
   /*
    * Set the key/value pair in the trace context.
@@ -41,10 +65,6 @@ public:
    * @param value the value to set.
    */
   void setRef(TraceContext& trace_context, absl::string_view value) const;
-
-  absl::optional<absl::string_view> get(const TraceContext& trace_context) const;
-  void erase(TraceContext& trace_context) const;
-  absl::string_view key() const { return key_.get(); }
 
 private:
   const Http::LowerCaseString key_;
