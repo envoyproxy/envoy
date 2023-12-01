@@ -4,6 +4,10 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
+    Remove the hop by hop TE header from downstream request headers. This change can be temporarily reverted
+    by setting ``envoy.reloadable_features.sanitize_te`` to false.
+- area: http
+  change: |
     Flip runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to true. Name downgrading in the
     per filter config searching will be disabled by default. This behavior can be temporarily reverted by setting
     the flag to false explicitly.
@@ -210,5 +214,11 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.
+- area: udp_proxy
+  change: |
+    add :ref:`access log options
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log_options>`
+    to allow recording an access log entry periodically for the UDP session, and allow recording an access
+    log entry on the connection tunnel created successfully to upstream when UDP tunneling is configured.
 
 deprecated:
