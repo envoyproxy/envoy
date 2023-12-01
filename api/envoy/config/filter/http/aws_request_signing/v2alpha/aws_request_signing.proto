@@ -43,6 +43,4 @@ message AwsRequestSigning {
   // value set here would be used for signing whereas the value set in the HCM would be used
   // for host header forwarding which is not the desired outcome.
   string host_rewrite = 3;
-
-  string algorithm = 4 [(validate.rules).string = {in: "sigv4" in: "sigv4a"}];
 }
