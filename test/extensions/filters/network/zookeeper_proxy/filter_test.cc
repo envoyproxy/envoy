@@ -351,6 +351,24 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl
+  encodeTooSmallCreateRequest(const std::string& path, const std::string& data,
+                              const bool txn = false, const int32_t xid = 1000,
+                              const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
+    Buffer::OwnedImpl buffer;
+
+    if (!txn) {
+      buffer.writeBEInt<int32_t>(16 + path.length() + data.length());
+      buffer.writeBEInt<int32_t>(xid);
+      buffer.writeBEInt<int32_t>(opcode);
+    }
+
+    addString(buffer, path);
+    addString(buffer, data);
+    // Deliberately not adding acls and flags to the buffer and change the length accordingly.
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeSetRequest(const std::string& path, const std::string& data,
                                      const int32_t version, const bool txn = false) const {
     Buffer::OwnedImpl buffer;
@@ -558,6 +576,9 @@ public:
     case OpCodes::CreateTtl:
       opname = "createttl";
       break;
+    case OpCodes::Create2:
+      opname = "create2";
+      break;
     default:
       break;
     }
@@ -567,26 +588,12 @@ public:
          {{"bytes", "35"}}});
 
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-
-    switch (opcode) {
-    case OpCodes::Create:
-      EXPECT_EQ(1UL, config_->stats().create_rq_.value());
-      EXPECT_EQ(35UL, config_->stats().create_rq_bytes_.value());
-      break;
-    case OpCodes::CreateContainer:
-      EXPECT_EQ(1UL, config_->stats().createcontainer_rq_.value());
-      EXPECT_EQ(35UL, config_->stats().createcontainer_rq_bytes_.value());
-      break;
-    case OpCodes::CreateTtl:
-      EXPECT_EQ(1UL, config_->stats().createttl_rq_.value());
-      EXPECT_EQ(35UL, config_->stats().createttl_rq_bytes_.value());
-      break;
-    default:
-      break;
-    }
-
+    EXPECT_EQ(1UL, store_.counter(absl::StrCat("test.zookeeper.", opname, "_rq")).value());
     EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
+    EXPECT_EQ(35UL, store_.counter(absl::StrCat("test.zookeeper.", opname, "_rq_bytes")).value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+    EXPECT_EQ(0UL,
+              store_.counter(absl::StrCat("test.zookeeper.", opname, "_decoder_error")).value());
   }
 
   void testCreateWithNegativeDataLen(CreateFlags flag, const int32_t flag_val,
@@ -603,6 +610,9 @@ public:
     case OpCodes::CreateTtl:
       opname = "createttl";
       break;
+    case OpCodes::Create2:
+      opname = "create2";
+      break;
     default:
       break;
     }
@@ -612,24 +622,12 @@ public:
          {{"bytes", "32"}}});
 
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-
-    switch (opcode) {
-    case OpCodes::Create:
-      EXPECT_EQ(1UL, config_->stats().create_rq_.value());
-      break;
-    case OpCodes::CreateContainer:
-      EXPECT_EQ(1UL, config_->stats().createcontainer_rq_.value());
-      break;
-    case OpCodes::CreateTtl:
-      EXPECT_EQ(1UL, config_->stats().createttl_rq_.value());
-      break;
-    default:
-      break;
-    }
-
+    EXPECT_EQ(1UL, store_.counter(absl::StrCat("test.zookeeper.", opname, "_rq")).value());
     EXPECT_EQ(32UL, config_->stats().request_bytes_.value());
-    EXPECT_EQ(32UL, config_->stats().create_rq_bytes_.value());
+    EXPECT_EQ(32UL, store_.counter(absl::StrCat("test.zookeeper.", opname, "_rq_bytes")).value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+    EXPECT_EQ(0UL,
+              store_.counter(absl::StrCat("test.zookeeper.", opname, "_decoder_error")).value());
   }
 
   void testRequest(Buffer::OwnedImpl& data, const std::vector<StrStrMap>& metadata_values) {
@@ -1129,14 +1127,39 @@ TEST_F(ZooKeeperFilterTest, CreateRequestTTLSequential) {
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequest2) {
+  testCreate(CreateFlags::Persistent, 0, OpCodes::Create2);
+  testResponse({{{"opname", "create2_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}});
+}
+
+TEST_F(ZooKeeperFilterTest, TooSmallCreateRequest) {
   initialize();
 
   Buffer::OwnedImpl data =
-      encodeCreateRequest("/foo", "bar", 0, false, 1000, enumToSignedInt(OpCodes::Create2));
+      encodeTooSmallCreateRequest("/foo", "bar", false, 1000, enumToSignedInt(OpCodes::Create));
 
-  testRequest(data, {{{"opname", "create2"}, {"path", "/foo"}, {"create_type", "persistent"}},
-                     {{"bytes", "35"}}});
-  testResponse({{{"opname", "create2_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(0UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().create_rq_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+  EXPECT_EQ(1UL, config_->stats().create_decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, TooSmallCreateRequestWithDisabledPerOpcodeDecoderErrorMetrics) {
+  std::chrono::milliseconds default_latency_threshold(100);
+  LatencyThresholdOverrideList latency_threshold_overrides;
+
+  initialize(true, true, false, true, default_latency_threshold, latency_threshold_overrides);
+
+  Buffer::OwnedImpl data =
+      encodeTooSmallCreateRequest("/foo", "bar", false, 1000, enumToSignedInt(OpCodes::Create));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(0UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().create_rq_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+  EXPECT_EQ(0UL, config_->stats().create_decoder_error_.value());
 }
 
 TEST_F(ZooKeeperFilterTest, SetRequest) {
