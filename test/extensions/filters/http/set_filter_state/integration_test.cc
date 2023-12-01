@@ -3,6 +3,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/set_filter_state/config.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -39,9 +40,19 @@ public:
     envoy::extensions::filters::http::set_filter_state::v3::Config proto_config;
     TestUtility::loadFromYaml(yaml_config, proto_config);
 
+    // Test the factory method.
+    {
+      SetFilterStateConfig factory;
+      EXPECT_NE(nullptr, factory.createFilterFactoryFromProto(proto_config, "", context_));
+      EXPECT_NE(nullptr, factory.createFilterFactoryFromProtoWithServerContext(
+                             proto_config, "", context_.server_factory_context_));
+    }
+
+    Server::GenericFactoryContextImpl generic_context(context_);
+
     auto config = std::make_shared<Filters::Common::SetFilterState::Config>(
         proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-        context_);
+        generic_context);
     auto filter = std::make_shared<SetFilterState>(config);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -49,7 +60,7 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
   }
 
-  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::TestRequestHeaderMapImpl headers_{{"test-header", "test-value"}};
   NiceMock<StreamInfo::MockStreamInfo> info_;
 };

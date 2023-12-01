@@ -89,6 +89,10 @@ public:
     generic_active_listener_->incNumConnections();
     generic_accepted_socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     EXPECT_CALL(*generic_accepted_socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
+
+    // Senseless calls to make the coverage CI happy.
+    const_cast<const ActiveTcpSocket*>(generic_active_listener_->sockets().begin()->get())
+        ->dynamicMetadata();
   }
 
   void initializeWithFilter() {

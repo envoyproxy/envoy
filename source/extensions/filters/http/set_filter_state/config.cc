@@ -36,9 +36,6 @@ Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});
   };
-
-  return createFilterFactoryFromProtoWithServerContextTyped(proto_config, stat_prefix,
-                                                            context.getServerFactoryContext());
 }
 
 Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServerContextTyped(
