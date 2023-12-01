@@ -333,6 +333,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 
 /*/extensions/health_checkers/common @zuercher @botengyao
 
+# Lua cluster specifier
+/*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
+
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
