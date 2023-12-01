@@ -1179,6 +1179,12 @@ public:
     header_map_->setByReferenceKey(key, val);
   }
   void removeByKey(absl::string_view key) override { header_map_->removeByKey(key); }
+  OptRef<RequestHeaderMap> requestHeaders() override {
+    return makeOptRefFromPtr<RequestHeaderMap>(this);
+  }
+  OptRef<const RequestHeaderMap> requestHeaders() const override {
+    return makeOptRefFromPtr<const RequestHeaderMap>(this);
+  }
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;

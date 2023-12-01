@@ -502,6 +502,12 @@ public:
   void setByReferenceKey(absl::string_view key, absl::string_view val) override;
   void setByReference(absl::string_view key, absl::string_view val) override;
   void removeByKey(absl::string_view key) override;
+  OptRef<RequestHeaderMap> requestHeaders() override {
+    return makeOptRefFromPtr<RequestHeaderMap>(this);
+  }
+  OptRef<const RequestHeaderMap> requestHeaders() const override {
+    return makeOptRefFromPtr<const RequestHeaderMap>(this);
+  }
 
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the

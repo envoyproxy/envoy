@@ -10,6 +10,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/null_span_impl.h"
+#include "source/common/tracing/trace_context_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,6 +22,10 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     ot_span_context_handle(Http::CustomHeaders::get().OtSpanContext);
 
 namespace {
+
+const Tracing::TraceContextHandler& otSpanContextHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, Http::CustomHeaders::get().OtSpanContext);
+}
 
 /**
  * TODO(wbpcode): Use opentracing::TextMapWriter to replace opentracing::HTTPHeadersWriter.
@@ -120,9 +125,8 @@ void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context,
       return;
     }
     const std::string current_span_context = oss.str();
-    trace_context.setByReferenceKey(
-        Http::CustomHeaders::get().OtSpanContext,
-        Base64::encode(current_span_context.c_str(), current_span_context.length()));
+    otSpanContextHeader().setReferenceKey(
+        trace_context, Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
     // Inject the context using the tracer's standard header format.
     const OpenTracingHeadersWriter writer{trace_context};
@@ -161,7 +165,7 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   std::unique_ptr<opentracing::Span> active_span;
   std::unique_ptr<opentracing::SpanContext> parent_span_ctx;
 
-  const auto entry = trace_context.getByKey(Http::CustomHeaders::get().OtSpanContext);
+  const auto entry = otSpanContextHeader().get(trace_context);
   if (propagation_mode == PropagationMode::SingleHeader && entry.has_value()) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
     std::string parent_context = Base64::decode(std::string(entry.value()));

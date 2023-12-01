@@ -3,13 +3,19 @@
 #include <functional>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Http {
+class RequestHeaderMap;
+}
 namespace Tracing {
+
+class TraceContextHandler;
 
 /**
  * Protocol-independent abstraction for traceable stream. It hides the differences between different
@@ -101,6 +107,16 @@ public:
    * @param key The key to remove if it exists.
    */
   virtual void removeByKey(absl::string_view key) PURE;
+
+private:
+  friend class TraceContextHandler;
+
+  /**
+   * Optional HTTP request headers map. This is valid for HTTP protocol or any protocol that
+   * that provides HTTP request headers.
+   */
+  virtual OptRef<Http::RequestHeaderMap> requestHeaders() { return {}; };
+  virtual OptRef<const Http::RequestHeaderMap> requestHeaders() const { return {}; };
 };
 
 } // namespace Tracing
