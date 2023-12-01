@@ -37,7 +37,7 @@ A simple example of configuring Lua cluster specifier is as follow:
 
 Lua script defined in ``source_code`` will be executed to select router cluster, and just as cluster specifier
 plugin in C++, Lua script can also select router cluster based on request headers. If Lua script has no
-``envoy_on_cluster`` function or execute failure, ``default_cluster`` will be used.
+*envoy_on_cluster* function or execute failure, ``default_cluster`` will be used.
 
 Complete example
 ----------------
