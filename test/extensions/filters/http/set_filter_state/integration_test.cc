@@ -43,9 +43,9 @@ public:
     // Test the factory method.
     {
       SetFilterStateConfig factory;
-      EXPECT_NE(nullptr, factory.createFilterFactoryFromProto(proto_config, "", context_));
-      EXPECT_NE(nullptr, factory.createFilterFactoryFromProtoWithServerContext(
-                             proto_config, "", context_.server_factory_context_));
+      EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, "", context_).ok());
+      EXPECT_TRUE(factory.createFilterFactoryFromProtoWithServerContext(
+          proto_config, "", context_.server_factory_context_));
     }
 
     Server::GenericFactoryContextImpl generic_context(context_);
