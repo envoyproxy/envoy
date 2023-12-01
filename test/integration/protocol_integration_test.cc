@@ -3445,6 +3445,7 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeData) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
 }
 
 // Verify that when a filter decodeData callback overflows request buffer in filter manager the
