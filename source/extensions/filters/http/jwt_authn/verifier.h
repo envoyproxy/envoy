@@ -35,6 +35,11 @@ public:
     virtual void setExtractedData(const ProtobufWkt::Struct& payload) PURE;
 
     /**
+     * JWT payloads added to headers may require clearing the cached route.
+     */
+    virtual void clearRouteCache() PURE;
+
+    /**
      * Called on completion of request.
      *
      * @param status the status of the request.

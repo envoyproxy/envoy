@@ -91,14 +91,14 @@ public:
   Common::Dubbo::DubboCodecPtr codec_;
 };
 
-template <class DecoderType, class MessageType, class CallBackType>
-class DubboDecoderBase : public DubboCodecBase, public DecoderType {
+template <class CodecType, class DecoderMessageType, class EncoderMessageType, class CallBackType>
+class DubboDecoderBase : public DubboCodecBase, public CodecType {
 public:
   using DubboCodecBase::DubboCodecBase;
 
-  void setDecoderCallback(CallBackType& callback) override { callback_ = &callback; }
+  void setCodecCallbacks(CallBackType& callback) override { callback_ = &callback; }
 
-  void decode(Buffer::Instance& buffer) override {
+  void decode(Buffer::Instance& buffer, bool) override {
     if (metadata_ == nullptr) {
       metadata_ = std::make_shared<Common::Dubbo::MessageMetadata>();
     }
@@ -130,7 +130,7 @@ public:
 
       ASSERT(decode_status == Common::Dubbo::DecodeStatus::Success);
 
-      auto message = std::make_unique<MessageType>(metadata_);
+      auto message = std::make_unique<DecoderMessageType>(metadata_);
       message->stream_frame_flags_ = {{static_cast<uint64_t>(metadata_->requestId()),
                                        !metadata_->context().isTwoWay(), false,
                                        metadata_->context().heartbeat()},
@@ -144,67 +144,43 @@ public:
     }
   }
 
+  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override {
+    ASSERT(dynamic_cast<const EncoderMessageType*>(&frame) != nullptr);
+    const auto* typed_message = static_cast<const EncoderMessageType*>(&frame);
+
+    Buffer::OwnedImpl buffer;
+    codec_->encode(buffer, *typed_message->inner_metadata_);
+    callbacks.onEncodingSuccess(buffer, true);
+  }
+
   Common::Dubbo::MessageMetadataSharedPtr metadata_;
   CallBackType* callback_{};
 };
 
-using DubboRequestDecoder = DubboDecoderBase<RequestDecoder, DubboRequest, RequestDecoderCallback>;
-using DubboResponseDecoder =
-    DubboDecoderBase<ResponseDecoder, DubboResponse, ResponseDecoderCallback>;
-
-class DubboRequestEncoder : public RequestEncoder, public DubboCodecBase {
+class DubboServerCodec
+    : public DubboDecoderBase<ServerCodec, DubboRequest, DubboResponse, ServerCodecCallbacks> {
 public:
-  using DubboCodecBase::DubboCodecBase;
+  using DubboDecoderBase::DubboDecoderBase;
 
-  void encode(const StreamFrame& request, RequestEncoderCallback& callback) override {
-    ASSERT(dynamic_cast<const DubboRequest*>(&request) != nullptr);
-    const auto* typed_request = static_cast<const DubboRequest*>(&request);
-
-    Buffer::OwnedImpl buffer;
-    codec_->encode(buffer, *typed_request->inner_metadata_);
-    callback.onEncodingSuccess(buffer, true);
-  }
+  ResponsePtr respond(Status status, absl::string_view short_response_flags,
+                      const Request& request) override;
 };
 
-class DubboResponseEncoder : public ResponseEncoder, public DubboCodecBase {
+class DubboClientCodec
+    : public DubboDecoderBase<ClientCodec, DubboResponse, DubboRequest, ClientCodecCallbacks> {
 public:
-  using DubboCodecBase::DubboCodecBase;
-
-  void encode(const StreamFrame& response, ResponseEncoderCallback& callback) override {
-    ASSERT(dynamic_cast<const DubboResponse*>(&response) != nullptr);
-    const auto* typed_response = static_cast<const DubboResponse*>(&response);
-
-    Buffer::OwnedImpl buffer;
-    codec_->encode(buffer, *typed_response->inner_metadata_);
-    callback.onEncodingSuccess(buffer, true);
-  }
-};
-
-class DubboMessageCreator : public MessageCreator {
-public:
-  ResponsePtr response(Status status, const Request& origin_request) override;
+  using DubboDecoderBase::DubboDecoderBase;
 };
 
 class DubboCodecFactory : public CodecFactory {
 public:
-  RequestDecoderPtr requestDecoder() const override {
-    return std::make_unique<DubboRequestDecoder>(
+  ServerCodecPtr createServerCodec() const override {
+    return std::make_unique<DubboServerCodec>(
         Common::Dubbo::DubboCodec::codecFromSerializeType(Common::Dubbo::SerializeType::Hessian2));
   }
-  ResponseDecoderPtr responseDecoder() const override {
-    return std::make_unique<DubboResponseDecoder>(
+  ClientCodecPtr createClientCodec() const override {
+    return std::make_unique<DubboClientCodec>(
         Common::Dubbo::DubboCodec::codecFromSerializeType(Common::Dubbo::SerializeType::Hessian2));
-  }
-  RequestEncoderPtr requestEncoder() const override {
-    return std::make_unique<DubboRequestEncoder>(
-        Common::Dubbo::DubboCodec::codecFromSerializeType(Common::Dubbo::SerializeType::Hessian2));
-  }
-  ResponseEncoderPtr responseEncoder() const override {
-    return std::make_unique<DubboResponseEncoder>(
-        Common::Dubbo::DubboCodec::codecFromSerializeType(Common::Dubbo::SerializeType::Hessian2));
-  }
-  MessageCreatorPtr messageCreator() const override {
-    return std::make_unique<DubboMessageCreator>();
   }
 };
 

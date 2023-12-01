@@ -15,6 +15,7 @@ exports_files([
     ".coveragerc",
     "CODEOWNERS",
     "OWNERS.md",
+    ".github/workflows/_env.yml",
 ])
 
 alias(

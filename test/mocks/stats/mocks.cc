@@ -68,6 +68,8 @@ MockMetricSnapshot::MockMetricSnapshot() {
   ON_CALL(*this, counters()).WillByDefault(ReturnRef(counters_));
   ON_CALL(*this, gauges()).WillByDefault(ReturnRef(gauges_));
   ON_CALL(*this, histograms()).WillByDefault(ReturnRef(histograms_));
+  ON_CALL(*this, hostCounters()).WillByDefault(ReturnRef(host_counters_));
+  ON_CALL(*this, hostGauges()).WillByDefault(ReturnRef(host_gauges_));
   ON_CALL(*this, snapshotTime()).WillByDefault(Return(snapshot_time_));
 }
 

@@ -12,7 +12,6 @@
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/exe/process_wide.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
 #include "source/server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -82,6 +81,9 @@ protected:
   std::unique_ptr<Logger::Context> logging_context_;
   std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
   std::unique_ptr<Server::Instance> server_;
+
+  // Only used for validation mode
+  std::unique_ptr<ProcessContext> process_context_;
 
 private:
   void configureComponentLogLevels();

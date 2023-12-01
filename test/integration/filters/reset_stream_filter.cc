@@ -22,8 +22,8 @@ public:
 class ResetFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
 public:
   ResetFilterConfig() : EmptyHttpDualFilterConfig("reset-stream-filter") {}
-  Http::FilterFactoryCb createDualFilter(const std::string&,
-                                         Server::Configuration::ServerFactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::ResetFilter>());
     };

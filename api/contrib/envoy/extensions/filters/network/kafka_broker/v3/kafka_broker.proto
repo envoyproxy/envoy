@@ -9,7 +9,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.kafka_broker.v3";
 option java_outer_classname = "KafkaBrokerProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/kafka_broker/v3;kafka_brokerv3";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/kafka_broker/v3;kafka_brokerv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Kafka Broker]
@@ -22,4 +22,42 @@ message KafkaBroker {
 
   // The prefix to use when emitting :ref:`statistics <config_network_filters_kafka_broker_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Set to true if broker filter should attempt to serialize the received responses from the
+  // upstream broker instead of passing received bytes as is.
+  // Disabled by default.
+  bool force_response_rewrite = 2;
+
+  // Optional broker address rewrite specification.
+  // Allows the broker filter to rewrite Kafka responses so that all connections established by
+  // the Kafka clients point to Envoy.
+  // This allows Kafka cluster not to configure its 'advertised.listeners' property
+  // (as the necessary re-pointing will be done by this filter).
+  // This collection of rules should cover all brokers in the cluster that is being proxied,
+  // otherwise some nodes' addresses might leak to the downstream clients.
+  oneof broker_address_rewrite_spec {
+    // Broker address rewrite rules that match by broker ID.
+    IdBasedBrokerRewriteSpec id_based_broker_address_rewrite_spec = 3;
+  }
+}
+
+// Collection of rules matching by broker ID.
+message IdBasedBrokerRewriteSpec {
+  repeated IdBasedBrokerRewriteRule rules = 1;
+}
+
+// Defines a rule to rewrite broker address data.
+message IdBasedBrokerRewriteRule {
+  // Broker ID to match.
+  uint32 id = 1 [(validate.rules).uint32 = {gte: 0}];
+
+  // The host value to use (resembling the host part of Kafka's advertised.listeners).
+  // The value should point to the Envoy (not Kafka) listener, so that all client traffic goes
+  // through Envoy.
+  string host = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The port value to use (resembling the port part of Kafka's advertised.listeners).
+  // The value should point to the Envoy (not Kafka) listener, so that all client traffic goes
+  // through Envoy.
+  uint32 port = 3 [(validate.rules).uint32 = {lte: 65535}];
 }

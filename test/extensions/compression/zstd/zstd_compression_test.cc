@@ -28,8 +28,9 @@ class ZstdCompressionTest {
 protected:
   ZstdCompressionTest() : api_(Api::createApiForTest()), dispatcher_(setupDispatcher()) {
     TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
-    EXPECT_CALL(mock_context_, api()).WillRepeatedly(ReturnRef(*api_));
-    EXPECT_CALL(mock_context_, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+    EXPECT_CALL(mock_context_.server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
+    EXPECT_CALL(mock_context_.server_factory_context_, mainThreadDispatcher())
+        .WillRepeatedly(ReturnRef(*dispatcher_));
   }
 
   void drainBuffer(Buffer::OwnedImpl& buffer) {

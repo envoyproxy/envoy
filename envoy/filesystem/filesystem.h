@@ -241,6 +241,9 @@ struct DirectoryEntry {
 };
 
 class DirectoryIteratorImpl;
+
+// Failures during this iteration will be silent; check status() after initialization
+// and after each increment, if error-handling is desired.
 class DirectoryIterator {
 public:
   DirectoryIterator() : entry_({"", FileType::Other, absl::nullopt}) {}
@@ -252,8 +255,11 @@ public:
 
   virtual DirectoryIteratorImpl& operator++() PURE;
 
+  const absl::Status& status() const { return status_; }
+
 protected:
   DirectoryEntry entry_;
+  absl::Status status_;
 };
 
 } // namespace Filesystem

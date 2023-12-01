@@ -20,6 +20,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admin_factory_context",
+    hdrs = ["admin_factory_context.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:instance_interface",
+        "//source/common/config:metadata_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "admin_lib_internal",
     srcs = ["admin.cc"] + envoy_select_admin_html([
         "admin_html.cc",
@@ -28,6 +39,7 @@ envoy_cc_library(
     ]),
     hdrs = ["admin.h"],
     deps = [
+        ":admin_factory_context",
         ":admin_filter_lib",
         ":clusters_handler_lib",
         ":config_dump_handler_lib",
@@ -78,6 +90,7 @@ envoy_cc_library(
         "//source/extensions/http/header_validators/envoy_default:config",
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/extensions/request_id/uuid:config",
+        "//source/server:null_overload_manager_lib",
     ] + envoy_select_admin_html([
         ":admin_html_util",
     ]),
@@ -152,6 +165,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:histogram_lib",
+        "//source/common/upstream:host_utility_lib",
         "@com_google_absl//absl/container:btree",
     ],
 )
@@ -208,6 +222,7 @@ envoy_cc_library(
         "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/stats:histogram_lib",
+        "//source/common/upstream:host_utility_lib",
     ],
 )
 

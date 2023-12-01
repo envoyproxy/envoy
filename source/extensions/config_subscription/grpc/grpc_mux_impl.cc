@@ -91,7 +91,14 @@ void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
   queueDiscoveryRequest(resource_type_url);
 }
 
-void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
+void GrpcMuxImpl::start() {
+  ASSERT(!started_);
+  if (started_) {
+    return;
+  }
+  started_ = true;
+  grpc_stream_.establishNewStream();
+}
 
 void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   if (shutdown_) {

@@ -354,7 +354,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
                                                                                  false);
   }
-  return local_address_selector_factory->createLocalAddressSelector(
+  auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       parseBindConfig(
           bind_config, cluster_name,
           buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
@@ -362,6 +362,8 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{}))),
       cluster_name);
+  THROW_IF_STATUS_NOT_OK(selector_or_error, throw);
+  return selector_or_error.value();
 }
 
 } // namespace
@@ -1082,7 +1084,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                   common_lb_config_->ignore_new_hosts_until_first_hc()),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
-      added_via_api_(added_via_api), has_configured_http_filters_(false) {
+      added_via_api_(added_via_api), has_configured_http_filters_(false),
+      per_endpoint_stats_(config.has_track_cluster_stats() &&
+                          config.track_cluster_stats().per_endpoint_stats()) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(
@@ -1090,6 +1094,14 @@ ClusterInfoImpl::ClusterInfoImpl(
         "on Windows platforms");
   }
 #endif
+
+  // Both LoadStatsReporter and per_endpoint_stats need to `latch()` the counters, so if both are
+  // configured they will interfere with each other and both get incorrect values.
+  if (perEndpointStatsEnabled() &&
+      server_context.bootstrap().cluster_manager().has_load_stats_config()) {
+    throwEnvoyExceptionOrPanic("Only one of cluster per_endpoint_stats and cluster manager "
+                               "load_stats_config can be specified");
+  }
 
   if (config.has_max_requests_per_connection() &&
       http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
@@ -1221,14 +1233,14 @@ ClusterInfoImpl::ClusterInfoImpl(
   // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_->update_merge_window());
 
-  // Create upstream filter factories
+  // Create upstream network filter factories
   const auto& filters = config.filters();
   ASSERT(filter_factories_.empty());
   filter_factories_.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const bool is_terminal = i == filters.size() - 1;
-    ENVOY_LOG(debug, "  upstream filter #{}:", i);
+    ENVOY_LOG(debug, "  upstream network filter #{}:", i);
 
     if (proto_config.has_config_discovery()) {
       if (proto_config.has_typed_config()) {
@@ -1268,7 +1280,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
     if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
       throwEnvoyExceptionOrPanic(
-          fmt::format("The codec filter is the only valid terminal upstream filter"));
+          fmt::format("The codec filter is the only valid terminal upstream HTTP filter"));
     }
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());

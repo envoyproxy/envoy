@@ -34,10 +34,12 @@ Bencoded
 CIO
 deadcode
 DFP
+Dynatrace
 DOM
 Gasd
 GiB
 IPTOS
+OTEL
 Repick
 Reserializer
 SION
@@ -261,6 +263,7 @@ integrations
 iouring
 jkl
 lang
+libcurl
 libsxg
 LLVM
 LPT
@@ -822,6 +825,7 @@ hostnames
 hostset
 hotrestart
 hrefs
+htpasswd
 huffman
 hystrix
 idempotency

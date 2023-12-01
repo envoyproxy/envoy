@@ -111,6 +111,9 @@ public:
     return vh_rate_limits_;
   }
   bool consumeDefaultTokenBucket() const { return always_consume_default_token_bucket_; }
+  const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
+    return rate_limited_grpc_status_;
+  }
 
 private:
   friend class FilterTest;
@@ -147,6 +150,7 @@ private:
   const bool has_descriptors_;
   const bool enable_x_rate_limit_headers_;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
+  const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

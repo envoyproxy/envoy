@@ -52,6 +52,7 @@ envoy_extension_cc_test(
     name = "dynamic_forward_proxy_filter_integration_test",
     srcs = ["proxy_filter_integration_test.cc"],
     extension_names = ["envoy.filters.udp.session.dynamic_forward_proxy"],
+    tags = ["cpu:3"],
     deps = [
         ":dfp_setter_filter_config_lib",
         ":dfp_setter_filter_proto_cc_proto",

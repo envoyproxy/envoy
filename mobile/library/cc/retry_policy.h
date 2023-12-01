@@ -12,22 +12,9 @@ namespace Platform {
 
 class RequestHeaders;
 
-enum RetryRule {
-  Status5xx,
-  GatewayError,
-  ConnectFailure,
-  RefusedStream,
-  Retriable4xx,
-  RetriableHeaders,
-  Reset,
-};
-
-std::string retryRuleToString(RetryRule retry_rule);
-RetryRule retryRuleFromString(const std::string& str);
-
 struct RetryPolicy {
   int max_retry_count;
-  std::vector<RetryRule> retry_on;
+  std::vector<std::string> retry_on;
   std::vector<int> retry_status_codes;
   absl::optional<int> per_try_timeout_ms;
   absl::optional<int> total_upstream_timeout_ms;
