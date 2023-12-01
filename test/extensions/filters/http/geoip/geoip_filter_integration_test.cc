@@ -219,9 +219,9 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
                            ->value()
                            .getStringView());
   EXPECT_EQ("ENG", upstream_request_->headers()
-                           .get(Http::LowerCaseString("x-geo-region"))[0]
-                           ->value()
-                           .getStringView());
+                       .get(Http::LowerCaseString("x-geo-region"))[0]
+                       ->value()
+                       .getStringView());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
