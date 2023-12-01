@@ -114,8 +114,7 @@ QatzipCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
 
 Envoy::Compression::Compressor::CompressorFactoryPtr
 QatzipCompressorLibraryFactory::createCompressorFactoryFromProto(
-    const Protobuf::Message& proto_config,
-    Server::Configuration::FactoryContext& context) override {
+    const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
 
   const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip config =
       MessageUtil::downcastAndValidate<
