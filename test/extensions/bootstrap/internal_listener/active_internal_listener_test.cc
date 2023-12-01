@@ -397,6 +397,7 @@ public:
   std::shared_ptr<AccessLog::MockInstance> access_log_;
   TestScopedRuntime scoped_runtime_;
   Runtime::Loader& runtime_{scoped_runtime_.loader()};
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 TEST_F(ConnectionHandlerTest, DisableInternalListener) {
@@ -410,7 +411,7 @@ TEST_F(ConnectionHandlerTest, DisableInternalListener) {
                   internal_listener->socket_factories_[0].get()),
               localAddress())
       .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_);
+  handler_->addListener(absl::nullopt, *internal_listener, runtime_, random_);
   auto internal_listener_cb = handler_->findByAddress(local_address);
   ASSERT_TRUE(internal_listener_cb.has_value());
 
@@ -438,7 +439,7 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
                   internal_listener->socket_factories_[0].get()),
               localAddress())
       .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_);
+  handler_->addListener(absl::nullopt, *internal_listener, runtime_, random_);
 
   ASSERT_NE(internal_listener, nullptr);
 
@@ -448,7 +449,7 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
       addInternalListener(new_listener_tag, "test_internal_listener", std::chrono::milliseconds(),
                           false, overridden_filter_chain_manager);
 
-  handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
+  handler_->addListener(old_listener_tag, *new_test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
 

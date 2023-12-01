@@ -35,7 +35,7 @@ public:
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
   static FilterPtr fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                             Server::Configuration::CommonFactoryContext& context);
+                             Server::Configuration::FactoryContext& context);
 };
 
 /**
@@ -87,7 +87,7 @@ class OperatorFilter : public Filter {
 public:
   OperatorFilter(
       const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-      Server::Configuration::CommonFactoryContext& context);
+      Server::Configuration::FactoryContext& context);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -99,7 +99,7 @@ protected:
 class AndFilter : public OperatorFilter {
 public:
   AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-            Server::Configuration::CommonFactoryContext& context);
+            Server::Configuration::FactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const Formatter::HttpFormatterContext& context,
@@ -112,7 +112,7 @@ public:
 class OrFilter : public OperatorFilter {
 public:
   OrFilter(const envoy::config::accesslog::v3::OrFilter& config,
-           Server::Configuration::CommonFactoryContext& context);
+           Server::Configuration::FactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const Formatter::HttpFormatterContext& context,
@@ -265,16 +265,8 @@ public:
    * Read a filter definition from proto and instantiate an Instance. This method is used
    * to create access log instances that need access to listener properties.
    */
-  static InstanceSharedPtr
-  fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-            Server::Configuration::ListenerAccessLogFactoryContext& context);
-
-  /**
-   * Read a filter definition from proto and instantiate an Instance. This method does not
-   * have access to listener properties, for example for access loggers of admin interface.
-   */
   static InstanceSharedPtr fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                                     Server::Configuration::CommonFactoryContext& context);
+                                     Server::Configuration::FactoryContext& context);
 
   /**
    * Template method to create an access log filter from proto configuration for non-HTTP access
@@ -283,7 +275,7 @@ public:
   template <class Context>
   static FilterBasePtr<Context>
   accessLogFilterFromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                           Server::Configuration::CommonFactoryContext& context) {
+                           Server::Configuration::FactoryContext& context) {
     if (!config.has_extension_filter()) {
       ExceptionUtil::throwEnvoyException(
           "Access log filter: only extension filter is supported by non-HTTP access loggers.");
@@ -301,7 +293,7 @@ public:
   template <class Context>
   static InstanceBaseSharedPtr<Context>
   accessLoggerFromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                        Server::Configuration::CommonFactoryContext& context) {
+                        Server::Configuration::FactoryContext& context) {
     FilterBasePtr<Context> filter;
     if (config.has_filter()) {
       filter = accessLogFilterFromProto<Context>(config.filter(), context);

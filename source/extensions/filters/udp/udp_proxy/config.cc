@@ -134,6 +134,19 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
     tunneling_config_ = std::make_unique<TunnelingConfigImpl>(config.tunneling_config(), context);
   }
 
+  if (config.has_access_log_options()) {
+    flush_access_log_on_tunnel_connected_ =
+        config.access_log_options().flush_access_log_on_tunnel_connected();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
+  } else {
+    flush_access_log_on_tunnel_connected_ = false;
+  }
+
   for (const auto& filter : config.session_filters()) {
     ENVOY_LOG(debug, "    UDP session filter #{}", filter_factories_.size());
     ENVOY_LOG(debug, "      name: {}", filter.name());

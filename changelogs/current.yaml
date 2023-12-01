@@ -4,6 +4,10 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
+    Remove the hop by hop TE header from downstream request headers. This change can be temporarily reverted
+    by setting ``envoy.reloadable_features.sanitize_te`` to false.
+- area: http
+  change: |
     Flip runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to true. Name downgrading in the
     per filter config searching will be disabled by default. This behavior can be temporarily reverted by setting
     the flag to false explicitly.
@@ -21,6 +25,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: golang
+  change: |
+    Remove Protocol method from RequestHeaderMap.
+    To get the protocol, please use GetProperty("request.protocol") instead.
 - area: aws
   change: |
     uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
@@ -100,7 +108,7 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.expand_agnostic_stream_lifetime`` and legacy code paths.
 - area: http
   change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
+    removed ``envoy.reloadable_features.sanitize_original_path`` and legacy code paths.
 - area: maglev
   change: |
     Removed ``envoy.reloadable_features.allow_compact_maglev`` and legacy code paths.
@@ -159,6 +167,10 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a sampler for the OpenTelemetry tracer.
+- area: CEL-attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``connection.transport_failure_reason``
+    for looking up connection transport failure reason.
 - area: ext_authz
   change: |
     New config parameter :ref:`charge_cluster_response_stats
@@ -196,5 +208,17 @@ new_features:
     response trailers in :ref:`UdpTunnelingConfig
     <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.propagate_response_trailers>` to
     the downstream info filter state.
+- area: tracing
+  change: |
+    Provide initial span attributes to a sampler used in the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.
+- area: udp_proxy
+  change: |
+    add :ref:`access log options
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log_options>`
+    to allow recording an access log entry periodically for the UDP session, and allow recording an access
+    log entry on the connection tunnel created successfully to upstream when UDP tunneling is configured.
 
 deprecated:

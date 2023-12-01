@@ -7,7 +7,7 @@ namespace Envoy {
 
 TEST(EngineCommonTest, SignalHandlingFalse) {
   ExtensionRegistry::registerFactories();
-  auto options = std::make_unique<Envoy::OptionsImpl>();
+  auto options = std::make_unique<Envoy::OptionsImplBase>();
 
   Platform::EngineBuilder builder;
   options->setConfigProto(builder.generateBootstrap());

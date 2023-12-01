@@ -1,6 +1,9 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_objc_test", "envoy_objc_library")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 envoy_mobile_objc_test(
     name = "envoy_bridge_utility_test",

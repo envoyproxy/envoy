@@ -52,7 +52,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 xdsServerPort;
 @property (nonatomic, strong) NSDictionary<NSString *, NSString *> *xdsGrpcInitialMetadata;
 @property (nonatomic, strong, nullable) NSString *xdsSslRootCerts;
-@property (nonatomic, strong, nullable) NSString *xdsSni;
 @property (nonatomic, strong, nullable) NSString *rtdsResourceName;
 @property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
 @property (nonatomic, assign) BOOL enableCds;
@@ -111,7 +110,6 @@ NS_ASSUME_NONNULL_BEGIN
                            xdsGrpcInitialMetadata:
                                (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
-                                           xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                         enableCds:(BOOL)enableCds

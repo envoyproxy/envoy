@@ -12,6 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/admin/admin_factory_context.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/overload_manager_impl.h"
 #include "source/server/regex_engine.h"
@@ -111,7 +112,8 @@ void ValidationInstance::initialize(const Options& options,
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   Configuration::InitialImpl initial_config(bootstrap_);
-  initial_config.initAdminAccessLog(bootstrap_, *this);
+  AdminFactoryContext factory_context(*this);
+  initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
                           Config::ServerExtensionValues::get().VALIDATION_LISTENER)

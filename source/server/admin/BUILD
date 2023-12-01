@@ -20,6 +20,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admin_factory_context",
+    hdrs = ["admin_factory_context.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:instance_interface",
+        "//source/common/config:metadata_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "admin_lib_internal",
     srcs = ["admin.cc"] + envoy_select_admin_html([
         "admin_html.cc",
@@ -28,6 +39,7 @@ envoy_cc_library(
     ]),
     hdrs = ["admin.h"],
     deps = [
+        ":admin_factory_context",
         ":admin_filter_lib",
         ":clusters_handler_lib",
         ":config_dump_handler_lib",
