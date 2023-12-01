@@ -51,16 +51,11 @@ public:
   void expectStats(const std::string& db_type, const uint32_t total_count = 1,
                    const uint32_t hit_count = 1, const uint32_t error_count = 0) {
     auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
-    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat("prefix.maxmind.", db_type, ".total"))
-                  .value(),
+    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".total")).value(),
               total_count);
-    EXPECT_EQ(
-        provider_scope.counterFromString(absl::StrCat("prefix.maxmind.", db_type, ".hit")).value(),
-        hit_count);
-    EXPECT_EQ(
-        provider_scope.counterFromString(absl::StrCat("prefix.maxmind.", db_type, ".lookup_error"))
-            .value(),
-        error_count);
+    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".hit")).value(), hit_count);
+    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".lookup_error")).value(),
+              error_count);
   }
 
   Stats::IsolatedStoreImpl stats_store_;

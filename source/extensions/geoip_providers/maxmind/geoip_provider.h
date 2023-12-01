@@ -70,7 +70,6 @@ private:
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_hit_;
   void incCounter(Stats::StatName name);
 };
