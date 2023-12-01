@@ -90,13 +90,16 @@ public:
                                        OpCodes opcode) PURE;
   virtual void onSetRequest(const std::string& path) PURE;
   virtual void onGetChildrenRequest(const std::string& path, bool watch, bool v2) PURE;
-  virtual absl::Status onGetEphemeralsRequest(const absl::StatusOr<std::string>& path) PURE;
-  virtual absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) PURE;
+  virtual absl::Status onGetEphemeralsRequest(const absl::StatusOr<std::string>& path,
+                                              const OpCodes opcode) PURE;
+  virtual absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path,
+                                                     const OpCodes opcode) PURE;
   virtual void onDeleteRequest(const std::string& path, int32_t version) PURE;
   virtual void onExistsRequest(const std::string& path, bool watch) PURE;
   virtual void onGetAclRequest(const std::string& path) PURE;
   virtual void onSetAclRequest(const std::string& path, int32_t version) PURE;
-  virtual absl::Status onSyncRequest(const absl::StatusOr<std::string>& path) PURE;
+  virtual absl::Status onSyncRequest(const absl::StatusOr<std::string>& path,
+                                     const OpCodes opcode) PURE;
   virtual void onCheckRequest(const std::string& path, int32_t version) PURE;
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;
@@ -187,7 +190,7 @@ private:
   absl::Status ensureMinLength(int32_t len, int32_t minlen) const;
   absl::Status ensureMaxLength(int32_t len) const;
   absl::StatusOr<std::string> pathOnlyRequest(Buffer::Instance& data, uint64_t& offset,
-                                              uint32_t len, OpCodes opcode);
+                                              uint32_t len);
   absl::Status parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                     const std::chrono::milliseconds latency);
   absl::Status parseWatchEvent(Buffer::Instance& data, uint64_t& offset, uint32_t len, int64_t zxid,

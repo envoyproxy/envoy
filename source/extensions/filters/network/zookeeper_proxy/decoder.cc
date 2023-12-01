@@ -180,7 +180,7 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
         status, fmt::format("parseSetAclRequest: {}", status.message()));
     break;
   case OpCodes::Sync:
-    status = callbacks_.onSyncRequest(pathOnlyRequest(data, offset, len.value(), opcode));
+    status = callbacks_.onSyncRequest(pathOnlyRequest(data, offset, len.value()), opcode);
     RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status,
                                             fmt::format("onSyncRequest: {}", status.message()));
     break;
@@ -225,13 +225,13 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
         status, fmt::format("parseXWatchesRequest (remove watches): {}", status.message()));
     break;
   case OpCodes::GetEphemerals:
-    status = callbacks_.onGetEphemeralsRequest(pathOnlyRequest(data, offset, len.value(), opcode));
+    status = callbacks_.onGetEphemeralsRequest(pathOnlyRequest(data, offset, len.value()), opcode);
     RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
         status, fmt::format("onGetEphemeralsRequest: {}", status.message()));
     break;
   case OpCodes::GetAllChildrenNumber:
-    status = callbacks_.onGetAllChildrenNumberRequest(
-        pathOnlyRequest(data, offset, len.value(), opcode));
+    status = callbacks_.onGetAllChildrenNumberRequest(pathOnlyRequest(data, offset, len.value()),
+                                                      opcode);
     RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
         status, fmt::format("onGetAllChildrenNumberRequest: {}", status.message()));
     break;
@@ -592,10 +592,11 @@ absl::Status DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& o
 }
 
 absl::StatusOr<std::string> DecoderImpl::pathOnlyRequest(Buffer::Instance& data, uint64_t& offset,
-                                                         uint32_t len, OpCodes opcode) {
+                                                         uint32_t len) {
   absl::Status status = ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH);
-  EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-      status, opcode,
+
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+      status,
       fmt::format("zookeeper_proxy: path only request decoding exception {}", status.message()));
 
   return helper_.peekString(data, offset);
