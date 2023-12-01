@@ -10,7 +10,10 @@ envoy_contrib_package()
 
 envoy_cc_test(
     name = "qatzip_compressor_impl_test",
-    srcs = ["qatzip_compressor_impl_test.cc"],
+    srcs = select({
+        "//bazel:linux_x86_64": ["qatzip_compressor_impl_test.cc"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//contrib/qat/compression/qatzip/compressor/source:config",
         "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",
