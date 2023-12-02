@@ -349,7 +349,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   size_t i = 0;
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
-  for (const std::string& status : {"100", "199", "100"}) {
+  for (const std::string status : {"100", "199", "100"}) {
     spdy::Http2HeaderBlock continue_header;
     continue_header[":status"] = status;
     continue_header["i"] = absl::StrCat("", i++);
