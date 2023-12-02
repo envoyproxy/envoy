@@ -133,7 +133,12 @@ removed_config_or_runtime:
 new_features:
 - area: aws
   change: |
-    Added support for AWS common utility to fetch metadata credentials from AWS STS by using ``WebIdentityToken``.
+    Added support for AWS common utility to fetch metadata credentials from AWS STS by using ``WebIdentityToken``. To enable you need to set
+    ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to ``true`` so that web identity credentials provider can use http async
+    client to fetch credentials. Web identity credentials provider cannot use current default libcurl credentials fetcher which is
+    under deprecation and will soon be removed. Web identity credentials provider is not compatible with :ref:`Grpc Credentials AWS IAM
+    <envoy_v3_api_file_envoy/config/grpc_credential/v3/aws_iam.proto>` plugin which can only support deprecated libcurl credentials fetcher,
+    see https://github.com/envoyproxy/envoy/pull/30626.
 - area: filters
   change: |
     Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to

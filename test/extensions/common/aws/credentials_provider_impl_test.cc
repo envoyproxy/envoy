@@ -475,6 +475,7 @@ public:
         }));
   }
 
+  TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
@@ -1184,7 +1185,6 @@ public:
     EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
   }
 
-  TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
@@ -1503,6 +1503,7 @@ public:
         }));
   }
 
+  TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
@@ -1858,7 +1859,6 @@ public:
     EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
   }
 
-  TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
@@ -1999,6 +1999,8 @@ public:
   }
 
   void setupProvider() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
         *api_, context_,
@@ -2021,6 +2023,22 @@ public:
     setupProvider();
     expected_duration_ = provider_->getCacheDuration();
     init_target_handle_->initialize(init_watcher_);
+  }
+
+  void setupProviderWithLibcurl() {
+    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    provider_ = std::make_shared<WebIdentityCredentialsProvider>(
+        *api_, context_,
+        [this](Http::RequestMessage& message) -> absl::optional<std::string> {
+          return this->fetch_metadata_.fetch(message);
+        },
+        [this](Upstream::ClusterManager&, absl::string_view) {
+          metadata_fetcher_.reset(raw_metadata_fetcher_);
+          return std::move(metadata_fetcher_);
+        },
+        TestEnvironment::writeStringToFileForTest("web_token_file", "web_token"),
+        "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn", "role-session-name",
+        "credentials_provider_cluster");
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document) {
@@ -2677,9 +2695,7 @@ TEST_F(WebIdentityCredentialsProviderTest, TimestampCredentialExpiration) {
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, LibcurlEnabled) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials", "true"}});
-  setupProvider();
+  setupProviderWithLibcurl();
   // Won't call fetch or cancel on metadata fetcher.
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
