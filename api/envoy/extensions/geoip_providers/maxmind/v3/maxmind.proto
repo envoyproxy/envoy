@@ -23,7 +23,13 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // :ref:`anon_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path>` must be configured.
 // [#extension: envoy.geoip_providers.maxmind]
 
+// [#next-free-field: 6]
 message MaxMindConfig {
+  // Full file path to the Maxmind country database, e.g. /etc/GeoLite2-Country.mmdb.
+  // Database file is expected to have .mmdb extension.
+  // Note that only one of country_db_path and city_db_path can be set.
+  string country_db_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+
   // Full file path to the Maxmind city database, e.g. /etc/GeoLite2-City.mmdb.
   // Database file is expected to have .mmdb extension.
   string city_db_path = 1 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];

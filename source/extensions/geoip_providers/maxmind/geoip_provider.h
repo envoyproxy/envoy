@@ -18,6 +18,7 @@ public:
   GeoipProviderConfig(const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
                       const std::string& stat_prefix, Stats::Scope& scope);
 
+  const absl::optional<std::string>& countryDbPath() const { return country_db_path_; }
   const absl::optional<std::string>& cityDbPath() const { return city_db_path_; }
   const absl::optional<std::string>& ispDbPath() const { return isp_db_path_; }
   const absl::optional<std::string>& anonDbPath() const { return anon_db_path_; }
@@ -53,6 +54,7 @@ public:
   Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
 
 private:
+  absl::optional<std::string> country_db_path_;
   absl::optional<std::string> city_db_path_;
   absl::optional<std::string> isp_db_path_;
   absl::optional<std::string> anon_db_path_;
@@ -83,6 +85,7 @@ class GeoipProvider : public Envoy::Geolocation::Driver,
 public:
   GeoipProvider(Singleton::InstanceSharedPtr owner, GeoipProviderConfigSharedPtr config)
       : config_(config), owner_(owner) {
+    country_db_ = initMaxMindDb(config_->countryDbPath());
     city_db_ = initMaxMindDb(config_->cityDbPath());
     isp_db_ = initMaxMindDb(config_->ispDbPath());
     anon_db_ = initMaxMindDb(config_->anonDbPath());
@@ -97,10 +100,13 @@ private:
   // Allow the unit test to have access to private members.
   friend class GeoipProviderPeer;
   GeoipProviderConfigSharedPtr config_;
+  MaxmindDbPtr country_db_;
   MaxmindDbPtr city_db_;
   MaxmindDbPtr isp_db_;
   MaxmindDbPtr anon_db_;
   MaxmindDbPtr initMaxMindDb(const absl::optional<std::string>& db_path);
+  void lookupInCountryDb(const Network::Address::InstanceConstSharedPtr& remote_address,
+                         absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInCityDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAsnDb(const Network::Address::InstanceConstSharedPtr& remote_address,

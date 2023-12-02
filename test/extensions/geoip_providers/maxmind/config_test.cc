@@ -25,6 +25,9 @@ public:
   static const absl::optional<std::string>& cityDbPath(const GeoipProvider& provider) {
     return provider.config_->cityDbPath();
   }
+  static const absl::optional<std::string>& countryDbPath(const GeoipProvider& provider) {
+    return provider.config_->countryDbPath();
+  }
   static const absl::optional<std::string>& ispDbPath(const GeoipProvider& provider) {
     return provider.config_->ispDbPath();
   }
@@ -56,6 +59,17 @@ public:
     return provider.config_->anonHostingHeader();
   }
 };
+
+MATCHER_P(HasCountryDbPath, expected_db_path, "") {
+  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
+  auto country_db_path = GeoipProviderPeer::countryDbPath(*provider);
+  if (country_db_path && testing::Matches(expected_db_path)(country_db_path.value())) {
+    return true;
+  }
+  *result_listener << "expected country_db_path=" << expected_db_path
+                   << " but country_db_path was not found in provider config";
+  return false;
+}
 
 MATCHER_P(HasCityDbPath, expected_db_path, "") {
   auto provider = std::static_pointer_cast<GeoipProvider>(arg);
@@ -241,7 +255,29 @@ TEST(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
   EXPECT_THROW_WITH_MESSAGE(factory.createGeoipProviderDriver(provider_config, "maxmind", context),
                             Envoy::EnvoyException,
                             "At least one geolocation database path needs to be configured: "
-                            "city_db_path, isp_db_path or anon_db_path");
+                            "country_db_path, city_db_path, isp_db_path or anon_db_path");
+}
+
+TEST(MaxmindProviderConfigTest, ProviderConfigWithBothCountryDbAndCityDbConfigured) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    country_db_path: %s
+    city_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto country_db_path = genGeoDbFilePath("GeoLite2-Country-Test.mmdb");
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto processed_provider_config_yaml =
+      absl::StrFormat(provider_config_yaml, country_db_path, city_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  MaxmindProviderFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(factory.createGeoipProviderDriver(provider_config, "maxmind", context),
+                            Envoy::EnvoyException,
+                            "At most one of country_db_path and city_db_path can be configured");
 }
 
 TEST(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {

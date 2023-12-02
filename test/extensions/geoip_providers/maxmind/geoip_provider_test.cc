@@ -297,6 +297,27 @@ TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
   EXPECT_DEATH(initializeProvider(config_yaml), ".*Unable to open Maxmind database file.*");
 }
 
+TEST_F(GeoipProviderTest, ValidConfigCountryDbSuccessfulLookup) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-Country-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(1, captured_lookup_response_.size());
+  const auto& country_it = captured_lookup_response_.find("x-geo-country");
+  EXPECT_EQ("GB", country_it->second);
+  expectStats("country_db");
+}
+
 } // namespace Maxmind
 } // namespace GeoipProviders
 } // namespace Extensions
