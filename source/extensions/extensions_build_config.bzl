@@ -283,6 +283,15 @@ EXTENSIONS = {
     # Transport sockets
     #
 
+    "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
+    "envoy.transport_sockets.http_11_proxy":            "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
+    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
+    "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
+    "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
+    "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
+    "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
+    "envoy.transport_sockets.internal_upstream":        "//source/extensions/transport_sockets/internal_upstream:config",
+
     #
     # Retry host predicates
     #

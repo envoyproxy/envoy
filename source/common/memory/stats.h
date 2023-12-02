@@ -65,16 +65,16 @@ public:
       tcmalloc_thread_->join();
     }
   }
-  /**
-   * Configures tcmalloc release rate from the page heap. If `background_release_rate_`
-   * has been initialized to `0`, no heap memory will be release in background.
-   */
-  void configureBackgroundMemoryRelease();
 
 private:
   Thread::ThreadFactory& thread_factory_;
   const uint64_t background_release_rate_;
   Thread::ThreadPtr tcmalloc_thread_;
+  /**
+   * Configures tcmalloc release rate from the page heap. If `background_release_rate_`
+   * has been initialized to `0`, no heap memory will be release in background.
+   */
+  void configureBackgroundMemoryRelease();
 };
 
 } // namespace Memory
