@@ -43,9 +43,15 @@ public:
     // Test the factory method.
     {
       SetFilterStateConfig factory;
-      EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, "", context_).ok());
-      EXPECT_TRUE(factory.createFilterFactoryFromProtoWithServerContext(
-          proto_config, "", context_.server_factory_context_));
+      auto cb_1 = factory.createFilterFactoryFromProto(proto_config, "", context_);
+      auto cb_2 = factory.createFilterFactoryFromProtoWithServerContext(
+          proto_config, "", context_.server_factory_context_);
+
+      NiceMock<Http::MockFilterChainFactoryCallbacks> filter_chain_factory_callbacks;
+
+      EXPECT_CALL(filter_chain_factory_callbacks, addStreamDecoderFilter(_)).Times(2);
+      cb_1.value()(filter_chain_factory_callbacks);
+      cb_2(filter_chain_factory_callbacks);
     }
 
     Server::GenericFactoryContextImpl generic_context(context_);
