@@ -2898,7 +2898,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScan) {
   // Creating various load balancer objects with different choice configs.
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
-  // Enable full table scan on hosts
+  // Enable full table scan on hosts.
   lr_lb_config.mutable_enable_full_scan()->set_value(true);
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
@@ -2914,19 +2914,59 @@ TEST_P(LeastRequestLoadBalancerTest, FullScan) {
   LeastRequestLoadBalancer lb_6{priority_set_, nullptr, stats_,       runtime_,
                                 random_,       1,       lr_lb_config, simTime()};
 
-  // random is called only once every time and is not to select the host.
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
+  // With full scan we will always choose the host with least number of active requests.
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_4.chooseHost(nullptr));
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_6.chooseHost(nullptr));
+}
+
+TEST_P(LeastRequestLoadBalancerTest, FullScanReturnDifferentHostWhenRequestsAreEqual) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[2]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[3]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[4]->stats().rq_active_.set(3);
+
+  // Creating various load balancer objects with different choice configs.
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  lr_lb_config.mutable_choice_count()->set_value(2);
+  // Enable full table scan on hosts.
+  lr_lb_config.mutable_enable_full_scan()->set_value(true);
+  common_config_.mutable_healthy_panic_threshold()->set_value(0);
+
+  LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
+                              random_,       1,       lr_lb_config, simTime()};
+
+  // random is called every time to choose the first host.
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(1))
+      .WillOnce(Return(1))
+      .WillOnce(Return(2))
+      .WillOnce(Return(2))
+      .WillOnce(Return(3))
+      .WillOnce(Return(3))
+      .WillOnce(Return(4))
+      .WillOnce(Return(4))
+      .WillOnce(Return(5))
+      .WillOnce(Return(5));
+
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[4], lb.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {

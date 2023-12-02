@@ -101,6 +101,11 @@ bug_fixes:
     used for retrieval. This caused cache misses on initial use, even though the host DNS entry
     was pre-resolved. The fix is guarded by runtime guard ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns``,
     which defaults to true.
+- area: upstream
+  change: |
+    Fixed a bug (https://github.com/envoyproxy/envoy/pull/11006) that caused the Least Request load balancer policy to choose
+    the first host of the list when the number of requests are the same during a full scan. Start the selection from a random
+    index instead of 0.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
