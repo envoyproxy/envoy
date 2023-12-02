@@ -414,9 +414,7 @@ private:
   ServerFactoryContextImpl server_contexts_;
   bool enable_reuse_port_default_{false};
   Regex::EnginePtr regex_engine_;
-
   bool stats_flush_in_progress_ : 1;
-
   Memory::Allocator memory_allocator_;
 
   template <class T>

@@ -864,7 +864,7 @@ void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path
   }
 }
 
-void InstanceImpl::configureBackgroundMemoryRelease() {
+void InstanceBase::configureBackgroundMemoryRelease() {
   uint64_t background_release_rate_bytes_per_second =
       bootstrap_.memory_allocator_manager().background_release_rate_bytes_per_second();
   memory_allocator_.configureBackgroundMemoryRelease(background_release_rate_bytes_per_second);
