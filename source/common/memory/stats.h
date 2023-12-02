@@ -55,7 +55,10 @@ public:
 
 class Allocator {
 public:
-  Allocator(Thread::ThreadFactory& thread_factory) : thread_factory_(thread_factory){};
+  Allocator(Thread::ThreadFactory& thread_factory, const uint64_t background_release_rate)
+      : thread_factory_(thread_factory), background_release_rate_(background_release_rate) {
+    configureBackgroundMemoryRelease();
+  };
 
   ~Allocator() {
     if (tcmalloc_thread_ != nullptr) {
@@ -63,15 +66,14 @@ public:
     }
   }
   /**
-   * Configures tcmalloc release rate from the page heap. If `background_release_rate`
-   * is passed as `0`, not heap memory will be release in background.
-   *
-   * @param background_release_rate memory release rate in bytes per second.
+   * Configures tcmalloc release rate from the page heap. If `background_release_rate_`
+   * has been initialized to `0`, no heap memory will be release in background.
    */
-  void configureBackgroundMemoryRelease(const uint64_t background_release_rate);
+  void configureBackgroundMemoryRelease();
 
 private:
   Thread::ThreadFactory& thread_factory_;
+  const uint64_t background_release_rate_;
   Thread::ThreadPtr tcmalloc_thread_;
 };
 

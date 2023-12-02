@@ -47,13 +47,13 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", tcmalloc::MallocExtension::GetStats());
 }
 
-void Allocator::configureBackgroundMemoryRelease(const uint64_t background_release_rate) {
+void Allocator::configureBackgroundMemoryRelease() {
   ASSERT(!tcmalloc_thread_);
-  if (background_release_rate > 0) {
+  if (background_release_rate_ > 0) {
     tcmalloc::MallocExtension::SetBackgroundReleaseRate(
-        tcmalloc::MallocExtension::BytesPerSecond{background_release_rate});
+        tcmalloc::MallocExtension::BytesPerSecond{background_release_rate_});
     ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second",
-                   background_release_rate);
+                   background_release_rate_);
     // This routine needs to be invoked for background memory release to be operative.
     // `ProcessBackgroundActions` routine needs to be invoked for background memory release to be
     // operative. https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h#L635
@@ -119,13 +119,13 @@ void Stats::dumpStatsToLog() {
 
 }
 
-void configureBackgroundMemoryRelease(const uint64_t background_release_rate) {
+void configureBackgroundMemoryRelease() {
   RELEASE_ASSERT(!tcmalloc_thread_);
-  if (background_release_rate > 0) {
+  if (background_release_rate_ > 0) {
     MallocExtension::instance()->SetBackgroundReleaseRate(
-        MallocExtension::instance()->BytesPerSecond{background_release_rate});
+        MallocExtension::instance()->BytesPerSecond{background_release_rate_});
     ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second",
-                   background_release_rate);
+                   background_release_rate_);
     // `ProcessBackgroundActions` routine needs to be invoked for background memory release to be
     // operative. https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h#L635
     tcmalloc_thread_ = thread_factory_.createThread(

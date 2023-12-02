@@ -336,7 +336,6 @@ private:
       Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
-  void configureBackgroundMemoryRelease();
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
 

@@ -104,7 +104,11 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
       enable_reuse_port_default_(true), stats_flush_in_progress_(false),
-      memory_allocator_(api_->threadFactory()) {}
+      memory_allocator_(
+          api_->threadFactory(),
+          bootstrap_.has_memory_allocator_manager()
+              ? bootstrap_.memory_allocator_manager().background_release_rate_bytes_per_second()
+              : 0) {}
 
 InstanceBase::~InstanceBase() {
   terminate();
@@ -438,10 +442,6 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
-
-  if (bootstrap_.has_memory_allocator_manager()) {
-    configureBackgroundMemoryRelease();
-  }
 
   if (bootstrap_.has_application_log_config()) {
     THROW_IF_NOT_OK(
@@ -862,12 +862,6 @@ void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path
     ENVOY_LOG(info, "starting server in drain mode");
     InstanceBase::failHealthcheck(true);
   }
-}
-
-void InstanceBase::configureBackgroundMemoryRelease() {
-  uint64_t background_release_rate_bytes_per_second =
-      bootstrap_.memory_allocator_manager().background_release_rate_bytes_per_second();
-  memory_allocator_.configureBackgroundMemoryRelease(background_release_rate_bytes_per_second);
 }
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
