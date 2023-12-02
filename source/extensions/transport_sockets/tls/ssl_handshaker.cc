@@ -29,9 +29,28 @@ void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
   extended_socket_info_->onCertificateValidationCompleted(succeeded, true);
 }
 
+void CertSelectionCallbackImpl::onSslHandshakeCancelled() { extended_socket_info_.reset(); }
+
+void CertSelectionCallbackImpl::onCertSelectionResult(Ssl::OnDemandSslCtxSharedPtr ctx) {
+  ENVOY_LOG(debug, "onCertSelectionResult");
+  if (!extended_socket_info_.has_value()) {
+    ENVOY_LOG(debug, "extended socket info is gone, maybe connection terminated");
+    return;
+  }
+  if (ctx != nullptr) {
+    ctx->initCtx(ctx_);
+    // Apply the selected context.
+    RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_, ctx->getCtx()) != nullptr, "");
+  }
+  extended_socket_info_->onCertSelectionCompleted(ctx != nullptr);
+}
+
 SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
   if (cert_validate_result_callback_.has_value()) {
     cert_validate_result_callback_->onSslHandshakeCancelled();
+  }
+  if (cert_selection_callback_.has_value()) {
+    cert_selection_callback_->onSslHandshakeCancelled();
   }
 }
 
@@ -61,6 +80,36 @@ Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCa
       ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
   cert_validate_result_callback_ = *callback;
   cert_validation_result_ = Ssl::ValidateStatus::Pending;
+  return callback;
+}
+
+void SslExtendedSocketInfoImpl::onCertSelectionCompleted(bool succeeded) {
+  RELEASE_ASSERT(cert_selection_result_ != Ssl::CertSelectionStatus::Successful &&
+                     cert_selection_result_ != Ssl::CertSelectionStatus::Failed,
+                 "onCertSelectionCompleted twice");
+  bool async = cert_selection_result_ == Ssl::CertSelectionStatus::Pending;
+  if (cert_selection_callback_.has_value()) {
+    cert_selection_callback_.reset();
+    // Resume handshake.
+    if (async) {
+      ssl_handshaker_.handshakeCallbacks()->onAsynchronousCertSelectionComplete();
+    }
+  }
+  cert_selection_result_ =
+      succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;
+}
+
+void SslExtendedSocketInfoImpl::setCertSelectionAsync() {
+  RELEASE_ASSERT(cert_selection_result_ == Ssl::CertSelectionStatus::NotStarted,
+                 "unexpected cert selection result");
+  cert_selection_result_ = Ssl::CertSelectionStatus::Pending;
+}
+
+Ssl::CertSelectionCallbackPtr
+SslExtendedSocketInfoImpl::createCertSelectionCallback(SSL* ssl, Ssl::ContextSharedPtr ctx) {
+  auto callback = std::make_unique<CertSelectionCallbackImpl>(
+      ssl, ctx, ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
+  cert_selection_callback_ = *callback;
   return callback;
 }
 
@@ -95,6 +144,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
       return PostIoAction::KeepOpen;
+    case SSL_ERROR_PENDING_CERTIFICATE:
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
       state_ = Ssl::SocketState::HandshakeInProgress;

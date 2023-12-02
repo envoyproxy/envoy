@@ -1,0 +1,420 @@
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/ssl/handshaker.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+
+#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
+#include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
+#include "test/extensions/transport_sockets/tls/test_data/ca_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/extensions_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/password_protected_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns2_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns3_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns4_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns_rsa_2_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_multiple_dns_1_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_uri_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
+#include "test/mocks/buffer/mocks.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
+#include "test/mocks/network/io_handle.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
+
+#include "absl/strings/str_replace.h"
+#include "absl/types/optional.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "openssl/ssl.h"
+#include "xds/type/v3/typed_struct.pb.h"
+
+using testing::_;
+using testing::ContainsRegex;
+using testing::DoAll;
+using testing::InSequence;
+using testing::Invoke;
+using testing::MockFunction;
+using testing::NiceMock;
+using testing::Ref;
+using testing::Return;
+using testing::ReturnRef;
+using testing::StrictMock;
+using testing::WithArg;
+
+namespace Envoy {
+namespace Ssl {
+namespace TLSContextProvider {
+
+class TestOnDemandSslCtxImpl : public virtual Ssl::OnDemandSslCtx {
+public:
+  TestOnDemandSslCtxImpl() {}
+  void initCtx(Ssl::ContextSharedPtr ctx) override {
+    if (inited_) {
+      return;
+    }
+    inited_ = true;
+
+    ctx->initSslContext(ssl_ctx_);
+  }
+
+  SSL_CTX* getCtx() override { return ssl_ctx_; }
+
+  SSL_CTX* ssl_ctx_;
+
+private:
+  bool inited_{false};
+};
+
+using TestOnDemandSslCtxSharedPtr = std::shared_ptr<TestOnDemandSslCtxImpl>;
+
+class TestTlsContextProvider : public virtual Ssl::TlsContextProvider {
+public:
+  TestTlsContextProvider(const ProtobufWkt::Any& typed_config,
+                         TlsContextProviderFactoryContext& factory_context)
+      : ssl_ctx_(std::make_shared<TestOnDemandSslCtxImpl>()), config_(typed_config),
+        factory_context_(factory_context) {}
+  SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*, CertSelectionCallbackPtr cb) override {
+    ENVOY_LOG_MISC(info, "debug: select context");
+
+    switch (mod_) {
+    case Ssl::SelectionResult::Continue:
+      ENVOY_LOG_MISC(info, "debug: select cert done");
+      cb->onCertSelectionResult(ssl_ctx_);
+      break;
+    case Ssl::SelectionResult::Stop:
+      ENVOY_LOG_MISC(info, "debug: select cert async");
+      cb_ = std::move(cb);
+      cb_->dispatcher().post([this] { selectTlsContextAsync(); });
+      break;
+    default:
+      break;
+    }
+    return mod_;
+  };
+
+  void selectTlsContextAsync() {
+    ENVOY_LOG_MISC(info, "debug: select cert async done");
+    cb_->onCertSelectionResult(ssl_ctx_);
+    cb_.reset();
+  }
+
+  TestOnDemandSslCtxSharedPtr ssl_ctx_;
+  Ssl::SelectionResult mod_;
+
+private:
+  const ProtobufWkt::Any& config_;
+  TlsContextProviderFactoryContext& factory_context_;
+  CertSelectionCallbackPtr cb_;
+};
+
+class TestTlsContextProviderFactory : public Ssl::TlsContextProviderFactory {
+public:
+  using CreateProviderHook =
+      std::function<void(const ProtobufWkt::Any&, TlsContextProviderFactoryContext&,
+                         ProtobufMessage::ValidationVisitor&)>;
+
+  TlsContextProviderFactoryCb
+  createTlsContextProviderCb(const ProtobufWkt::Any& config,
+                             TlsContextProviderFactoryContext& tls_context_provider_factory_context,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    if (provider_cb_) {
+      provider_cb_(config, tls_context_provider_factory_context, validation_visitor);
+    }
+    return [&config, &tls_context_provider_factory_context, this]() {
+      ENVOY_LOG_MISC(info, "debug: init provider");
+      provider_ =
+          std::make_shared<TestTlsContextProvider>(config, tls_context_provider_factory_context);
+      provider_->ssl_ctx_->ssl_ctx_ = tls_context_.ssl_ctx_.get();
+      provider_->mod_ = mod_;
+      return provider_;
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<xds::type::v3::TypedStruct>();
+  }
+  std::string name() const override { return "test-tls-context-provider"; };
+
+  CreateProviderHook provider_cb_;
+  Extensions::TransportSockets::Tls::TlsContext tls_context_;
+  Ssl::SelectionResult mod_;
+
+  std::shared_ptr<TestTlsContextProvider> provider_;
+};
+
+Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
+                                    Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+                                    const Network::ListenerConfig& listener_config,
+                                    Server::ThreadLocalOverloadStateOptRef overload_state,
+                                    Random::RandomGenerator& rng, Event::Dispatcher& dispatcher) {
+  return std::make_unique<Network::TcpListenerImpl>(
+      dispatcher, rng, runtime, socket, cb, listener_config.bindToPort(),
+      listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
+}
+
+void loadTlsCert(Extensions::TransportSockets::Tls::TlsContext* tls_context,
+                 Server::Configuration::TransportSocketFactoryContext& server_factory_context) {
+  const std::string server_tls_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_ctx_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_tls_ctx_yaml),
+                            server_tls_ctx_context);
+  auto server_tls_ctx_cfg =
+      std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+          server_tls_ctx_context, server_factory_context);
+
+  const auto& tls_certificate = server_tls_ctx_cfg->tlsCertificates()[0].get();
+  tls_context->ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
+  tls_context->loadCertificateChain(tls_certificate.certificateChain(),
+                                    tls_certificate.certificateChainPath());
+  tls_context->loadPrivateKey(tls_certificate.privateKey(), tls_certificate.privateKeyPath(),
+                              tls_certificate.password());
+}
+
+class TlsContextProviderFactoryTest
+    : public testing::Test,
+      public testing::WithParamInterface<Network::Address::IpVersion> {
+protected:
+  TlsContextProviderFactoryTest()
+      : context_manager_(
+            std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_)),
+        registered_factory_(provider_factory_), version_(GetParam()) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+  }
+
+  void testUtil(Ssl::SelectionResult mod) {
+    const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    custom_tls_context_provider:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        value:
+          certificate_chain:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+          private_key:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+    const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+)EOF";
+
+    Event::SimulatedTimeSystem time_system;
+
+    Stats::TestUtil::TestStore server_stats_store;
+    Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
+    NiceMock<Runtime::MockLoader> runtime;
+    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+        server_factory_context;
+    ON_CALL(server_factory_context.server_context_, api()).WillByDefault(ReturnRef(*server_api));
+
+    ENVOY_LOG_MISC(info, "debug: 1");
+
+    MockFunction<TestTlsContextProviderFactory::CreateProviderHook> mock_factory_cb;
+    provider_factory_.provider_cb_ = mock_factory_cb.AsStdFunction();
+
+    EXPECT_CALL(mock_factory_cb, Call)
+        .WillOnce(WithArg<1>([&](Ssl::TlsContextProviderFactoryContext& context) {
+          // Check that the objects available via the context are the same ones
+          // provided to the parent context.
+          EXPECT_THAT(context.api(), Ref(*server_api));
+        }));
+
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+    // provider factory callback will be Called here.
+    auto server_cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        server_tls_context, server_factory_context);
+
+    ENVOY_LOG_MISC(info, "debug: 2");
+
+    EXPECT_EQ(true, server_tls_context.common_tls_context().has_custom_tls_context_provider());
+
+    loadTlsCert(&provider_factory_.tls_context_, server_factory_context);
+
+    // test mod: terminate
+    // auto mod = Ssl::SelectionResult::Continue;
+    provider_factory_.mod_ = mod;
+
+    Extensions::TransportSockets::Tls::ContextManagerImpl manager(*time_system);
+    Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
+    Extensions::TransportSockets::Tls::ServerSslSocketFactory server_ssl_socket_factory(
+        std::move(server_cfg), manager, *server_stats_store.rootScope(),
+        std::vector<std::string>{});
+
+    ENVOY_LOG_MISC(info, "debug: 3");
+
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(version_));
+    Network::MockTcpListenerCallbacks callbacks;
+    NiceMock<Network::MockListenerConfig> listener_config;
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    Network::ListenerPtr listener =
+        createListener(socket, callbacks, runtime, listener_config, overload_state,
+                       server_api->randomGenerator(), *dispatcher);
+
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+
+    Stats::TestUtil::TestStore client_stats_store;
+    Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
+    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+        client_factory_context;
+    ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+
+    auto client_cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+        client_tls_context, client_factory_context);
+    Extensions::TransportSockets::Tls::ClientSslSocketFactory client_ssl_socket_factory(
+        std::move(client_cfg), manager, *client_stats_store.rootScope());
+    Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
+        socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+        client_ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+    Network::ConnectionPtr server_connection;
+    Network::MockConnectionCallbacks server_connection_callbacks;
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    EXPECT_CALL(callbacks, onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          auto ssl_socket = server_ssl_socket_factory.createDownstreamTransportSocket();
+          // configureInitialCongestionWindow is an unimplemented empty function, this is just to
+          // increase code coverage.
+          ssl_socket->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
+          server_connection = dispatcher->createServerConnection(
+              std::move(socket), std::move(ssl_socket), stream_info);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        }));
+    EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+    Network::MockConnectionCallbacks client_connection_callbacks;
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    client_connection->connect();
+
+    ENVOY_LOG_MISC(info, "debug: 4");
+
+    size_t connect_count = 0;
+    auto connect_second_time = [&]() {
+      ENVOY_LOG_MISC(debug, "connect count: {}", connect_count);
+      if (++connect_count == 2) {
+        // By default, the session is not created with session resumption. The
+        // client should see a session ID but the server should not.
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+        EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        dispatcher->exit();
+      }
+    };
+
+    size_t close_count = 0;
+    auto close_second_time = [&close_count, &dispatcher]() {
+      if (++close_count == 2) {
+        dispatcher->exit();
+      }
+    };
+
+    if (false) {
+      EXPECT_CALL(client_connection_callbacks, onEvent)
+          .WillRepeatedly(Invoke([&](Network::ConnectionEvent e) -> void {
+            ENVOY_LOG_MISC(info, "client onEvent {}", static_cast<int>(e));
+            connect_second_time();
+          }));
+
+      EXPECT_CALL(server_connection_callbacks, onEvent)
+          .WillRepeatedly(Invoke([&](Network::ConnectionEvent e) -> void {
+            ENVOY_LOG_MISC(info, "server onEvent {}", static_cast<int>(e));
+            connect_second_time();
+          }));
+    } else {
+      if (mod == Ssl::SelectionResult::Terminate) {
+        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+      } else {
+        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+      }
+    }
+
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+  }
+
+  Event::GlobalTimeSystem time_system_;
+  Stats::IsolatedStoreImpl stats_store_;
+  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
+  TestTlsContextProviderFactory provider_factory_;
+  Registry::InjectFactory<Ssl::TlsContextProviderFactory> registered_factory_;
+  TestScopedRuntime scoped_runtime_;
+
+  Network::Address::IpVersion version_;
+};
+
+TEST_P(TlsContextProviderFactoryTest, Continue) { testUtil(Ssl::SelectionResult::Continue); }
+
+TEST_P(TlsContextProviderFactoryTest, Terminate) { testUtil(Ssl::SelectionResult::Terminate); }
+
+TEST_P(TlsContextProviderFactoryTest, Stop) { testUtil(Ssl::SelectionResult::Stop); }
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TlsContextProviderFactoryTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+} // namespace TLSContextProvider
+} // namespace Ssl
+} // namespace Envoy

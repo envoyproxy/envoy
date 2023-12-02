@@ -44,6 +44,12 @@ public:
    * asynchronous.
    */
   virtual void onAsynchronousCertValidationComplete() PURE;
+
+  /**
+   * A callback to be called upon certificate selection completion if the selection is
+   * asynchronous.
+   */
+  virtual void onAsynchronousCertSelectionComplete() PURE;
 };
 
 /**
@@ -148,6 +154,101 @@ public:
    * API and other factory context methods.
    */
   virtual SslCtxCb sslctxCb(HandshakerFactoryContext& handshaker_factory_context) const PURE;
+};
+
+enum class SelectionResult {
+  // continue the TLS handshake.
+  Continue,
+  // block the TLS handshake.
+  Stop,
+  // terminate the TLS handshake.
+  Terminate
+};
+
+/**
+ * An SSL_CTX wrapper that created on demand.
+ */
+class OnDemandSslCtx {
+public:
+  virtual ~OnDemandSslCtx() = default;
+
+  /**
+   * initialize the SSL_CTX.
+   */
+  virtual void initCtx(ContextSharedPtr ctx) PURE;
+
+  /**
+   * @return the pointer of SSL_CTX.
+   */
+  virtual SSL_CTX* getCtx() PURE;
+};
+
+using OnDemandSslCtxSharedPtr = std::shared_ptr<OnDemandSslCtx>;
+
+/**
+ * Used to return the result from an synchronous/asynchronous cert selection.
+ */
+class CertSelectionCallback {
+public:
+  virtual ~CertSelectionCallback() = default;
+
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Called when the cert selection completes.
+   */
+  virtual void onCertSelectionResult(OnDemandSslCtxSharedPtr ctx) PURE;
+};
+
+using CertSelectionCallbackPtr = std::unique_ptr<CertSelectionCallback>;
+
+class TlsContextProvider {
+public:
+  virtual ~TlsContextProvider() = default;
+
+  /**
+   * select TLS context based on the client hello.
+   */
+  virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
+                                           CertSelectionCallbackPtr cb) PURE;
+};
+
+using TlsContextProviderSharedPtr = std::shared_ptr<TlsContextProvider>;
+using TlsContextProviderFactoryCb = std::function<TlsContextProviderSharedPtr()>;
+
+class TlsContextProviderFactoryContext {
+public:
+  virtual ~TlsContextProviderFactoryContext() = default;
+
+  /**
+   * Returns the singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * @return reference to the server options
+   */
+  virtual const Server::Options& options() const PURE;
+
+  /**
+   * @return reference to the Api object
+   */
+  virtual Api::Api& api() PURE;
+};
+
+class TlsContextProviderFactory : public Config::TypedFactory {
+public:
+  /**
+   * @returns a callback to create a TlsContextProvider. Accepts the |config| and
+   * |validation_visitor| for early validation. This virtual base doesn't
+   * perform MessageUtil::downcastAndValidate, but an implementation should.
+   */
+  virtual TlsContextProviderFactoryCb
+  createTlsContextProviderCb(const ProtobufWkt::Any& config,
+                             TlsContextProviderFactoryContext& tls_context_provider_factory_context,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+
+  std::string category() const override { return "envoy.tls_context_provider"; }
 };
 
 } // namespace Ssl

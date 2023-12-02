@@ -60,6 +60,10 @@ public:
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override;
+  Ssl::TlsContextProviderFactoryCb createTlsContextProvider() const override;
+  bool hasCustomTlsContextProvider() const override {
+    return tls_context_provider_factory_cb_.has_value();
+  }
   Ssl::HandshakerFactoryCb createHandshaker() const override;
   Ssl::HandshakerCapabilities capabilities() const override { return capabilities_; }
   Ssl::SslCtxCb sslctxCb() const override { return sslctx_cb_; }
@@ -106,6 +110,7 @@ private:
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 
+  absl::optional<Ssl::TlsContextProviderFactoryCb> tls_context_provider_factory_cb_;
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
   Ssl::SslCtxCb sslctx_cb_;

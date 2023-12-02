@@ -21,6 +21,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
+    external_deps = ["ssl"],
     deps = [
         "//source/common/network:cidr_range_interface",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

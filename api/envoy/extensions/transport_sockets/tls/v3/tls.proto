@@ -158,7 +158,7 @@ message TlsKeyLog {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -249,7 +249,7 @@ message CommonTlsContext {
   // same context to allow both RSA and ECDSA certificates and support SNI-based selection.
   //
   // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
-  // and ``tls_certificate_provider_instance`` may be used.
+  // ``tls_certificate_provider_instance`` and ``custom_tls_context_provider`` may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
@@ -262,7 +262,7 @@ message CommonTlsContext {
   // are valid in the the certificates fetched through this setting.
   //
   // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
-  // and ``tls_certificate_provider_instance`` may be used.
+  // ``tls_certificate_provider_instance`` and ``custom_tls_context_provider`` may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
@@ -271,9 +271,15 @@ message CommonTlsContext {
   // Certificate provider instance for fetching TLS certs.
   //
   // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
-  // and ``tls_certificate_provider_instance`` may be used.
+  // ``tls_certificate_provider_instance`` and ``custom_tls_context_provider`` may be used.
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
+
+  // Custom TLS context provider.
+  //
+  // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
+  // ``tls_certificate_provider_instance`` and ``custom_tls_context_provider`` may be used.
+  config.core.v3.TypedExtensionConfig custom_tls_context_provider = 16;
 
   // Certificate provider for fetching TLS certificates.
   // [#not-implemented-hide:]

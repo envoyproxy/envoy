@@ -20,6 +20,13 @@ enum class ValidateStatus {
   Failed,
 };
 
+enum class CertSelectionStatus {
+  NotStarted,
+  Pending,
+  Successful,
+  Failed,
+};
+
 /**
  * Used to return the result from an asynchronous cert validation.
  */
@@ -82,6 +89,27 @@ public:
    * case of failure.
    */
   virtual uint8_t certificateValidationAlert() const PURE;
+
+  /**
+   * @return CertSelectionCallbackPtr a callback used to return the cert selection result.
+   */
+  virtual CertSelectionCallbackPtr createCertSelectionCallback(SSL* ssl, ContextSharedPtr ctx) PURE;
+
+  /**
+   * Called after the cert selection completes.
+   * @param succeeded true if the cert selection succeeded.
+   */
+  virtual void onCertSelectionCompleted(bool succeeded) PURE;
+
+  /**
+   * Set the cert selection enter asynchronous status.
+   */
+  virtual void setCertSelectionAsync() PURE;
+
+  /**
+   * @return CertSelectionStatus the cert selection status.
+   */
+  virtual CertSelectionStatus CertSelectionResult() const PURE;
 };
 
 } // namespace Ssl

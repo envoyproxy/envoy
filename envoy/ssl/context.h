@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 
 #include "absl/types/optional.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -41,7 +42,13 @@ public:
    * expire, or `absl::nullopt` if no OCSP responses exist.
    */
   virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+
+  /*
+   * Initialize SSL_CTX, such as proto version, app data and etc.
+   */
+  virtual void initSslContext(SSL_CTX* ctx) const PURE;
 };
+
 using ContextSharedPtr = std::shared_ptr<Context>;
 
 class ClientContext : public virtual Context {};

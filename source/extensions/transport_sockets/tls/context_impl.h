@@ -88,6 +88,10 @@ public:
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
+  void initSslContext(SSL_CTX* ctx) const override;
+
+  void initSslContextHelper(SSL_CTX* ctx) const;
+  void sslCtxSetCustomVerify(SSL_CTX* ctx, int verify_mode) const;
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
@@ -140,7 +144,12 @@ protected:
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
+  const unsigned tls_min_version_;
   const unsigned tls_max_version_;
+  const std::string cipher_suites_;
+  const std::string ecdh_curves_;
+  const std::string signature_algorithms_;
+  const Ssl::SslCtxCb sslctx_cb_;
   mutable Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName unknown_ssl_cipher_;
   const Stats::StatName unknown_ssl_curve_;
@@ -180,7 +189,9 @@ private:
 
 enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 
-class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
+class ServerContextImpl : public ContextImpl,
+                          public Envoy::Ssl::ServerContext,
+                          public std::enable_shared_from_this<ServerContextImpl> {
 public:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                     const std::vector<std::string>& server_names, TimeSource& time_source);
@@ -213,6 +224,7 @@ private:
 
   SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
+  Ssl::TlsContextProviderSharedPtr tls_context_provider_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
   ServerNamesMap server_names_map_;

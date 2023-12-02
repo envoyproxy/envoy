@@ -50,6 +50,27 @@ private:
   OptRef<SslExtendedSocketInfoImpl> extended_socket_info_;
 };
 
+class CertSelectionCallbackImpl : public Ssl::CertSelectionCallback,
+                                  protected Logger::Loggable<Logger::Id::connection> {
+public:
+  CertSelectionCallbackImpl(SSL* ssl, Ssl::ContextSharedPtr ctx, Event::Dispatcher& dispatcher,
+                            SslExtendedSocketInfoImpl& extended_socket_info)
+      : ssl_(ssl), ctx_(ctx), dispatcher_(dispatcher), extended_socket_info_(extended_socket_info) {
+  }
+
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+  void onCertSelectionResult(Ssl::OnDemandSslCtxSharedPtr ctx) override;
+
+  void onSslHandshakeCancelled();
+
+private:
+  SSL* ssl_;
+  Ssl::ContextSharedPtr ctx_;
+  Event::Dispatcher& dispatcher_;
+  OptRef<SslExtendedSocketInfoImpl> extended_socket_info_;
+};
+
 class SslExtendedSocketInfoImpl : public Envoy::Ssl::SslExtendedSocketInfo {
 public:
   explicit SslExtendedSocketInfoImpl(SslHandshakerImpl& handshaker) : ssl_handshaker_(handshaker) {}
@@ -67,6 +88,12 @@ public:
 
   void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
+  Ssl::CertSelectionCallbackPtr createCertSelectionCallback(SSL* ssl,
+                                                            Ssl::ContextSharedPtr ctx) override;
+  void onCertSelectionCompleted(bool succeeded) override;
+  void setCertSelectionAsync() override;
+  Ssl::CertSelectionStatus CertSelectionResult() const override { return cert_selection_result_; }
+
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
       Envoy::Ssl::ClientValidationStatus::NotValidated};
@@ -79,6 +106,12 @@ private:
   // Stores the validation result if there is any.
   // nullopt if no validation has ever been kicked off.
   Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};
+  // Latch the in-flight cert validation callback.
+  // nullopt if there is none.
+  OptRef<CertSelectionCallbackImpl> cert_selection_callback_;
+  // Stores the cert selection result if there is any.
+  // nullopt if no cert selection has ever been kicked off.
+  Ssl::CertSelectionStatus cert_selection_result_{Ssl::CertSelectionStatus::NotStarted};
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,
@@ -111,6 +144,22 @@ private:
 };
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
+
+class TlsContextProviderFactoryContextImpl : public Ssl::TlsContextProviderFactoryContext {
+public:
+  TlsContextProviderFactoryContextImpl(Api::Api& api, const Server::Options& options,
+                                       Singleton::Manager& singleton_manager)
+      : api_(api), options_(options), singleton_manager_(singleton_manager) {}
+  // TlsContextProviderFactoryContext
+  Api::Api& api() override { return api_; }
+  const Server::Options& options() const override { return options_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
+
+private:
+  Api::Api& api_;
+  const Server::Options& options_;
+  Singleton::Manager& singleton_manager_;
+};
 
 class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {
 public:
