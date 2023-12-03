@@ -34,13 +34,21 @@ public:
   const std::string SigV4ACredentialScopeFormat{"{}/{}/aws4_request"};
   const std::string HashedEmptyString{
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"};
-  const std::string SignatureVersion{"AWS4"};
+  const std::string SigV4SignatureVersion{"AWS4"};
   const std::string SigV4StringToSignFormat{"AWS4-HMAC-SHA256\n{}\n{}\n{}"};
+  const std::string SigV4ASignatureVersion{"AWS4A"};
   const std::string SigV4AStringToSignFormat{"AWS4-ECDSA-P256-SHA256\n{}\n{}\n{}"};
+  const std::string SigV4ALabel="AWS4-ECDSA-P256-SHA256";
 
   const std::string LongDateFormat{"%Y%m%dT%H%M00Z"};
   const std::string ShortDateFormat{"%Y%m%d"};
   const std::string UnsignedPayload{"UNSIGNED-PAYLOAD"};
+};
+
+enum SigV4AKeyDerivationResult {
+    AkdrSuccess,
+    AkdrNextCounter,
+    AkdrFailure,
 };
 
 using SignatureConstants = ConstSingleton<SignatureConstantValues>;
@@ -149,8 +157,8 @@ private:
   std::string createStringToSign(absl::string_view canonical_request, absl::string_view long_date,
                                  absl::string_view credential_scope) const;
 
-  std::string createSignature(absl::string_view secret_access_key, absl::string_view short_date,
-                              absl::string_view string_to_sign,
+  std::string createSignature(absl::string_view access_key_id, absl::string_view secret_access_key, 
+                              absl::string_view short_date, absl::string_view string_to_sign,
                               const absl::string_view override_region) const;
 
   std::string createAuthorizationHeader(absl::string_view access_key_id,
@@ -170,6 +178,13 @@ private:
     return matcher_ptrs;
   }
 
+
+  bool constantTimeLessThanOrEqualTo(
+    std::vector<uint8_t> lhs_raw_be_bigint,
+    std::vector<uint8_t> rhs_raw_be_bigint) const;
+
+  void constantTimeAddOne(std::vector<uint8_t> raw_be_bigint) const;
+
   const std::string service_name_;
   const std::string region_;
   const std::vector<std::string> default_excluded_headers_ = {
@@ -181,6 +196,7 @@ private:
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
 };
+
 
 } // namespace Aws
 } // namespace Common
