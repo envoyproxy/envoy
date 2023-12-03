@@ -185,7 +185,7 @@ public:
   OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
                      on_demand_message,
                  Server::Configuration::FactoryContext& context, Stats::Scope& scope)
-      : odcds_(context.getServerFactoryContext().clusterManager().allocateOdCdsApi(
+      : odcds_(context.serverFactoryContext().clusterManager().allocateOdCdsApi(
             on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
             context.messageValidationVisitor())),
         lookup_timeout_(std::chrono::milliseconds(

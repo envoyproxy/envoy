@@ -16,7 +16,7 @@ Http::FilterFactoryCb KillRequestFilterFactory::createFilterFactoryFromProtoType
     const std::string&, Server::Configuration::FactoryContext& context) {
   return [proto_config, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<KillRequestFilter>(
-        proto_config, context.getServerFactoryContext().api().randomGenerator()));
+        proto_config, context.serverFactoryContext().api().randomGenerator()));
   };
 }
 
