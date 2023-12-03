@@ -221,5 +221,9 @@ new_features:
     <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log_options>`
     to allow recording an access log entry periodically for the UDP session, and allow recording an access
     log entry on the connection tunnel created successfully to upstream when UDP tunneling is configured.
+- area: zookeeper
+  change: |
+    Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
 
 deprecated:
