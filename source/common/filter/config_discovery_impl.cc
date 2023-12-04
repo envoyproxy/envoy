@@ -225,7 +225,7 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   bool last_config_valid = false;
   if (subscription->lastConfig()) {
     TRY_ASSERT_MAIN_THREAD {
-      THROW_IF_NOT_OK(provider.validateTypeUrl(subscription->lastTypeUrl()))
+      THROW_IF_NOT_OK(provider.validateTypeUrl(subscription->lastTypeUrl()));
       provider.validateMessage(filter_config_name, *subscription->lastConfig(),
                                subscription->lastFactoryName());
       last_config_valid = true;

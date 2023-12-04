@@ -51,8 +51,9 @@ public:
   AccessLogImplTest()
       : stream_info_(time_source_), file_(new MockAccessLogFile()),
         engine_(std::make_unique<Regex::GoogleReEngine>()) {
-    ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
-    ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+    ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
+    ON_CALL(context_.server_factory_context_, accessLogManager())
+        .WillByDefault(ReturnRef(log_manager_));
     ON_CALL(log_manager_, createAccessLog(_)).WillByDefault(Return(file_));
     ON_CALL(*file_, write(_)).WillByDefault(SaveArg<0>(&output_));
     stream_info_.addBytesReceived(1);
@@ -365,13 +366,13 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // Value is taken from random generator.
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(42));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 42, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 43, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
@@ -408,13 +409,13 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // Value is taken from random generator.
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(42));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 10000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
@@ -452,13 +453,13 @@ typed_config:
 
   stream_info_.stream_id_provider_ =
       std::make_shared<StreamInfo::StreamIdProviderImpl>("000000ff-0000-0000-0000-000000000000");
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(42));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 1000000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 1000000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
@@ -1123,8 +1124,9 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
   )EOF";
 
-  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_.server_factory_context_, accessLogManager())
+      .WillByDefault(ReturnRef(log_manager_));
   EXPECT_CALL(log_manager_, createAccessLog(_))
       .WillOnce(Invoke(
           [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
@@ -1143,8 +1145,9 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StderrAccessLog
   )EOF";
 
-  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_.server_factory_context_, accessLogManager())
+      .WillByDefault(ReturnRef(log_manager_));
   EXPECT_CALL(log_manager_, createAccessLog(_))
       .WillOnce(Invoke(
           [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
@@ -1639,7 +1642,7 @@ public:
   ~TestHeaderFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Server::Configuration::CommonFactoryContext& context) override {
+                         Server::Configuration::FactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
     const auto& header_config =
@@ -1715,7 +1718,7 @@ public:
   ~SampleExtensionFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Server::Configuration::CommonFactoryContext& context) override {
+                         Server::Configuration::FactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
 

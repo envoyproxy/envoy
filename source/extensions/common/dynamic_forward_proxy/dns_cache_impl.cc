@@ -305,8 +305,8 @@ void DnsCacheImpl::forceRefreshHosts() {
 }
 
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
-  ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
-            host_info.host_info_->resolvedHost(), host_info.port_);
+  ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}' timeout='{}'",
+            host, host_info.host_info_->resolvedHost(), host_info.port_, timeout_interval_.count());
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();

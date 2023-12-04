@@ -50,23 +50,15 @@ public:
 
 class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
-  AccessLog::InstanceSharedPtr createAccessLogInstance(
-      const Protobuf::Message&, AccessLog::FilterPtr&&,
-      Server::Configuration::ListenerAccessLogFactoryContext& context) override {
+  AccessLog::InstanceSharedPtr
+  createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
+                          Server::Configuration::FactoryContext& context) override {
     // Check that expected listener metadata is present
     EXPECT_EQ(1, context.listenerMetadata().typed_filter_metadata().size());
     const auto iter =
         context.listenerMetadata().typed_filter_metadata().find("test.listener.typed.metadata");
     EXPECT_NE(iter, context.listenerMetadata().typed_filter_metadata().end());
     return std::make_shared<NiceMock<MockAccessLog>>();
-  }
-
-  AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
-                          Server::Configuration::CommonFactoryContext&) override {
-    // This method should never be called in this test
-    ASSERT(false);
-    return nullptr;
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

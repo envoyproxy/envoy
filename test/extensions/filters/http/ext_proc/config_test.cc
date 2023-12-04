@@ -21,12 +21,8 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
       target_uri: ext_proc_server
       stat_prefix: google
   failure_mode_allow: true
-  request_attributes:
-  - 'Foo'
-  - 'Bar'
-  - 'Baz'
-  response_attributes:
-  - 'More'
+  request_attributes: 'Foo, Bar, Baz'
+  response_attributes: More
   processing_mode:
     request_header_mode: send
     response_header_mode: skip
@@ -58,12 +54,8 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
       target_uri: ext_proc_server
       stat_prefix: google
   failure_mode_allow: true
-  request_attributes:
-  - 'Foo'
-  - 'Bar'
-  - 'Baz'
-  response_attributes:
-  - 'More'
+  request_attributes: 'Foo, Bar, Baz'
+  response_attributes: More
   processing_mode:
     request_header_mode: send
     response_header_mode: skip

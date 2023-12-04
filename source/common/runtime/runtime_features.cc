@@ -56,7 +56,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http_allow_partial_urls_in_referer);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
-RUNTIME_GUARD(envoy_reloadable_features_ignore_optional_option_from_hcm_for_route_config);
 RUNTIME_GUARD(envoy_reloadable_features_immediate_response_use_filter_mutation_rule);
 RUNTIME_GUARD(envoy_reloadable_features_initialize_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_keep_endpoint_active_hc_status_on_locality_update);
@@ -73,6 +72,7 @@ RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_overload_manager_error_unknown_action);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_upstream_request_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
+RUNTIME_GUARD(envoy_reloadable_features_sanitize_te);
 RUNTIME_GUARD(envoy_reloadable_features_send_header_raw_value);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_transport_failure_reason_format);
@@ -114,9 +114,11 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
-// TODO(suniltheta): Once the newly added http async technique proves effective and
-// is stabilized get rid of this feature flag and code path that relies on libcurl.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_libcurl_to_fetch_aws_credentials);
+// TODO(suniltheta): Once the newly added http async technique is stabilized move it under
+// RUNTIME_GUARD so that this option becomes default enabled. Once this option proves effective
+// remove the feature flag and remove code path that relies on old technique to fetch credentials
+// via libcurl and remove the bazel steps to pull and test the curl dependency.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_http_client_to_fetch_aws_credentials);
 // TODO(adisuissa): enable by default once this is tested in prod.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 // TODO(#10646) change to true when UHV is sufficiently tested

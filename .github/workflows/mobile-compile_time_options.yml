@@ -101,7 +101,6 @@ jobs:
             --test_output=all \
             --config=mobile-remote-ci \
             --define=signal_trace=disabled \
-            --define=envoy_mobile_request_compression=disabled \
             --define=google_grpc=disabled \
             --define=envoy_mobile_xds=disabled \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
@@ -132,7 +131,6 @@ jobs:
             --config=ios \
             --config=mobile-remote-ci-macos \
             --define=signal_trace=disabled \
-            --define=envoy_mobile_request_compression=disabled \
             --define=envoy_mobile_stats_reporting=disabled \
             --define=envoy_mobile_swift_cxx_interop=disabled \
             --define=google_grpc=disabled \
@@ -171,7 +169,6 @@ jobs:
             --config=mobile-remote-ci-macos \
             --fat_apk_cpu=x86_64 \
             --define=signal_trace=disabled \
-            --define=envoy_mobile_request_compression=disabled \
             --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
             --define=envoy_mobile_xds=disabled \
