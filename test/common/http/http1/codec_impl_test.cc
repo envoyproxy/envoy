@@ -4832,6 +4832,7 @@ TEST_P(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
 // such messages (also permitted by the specification). See RFC9110 Section 5.5:
 // https://www.rfc-editor.org/rfc/rfc9110.html#name-field-values.
 TEST_P(Http1ServerConnectionImplTest, ObsFold) {
+  // SPELLCHECKER(off)
   initialize();
 
   StrictMock<MockRequestDecoder> decoder;
@@ -4849,9 +4850,11 @@ TEST_P(Http1ServerConnectionImplTest, ObsFold) {
                            "\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
+  // SPELLCHECKER(on)
 }
 
 TEST_P(Http1ClientConnectionImplTest, ObsFold) {
+  // SPELLCHECKER(off)
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -4873,6 +4876,7 @@ TEST_P(Http1ClientConnectionImplTest, ObsFold) {
 
   auto status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());
+  // SPELLCHECKER(on)
 }
 
 } // namespace Http
