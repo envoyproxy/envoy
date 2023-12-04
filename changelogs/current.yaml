@@ -129,6 +129,10 @@ removed_config_or_runtime:
   change: |
     Removed the deprecated ``envoy.reloadable_features.format_ports_as_numbers``
     runtime flag and legacy code path.
+- area: router
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config``
+    runtime flag and legacy code path.
 
 new_features:
 - area: filters
