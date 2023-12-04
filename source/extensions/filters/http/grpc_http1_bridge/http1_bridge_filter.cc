@@ -49,7 +49,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
     do_bridging_ = true;
   }
 
-  if (do_briging_ && ignore_query_parameters_) {
+  if (do_bridging_ && ignore_query_parameters_) {
     ignoreQueryParams(headers);
   }
   return Http::FilterHeadersStatus::Continue;
