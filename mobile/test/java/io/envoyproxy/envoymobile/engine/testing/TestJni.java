@@ -12,6 +12,30 @@ public final class TestJni {
   private static final AtomicBoolean xdsServerRunning = new AtomicBoolean();
 
   /**
+   * Initializes an envoy server which will terminate cleartext CONNECT requests.
+   *
+   * @throws IllegalStateException if it's already started.
+   */
+  public static void startHttpProxyTestServer() {
+    if (!sServerRunning.compareAndSet(false, true)) {
+      throw new IllegalStateException("Server is already running");
+    }
+    nativeStartHttpProxyTestServer();
+  }
+
+  /**
+   * Initializes an envoy server which will terminate encrypted CONNECT requests.
+   *
+   * @throws IllegalStateException if it's already started.
+   */
+  public static void startHttpsProxyTestServer() {
+    if (!sServerRunning.compareAndSet(false, true)) {
+      throw new IllegalStateException("Server is already running");
+    }
+    nativeStartHttpsProxyTestServer();
+  }
+
+  /**
    * Initializes the xDS test server.
    *
    * @throws IllegalStateException if it's already started.
@@ -28,7 +52,7 @@ public final class TestJni {
    */
   public static void startHttp3TestServer() {
     if (!sServerRunning.compareAndSet(false, true)) {
-      throw new IllegalStateException("Http3 server is already running");
+      throw new IllegalStateException("Server is already running");
     }
     nativeStartHttp3TestServer();
   }
@@ -106,7 +130,7 @@ public final class TestJni {
    */
   public static int getServerPort() {
     if (!sServerRunning.get()) {
-      throw new IllegalStateException("Quic server not started.");
+      throw new IllegalStateException("Server not started.");
     }
     return nativeGetServerPort();
   }
@@ -122,6 +146,10 @@ public final class TestJni {
   private static native void nativeShutdownTestServer();
 
   private static native int nativeGetServerPort();
+
+  private static native void nativeStartHttpProxyTestServer();
+
+  private static native void nativeStartHttpsProxyTestServer();
 
   private static native void nativeInitXdsTestServer();
 
