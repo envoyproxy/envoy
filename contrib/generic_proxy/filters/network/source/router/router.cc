@@ -11,6 +11,7 @@
 #include "source/common/tracing/tracer_impl.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
+#include "contrib/generic_proxy/filters/network/source/tracing.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -308,7 +309,8 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
   if (span_ != nullptr) {
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, resetReasonToStringView(reason));
-    Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_stream_, stream_info_,
+    TraceContextBridge trace_context{*parent_.request_stream_};
+    Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
                                          tracing_config_.value().get(), true);
   }
 
@@ -327,7 +329,8 @@ void UpstreamRequest::clearStream(bool close_connection) {
   ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request");
 
   if (span_ != nullptr) {
-    Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_stream_, stream_info_,
+    TraceContextBridge trace_context{*parent_.request_stream_};
+    Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
                                          tracing_config_.value().get(), true);
   }
 
@@ -408,7 +411,8 @@ void UpstreamRequest::onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr 
   onUpstreamHostSelected(std::move(host));
 
   if (span_ != nullptr) {
-    span_->injectContext(*parent_.request_stream_, upstream_host_);
+    TraceContextBridge trace_context{*parent_.request_stream_};
+    span_->injectContext(trace_context, upstream_host_);
   }
 
   sendRequestStartToUpstream();
