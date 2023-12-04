@@ -123,6 +123,8 @@ void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
     }
   }
 
+  session->onSessionComplete();
+
   // Now remove it from the primary map.
   ASSERT(sessions_.count(session) == 1);
   sessions_.erase(session);
@@ -178,6 +180,7 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOpt
     return new_session_ptr;
   }
 
+  new_session->onSessionComplete();
   return nullptr;
 }
 
@@ -310,7 +313,6 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
       .dec();
 
   disableAccessLogFlushTimer();
-  onSessionComplete();
 
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
