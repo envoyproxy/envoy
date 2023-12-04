@@ -1211,7 +1211,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 
   pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
 
-  auto drop_overload = cm_cluster.cluster().dropOverload();
+  const UnitFloat drop_overload = cm_cluster.cluster().dropOverload();
   // Populate the cluster initialization object based on this update.
   ClusterInitializationObjectConstSharedPtr cluster_initialization_object =
       addOrUpdateClusterInitializationObjectIfSupported(
