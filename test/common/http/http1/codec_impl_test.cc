@@ -28,6 +28,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -4926,6 +4927,58 @@ TEST_P(Http1ClientConnectionImplTest, ObsFold) {
     EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_FORMAT");
   } else {
     EXPECT_TRUE(status.ok());
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, ValueWithNullCharacter) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _,
+                                        "http1.invalid_characters"));
+  } else {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  }
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\n"
+                                        "key: value has ",
+                                        absl::string_view("\0", 1),
+                                        "null character\r\n"
+                                        "\r\n"));
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(status.ok());
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+  } else {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, ValueWithNullCharacter) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl response(absl::StrCat("HTTP/1.1 200 OK\r\n"
+                                          "key: value has ",
+                                          absl::string_view("\0", 1),
+                                          "null character\r\n"
+                                          "Content-Length: 0\r\n"
+                                          "\r\n"));
+
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+  } else {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
   }
 }
 
