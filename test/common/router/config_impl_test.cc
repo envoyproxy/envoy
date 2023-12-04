@@ -10692,6 +10692,8 @@ virtual_hosts:
             "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
 )EOF";
 
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+
   const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
   const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
   EXPECT_EQ(nullptr, route->mostSpecificPerFilterConfig("filter.unknown"));
