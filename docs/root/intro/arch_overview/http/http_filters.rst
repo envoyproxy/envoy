@@ -212,6 +212,7 @@ for a specific route, we can set per filter config map in the route configuratio
       "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
     lua:
       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      name: my_lua_script
 
 
 Both valid route-specific configurations for filters (like the above ``lua`` filter) and empty FilterConfig
