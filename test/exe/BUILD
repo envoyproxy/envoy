@@ -109,12 +109,12 @@ envoy_cc_test(
         "//source/extensions:extensions_metadata.yaml",
     ],
     deps = [
+        "//source/exe:main_common_lib",
         "//test/test_common:environment_lib",
     ] + select({
         # gcc RBE build has trouble compiling target with all extensions
         "//bazel:gcc_build": ["//source/exe:envoy_main_common_with_core_extensions_lib"],
-        # This dependency MUST be main_common_lib to meet the purpose of this test
-        "//conditions:default": ["//source/exe:main_common_lib"],
+        "//conditions:default": ["//source/exe:all_extensions_lib"],
     }),
 )
 
