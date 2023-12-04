@@ -863,6 +863,30 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
+  {
+    StreamInfoFormatter upstream_connection_pool_callback_duration_format(
+        "UPSTREAM_CONNECTION_POOL_READY_DURATION");
+    EXPECT_EQ(absl::nullopt,
+              upstream_connection_pool_callback_duration_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter upstream_connection_pool_callback_duration_format(
+        "UPSTREAM_CONNECTION_POOL_READY_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
+    upstream_timing.recordConnectionPoolCallbackLatency(
+        MonotonicTime(std::chrono::nanoseconds(10000000)), time_system);
+
+    EXPECT_EQ("15",
+              upstream_connection_pool_callback_duration_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::numberValue(15.0)));
+  }
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {

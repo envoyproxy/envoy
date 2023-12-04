@@ -30,7 +30,7 @@
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
 #include "contrib/generic_proxy/filters/network/source/stats.h"
-#include "contrib/generic_proxy/filters/network/source/upstream.h"
+#include "contrib/generic_proxy/filters/network/source/tracing.h"
 
 namespace Envoy {
 namespace Extensions {
