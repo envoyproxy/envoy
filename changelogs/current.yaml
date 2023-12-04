@@ -16,6 +16,13 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: config parsing, http cache filter
+  change: |
+    replaces protobuf hashing by human-readable string with a dedicated deterministic hashing algorithm.
+    The performance of the hash operation is improved by 2-10x depending on the structure of the message,
+    which is expected to reduce config update time or startup time by 10-25%. The new algorithm is also
+    used for http_cache_filter hashing, which will effectively cause a one-time cache flush on update
+    for users with a persistent cache. To revert this behavior set ``envoy.restart_features.use_fast_protobuf_hash`` to false.
 - area: aws
   change: |
     uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
