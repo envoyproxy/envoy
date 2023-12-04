@@ -57,7 +57,7 @@ public:
 
 private:
   void setupStatTracking(const Http::RequestHeaderMap& headers);
-  void removeQueryParams(Http::RequestHeaderMap& headers);
+  void ignoreQueryParams(Http::RequestHeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
