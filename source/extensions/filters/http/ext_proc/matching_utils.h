@@ -22,18 +22,18 @@ public:
 
   bool hasResponseExpr() const { return !response_expr_.empty(); };
 
-  const absl::optional<ProtobufWkt::Struct>
-  evaluateRequestAttributes(const Filters::Common::Expr::ActivationPtr& activation) const {
+  std::unique_ptr<ProtobufWkt::Struct>
+  evaluateRequestAttributes(const Filters::Common::Expr::Activation& activation) const {
     return evaluateAttributes(activation, request_expr_);
   }
 
-  const absl::optional<ProtobufWkt::Struct>
-  evaluateResponseAttributes(const Filters::Common::Expr::ActivationPtr& activation) const {
+  std::unique_ptr<ProtobufWkt::Struct>
+  evaluateResponseAttributes(const Filters::Common::Expr::Activation& activation) const {
     return evaluateAttributes(activation, response_expr_);
   }
 
-  static const absl::optional<ProtobufWkt::Struct> evaluateAttributes(
-      const Filters::Common::Expr::ActivationPtr& activation,
+  static std::unique_ptr<ProtobufWkt::Struct> evaluateAttributes(
+      const Filters::Common::Expr::Activation& activation,
       const absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr>& expr);
 
 private:
@@ -49,19 +49,8 @@ private:
   const absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr> response_expr_;
 };
 
-class MatchingUtils : public Logger::Loggable<Logger::Id::ext_proc> {
-public:
-  static const std::vector<Matchers::StringMatcherPtr>
-  initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list) {
-    std::vector<Matchers::StringMatcherPtr> header_matchers;
-    for (const auto& matcher : header_list.patterns()) {
-      header_matchers.push_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher));
-    }
-    return header_matchers;
-  }
-};
+const std::vector<Matchers::StringMatcherPtr>
+initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list);
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

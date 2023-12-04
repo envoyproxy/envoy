@@ -138,9 +138,9 @@ public:
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(
-            MatchingUtils::initHeaderMatchers(config.forward_rules().allowed_headers())),
+            initHeaderMatchers(config.forward_rules().allowed_headers())),
         disallowed_headers_(
-            MatchingUtils::initHeaderMatchers(config.forward_rules().disallowed_headers())),
+            initHeaderMatchers(config.forward_rules().disallowed_headers())),
         expression_manager_(builder, config.request_attributes(), config.response_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -169,7 +169,7 @@ public:
     return disallowed_headers_;
   }
 
-  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
   const ExpressionManager& expressionManager() const { return expression_manager_; }
 
@@ -187,7 +187,7 @@ private:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
-  const Envoy::ProtobufWkt::Struct filter_metadata_;
+  const ProtobufWkt::Struct filter_metadata_;
   // If set to true, allow the processing mode to be modified by the ext_proc response.
   const bool allow_mode_override_;
   // If set to true, disable the immediate response from the ext_proc server, which means
@@ -299,7 +299,7 @@ private:
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      absl::optional<ProtobufWkt::Struct> proto);
+                                      std::unique_ptr<ProtobufWkt::Struct> proto);
 
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);

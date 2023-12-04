@@ -37,45 +37,59 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
   return expressions;
 }
 
-const absl::optional<ProtobufWkt::Struct> ExpressionManager::evaluateAttributes(
-    const Filters::Common::Expr::ActivationPtr& activation,
+std::unique_ptr<ProtobufWkt::Struct> ExpressionManager::evaluateAttributes(
+    const Filters::Common::Expr::Activation& activation,
     const absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr>& expr) {
-  absl::optional<ProtobufWkt::Struct> proto;
-  if (!expr.empty()) {
-    proto.emplace(ProtobufWkt::Struct{});
-    for (const auto& hash_entry : expr) {
-      ProtobufWkt::Arena arena;
-      const auto result = hash_entry.second->Evaluate(*activation, &arena);
-      if (!result.ok()) {
-        // TODO: Stats?
-        continue;
-      }
 
-      if (result.value().IsError()) {
-        ENVOY_LOG(trace, "error parsing cel expression {}", hash_entry.first);
-        continue;
-      }
+  if (expr.empty()) {
+    return nullptr;
+  }
 
-      ProtobufWkt::Value value;
-      switch (result.value().type()) {
-      case google::api::expr::runtime::CelValue::Type::kBool:
-        value.set_bool_value(result.value().BoolOrDie());
-        break;
-      case google::api::expr::runtime::CelValue::Type::kNullType:
-        value.set_null_value(ProtobufWkt::NullValue{});
-        break;
-      case google::api::expr::runtime::CelValue::Type::kDouble:
-        value.set_number_value(result.value().DoubleOrDie());
-        break;
-      default:
-        value.set_string_value(Filters::Common::Expr::print(result.value()));
-      }
-
-      (*(proto.value()).mutable_fields())[hash_entry.first] = value;
+  auto proto = std::make_unique<ProtobufWkt::Struct>();
+  for (const auto& hash_entry : expr) {
+    ProtobufWkt::Arena arena;
+    const auto result = hash_entry.second->Evaluate(activation, &arena);
+    if (!result.ok()) {
+      // TODO: Stats?
+      continue;
     }
+
+    if (result.value().IsError()) {
+      ENVOY_LOG(trace, "error parsing cel expression {}", hash_entry.first);
+      continue;
+    }
+
+    ProtobufWkt::Value value;
+    switch (result.value().type()) {
+    case google::api::expr::runtime::CelValue::Type::kBool:
+      value.set_bool_value(result.value().BoolOrDie());
+      break;
+    case google::api::expr::runtime::CelValue::Type::kNullType:
+      value.set_null_value(ProtobufWkt::NullValue{});
+      break;
+    case google::api::expr::runtime::CelValue::Type::kDouble:
+      value.set_number_value(result.value().DoubleOrDie());
+      break;
+    default:
+      value.set_string_value(Filters::Common::Expr::print(result.value()));
+    }
+
+    auto proto_mut_fields = proto->mutable_fields();
+    (*proto_mut_fields)[hash_entry.first] = value;
   }
 
   return proto;
+}
+
+const std::vector<Matchers::StringMatcherPtr>
+initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list) {
+  std::vector<Matchers::StringMatcherPtr> header_matchers;
+  for (const auto& matcher : header_list.patterns()) {
+    header_matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
+  }
+  return header_matchers;
 }
 
 } // namespace ExternalProcessing
