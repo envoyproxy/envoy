@@ -16,6 +16,7 @@ envoy_cc_library(
     hdrs = [
         "fetch_client.h",
     ],
+    external_deps = ["abseil_synchronization"],
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",

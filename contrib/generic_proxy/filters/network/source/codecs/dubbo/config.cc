@@ -94,7 +94,7 @@ void DubboRequest::forEach(IterateCallback callback) const {
   }
 }
 
-absl::optional<absl::string_view> DubboRequest::getByKey(absl::string_view key) const {
+absl::optional<absl::string_view> DubboRequest::get(absl::string_view key) const {
   if (key == VERSION_KEY) {
     return inner_metadata_->request().serviceVersion();
   }
@@ -105,7 +105,7 @@ absl::optional<absl::string_view> DubboRequest::getByKey(absl::string_view key) 
   return typed_request->attachment().lookup(key);
 }
 
-void DubboRequest::setByKey(absl::string_view key, absl::string_view val) {
+void DubboRequest::set(absl::string_view key, absl::string_view val) {
   auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
   ASSERT(typed_request != nullptr);
@@ -113,7 +113,7 @@ void DubboRequest::setByKey(absl::string_view key, absl::string_view val) {
   typed_request->mutableAttachment()->insert(key, val);
 }
 
-void DubboRequest::removeByKey(absl::string_view key) {
+void DubboRequest::erase(absl::string_view key) {
   auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
   ASSERT(typed_request != nullptr);

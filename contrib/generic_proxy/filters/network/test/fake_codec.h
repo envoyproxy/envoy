@@ -18,20 +18,15 @@ public:
       callback(pair.first, pair.second);
     }
   }
-  absl::optional<absl::string_view> getByKey(absl::string_view key) const override {
+  absl::optional<absl::string_view> get(absl::string_view key) const override {
     auto iter = data_.find(key);
     if (iter == data_.end()) {
       return absl::nullopt;
     }
     return absl::make_optional<absl::string_view>(iter->second);
   }
-  void setByKey(absl::string_view key, absl::string_view val) override {
-    data_[key] = std::string(val);
-  }
-  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
-    setByKey(key, val);
-  }
-  void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
+  void set(absl::string_view key, absl::string_view val) override { data_[key] = std::string(val); }
+  void erase(absl::string_view key) override { data_.erase(key); }
 
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
@@ -58,7 +53,6 @@ public:
     absl::string_view host() const override { return host_; }
     absl::string_view path() const override { return path_; }
     absl::string_view method() const override { return method_; }
-    void removeByKey(absl::string_view key) override { data_.erase(key); }
 
     std::string protocol_;
     std::string host_;

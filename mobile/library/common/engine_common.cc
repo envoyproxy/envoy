@@ -62,9 +62,12 @@ public:
   std::unique_ptr<Envoy::Server::OverloadManager> createOverloadManager() override {
     return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
   }
+  std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view) override {
+    return nullptr;
+  }
 };
 
-EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
+EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImplBase>&& options)
     : options_(std::move(options)) {
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
@@ -91,7 +94,6 @@ EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
       *options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
       std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(), nullptr,
       create_instance);
-
   // Disabling signal handling in the options makes it so that the server's event dispatcher _does
   // not_ listen for termination signals such as SIGTERM, SIGINT, etc
   // (https://github.com/envoyproxy/envoy/blob/048f4231310fbbead0cbe03d43ffb4307fff0517/source/server/server.cc#L519).
