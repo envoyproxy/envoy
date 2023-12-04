@@ -8,24 +8,6 @@
 namespace Envoy {
 namespace Server {
 
-class EmptyListenerInfo : public Network::ListenerInfo {
-public:
-  // Network::ListenerInfo
-  const envoy::config::core::v3::Metadata& metadata() const override {
-    return metadata_.proto_metadata_;
-  }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override {
-    return metadata_.typed_metadata_;
-  }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
-  }
-  bool isQuic() const override { return false; }
-
-private:
-  Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
-};
-
 class AdminFactoryContext final : public Configuration::FactoryContext {
 public:
   AdminFactoryContext(Envoy::Server::Instance& server)

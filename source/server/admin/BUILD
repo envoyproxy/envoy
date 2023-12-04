@@ -88,6 +88,7 @@ envoy_cc_library(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/http/header_validators/envoy_default:config",
+        "//source/extensions/listener_managers/listener_manager:listener_info_lib",
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/extensions/request_id/uuid:config",
         "//source/server:null_overload_manager_lib",

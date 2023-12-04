@@ -18,11 +18,11 @@
 
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/extensions/listener_managers/listener_manager/filter_chain_manager_impl.h"
+#include "source/extensions/listener_managers/listener_manager/listener_info_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -117,28 +117,6 @@ private:
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
-
-class ListenerInfoImpl : public Network::ListenerInfo {
-public:
-  explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener& config)
-      : config_(config), typed_metadata_(config_.metadata()),
-        is_quic_(config.udp_listener_config().has_quic_options()) {}
-  // Allow access to the underlying protobuf as an internal detail.
-  const envoy::config::listener::v3::Listener& config() const { return config_; }
-  // Network::ListenerInfo
-  const envoy::config::core::v3::Metadata& metadata() const override { return config_.metadata(); }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return config_.traffic_direction();
-  }
-  bool isQuic() const override { return is_quic_; }
-
-private:
-  const envoy::config::listener::v3::Listener config_;
-  const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
-      typed_metadata_;
-  const bool is_quic_;
-};
 
 /**
  * The common functionality shared by PerListenerFilterFactoryContexts and

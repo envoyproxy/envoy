@@ -35,6 +35,7 @@
 #include "source/common/router/scoped_config_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/listener_managers/listener_manager/listener_info_impl.h"
 #include "source/server/admin/admin_factory_context.h"
 #include "source/server/admin/admin_filter.h"
 #include "source/server/admin/clusters_handler.h"
@@ -414,7 +415,7 @@ private:
     BasicResourceLimitImpl open_connections_;
 
   private:
-    const EmptyListenerInfo listener_info_;
+    const ListenerInfoImpl listener_info_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
