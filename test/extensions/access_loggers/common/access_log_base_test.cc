@@ -31,7 +31,7 @@ private:
 };
 
 TEST(AccessLogBaseTest, NoFilter) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   TestImpl logger(nullptr);
   EXPECT_EQ(logger.count(), 0);
   logger.log({}, stream_info);
@@ -39,7 +39,7 @@ TEST(AccessLogBaseTest, NoFilter) {
 }
 
 TEST(AccessLogBaseTest, FilterReject) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   std::unique_ptr<MockFilter> filter = std::make_unique<MockFilter>();
   EXPECT_CALL(*filter, evaluate(_, _)).WillOnce(Return(false));
