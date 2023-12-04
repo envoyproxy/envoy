@@ -173,9 +173,7 @@ struct StreamInfoImpl : public StreamInfo {
     final_time_ = time_source_.monotonicTime();
   }
 
-  void onEmitLog() override {
-    emit_log_time_ = time_source_.systemTime();
-  }
+  void onEmitLog() override { emit_log_time_ = time_source_.systemTime(); }
 
   DownstreamTiming& downstreamTiming() override {
     if (!downstream_timing_.has_value()) {

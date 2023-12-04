@@ -15,8 +15,7 @@ class FakeAccessLog : public AccessLog::Instance {
 public:
   FakeAccessLog(LogSignature cb) : log_cb_(cb) {}
 
-  void log(const Formatter::HttpFormatterContext& context,
-           StreamInfo::StreamInfo& info) override {
+  void log(const Formatter::HttpFormatterContext& context, StreamInfo::StreamInfo& info) override {
     if (log_cb_) {
       log_cb_(context, info);
     }
