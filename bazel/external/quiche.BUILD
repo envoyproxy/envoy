@@ -148,12 +148,12 @@ envoy_cc_library(
     name = "http2_adapter_header_validator",
     srcs = [
         "quiche/http2/adapter/header_validator.cc",
-        "quiche/http2/adapter/noop_header_validator.cc",
+        "quiche/http2/adapter/minimal_header_validator.cc",
     ],
     hdrs = [
         "quiche/http2/adapter/header_validator.h",
         "quiche/http2/adapter/header_validator_base.h",
-        "quiche/http2/adapter/noop_header_validator.h",
+        "quiche/http2/adapter/minimal_header_validator.h",
     ],
     copts = quiche_copts,
     repository = "@envoy",
@@ -167,7 +167,7 @@ envoy_cc_test(
     name = "http2_adapter_header_validator_test",
     srcs = [
         "quiche/http2/adapter/header_validator_test.cc",
-        "quiche/http2/adapter/noop_header_validator_test.cc",
+        "quiche/http2/adapter/minimal_header_validator_test.cc",
     ],
     copts = quiche_copts,
     repository = "@envoy",
