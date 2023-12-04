@@ -10690,13 +10690,12 @@ virtual_hosts:
         typed_per_filter_config:
           filter.unknown:
             "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
-            is_optional: true
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, false),
-      EnvoyException,
-      "Empty route/virtual host per filter configuration for filter.unknown filter");
+  const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+  EXPECT_EQ(nullptr, route->mostSpecificPerFilterConfig("filter.unknown"));
+  EXPECT_EQ(false, route->filterDisabled("filter.unknown").value());
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
