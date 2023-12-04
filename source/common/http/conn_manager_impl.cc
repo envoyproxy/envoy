@@ -65,6 +65,9 @@ const absl::string_view ConnectionManagerImpl::PrematureResetMinStreamLifetimeSe
 // I/O cycle. Requests over this limit are deferred until the next I/O cycle.
 const absl::string_view ConnectionManagerImpl::MaxRequestsPerIoCycle =
     "http.max_requests_per_io_cycle";
+// Don't attempt to intelligently delay close: https://github.com/envoyproxy/envoy/issues/30010
+const absl::string_view ConnectionManagerImpl::OptionallyDelayClose =
+    "http1.optionally_delay_close";
 
 bool requestWasConnect(const RequestHeaderMapSharedPtr& headers, Protocol protocol) {
   if (!headers) {
@@ -213,7 +216,8 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
   Network::ConnectionCloseType close = Network::ConnectionCloseType::FlushWriteAndDelay;
-  if (skip_delay_close) {
+  if (runtime_.snapshot().getBoolean(ConnectionManagerImpl::OptionallyDelayClose, true) &&
+      skip_delay_close) {
     close = Network::ConnectionCloseType::FlushWrite;
   }
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
