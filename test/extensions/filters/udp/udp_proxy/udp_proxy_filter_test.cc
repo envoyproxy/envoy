@@ -505,6 +505,7 @@ upstream_socket_config:
       "17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 0 "
       "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
       AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
+  EXPECT_TRUE(std::regex_match(output_[0], std::regex(session_access_log_regex1)));
 
   const std::string session_access_log_regex2 =
       "6 1 6 1 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 1 "
