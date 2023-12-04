@@ -31,17 +31,16 @@ public:
    * Return 64-bit hash from deterministically serializing a value in
    * an endian-independent way and hashing it with the xxHash algorithm.
    *
-   * Floats and doubles are just done as endian-adjusted raw bytes the same
-   * as integers; this is on par with what protobuf serialization does.
-   * src/google/protobuf/generated_message_util.cc literally just treats
-   * a float the same as int32 for serialization purposes.
-   *
    * enums are excluded because they're not needed; if they were to be
    * supported later they should have a separate function because enum
    * sizes are implementation-specific.
    *
    * bools have an inlined specialization below because they too have
    * implementation-specific sizes.
+   *
+   * floating point values have a specialization because just endian-
+   * ordering the binary leaves many possible binary representations of
+   * NaN, for example.
    *
    * @param input supplies the value to hash.
    * @param seed supplies the hash seed which defaults to 0.
@@ -61,6 +60,21 @@ public:
     }
     return XXH64(buf, sizeof(input), seed);
 #endif
+  }
+  template <typename FloatingPoint,
+            std::enable_if_t<std::is_floating_point_v<FloatingPoint>, bool> = true>
+  static uint64_t xxHash64FloatingPoint(FloatingPoint input, uint64_t seed = 0) {
+    if (std::isnan(input)) {
+      return XXH64("NaN", 3, seed);
+    }
+    if (std::isinf(input)) {
+      return XXH64("Inf", 3, seed);
+    }
+    int exp;
+    auto frac = std::frexp(input, &exp);
+    seed = xxHash64Value(exp, seed);
+    uint64_t mantissa = frac * 9223372036854775808.0; // 2^63
+    return xxHash64Value(mantissa, seed);
   }
 
   /**
@@ -92,6 +106,14 @@ public:
 template <> inline uint64_t HashUtil::xxHash64Value(bool input, uint64_t seed) {
   char b = input ? 1 : 0;
   return XXH64(&b, sizeof(b), seed);
+}
+// Explicit specialization for float and double because IEEE binary representation of NaN
+// can be inconsistent.
+template <> inline uint64_t HashUtil::xxHash64Value(double input, uint64_t seed) {
+  return xxHash64FloatingPoint(input, seed);
+}
+template <> inline uint64_t HashUtil::xxHash64Value(float input, uint64_t seed) {
+  return xxHash64FloatingPoint(input, seed);
 }
 
 /**

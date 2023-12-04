@@ -19,8 +19,19 @@ TEST(Hash, xxHash64Value) {
   EXPECT_EQ(5127252389447085590UL, HashUtil::xxHash64Value(-1234567890123456789L));
   EXPECT_EQ(14922725725041217620UL, HashUtil::xxHash64Value(1234567890U));
   EXPECT_EQ(12903803813495632273UL, HashUtil::xxHash64Value(-1234567890));
-  EXPECT_EQ(496866755078513886UL, HashUtil::xxHash64Value(1234567890.12345));
-  EXPECT_EQ(15789047197365695310UL, HashUtil::xxHash64Value(-1234567890.12345f));
+  EXPECT_EQ(6394838272449507810UL, HashUtil::xxHash64Value(1234567890.12345));
+  EXPECT_EQ(16086425465732342325UL, HashUtil::xxHash64Value(-1234567890.12345f));
+  // All NaN should be alike.
+  EXPECT_EQ(13464136223671999926UL, HashUtil::xxHash64Value(std::nan("")));
+  EXPECT_EQ(13464136223671999926UL, HashUtil::xxHash64Value(std::nan("1")));
+  EXPECT_EQ(13464136223671999926UL, HashUtil::xxHash64Value(std::nanf("")));
+  EXPECT_EQ(13464136223671999926UL, HashUtil::xxHash64Value(std::nanf("1")));
+  // All Inf should be alike.
+  EXPECT_EQ(16018703821796664527UL,
+            HashUtil::xxHash64Value(std::numeric_limits<double>::infinity()));
+  EXPECT_EQ(16018703821796664527UL,
+            HashUtil::xxHash64Value(std::numeric_limits<float>::infinity()));
+
   EXPECT_EQ(9962287286179718960UL, HashUtil::xxHash64Value(true));
   EXPECT_EQ(16804241149081757544UL, HashUtil::xxHash64Value(false));
   EXPECT_EQ(9486749600008296231UL, HashUtil::xxHash64Value(false, /*seed=*/42));
