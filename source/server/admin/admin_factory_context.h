@@ -3,7 +3,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
-#include "source/common/config/metadata.h"
+#include "source/extensions/listener_managers/listener_manager/listener_info_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -67,7 +67,7 @@ private:
   // Listener scope with the listener prefix.
   Stats::ScopeSharedPtr listener_scope_;
 
-  const EmptyListenerInfo listener_info_;
+  const ListenerInfoImpl listener_info_;
 };
 using AdminFactoryContextPtr = std::unique_ptr<AdminFactoryContext>;
 

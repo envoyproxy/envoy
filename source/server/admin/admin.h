@@ -35,7 +35,6 @@
 #include "source/common/router/scoped_config_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "source/extensions/listener_managers/listener_manager/listener_info_impl.h"
 #include "source/server/admin/admin_factory_context.h"
 #include "source/server/admin/admin_filter.h"
 #include "source/server/admin/clusters_handler.h"
@@ -390,7 +389,9 @@ private:
     Stats::Scope& listenerScope() override { return scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
+    const Network::ListenerInfo& listenerInfo() const override {
+      return parent_.factoryContext().listenerInfo();
+    }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
@@ -415,7 +416,6 @@ private:
     BasicResourceLimitImpl open_connections_;
 
   private:
-    const ListenerInfoImpl listener_info_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
