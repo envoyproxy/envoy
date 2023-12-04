@@ -1184,7 +1184,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 // modifications which may themselves affect route selection.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
                                                         bool end_stream) {
-  ENVOY_STREAM_LOG(trace, "request headers complete (end_stream={}):\n{}", *this, end_stream,
+  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *headers);
   // We only want to record this when reading the headers the first time, not when recreating
   // a stream.
