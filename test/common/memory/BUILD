@@ -15,6 +15,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "memory_release_test",
+    srcs = ["memory_release_test.cc"],
+    deps = [
+        "//source/common/memory:stats_lib",
+        "//source/common/event:dispatcher_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:overload_manager_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        ],
+)
+
+envoy_cc_test(
     name = "heap_shrinker_test",
     srcs = ["heap_shrinker_test.cc"],
     deps = [
