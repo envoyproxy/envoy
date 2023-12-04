@@ -78,7 +78,7 @@ public:
   MockDnsCacheManager();
   ~MockDnsCacheManager() override;
 
-  MOCK_METHOD(DnsCacheSharedPtr, getCache,
+  MOCK_METHOD(absl::StatusOr<DnsCacheSharedPtr>, getCache,
               (const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config));
   MOCK_METHOD(DnsCacheSharedPtr, lookUpCacheByName, (absl::string_view cache_name));
 

@@ -53,12 +53,12 @@ REGISTER_FACTORY(DynamicPortObjectFactory, StreamInfo::FilterState::ObjectFactor
 
 Cluster::Cluster(
     const envoy::config::cluster::v3::Cluster& cluster,
+    Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Upstream::ClusterFactoryContext& context,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager)
     : Upstream::BaseDynamicClusterImpl(cluster, context),
-      dns_cache_manager_(cache_manager_factory.get()),
-      dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
+      dns_cache_manager_(std::move(cache_manager)), dns_cache_(std::move(cache)),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)),
       local_info_(context.serverFactoryContext().localInfo()),
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
@@ -490,8 +490,14 @@ ClusterFactory::createClusterWithConfig(
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
 
-  auto new_cluster = std::shared_ptr<Cluster>(
-      new Cluster(cluster_config, proto_config, context, cache_manager_factory));
+  Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
+      cache_manager_factory.get();
+  auto dns_cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
+  RETURN_IF_STATUS_NOT_OK(dns_cache_or_error);
+
+  auto new_cluster =
+      std::shared_ptr<Cluster>(new Cluster(cluster_config, std::move(dns_cache_or_error.value()),
+                                           proto_config, context, std::move(cache_manager)));
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       context.serverFactoryContext());
