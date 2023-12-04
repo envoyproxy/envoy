@@ -248,7 +248,7 @@ private:
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
-  void setUpstreamOverrideHost(absl::string_view, bool) override {}
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost&&) override {}
   absl::optional<Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const override {
     return absl::nullopt;

@@ -67,7 +67,8 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
   }
 
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
-    decoder_callbacks_->setUpstreamOverrideHost(upstream_address.value(), config->isStrict());
+    decoder_callbacks_->setUpstreamOverrideHost(
+        std::make_pair(upstream_address.value(), config->isStrict()));
   }
   return Http::FilterHeadersStatus::Continue;
 }

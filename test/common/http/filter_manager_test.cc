@@ -419,7 +419,7 @@ TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
       }));
   filter_manager_->createFilterChain();
 
-  decoder_filter->callbacks_->setUpstreamOverrideHost("1.2.3.4", true);
+  decoder_filter->callbacks_->setUpstreamOverrideHost(std::make_pair("1.2.3.4", true));
 
   auto override_host = decoder_filter->callbacks_->upstreamOverrideHost();
   EXPECT_EQ(override_host.value().first, "1.2.3.4");
