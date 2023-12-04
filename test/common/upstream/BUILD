@@ -565,8 +565,7 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
-        "//source/common/quic:quic_client_transport_socket_factory_lib",
-        "//source/common/quic:quic_server_transport_socket_factory_lib",
+        "//source/common/quic:quic_transport_socket_factory_lib",
     ]),
 )
 
