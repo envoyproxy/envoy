@@ -16,7 +16,7 @@ public:
   FakeAccessLog(LogSignature cb) : log_cb_(cb) {}
 
   void log(const Formatter::HttpFormatterContext& context,
-           const StreamInfo::StreamInfo& info) override {
+           StreamInfo::StreamInfo& info) override {
     if (log_cb_) {
       log_cb_(context, info);
     }

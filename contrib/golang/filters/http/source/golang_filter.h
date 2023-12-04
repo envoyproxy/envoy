@@ -205,7 +205,7 @@ public:
 
   // AccessLog::Instance
   void log(const Formatter::HttpFormatterContext& log_context,
-           const StreamInfo::StreamInfo& info) override;
+           StreamInfo::StreamInfo& info) override;
 
   void onStreamComplete() override {}
 

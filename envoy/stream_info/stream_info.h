@@ -694,6 +694,11 @@ public:
   virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
+   * @return the time that the access log was emitted.
+   */
+  virtual absl::optional<SystemTime> emitLogTime() const PURE;
+
+  /**
    * Sets the upstream information for this stream.
    */
   virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo>) PURE;
@@ -720,6 +725,11 @@ public:
    * completed (i.e., when the request's ActiveStream is destroyed).
    */
   virtual void onRequestComplete() PURE;
+
+  /**
+   * Sets the emit log time. This method is called once the access log has been emitted.
+   */
+  virtual void onEmitLog() PURE;
 
   /**
    * @return the downstream timing information.

@@ -227,7 +227,7 @@ ContextBase* Wasm::createRootContext(const std::shared_ptr<PluginBase>& plugin) 
 ContextBase* Wasm::createVmContext() { return new Context(this); }
 
 void Wasm::log(const PluginSharedPtr& plugin, const Formatter::HttpFormatterContext& log_context,
-               const StreamInfo::StreamInfo& info) {
+               StreamInfo::StreamInfo& info) {
   auto context = getRootContext(plugin, true);
   context->log(log_context, info);
 }

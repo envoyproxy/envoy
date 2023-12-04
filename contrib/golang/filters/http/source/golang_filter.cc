@@ -212,7 +212,8 @@ void Filter::onDestroy() {
 
 // access_log is executed before the log of the stream filter
 void Filter::log(const Formatter::HttpFormatterContext& log_context,
-                 const StreamInfo::StreamInfo&) {
+                 StreamInfo::StreamInfo& stream_info) {
+  stream_info.onEmitLog();
   // `log` may be called multiple times with different log type
   switch (log_context.accessLogType()) {
   case Envoy::AccessLog::AccessLogType::DownstreamStart:

@@ -9,8 +9,8 @@ namespace AccessLoggers {
 namespace Common {
 
 void ImplBase::log(const Formatter::HttpFormatterContext& log_context,
-                   const StreamInfo::StreamInfo& stream_info) {
-
+                   StreamInfo::StreamInfo& stream_info) {
+  stream_info.onEmitLog();
   if (filter_ && !filter_->evaluate(log_context, stream_info)) {
     return;
   }

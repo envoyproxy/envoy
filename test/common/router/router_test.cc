@@ -69,14 +69,14 @@ namespace Router {
 // Allows verifying the state of the upstream StreamInfo
 class TestAccessLog : public AccessLog::Instance {
 public:
-  explicit TestAccessLog(std::function<void(const StreamInfo::StreamInfo&)> func) : func_(func) {}
+  explicit TestAccessLog(std::function<void(StreamInfo::StreamInfo&)> func) : func_(func) {}
 
-  void log(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& info) override {
+  void log(const Formatter::HttpFormatterContext&, StreamInfo::StreamInfo& info) override {
     func_(info);
   }
 
 private:
-  std::function<void(const StreamInfo::StreamInfo&)> func_;
+  std::function<void(StreamInfo::StreamInfo&)> func_;
 };
 
 class RouterTest : public RouterTestBase {
