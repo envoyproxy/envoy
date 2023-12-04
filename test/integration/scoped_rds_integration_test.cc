@@ -434,67 +434,6 @@ key:
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(ScopedRdsIntegrationTest, IgnoreUnknownOptionalHttpFilterInPerFilterTypedConfig) {
-  constexpr absl::string_view scope_tmpl = R"EOF(
-name: {}
-route_configuration_name: {}
-key:
-  fragments:
-    - string_key: {}
-)EOF";
-  const std::string scope_route = fmt::format(scope_tmpl, "foo_scope1", "foo_route", "foo-route");
-
-  constexpr absl::string_view route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
-        typed_per_filter_config:
-          filter.unknown:
-            "@type": type.googleapis.com/google.protobuf.Struct
-)EOF";
-
-  on_server_init_function_ = [&]() {
-    createScopedRdsStream();
-    sendSrdsResponse({scope_route}, {scope_route}, {}, "1");
-    createRdsStream("foo_route");
-    // CreateRdsStream waits for connection which is fired by RDS subscription.
-    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route", "cluster_0"), "1");
-  };
-
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false");
-
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             http_connection_manager) {
-        auto* filter = http_connection_manager.mutable_http_filters()->Add();
-        filter->set_name("filter.unknown");
-        filter->set_is_optional(true);
-        // keep router the last
-        auto size = http_connection_manager.http_filters_size();
-        http_connection_manager.mutable_http_filters()->SwapElements(size - 2, size - 1);
-      });
-
-  initialize();
-  registerTestServerPorts({"http"});
-
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route.update_attempt", 1);
-  sendRequestAndVerifyResponse(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=foo-route"}},
-      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
-      /*cluster_0*/ 0);
-  cleanupUpstreamAndDownstream();
-}
-
 TEST_P(ScopedRdsIntegrationTest, RejectKeyConflictInDeltaUpdate) {
   if (!isDelta()) {
     return;

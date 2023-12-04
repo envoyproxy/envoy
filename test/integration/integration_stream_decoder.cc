@@ -24,6 +24,10 @@ namespace Envoy {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
+IntegrationStreamDecoder::~IntegrationStreamDecoder() {
+  ENVOY_LOG_MISC(trace, "Destroying IntegrationStreamDecoder");
+}
+
 void IntegrationStreamDecoder::waitFor1xxHeaders() {
   if (!continue_headers_.get()) {
     waiting_for_continue_headers_ = true;

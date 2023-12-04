@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
 // [#extension: envoy.filters.network.zookeeper_proxy]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ZooKeeperProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.zookeeper_proxy.v1alpha1.ZooKeeperProxy";
@@ -65,6 +65,9 @@ message ZooKeeperProxy {
 
   // Whether to emit per opcode response bytes metrics. If not set, it defaults to false.
   bool enable_per_opcode_response_bytes_metrics = 8;
+
+  // Whether to emit per opcode decoder error metrics. If not set, it defaults to false.
+  bool enable_per_opcode_decoder_error_metrics = 9;
 }
 
 message LatencyThresholdOverride {

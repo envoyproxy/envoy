@@ -372,7 +372,7 @@ TEST_P(IntegrationTest, RequestAndResponse) {
 
   EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().code(), StatusCode::kOk);
-  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->getByKey("zzzz"), "xxxx");
+  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->get("zzzz"), "xxxx");
 
   cleanup();
 }
@@ -475,8 +475,8 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), StatusCode::kOk);
-  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->getByKey("zzzz"), "xxxx");
-  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->getByKey("stream_id"), "2");
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("zzzz"), "xxxx");
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("stream_id"), "2");
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
@@ -491,8 +491,8 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), StatusCode::kOk);
-  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->getByKey("zzzz"), "yyyy");
-  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->getByKey("stream_id"), "1");
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("zzzz"), "yyyy");
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("stream_id"), "1");
 
   cleanup();
 }
@@ -606,8 +606,8 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
 
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), StatusCode::kOk);
-  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->getByKey("zzzz"), "xxxx");
-  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->getByKey("stream_id"), "2");
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("zzzz"), "xxxx");
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("stream_id"), "2");
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
@@ -628,8 +628,8 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
 
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), StatusCode::kOk);
-  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->getByKey("zzzz"), "yyyy");
-  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->getByKey("stream_id"), "1");
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("zzzz"), "yyyy");
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("stream_id"), "1");
 
   cleanup();
 }

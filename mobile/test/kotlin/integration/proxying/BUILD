@@ -1,20 +1,9 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_android_test")
 
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
-
-envoy_mobile_kt_library(
-    name = "proxy_lib",
-    srcs = ["Proxy.kt"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-    ],
-)
 
 envoy_mobile_android_test(
     name = "proxy_info_intent_perform_http_request_using_proxy_test",
@@ -38,7 +27,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
     ],
 )
 
@@ -64,7 +53,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
     ],
 )
 
@@ -90,7 +79,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
     ],
 )
 
@@ -116,7 +105,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
     ],
 )
 
@@ -142,7 +131,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
     ],
 )
 
@@ -168,6 +157,6 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
     ],
 )
