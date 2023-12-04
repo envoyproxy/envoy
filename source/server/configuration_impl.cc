@@ -119,7 +119,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
     ENVOY_LOG(debug, "static secret #{}: {}", i, secrets[i].name());
-    server.secretManager().addStaticSecret(secrets[i]);
+    THROW_IF_NOT_OK(server.secretManager().addStaticSecret(secrets[i]));
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
