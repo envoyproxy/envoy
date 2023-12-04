@@ -19,6 +19,16 @@ TEST(HashTest, EmptyMessageHashMatches) {
   EXPECT_EQ(hash(empty1), hash(empty2));
 }
 
+TEST(HashTest, MapWithRemovedValueBehavesTheSameAsEmptyMap) {
+  // This test is from an abundance of caution, to make sure that
+  // reflection can't be driven to traverse a map field with no values
+  // in it (there would be an ASSERT in that path.)
+  deterministichashtest::Maps empty1, empty2;
+  (*empty1.mutable_bool_string())[false] = "false";
+  (*empty1.mutable_bool_string()).erase(false);
+  EXPECT_EQ(hash(empty1), hash(empty2));
+}
+
 TEST(HashTest, BoolKeyedMapIsInsertionOrderAgnostic) {
   deterministichashtest::Maps map1, map2;
   (*map1.mutable_bool_string())[false] = "false";

@@ -80,105 +80,28 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed =
 uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor& field, uint64_t seed);
 
-// MapFieldComparator uses selectCompareFn at init-time, rather than putting the
-// switch into the comparator, because that way the switch is only performed once,
-// rather than O(n*log(n)) times during std::sort.
-//
-// This uses a member-function pointer rather than a virtual function with a
-// polymorphic object selected during a create function because std::sort
-// does not accept a polymorphic object as a comparator (due to that argument
-// being taken by value).
-struct MapFieldComparator {
-  MapFieldComparator(const Protobuf::Message& first_msg)
-      : reflection_(*first_msg.GetReflection()), descriptor_(*first_msg.GetDescriptor()),
-        key_field_(*descriptor_.map_key()), compare_fn_(selectCompareFn()) {}
-  bool operator()(const Protobuf::Message& a, const Protobuf::Message& b) const {
-    return (this->*compare_fn_)(a, b);
-  }
-
-private:
-  template <typename T>
-  bool compareByScalar(const Protobuf::Message& a, const Protobuf::Message& b) const {
-    return reflectionGet<T>(reflection_, a, key_field_) <
-           reflectionGet<T>(reflection_, b, key_field_);
-  };
-  bool compareByString(const Protobuf::Message& a, const Protobuf::Message& b) const {
-    std::string scratch_a, scratch_b;
-    return reflection_.GetStringReference(a, &key_field_, &scratch_a) <
-           reflection_.GetStringReference(b, &key_field_, &scratch_b);
-  }
-  using CompareMemberFn = bool (MapFieldComparator::*)(const Protobuf::Message& a,
-                                                       const Protobuf::Message& b) const;
-  CompareMemberFn selectCompareFn() {
-    using Protobuf::FieldDescriptor;
-    switch (key_field_.cpp_type()) {
-    case FieldDescriptor::CPPTYPE_INT32:
-      return &MapFieldComparator::compareByScalar<int32_t>;
-    case FieldDescriptor::CPPTYPE_UINT32:
-      return &MapFieldComparator::compareByScalar<uint32_t>;
-    case FieldDescriptor::CPPTYPE_INT64:
-      return &MapFieldComparator::compareByScalar<int64_t>;
-    case FieldDescriptor::CPPTYPE_UINT64:
-      return &MapFieldComparator::compareByScalar<uint64_t>;
-    case FieldDescriptor::CPPTYPE_BOOL:
-      return &MapFieldComparator::compareByScalar<bool>;
-    case FieldDescriptor::CPPTYPE_STRING:
-      return &MapFieldComparator::compareByString;
-    case FieldDescriptor::CPPTYPE_DOUBLE:
-    case FieldDescriptor::CPPTYPE_FLOAT:
-    case FieldDescriptor::CPPTYPE_ENUM:
-    case FieldDescriptor::CPPTYPE_MESSAGE:
-      break;
-    }
-    PANIC_DUE_TO_CORRUPT_ENUM;
-  }
-  const Protobuf::Reflection& reflection_;
-  const Protobuf::Descriptor& descriptor_;
-  const Protobuf::FieldDescriptor& key_field_;
-  CompareMemberFn compare_fn_;
-};
-
-std::vector<std::reference_wrapper<const Protobuf::Message>>
-sortedMapField(const Protobuf::RepeatedFieldRef<Protobuf::Message> map_entries) {
-  std::vector<std::reference_wrapper<const Protobuf::Message>> entries(map_entries.begin(),
-                                                                       map_entries.end());
-  MapFieldComparator compare(*entries.begin());
-  std::sort(entries.begin(), entries.end(), compare);
-  return entries;
-}
-
-// To make a map serialize deterministically we need to force the order.
-// Here we're going to sort the keys into numerical order for number keys,
-// or lexicographical order for strings, and then hash them in that order.
+// To make a map serialize deterministically we need to ignore the order of
+// the map fields. To do that, we simply combine the hashes of each entry
+// using an unordered operator (addition), and then apply that combined hash to
+// the seed.
 uint64_t reflectionHashMapField(const Protobuf::Message& message,
                                 const Protobuf::FieldDescriptor& field, uint64_t seed) {
   const Protobuf::Reflection& reflection = *message.GetReflection();
-  // For repeated fields in general the order is significant. For map fields,
-  // the implementation may have a fixed order or a nondeterministic order,
-  // but conceptually a map field is supposed to be order agnostic.
-  //
-  // We should definitely *not* sort repeated fields in general; maps, however,
-  // are represented on the wire and in reflection format as repeated fields.
-  // Since the order is canonically not part of the data in the case of maps,
-  // this means for consistent hashing it must be ensured that the fields are
-  // handled in a deterministic order.
-  //
-  // It may be that if we didn't sort them the order would be deterministic, but
-  // that would be a non-guaranteed implementation detail, and a future version
-  // of protobuf could potentially change the internal map representation. Sorting
-  // also means theoretically we could produce a cross-language compatible hash;
-  // golang, for example, explicitly randomly orders map fields in its implementation.
   ASSERT(field.is_map());
-  auto sorted_entries =
-      sortedMapField(reflection.GetRepeatedFieldRef<Protobuf::Message>(message, &field));
-  const Protobuf::Descriptor& map_descriptor = *sorted_entries.begin()->get().GetDescriptor();
+  const auto& entries = reflection.GetRepeatedFieldRef<Protobuf::Message>(message, &field);
+  ASSERT(!entries.empty());
+  const Protobuf::Descriptor& map_descriptor = *entries.begin()->GetDescriptor();
   const Protobuf::FieldDescriptor& key_field = *map_descriptor.map_key();
   const Protobuf::FieldDescriptor& value_field = *map_descriptor.map_value();
-  for (const Protobuf::Message& entry : sorted_entries) {
-    seed = reflectionHashField(entry, key_field, seed);
-    seed = reflectionHashField(entry, value_field, seed);
+  uint64_t combined_hash = 0;
+  for (const Protobuf::Message& entry : entries) {
+    uint64_t entry_hash = reflectionHashField(entry, key_field, 0);
+    entry_hash = reflectionHashField(entry, value_field, entry_hash);
+    combined_hash += entry_hash;
   }
-  return seed;
+  return HashUtil::xxHash64(
+      absl::string_view{reinterpret_cast<const char*>(&combined_hash), sizeof(combined_hash)},
+      seed);
 }
 
 uint64_t reflectionHashField(const Protobuf::Message& message,
