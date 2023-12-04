@@ -71,9 +71,11 @@ public:
       return XXH64("Inf", 3, seed);
     }
     int exp;
-    auto frac = std::frexp(input, &exp);
+    FloatingPoint frac = std::frexp(input, &exp);
     seed = xxHash64Value(exp, seed);
-    uint64_t mantissa = frac * 9223372036854775808.0; // 2^63
+    // Turn the fraction between -1 and 1 we have into an integer we can
+    // hash endian-independently, using the largest possible range.
+    int64_t mantissa = frac * 9223372036854775808.0; // 2^63
     return xxHash64Value(mantissa, seed);
   }
 
