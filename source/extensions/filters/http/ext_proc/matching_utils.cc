@@ -11,23 +11,26 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr>
+absl::flat_hash_map<std::string, ExpressionManager::CelExpression>
 ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) {
-  absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr> expressions;
+  absl::flat_hash_map<std::string, ExpressionManager::CelExpression> expressions;
 #if defined(USE_CEL_PARSER)
   for (const auto& matcher : matchers) {
+    if (expressions.contains(matcher)) {
+      continue;
+    }
     auto parse_status = google::api::expr::parser::Parse(matcher);
     if (!parse_status.ok()) {
       throw EnvoyException("Unable to parse descriptor expression: " +
                            parse_status.status().ToString());
     }
 
-    auto& iter = expr_list_.emplace_back(parse_status.value());
-
     Filters::Common::Expr::ExpressionPtr expression =
-        Extensions::Filters::Common::Expr::createExpression(builder_->builder(), iter.expr());
+        Extensions::Filters::Common::Expr::createExpression(builder_->builder(),
+                                                            parse_status.value().expr());
 
-    expressions.try_emplace(matcher, std::move(expression));
+    CelExpression cel_expr{parse_status.value(), std::move(expression)};
+    expressions.emplace(matcher, std::move(cel_expr));
   }
 #else
   ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."
@@ -37,9 +40,9 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
   return expressions;
 }
 
-std::unique_ptr<ProtobufWkt::Struct> ExpressionManager::evaluateAttributes(
-    const Filters::Common::Expr::Activation& activation,
-    const absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr>& expr) {
+std::unique_ptr<ProtobufWkt::Struct>
+ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& activation,
+                                      const absl::flat_hash_map<std::string, CelExpression>& expr) {
 
   if (expr.empty()) {
     return nullptr;
@@ -48,7 +51,7 @@ std::unique_ptr<ProtobufWkt::Struct> ExpressionManager::evaluateAttributes(
   auto proto = std::make_unique<ProtobufWkt::Struct>();
   for (const auto& hash_entry : expr) {
     ProtobufWkt::Arena arena;
-    const auto result = hash_entry.second->Evaluate(activation, &arena);
+    const auto result = hash_entry.second.compiled_expr_->Evaluate(activation, &arena);
     if (!result.ok()) {
       // TODO: Stats?
       continue;

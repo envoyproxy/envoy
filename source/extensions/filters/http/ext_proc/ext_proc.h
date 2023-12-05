@@ -137,10 +137,8 @@ public:
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
-        allowed_headers_(
-            initHeaderMatchers(config.forward_rules().allowed_headers())),
-        disallowed_headers_(
-            initHeaderMatchers(config.forward_rules().disallowed_headers())),
+        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
+        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
         expression_manager_(builder, config.request_attributes(), config.response_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }

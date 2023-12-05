@@ -12,6 +12,11 @@ namespace ExternalProcessing {
 
 class ExpressionManager : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
+  struct CelExpression {
+    google::api::expr::v1alpha1::ParsedExpr parsed_expr_;
+    Filters::Common::Expr::ExpressionPtr compiled_expr_;
+  };
+
   ExpressionManager(Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
                     const Protobuf::RepeatedPtrField<std::string>& request_matchers,
                     const Protobuf::RepeatedPtrField<std::string>& response_matchers)
@@ -32,21 +37,18 @@ public:
     return evaluateAttributes(activation, response_expr_);
   }
 
-  static std::unique_ptr<ProtobufWkt::Struct> evaluateAttributes(
-      const Filters::Common::Expr::Activation& activation,
-      const absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr>& expr);
+  static std::unique_ptr<ProtobufWkt::Struct>
+  evaluateAttributes(const Filters::Common::Expr::Activation& activation,
+                     const absl::flat_hash_map<std::string, CelExpression>& expr);
 
 private:
-  // This list is required to maintain the lifetimes of expr objects on which compiled expressions
-  // depend
-  std::list<google::api::expr::v1alpha1::ParsedExpr> expr_list_;
-  absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr>
+  absl::flat_hash_map<std::string, CelExpression>
   initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers);
 
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
 
-  const absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr> request_expr_;
-  const absl::flat_hash_map<std::string, Filters::Common::Expr::ExpressionPtr> response_expr_;
+  const absl::flat_hash_map<std::string, CelExpression> request_expr_;
+  const absl::flat_hash_map<std::string, CelExpression> response_expr_;
 };
 
 const std::vector<Matchers::StringMatcherPtr>

@@ -3342,7 +3342,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
         EXPECT_EQ(proto_struct.fields().at("response.code").string_value(), "200");
-        EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(), "via_upstream");
+        EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(),
+                  StreamInfo::ResponseCodeDetails::get().ViaUpstream);
         return true;
       });
 
