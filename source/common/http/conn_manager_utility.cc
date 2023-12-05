@@ -92,6 +92,9 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   if (!Utility::isUpgrade(request_headers)) {
     request_headers.removeConnection();
     request_headers.removeUpgrade();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
+      request_headers.removeTE();
+    }
   }
 
   // Clean proxy headers.

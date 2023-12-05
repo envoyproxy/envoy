@@ -45,6 +45,16 @@ MockStatsConfig::~MockStatsConfig() = default;
 StatelessMockServerFactoryContext::StatelessMockServerFactoryContext()
     : filter_config_provider_manager_(
           std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
+          
+MockGenericFactoryContext::~MockGenericFactoryContext() = default;
+
+MockGenericFactoryContext::MockGenericFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(*store_.rootScope()));
+  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+}
 
 } // namespace Configuration
 } // namespace Server

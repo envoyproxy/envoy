@@ -80,7 +80,7 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() = default;
 
-  virtual void onDecodeError() PURE;
+  virtual void onDecodeError(const absl::optional<OpCodes> opcode) PURE;
   virtual void onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) PURE;
   virtual void onConnect(bool readonly) PURE;
   virtual void onPing() PURE;
@@ -90,13 +90,16 @@ public:
                                        OpCodes opcode) PURE;
   virtual void onSetRequest(const std::string& path) PURE;
   virtual void onGetChildrenRequest(const std::string& path, bool watch, bool v2) PURE;
-  virtual absl::Status onGetEphemeralsRequest(const absl::StatusOr<std::string>& path) PURE;
-  virtual absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) PURE;
+  virtual absl::Status onGetEphemeralsRequest(const absl::StatusOr<std::string>& path,
+                                              const OpCodes opcode) PURE;
+  virtual absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path,
+                                                     const OpCodes opcode) PURE;
   virtual void onDeleteRequest(const std::string& path, int32_t version) PURE;
   virtual void onExistsRequest(const std::string& path, bool watch) PURE;
   virtual void onGetAclRequest(const std::string& path) PURE;
   virtual void onSetAclRequest(const std::string& path, int32_t version) PURE;
-  virtual absl::Status onSyncRequest(const absl::StatusOr<std::string>& path) PURE;
+  virtual absl::Status onSyncRequest(const absl::StatusOr<std::string>& path,
+                                     const OpCodes opcode) PURE;
   virtual void onCheckRequest(const std::string& path, int32_t version) PURE;
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;

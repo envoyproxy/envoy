@@ -23,7 +23,7 @@ public:
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
-                Server::Configuration::CommonFactoryContext& context)
+                Server::GenericFactoryContextImpl context)
       : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context)),
         content_type_(
             !config.content_type().empty() ? config.content_type()
