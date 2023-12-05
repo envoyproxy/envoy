@@ -84,7 +84,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
     PathWithEscapedSlashesAction
     getPathWithEscapedSlashesActionRuntimeOverride(Server::Configuration::FactoryContext& context) {
   // The default behavior is to leave escaped slashes unchanged.
-  uint64_t runtime_override = context.getServerFactoryContext().runtime().snapshot().getInteger(
+  uint64_t runtime_override = context.serverFactoryContext().runtime().snapshot().getInteger(
       "http_connection_manager.path_with_escaped_slashes_action", 0);
   switch (runtime_override) {
   default:
@@ -111,7 +111,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
   envoy::type::v3::FractionalPercent default_fraction;
   default_fraction.set_numerator(100);
   default_fraction.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-  if (context.getServerFactoryContext().runtime().snapshot().featureEnabled(
+  if (context.serverFactoryContext().runtime().snapshot().featureEnabled(
           "http_connection_manager.path_with_escaped_slashes_action_enabled", default_fraction)) {
     return config.path_with_escaped_slashes_action() ==
                    envoy::extensions::filters::network::http_connection_manager::v3::
@@ -177,7 +177,7 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
   }
 
   header_validator_factory = factory->createFromProto(header_validator_config.typed_config(),
-                                                      context.getServerFactoryContext());
+                                                      context.serverFactoryContext());
   if (!header_validator_factory) {
     throwEnvoyExceptionOrPanic(fmt::format("Header validator extension could not be created: '{}'",
                                            header_validator_config.name()));
@@ -206,7 +206,7 @@ SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       server_context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
@@ -278,7 +278,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
-    auto& server_context = context.getServerFactoryContext();
+    auto& server_context = context.serverFactoryContext();
 
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), server_context.api().randomGenerator(),
@@ -344,11 +344,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb,
-          context.getServerFactoryContext().runtime().snapshot().getInteger(
+          context.serverFactoryContext().runtime().snapshot().getInteger(
               Http::MaxRequestHeadersSizeOverrideKey, Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
-          context.getServerFactoryContext().runtime().snapshot().getInteger(
+          context.serverFactoryContext().runtime().snapshot().getInteger(
               Http::MaxRequestHeadersCountOverrideKey, Http::DEFAULT_MAX_HEADERS_COUNT))),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
@@ -375,13 +375,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
-          context.getServerFactoryContext().runtime().snapshot().featureEnabled(
+          context.serverFactoryContext().runtime().snapshot().featureEnabled(
               "http_connection_manager.normalize_path", 100))),
 #else
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
-          context.getServerFactoryContext().runtime().snapshot().featureEnabled(
+          context.serverFactoryContext().runtime().snapshot().featureEnabled(
               "http_connection_manager.normalize_path", 0))),
 #endif
       merge_slashes_(config.merge_slashes()),
@@ -497,13 +497,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_.getServerFactoryContext(), context_.messageValidationVisitor(),
+        config, context_.serverFactoryContext(), context_.messageValidationVisitor(),
         context_.initManager(), stats_prefix_, route_config_provider_manager_);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
-        config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
+        config, context_.serverFactoryContext(), context_.initManager(), stats_prefix_,
         scoped_routes_config_provider_manager_);
     scope_key_builder_ = Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
     break;
@@ -554,7 +554,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {
-    user_agent_ = context_.getServerFactoryContext().localInfo().clusterName();
+    user_agent_ = context_.serverFactoryContext().localInfo().clusterName();
   }
 
   if (config.has_tracing()) {
@@ -642,8 +642,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   Http::FilterChainHelper<Server::Configuration::FactoryContext,
                           Server::Configuration::NamedHttpFilterConfigFactory>
-      helper(filter_config_provider_manager_, context_.getServerFactoryContext(),
-             context_.getServerFactoryContext().clusterManager(), context_, stats_prefix_);
+      helper(filter_config_provider_manager_, context_.serverFactoryContext(),
+             context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
   THROW_IF_NOT_OK(helper.processFilters(config.http_filters(), "http", "http", filter_factories_));
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -688,7 +688,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
-        context_.getServerFactoryContext().api().randomGenerator(), http2_options_,
+        context_.serverFactoryContext().api().randomGenerator(), http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
         overload_manager);
   case CodecType::HTTP3:
@@ -702,7 +702,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(),
-        context_.getServerFactoryContext().api().randomGenerator(), http1_codec_stats_,
+        context_.serverFactoryContext().api().randomGenerator(), http1_codec_stats_,
         http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
   }
@@ -749,7 +749,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
 }
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
-  return *context_.getServerFactoryContext().localInfo().address();
+  return *context_.serverFactoryContext().localInfo().address();
 }
 
 /**
@@ -766,8 +766,8 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   }
   // Otherwise, for the sake of backwards compatibility, fall back to using tracing provider
   // configuration defined in the bootstrap config.
-  if (context_.getServerFactoryContext().httpContext().defaultTracingConfig().has_http()) {
-    return &context_.getServerFactoryContext().httpContext().defaultTracingConfig().http();
+  if (context_.serverFactoryContext().httpContext().defaultTracingConfig().has_http()) {
+    return &context_.serverFactoryContext().httpContext().defaultTracingConfig().http();
   }
   return nullptr;
 }
@@ -806,7 +806,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context, clear_hop_by_hop_headers](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
-    auto& server_context = context.getServerFactoryContext();
+    auto& server_context = context.serverFactoryContext();
 
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), server_context.api().randomGenerator(),

@@ -41,7 +41,7 @@ public:
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
   ProcessContextOptRef processContext() override;
-  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const Network::ListenerInfo& listenerInfo() const override;
   Network::DrainDecision& drainDecision() override;

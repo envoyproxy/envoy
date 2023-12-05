@@ -41,7 +41,7 @@ ServerLifecycleNotifier& FactoryContextImpl::lifecycleNotifier() {
   return server_.lifecycleNotifier();
 }
 ProcessContextOptRef FactoryContextImpl::processContext() { return server_.processContext(); }
-Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
+Configuration::ServerFactoryContext& FactoryContextImpl::serverFactoryContext() const {
   return server_.serverFactoryContext();
 }
 Configuration::TransportSocketFactoryContext&
