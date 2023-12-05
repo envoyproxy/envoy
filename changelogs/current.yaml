@@ -4,6 +4,10 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
+    Remove the hop by hop TE header from downstream request headers. This change can be temporarily reverted
+    by setting ``envoy.reloadable_features.sanitize_te`` to false.
+- area: http
+  change: |
     Flip runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to true. Name downgrading in the
     per filter config searching will be disabled by default. This behavior can be temporarily reverted by setting
     the flag to false explicitly.
@@ -27,8 +31,9 @@ minor_behavior_changes:
     To get the protocol, please use GetProperty("request.protocol") instead.
 - area: aws
   change: |
-    uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
-    which is deprecated. To revert this behavior set ``envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials`` to true.
+    Added support to use http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers
+    instead of libcurl which is deprecated. By default this behavior is disabled. To enable set
+    ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to true.
 - area: upstream
   change: |
     Fixed a reported issue (https://github.com/envoyproxy/envoy/issues/11004) that causes the Least
@@ -124,6 +129,10 @@ removed_config_or_runtime:
   change: |
     Removed the deprecated ``envoy.reloadable_features.format_ports_as_numbers``
     runtime flag and legacy code path.
+- area: router
+  change: |
+    Removed the deprecated ``envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config``
+    runtime flag and legacy code path.
 
 new_features:
 - area: filters
@@ -216,6 +225,13 @@ new_features:
     <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log_options>`
     to allow recording an access log entry periodically for the UDP session, and allow recording an access
     log entry on the connection tunnel created successfully to upstream when UDP tunneling is configured.
+- area: zookeeper
+  change: |
+    Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
+- area: stream info
+  change: |
+    Added time spent reading request headers to ``DownstreamTiming``.
 - area: ext_proc
   change: |
     implemented

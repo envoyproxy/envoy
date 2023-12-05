@@ -219,13 +219,14 @@ def format_header_from_file(
     # Workaround packages in generated go code conflicting by transforming:
     # foo/bar/v2 to use barv2 as the package in the generated code
     golang_package_name = ""
+    golang_package_base = file_proto.package.replace(".", "/")
+    if file_proto.name.startswith('contrib/'):
+        golang_package_base = 'contrib/' + golang_package_base
     if file_proto.package.split(".")[-1] in ("v2", "v3"):
         name = "".join(file_proto.package.split(".")[-2:])
         golang_package_name = ";" + name
-    options.go_package = "".join([
-        "github.com/envoyproxy/go-control-plane/",
-        file_proto.package.replace(".", "/"), golang_package_name
-    ])
+    options.go_package = "".join(
+        ["github.com/envoyproxy/go-control-plane/", golang_package_base, golang_package_name])
 
     # This is a workaround for C#/Ruby namespace conflicts between packages and
     # objects, see https://github.com/envoyproxy/envoy/pull/3854.
