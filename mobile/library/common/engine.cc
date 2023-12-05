@@ -90,8 +90,10 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
           ASSERT(Thread::MainThread::isMainOrTestThread());
 
-          connectivity_manager_ =
-              Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
+          Envoy::Server::GenericFactoryContextImpl generic_context(
+              server_->serverFactoryContext(),
+              server_->serverFactoryContext().messageValidationVisitor());
+          connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);

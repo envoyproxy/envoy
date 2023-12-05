@@ -23,8 +23,8 @@ public:
 
 } // namespace
 
-StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
-                                             Server::Configuration::CommonFactoryContext& context) {
+StatefulSessionConfig::StatefulSessionConfig(
+    const ProtoConfig& config, Server::Configuration::GenericFactoryContext& context) {
   if (!config.has_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
     return;
@@ -41,7 +41,7 @@ StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
 }
 
 PerRouteStatefulSession::PerRouteStatefulSession(
-    const PerRouteProtoConfig& config, Server::Configuration::CommonFactoryContext& context) {
+    const PerRouteProtoConfig& config, Server::Configuration::GenericFactoryContext& context) {
   if (config.override_case() == PerRouteProtoConfig::kDisabled) {
     disabled_ = true;
     return;
