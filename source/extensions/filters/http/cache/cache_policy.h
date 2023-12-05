@@ -44,8 +44,24 @@ enum class RequestCacheability {
   Cacheable,
   // Don't respond to this request from cache, or store its response into cache.
   Bypass,
-  // This request is eligible for serving from cache, but its response must not be stored. (E.g.
-  // requests with "Cache-Control: no-store").
+  // This request is eligible for serving from cache, but its response
+  // must not be stored. Consider the following sequence:
+  // - Request 1: "curl http://example.com/ -H 'cache-control: no-store'"
+  // - `requestCacheability` returns `NoStore`.
+  // - CacheFilter finds nothing in cache, so request 1 is proxied upstream.
+  // - Origin responds with a cacheable response 1.
+  // - CacheFilter does not store response 1 into cache.
+  // - Request 2: "curl http://example.com/"
+  // - `requestCacheability` returns `Cacheable`.
+  // - CacheFilter finds nothing in cache, so request 2 is proxied upstream.
+  // - Origin responds with a cacheable response 2.
+  // - CacheFilter stores response 2 into cache.
+  // - Request 3: "curl http://example.com/ -H 'cache-control: no-store'"
+  // - `requestCacheability` returns `NoStore`.
+  // - CacheFilter looks in cache and finds response 2, which matches.
+  // - CacheFilter serves response 2 from cache.
+  // To summarize, all 3 requests were eligble for serving from cache (though only request 3 found a
+  // match to serve), but only request 2 was allowed to have its response stored into cache.
   NoStore,
 };
 
