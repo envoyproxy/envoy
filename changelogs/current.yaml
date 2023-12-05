@@ -219,6 +219,9 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.
+- area: compression
+  change: |
+    Added qatzip :ref:`compressor <envoy_v3_api_msg_extensions.compression.qatzip.compressor.v3alpha.Qatzip>`.
 - area: udp_proxy
   change: |
     add :ref:`access log options
