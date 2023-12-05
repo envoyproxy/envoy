@@ -267,7 +267,7 @@ public:
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
 
   /**
    * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
@@ -379,7 +379,7 @@ public:
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
 
   /**
    * @return the init manager of the particular context. This can be used for extensions that need
