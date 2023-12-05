@@ -28,8 +28,10 @@ using SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 class SignatureConstantValues {
 public:
   const std::string Aws4Request{"aws4_request"};
-  const std::string AuthorizationHeaderFormat{
+  const std::string SigV4AuthorizationHeaderFormat{
       "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
+  const std::string SigV4AAuthorizationHeaderFormat{
+      "AWS4-ECDSA-P256-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
   const std::string SigV4CredentialScopeFormat{"{}/{}/{}/aws4_request"};
   const std::string SigV4ACredentialScopeFormat{"{}/{}/aws4_request"};
   const std::string HashedEmptyString{
@@ -158,8 +160,7 @@ private:
                                  absl::string_view credential_scope) const;
 
   std::string createSignature(absl::string_view access_key_id, absl::string_view secret_access_key, 
-                              absl::string_view short_date, absl::string_view string_to_sign,
-                              const absl::string_view override_region) const;
+                              absl::string_view string_to_sign) const;
 
   std::string createAuthorizationHeader(absl::string_view access_key_id,
                                         absl::string_view credential_scope,
@@ -183,7 +184,7 @@ private:
     std::vector<uint8_t> lhs_raw_be_bigint,
     std::vector<uint8_t> rhs_raw_be_bigint) const;
 
-  void constantTimeAddOne(std::vector<uint8_t> raw_be_bigint) const;
+  void constantTimeAddOne(std::vector<uint8_t> *raw_be_bigint) const;
 
   const std::string service_name_;
   const std::string region_;
