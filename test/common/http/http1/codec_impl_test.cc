@@ -4473,43 +4473,6 @@ TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
   }
 }
 
-// Line folding (also called continuation line) is disallowed per RFC9112 Section 5.2.
-TEST_P(Http1ServerConnectionImplTest, LineFolding) {
-  initialize();
-  InSequence s;
-
-  StrictMock<MockRequestDecoder> decoder;
-  Http::ResponseEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
-
-  TestRequestHeaderMapImpl expected_headers{
-      {":path", "/"}, {":method", "GET"}, {"foo", "folded value"}};
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder,
-                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-  } else {
-    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  }
-
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
-                           "foo: \r\n"
-                           " folded value\r\n\r\n");
-  auto status = codec_->dispatch(buffer);
-
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_FALSE(status.ok());
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_FORMAT");
-    EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
-  } else {
-    EXPECT_TRUE(status.ok());
-  }
-}
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/25458.
 TEST_P(Http1ServerConnectionImplTest, EmptyFieldName) {
   initialize();
@@ -4869,6 +4832,7 @@ TEST_P(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
 // such messages (also permitted by the specification). See RFC9110 Section 5.5:
 // https://www.rfc-editor.org/rfc/rfc9110.html#name-field-values.
 TEST_P(Http1ServerConnectionImplTest, ObsFold) {
+  // SPELLCHECKER(off)
   initialize();
 
   StrictMock<MockRequestDecoder> decoder;
@@ -4877,28 +4841,20 @@ TEST_P(Http1ServerConnectionImplTest, ObsFold) {
   TestRequestHeaderMapImpl expected_headers{
       {":path", "/"},
       {":method", "GET"},
-      {"multi-line-header", "foo  bar"},
+      {"multi-line-header", "foo  bar\t\tbaz"},
   };
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder,
-                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-  } else {
-    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  }
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
-                           "Multi-Line-Header: foo\r\n  bar\r\n"
+                           "Multi-Line-Header: \r\n  foo\r\n  bar\r\n\t\tbaz\r\n"
                            "\r\n");
   auto status = codec_->dispatch(buffer);
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_FALSE(status.ok());
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_FORMAT");
-  } else {
-    EXPECT_TRUE(status.ok());
-  }
+  EXPECT_TRUE(status.ok());
+  // SPELLCHECKER(on)
 }
 
 TEST_P(Http1ClientConnectionImplTest, ObsFold) {
+  // SPELLCHECKER(off)
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -4908,25 +4864,19 @@ TEST_P(Http1ClientConnectionImplTest, ObsFold) {
 
   TestRequestHeaderMapImpl expected_headers{
       {":status", "200"},
-      {"multi-line-header", "foo  bar"},
+      {"multi-line-header", "foo  bar\t\tbaz"},
       {"content-length", "0"},
   };
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
-    EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  }
+  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
-                             "Multi-Line-Header: foo\r\n  bar\r\n"
+                             "Multi-Line-Header: \r\n  foo\r\n  bar\r\n\t\tbaz\r\n"
                              "Content-Length: 0\r\n"
                              "\r\n");
 
   auto status = codec_->dispatch(response);
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_FALSE(status.ok());
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_FORMAT");
-  } else {
-    EXPECT_TRUE(status.ok());
-  }
+  EXPECT_TRUE(status.ok());
+  // SPELLCHECKER(on)
 }
 
 } // namespace Http
