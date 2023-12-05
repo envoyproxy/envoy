@@ -133,7 +133,7 @@ SignerImpl::createAuthorizationHeader(absl::string_view access_key_id,
                                       const std::map<std::string, std::string>& canonical_headers,
                                       absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-  return fmt::format(fmt::runtime(SignatureConstants::get().AuthorizationHeaderFormat),
+  return fmt::format(fmt::runtime(SignatureConstants::get().SigV4AuthorizationHeaderFormat),
                      access_key_id, credential_scope, signed_headers, signature);
 }
 
@@ -186,17 +186,20 @@ void SigV4ASignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& 
 
   // Phase 1: Create a canonical request
   const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
-  const auto canonical_request = Utility::createCanonicalRequest(
+  auto canonical_request = Utility::createCanonicalRequest(
       service_name_, method_header->value().getStringView(), path_header->value().getStringView(),
       canonical_headers, content_hash);
+
   ENVOY_LOG(debug, "Canonical request:\n{}", canonical_request);
+  ENVOY_LOG(debug, "Canonical request hex:\n{}", Hex::encode(std::vector<uint8_t> (canonical_request.begin(), canonical_request.end())));
   // Phase 2: Create a string to sign
   const auto credential_scope = createCredentialScope(short_date);
   const auto string_to_sign = createStringToSign(canonical_request, long_date, credential_scope);
+  
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
   // Phase 3: Create a signature
   const auto signature = createSignature(credentials.accessKeyId().value(), credentials.secretAccessKey().value(), 
-                                                            short_date, string_to_sign, override_region);
+                                                            string_to_sign);
   // Phase 4: Sign request
   const auto authorization_header = createAuthorizationHeader(
       credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
@@ -232,9 +235,7 @@ std::string SigV4ASignerImpl::createStringToSign(absl::string_view canonical_req
 
 std::string SigV4ASignerImpl::createSignature(absl::string_view access_key_id,
                                               absl::string_view secret_access_key,
-                                              absl::string_view short_date,
-                                              absl::string_view string_to_sign,
-                                              absl::string_view override_region) const {
+                                              absl::string_view string_to_sign) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
   // AWS SigV4A Key Derivation
@@ -246,19 +247,21 @@ std::string SigV4ASignerImpl::createSignature(absl::string_view access_key_id,
   const uint8_t required_fixed_input_length = 32 + access_key_length;
   std::vector<uint8_t> fixed_input(required_fixed_input_length);
 
-  std::vector<uint8_t> fixed_input_hmac_digest(32); // AWS_SHA256_LEN
-
   const auto secret_key =
   absl::StrCat(SignatureConstants::get().SigV4ASignatureVersion, secret_access_key);
-  auto k0 = crypto_util.getSha256Hmac(
-    std::vector<uint8_t>(secret_key.begin(), secret_key.end()), fixed_input);
 
   enum SigV4AKeyDerivationResult result = AkdrNextCounter;
   uint8_t external_counter = 1;
 
+  BIGNUM *priv_key_num;
+  EC_KEY *ec_key;
+
+  auto blank = std::string();
+
   while ((result == AkdrNextCounter) && (external_counter <= 254))  // MAX_KEY_DERIVATION_COUNTER_VALUE
   {
     fixed_input.clear();
+
     fixed_input.insert(fixed_input.begin(),{0x00,0x00,0x00,0x01});
     fixed_input.insert(fixed_input.end(),SignatureConstants::get().SigV4ALabel.begin(),SignatureConstants::get().SigV4ALabel.end());
     fixed_input.insert(fixed_input.end(), 0x00);
@@ -266,11 +269,8 @@ std::string SigV4ASignerImpl::createSignature(absl::string_view access_key_id,
     fixed_input.insert(fixed_input.end(), external_counter);
     fixed_input.insert(fixed_input.end(), {0x00,0x00,0x01,0x00});
 
-    fixed_input_hmac_digest.clear();
-    ENVOY_LOG(debug, "got hmac {}",Hex::encode(k0));
-    ENVOY_LOG(debug, "k0 size {}",k0.size());
-
-    // ASSERT(k0.size()==32);
+    auto k0 = crypto_util.getSha256Hmac(
+  std::vector<uint8_t>(secret_key.begin(), secret_key.end()), fixed_input);
 
     // ECDSA q - 2
     std::vector<uint8_t> s_n_minus_2 = {
@@ -282,65 +282,56 @@ std::string SigV4ASignerImpl::createSignature(absl::string_view access_key_id,
 
     ASSERT(k0.size() == s_n_minus_2.size());
 
-    // check that k0 < 
+    // check that k0 < s_n_minus_2
     bool lt_result = constantTimeLessThanOrEqualTo(k0, s_n_minus_2);
     if(!lt_result)
     {
-      ENVOY_LOG(debug, "comparison_result = {}, counter = {}, looping",lt_result,external_counter);
       external_counter++;
     }
     else {
       result=SigV4AKeyDerivationResult::AkdrSuccess;
-      ENVOY_LOG(debug, "comparison_result = {}, ending loop",lt_result);
       // PrivateKey d = c+1
-      constantTimeAddOne(k0);
-    }
-    
-  }
+      constantTimeAddOne(&k0);
 
-  auto blank = std::string();
+      priv_key_num = BN_bin2bn(k0.data(), k0.size(), nullptr);
+      char *priv_key_hex = BN_bn2hex(priv_key_num);
+      OPENSSL_free(priv_key_hex);
+      // Create a new OpenSSL EC_KEY by curve nid
+      ec_key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+      // And set the private key we calculated above
+      if (!EC_KEY_set_private_key(ec_key, priv_key_num)) {
+        ENVOY_LOG(debug, "Failed to set openssl private key");
+        BN_free(priv_key_num);
+        OPENSSL_free(ec_key);
+        return blank;
+      }
+      BN_free(priv_key_num);
+    }
+  }
 
   if(result==SigV4AKeyDerivationResult::AkdrNextCounter) 
   {
     ENVOY_LOG(debug, "Key derivation exceeded retries, returning no signature");
     return blank;
   }
-  
 
-  EC_KEY *ec_key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-  
-  BIGNUM *priv_key_num = BN_bin2bn(k0.data(), k0.size(), nullptr);
-  if (!EC_KEY_set_private_key(ec_key, priv_key_num)) {
-      ENVOY_LOG(debug, "Failed to set openssl private key");
-      BN_free(priv_key_num);
-      return blank;
-  }
-  BN_free(priv_key_num);
-  std::vector<uint8_t> signature(1000,0);
+  uint8_t *signature;
+  signature = new uint8_t[ECDSA_size(ec_key)];
   uint signature_size;
 
-  const uint8_t *stringChar = new uint8_t[string_to_sign.size()];
-  std::copy(string_to_sign.begin(),string_to_sign.end(),stringChar);
+  // Sign the SHA256 hash of our calculated string_to_sign
+  auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
 
   ECDSA_sign(
         0,
-        stringChar,
-        string_to_sign.size(),
-        signature.data(),
+        hash.data(),
+        hash.size(),
+        signature,
         &signature_size,
         ec_key);
-  ENVOY_LOG(debug, "calculated signature {}",Hex::encode(signature));
-
-  // const auto secret_key =
-  //     absl::StrCat(SignatureConstants::get().SigV4ASignatureVersion, secret_access_key);
-  const auto date_key = crypto_util.getSha256Hmac(
-      std::vector<uint8_t>(secret_key.begin(), secret_key.end()), short_date);
-  const auto region_key =
-      crypto_util.getSha256Hmac(date_key, override_region.empty() ? region_ : override_region);
-  const auto service_key = crypto_util.getSha256Hmac(region_key, service_name_);
-  const auto signing_key =
-      crypto_util.getSha256Hmac(service_key, SignatureConstants::get().Aws4Request);
-  return Hex::encode(crypto_util.getSha256Hmac(signing_key, string_to_sign));
+        
+  std::vector<uint8_t> newsig(signature,signature+signature_size);
+  return Hex::encode(newsig);
 }
 
 std::string SigV4ASignerImpl::createAuthorizationHeader(
@@ -348,7 +339,7 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
     const std::map<std::string, std::string>& canonical_headers,
     absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-  return fmt::format(fmt::runtime(SignatureConstants::get().AuthorizationHeaderFormat),
+  return fmt::format(fmt::runtime(SignatureConstants::get().SigV4AAuthorizationHeaderFormat),
                      access_key_id, credential_scope, signed_headers, signature);
 }
 
@@ -373,21 +364,21 @@ bool SigV4ASignerImpl::constantTimeLessThanOrEqualTo(
 
 }
 
-void SigV4ASignerImpl::constantTimeAddOne(std::vector<uint8_t> raw_be_bigint) const {
+void SigV4ASignerImpl::constantTimeAddOne(std::vector<uint8_t> *raw_be_bigint) const {
 
-    const uint8_t byte_count = raw_be_bigint.size();
+    const uint8_t byte_count = raw_be_bigint->size();
 
     volatile uint32_t carry = 1;
 
     for (size_t i = 0; i < byte_count; ++i) {
         const size_t index = byte_count - i - 1;
 
-        volatile uint32_t current_digit = raw_be_bigint[index];
+        volatile uint32_t current_digit = (*raw_be_bigint)[index];
         current_digit += carry;
 
         carry = (current_digit >> 8) & 0x01;
 
-        raw_be_bigint[index] = (current_digit & 0xFF);
+        (*raw_be_bigint)[index] = (current_digit & 0xFF);
     }
 }
 
