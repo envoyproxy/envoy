@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "source/extensions/filters/http/stateful_session/stateful_session.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stateful_session.h"
@@ -32,8 +33,9 @@ public:
     ASSERT(!config.empty());
     ProtoConfig proto_config;
     TestUtility::loadFromYaml(std::string(config), proto_config);
+    Envoy::Server::GenericFactoryContextImpl generic_context(context_);
 
-    config_ = std::make_shared<StatefulSessionConfig>(proto_config, context_);
+    config_ = std::make_shared<StatefulSessionConfig>(proto_config, generic_context);
 
     filter_ = std::make_shared<StatefulSession>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -49,7 +51,8 @@ public:
             .WillOnce(Return(route_factory_));
       }
 
-      route_config_ = std::make_shared<PerRouteStatefulSession>(proto_route_config, context_);
+      route_config_ =
+          std::make_shared<PerRouteStatefulSession>(proto_route_config, generic_context);
 
       ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
           .WillByDefault(Return(route_config_.get()));
@@ -208,9 +211,9 @@ TEST_F(StatefulSessionTest, NullSessionState) {
 
 TEST(EmpytProtoConfigTest, EmpytProtoConfigTest) {
   ProtoConfig empty_proto_config;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> generic_context;
 
-  StatefulSessionConfig config(empty_proto_config, server_context);
+  StatefulSessionConfig config(empty_proto_config, generic_context);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};

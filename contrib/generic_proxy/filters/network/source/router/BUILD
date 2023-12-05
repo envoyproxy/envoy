@@ -18,6 +18,7 @@ envoy_cc_library(
         "router.h",
     ],
     deps = [
+        "//contrib/generic_proxy/filters/network/source:tracing_lib",
         "//contrib/generic_proxy/filters/network/source:upstream_lib",
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
         "//contrib/generic_proxy/filters/network/source/interface:config_interface",

@@ -22,7 +22,7 @@ TEST(RouterFactoryTest, RouterFactoryTest) {
   EXPECT_NE(nullptr, factory.createEmptyConfigProto());
   EXPECT_EQ(nullptr, factory.createEmptyRouteConfigProto());
   EXPECT_EQ(nullptr, factory.createRouteSpecificFilterConfig(
-                         proto_config, factory_context.getServerFactoryContext(),
+                         proto_config, factory_context.serverFactoryContext(),
                          factory_context.messageValidationVisitor()));
   EXPECT_EQ("envoy.filters.generic.router", factory.name());
   EXPECT_EQ(true, factory.isTerminalFilter());

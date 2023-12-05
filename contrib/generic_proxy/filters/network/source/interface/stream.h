@@ -138,7 +138,7 @@ public:
    *
    * @param callback supplies the iteration callback.
    */
-  virtual void forEach(IterateCallback callback) const PURE;
+  virtual void forEach(IterateCallback /*callback*/) const {};
 
   /**
    * Get generic stream metadata value by key.
@@ -146,7 +146,7 @@ public:
    * @param key The metadata key of string view type.
    * @return The optional metadata value of string_view type.
    */
-  virtual absl::optional<absl::string_view> getByKey(absl::string_view key) const PURE;
+  virtual absl::optional<absl::string_view> get(absl::string_view /*key*/) const { return {}; }
 
   /**
    * Set new generic stream metadata key/value pair.
@@ -154,25 +154,13 @@ public:
    * @param key The metadata key of string view type.
    * @param val The metadata value of string view type.
    */
-  virtual void setByKey(absl::string_view key, absl::string_view val) PURE;
+  virtual void set(absl::string_view /*key*/, absl::string_view /*val*/) {}
 
   /**
-   * Set new generic stream metadata key/value pair. The key MUST point to data that will live
-   * beyond the lifetime of any generic stream that using the string.
-   *
+   * Erase generic stream metadata by key.
    * @param key The metadata key of string view type.
-   * @param val The metadata value of string view type.
    */
-  virtual void setByReferenceKey(absl::string_view key, absl::string_view val) PURE;
-
-  /**
-   * Set new generic stream metadata key/value pair. Both key and val MUST point to data that
-   * will live beyond the lifetime of any generic stream that using the string.
-   *
-   * @param key The metadata key of string view type.
-   * @param val The metadata value of string view type.
-   */
-  virtual void setByReference(absl::string_view key, absl::string_view val) PURE;
+  virtual void erase(absl::string_view /*key*/) {}
 
   // Used for matcher.
   static constexpr absl::string_view name() { return "generic_proxy"; }
@@ -186,10 +174,33 @@ public:
  * to simplify the tracing integration. This is not a good design. This should be changed in the
  * future.
  */
-class StreamRequest : public Tracing::TraceContext, public StreamFrame {
+class StreamRequest : public StreamBase {
 public:
-  // Used for matcher.
-  static constexpr absl::string_view name() { return "generic_proxy"; }
+  /**
+   * Get request host.
+   *
+   * @return The host of generic request. The meaning of the return value may be different For
+   * different application protocols. It typically should be domain, VIP, or service name that
+   * used to represents target service instances.
+   */
+  virtual absl::string_view host() const { return {}; }
+
+  /**
+   * Get request path.
+   *
+   * @return The path of generic request. The meaning of the return value may be different For
+   * different application protocols. It typically should be RPC service name that used to
+   * represents set of method or functionality provided by target service.
+   */
+  virtual absl::string_view path() const { return {}; }
+
+  /**
+   * Get request method.
+   *
+   * @return The method of generic request. The meaning of the return value may be different For
+   * different application protocols.
+   */
+  virtual absl::string_view method() const { return {}; }
 };
 
 using StreamRequestPtr = std::unique_ptr<StreamRequest>;
@@ -221,7 +232,7 @@ public:
    *
    * @return generic response status.
    */
-  virtual Status status() const PURE;
+  virtual Status status() const { return {}; }
 };
 
 using StreamResponsePtr = std::unique_ptr<StreamResponse>;

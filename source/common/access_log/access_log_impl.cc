@@ -54,8 +54,8 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
                                    Server::Configuration::FactoryContext& context) {
-  Runtime::Loader& runtime = context.getServerFactoryContext().runtime();
-  Random::RandomGenerator& random = context.getServerFactoryContext().api().randomGenerator();
+  Runtime::Loader& runtime = context.serverFactoryContext().runtime();
+  Random::RandomGenerator& random = context.serverFactoryContext().api().randomGenerator();
   ProtobufMessage::ValidationVisitor& validation_visitor = context.messageValidationVisitor();
   switch (config.filter_specifier_case()) {
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kStatusCodeFilter:

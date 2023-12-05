@@ -582,7 +582,7 @@ std::string Utility::stripQueryString(const HeaderString& path) {
   return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
-std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) {
+std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) const {
   std::string new_path{Http::Utility::stripQueryString(path)};
 
   if (!this->data_.empty()) {
@@ -1026,7 +1026,7 @@ RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri
   return message;
 }
 
-std::string Utility::QueryParamsMulti::toString() {
+std::string Utility::QueryParamsMulti::toString() const {
   std::string out;
   std::string delim = "?";
   for (const auto& p : this->data_) {
