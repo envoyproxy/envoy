@@ -556,7 +556,7 @@ private:
     bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
-    void onSessionComplete();
+    void onSessionComplete() const;
 
     void onAccessLogFlushInterval();
     void rearmAccessLogFlushTimer();
