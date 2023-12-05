@@ -26,7 +26,7 @@ private:
       const envoy::extensions::filters::network::direct_response::v3::Config& config,
       Server::Configuration::FactoryContext& context) override {
     auto content =
-        Config::DataSource::read(config.response(), true, context.getServerFactoryContext().api());
+        Config::DataSource::read(config.response(), true, context.serverFactoryContext().api());
 
     return [content](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(content));

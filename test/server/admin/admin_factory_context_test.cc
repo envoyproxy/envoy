@@ -13,7 +13,7 @@ TEST(AdminFactoryContextTest, AdminFactoryContextTest) {
 
   AdminFactoryContext context(server);
 
-  context.getServerFactoryContext();
+  context.serverFactoryContext();
   context.getTransportSocketFactoryContext();
   context.scope();
   context.listenerScope();

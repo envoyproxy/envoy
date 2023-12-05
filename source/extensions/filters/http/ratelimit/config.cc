@@ -20,7 +20,7 @@ namespace RateLimitFilter {
 Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   ASSERT(!proto_config.domain().empty());
   FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, server_context.localInfo(),

@@ -61,7 +61,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
 
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
   return std::make_shared<FileAccessLog>(file_info, std::move(filter), std::move(formatter),
-                                         context.getServerFactoryContext().accessLogManager());
+                                         context.serverFactoryContext().accessLogManager());
 }
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {

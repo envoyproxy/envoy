@@ -289,8 +289,7 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   EXPECT_CALL(not_a_draining_manager, drainClose).WillRepeatedly(Return(false));
   Configuration::MockServerFactoryContext mock_server_context;
   EXPECT_CALL(mock_server_context, drainManager).WillRepeatedly(ReturnRef(not_a_draining_manager));
-  EXPECT_CALL(parent_context_, getServerFactoryContext)
-      .WillRepeatedly(ReturnRef(mock_server_context));
+  EXPECT_CALL(parent_context_, serverFactoryContext).WillRepeatedly(ReturnRef(mock_server_context));
 
   EXPECT_FALSE(context0->drainDecision().drainClose());
   EXPECT_FALSE(context1->drainDecision().drainClose());
