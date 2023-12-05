@@ -27,15 +27,6 @@ final class ViewController: UITableViewController {
       .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.standard)
       .enableInterfaceBinding(true)
       .enablePlatformCertificateValidation(true)
-      .addNativeFilter(
-        name: "envoy.filters.http.buffer",
-        typedConfig: """
-          {
-            "@type": "type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer",
-            "max_request_bytes": 5242880
-          }
-          """
-      )
       .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)

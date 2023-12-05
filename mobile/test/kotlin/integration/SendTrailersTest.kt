@@ -36,10 +36,6 @@ class SendTrailersTest {
           "envoy.filters.http.assertion",
           "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}"
         )
-        .addNativeFilter(
-          "envoy.filters.http.buffer",
-          "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":65000}"
-        )
         .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
         .build()
 

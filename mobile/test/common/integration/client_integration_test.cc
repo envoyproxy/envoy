@@ -371,7 +371,18 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
   ASSERT_EQ(cc_.on_complete_calls, 1);
 }
 
-TEST_P(ClientIntegrationTest, BasicReset) {
+TEST_P(ClientIntegrationTest, DownstreamResetAfterHeaders) {
+  initialize();
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->resetStream();
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+  ASSERT_EQ(cc_.on_headers_calls, 0);
+}
+
+TEST_P(ClientIntegrationTest, UpstreamReset) {
   initialize();
 
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");

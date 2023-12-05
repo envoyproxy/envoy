@@ -66,45 +66,6 @@ layered_runtime:
       overload: { global_downstream_max_connections: 50000 }
 )";
 
-const std::string BUFFERED_TEST_CONFIG = R"(
-listener_manager:
-    name: envoy.listener_manager_impl.api
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
-    api_listener:
-       api_listener:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager
-        config:
-          stat_prefix: hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-            - name: api
-              include_attempt_count_in_response: true
-              domains: ["*"]
-              routes:
-              - match: { prefix: "/" }
-                direct_response: { status: 200 }
-          http_filters:
-          - name: buffer
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
-              max_request_bytes: 65000
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-layered_runtime:
-  layers:
-  - name: static_layer_0
-    static_layer:
-      overload: { global_downstream_max_connections: 50000 }
-)";
-
 const std::string LEVEL_DEBUG = "debug";
 
 // Transform C map to C++ map.
@@ -160,7 +121,7 @@ TEST_F(MainInterfaceTest, BasicStream) {
                                     } /*on_exit*/,
                                     &engine_cbs_context /*context*/};
   envoy_engine_t engine_handle = init_engine(engine_cbs, {}, {});
-  run_engine(engine_handle, BUFFERED_TEST_CONFIG.c_str(), level.c_str());
+  run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), level.c_str());
 
   ASSERT_TRUE(
       engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));

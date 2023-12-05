@@ -54,10 +54,6 @@ static_resources:
                   http_request_generic_body_match:
                     patterns:
                       - string_match: \(requestStringMatch)
-            - name: envoy.filters.http.buffer
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
-                max_request_bytes: 65000
             - name: envoy.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
