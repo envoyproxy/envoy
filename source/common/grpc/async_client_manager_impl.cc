@@ -19,6 +19,8 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
+constexpr uint64_t DefaultEntryIdleDuration{50000};
+
 // Validates a string for gRPC header key compliance. This is a subset of legal HTTP characters.
 // See https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
 bool validateGrpcHeaderChars(absl::string_view key) {
@@ -51,13 +53,18 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   cm_.checkActiveStaticCluster(config.envoy_grpc().cluster_name());
 }
 
-AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
-                                               ThreadLocal::Instance& tls, TimeSource& time_source,
-                                               Api::Api& api, const StatNames& stat_names)
+AsyncClientManagerImpl::AsyncClientManagerImpl(
+    Upstream::ClusterManager& cm, ThreadLocal::Instance& tls, TimeSource& time_source,
+    Api::Api& api, const StatNames& stat_names,
+    const envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig& config)
     : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names),
       raw_async_client_cache_(tls_) {
-  raw_async_client_cache_.set([](Event::Dispatcher& dispatcher) {
-    return std::make_shared<RawAsyncClientCache>(dispatcher);
+
+  const auto max_cached_entry_idle_duration = std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(config, max_cached_entry_idle_duration, DefaultEntryIdleDuration));
+
+  raw_async_client_cache_.set([max_cached_entry_idle_duration](Event::Dispatcher& dispatcher) {
+    return std::make_shared<RawAsyncClientCache>(dispatcher, max_cached_entry_idle_duration);
   });
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
@@ -163,8 +170,9 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClientWithHas
   return client;
 }
 
-AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher) {
+AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(
+    Event::Dispatcher& dispatcher, std::chrono::milliseconds max_cached_entry_idle_duration)
+    : dispatcher_(dispatcher), max_cached_entry_idle_duration_(max_cached_entry_idle_duration) {
   cache_eviction_timer_ = dispatcher.createTimer([this] { evictEntriesAndResetEvictionTimer(); });
 }
 
@@ -205,7 +213,8 @@ void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTi
   MonotonicTime now = dispatcher_.timeSource().monotonicTime();
   // Evict all the entries that have expired.
   while (!lru_list_.empty()) {
-    MonotonicTime next_expire = lru_list_.back().accessed_time_ + EntryTimeoutInterval;
+    const MonotonicTime next_expire =
+        lru_list_.back().accessed_time_ + max_cached_entry_idle_duration_;
     std::chrono::seconds time_to_next_expire_sec =
         std::chrono::duration_cast<std::chrono::seconds>(next_expire - now);
     // since 'now' and 'next_expire' are in nanoseconds, the following condition is to

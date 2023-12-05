@@ -26,6 +26,7 @@ stat_prefix: test_prefix
 max_packet_bytes: 1048576
 enable_per_opcode_request_bytes_metrics: true
 enable_per_opcode_response_bytes_metrics: true
+enable_per_opcode_decoder_error_metrics: true
 enable_latency_threshold_metrics: true
 default_latency_threshold: "0.1s"
 latency_threshold_overrides:)EOF";
@@ -183,6 +184,7 @@ stat_prefix: test_prefix
   EXPECT_EQ(proto_config_.max_packet_bytes().value(), 0);
   EXPECT_EQ(proto_config_.enable_per_opcode_request_bytes_metrics(), false);
   EXPECT_EQ(proto_config_.enable_per_opcode_response_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::SecondsToDuration(0));
@@ -204,6 +206,7 @@ default_latency_threshold: "0.15s"
   EXPECT_EQ(proto_config_.max_packet_bytes().value(), 0);
   EXPECT_EQ(proto_config_.enable_per_opcode_request_bytes_metrics(), false);
   EXPECT_EQ(proto_config_.enable_per_opcode_response_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::MillisecondsToDuration(150));
@@ -227,6 +230,7 @@ latency_threshold_overrides:
   EXPECT_EQ(proto_config_.max_packet_bytes().value(), 0);
   EXPECT_EQ(proto_config_.enable_per_opcode_request_bytes_metrics(), false);
   EXPECT_EQ(proto_config_.enable_per_opcode_response_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::SecondsToDuration(0));
@@ -251,6 +255,7 @@ TEST_F(ZookeeperFilterConfigTest, FullConfig) {
   EXPECT_EQ(proto_config_.max_packet_bytes().value(), 1048576);
   EXPECT_EQ(proto_config_.enable_per_opcode_request_bytes_metrics(), true);
   EXPECT_EQ(proto_config_.enable_per_opcode_response_bytes_metrics(), true);
+  EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), true);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), true);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::MillisecondsToDuration(100));

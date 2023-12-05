@@ -68,17 +68,19 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            Server::Configuration::FactoryContext& context,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config)
-    : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                   context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-                   PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                   config.start_child_span(), config.suppress_envoy_headers(),
-                   config.respect_expected_rq_timeout(),
-                   config.suppress_grpc_request_failure_code_stats(),
-                   config.has_upstream_log_options()
-                       ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
-                       : false,
-                   config.strict_check_headers(), context.api().timeSource(), context.httpContext(),
-                   context.routerContext()) {
+    : FilterConfig(
+          stat_prefix, context.serverFactoryContext().localInfo(), context.scope(),
+          context.serverFactoryContext().clusterManager(), context.serverFactoryContext().runtime(),
+          context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
+          config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
+          config.suppress_grpc_request_failure_code_stats(),
+          config.has_upstream_log_options()
+              ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
+              : false,
+          config.strict_check_headers(), context.serverFactoryContext().api().timeSource(),
+          context.serverFactoryContext().httpContext(),
+          context.serverFactoryContext().routerContext()) {
   for (const auto& upstream_log : config.upstream_log()) {
     upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
   }
@@ -90,7 +92,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
   }
 
   if (config.upstream_http_filters_size() > 0) {
-    auto& server_factory_ctx = context.getServerFactoryContext();
+    auto& server_factory_ctx = context.serverFactoryContext();
     const Http::FilterChainUtility::FiltersList& upstream_http_filters =
         config.upstream_http_filters();
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
@@ -101,8 +103,8 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, server_factory_ctx, context.clusterManager(),
-               *upstream_ctx_, prefix);
+        helper(*filter_config_provider_manager, server_factory_ctx,
+               context.serverFactoryContext().clusterManager(), *upstream_ctx_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
                                           "router upstream http", upstream_http_filter_factories_));
   }
@@ -326,13 +328,6 @@ Filter::~Filter() {
   // Upstream resources should already have been cleaned.
   ASSERT(upstream_requests_.empty());
   ASSERT(!retry_state_);
-
-  // Unregister from shadow stream notifications and cancel active streams.
-  for (auto* shadow_stream : shadow_streams_) {
-    shadow_stream->removeDestructorCallback();
-    shadow_stream->removeWatermarkCallbacks();
-    shadow_stream->cancel();
-  }
 }
 
 const FilterUtility::StrictHeaderChecker::HeaderCheckResult
@@ -1055,6 +1050,14 @@ void Filter::onRequestComplete() {
 void Filter::onDestroy() {
   // Reset any in-flight upstream requests.
   resetAll();
+
+  // Unregister from shadow stream notifications and cancel active streams.
+  for (auto* shadow_stream : shadow_streams_) {
+    shadow_stream->removeDestructorCallback();
+    shadow_stream->removeWatermarkCallbacks();
+    shadow_stream->cancel();
+  }
+
   cleanup();
 }
 

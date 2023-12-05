@@ -17,15 +17,22 @@ logs<envoy_v3_api_field_config.listener.v3.Listener.access_log>`. The listener a
 HTTP request access logging and can be enabled separately and independently from
 filter access logs.
 
-If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
-connection, or HTTP stream. It is possible to extend this behavior and report access logs periodically or at the
-start of a TCP connection or HTTP stream. Reporting access logs right after upstream connection establishment
-or new incoming HTTP request does not depend on periodic reporting, and the other way around.
+If access log is enabled, then by default it will be reported to the configured sinks at the end of a UDP
+session, TCP connection, or HTTP stream. It is possible to extend this behavior and report access logs
+periodically or at the start of a UDP session, TCP connection, or HTTP stream. Reporting access logs right
+upstream connection establishment or new incoming HTTP request does not depend on periodic reporting, and
+the other way around.
 
 .. _arch_overview_access_log_start:
 
 Start of session access logs
 ----------------------------
+
+UDP Proxy
+*********
+
+For UDP Proxy, when UDP tunneling over HTTP is configured, it is possible to enable an access log record once after a successful upstream tunnel connected by using
+:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions.flush_access_log_on_tunnel_connected>`
 
 TCP Proxy
 *********
@@ -52,6 +59,12 @@ Note: In case that the HTTP request involves retries, a start of request upstrea
 
 Periodic access logs
 --------------------
+
+UDP Proxy
+*********
+
+For UDP Proxy, it is possible to enable a prediodic access log by using
+:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions.access_log_flush_interval>`
 
 TCP Proxy
 *********

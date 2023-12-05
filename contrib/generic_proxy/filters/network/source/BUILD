@@ -21,7 +21,7 @@ envoy_cc_library(
         ":rds_lib",
         ":route_lib",
         ":stats_lib",
-        ":upstream_lib",
+        ":tracing_lib",
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
         "//contrib/generic_proxy/filters/network/source/interface:proxy_config_interface",
         "//contrib/generic_proxy/filters/network/source/router:router_lib",
@@ -173,4 +173,24 @@ envoy_cc_library(
     ],
     # Ensure this factory in the source is always linked in.
     alwayslink = 1,
+)
+
+envoy_cc_library(
+    name = "tracing_lib",
+    srcs = [
+        "tracing.cc",
+    ],
+    hdrs = [
+        "tracing.h",
+    ],
+    external_deps = [
+        "abseil_strings",
+        "abseil_optional",
+        "abseil_status",
+    ],
+    deps = [
+        "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
+        "//envoy/common:pure_lib",
+        "//envoy/tracing:trace_context_interface",
+    ],
 )

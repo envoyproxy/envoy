@@ -13,7 +13,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Typed configuration that may be used for starting Envoy.
 @interface EnvoyConfiguration : NSObject
 
-@property (nonatomic, strong, nullable) NSString *grpcStatsDomain;
 @property (nonatomic, assign) UInt32 connectTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
@@ -36,7 +35,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
-@property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, assign) UInt32 streamIdleTimeoutSeconds;
 @property (nonatomic, assign) UInt32 perTryIdleTimeoutSeconds;
 @property (nonatomic, strong, nullable) NSString *appVersion;
@@ -46,7 +44,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
-@property (nonatomic, strong) NSArray<NSString *> *statsSinks;
 @property (nonatomic, strong, nullable) NSString *nodeId;
 @property (nonatomic, strong, nullable) NSString *nodeRegion;
 @property (nonatomic, strong, nullable) NSString *nodeZone;
@@ -55,7 +52,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 xdsServerPort;
 @property (nonatomic, strong) NSDictionary<NSString *, NSString *> *xdsGrpcInitialMetadata;
 @property (nonatomic, strong, nullable) NSString *xdsSslRootCerts;
-@property (nonatomic, strong, nullable) NSString *xdsSni;
 @property (nonatomic, strong, nullable) NSString *rtdsResourceName;
 @property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
 @property (nonatomic, assign) BOOL enableCds;
@@ -66,8 +62,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Create a new instance of the configuration.
  */
-- (instancetype)initWithGrpcStatsDomain:(nullable NSString *)grpcStatsDomain
-                            connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
+- (instancetype)initWithConnectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
@@ -90,7 +85,6 @@ NS_ASSUME_NONNULL_BEGIN
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
-                                statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
@@ -107,7 +101,6 @@ NS_ASSUME_NONNULL_BEGIN
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks
                                            nodeId:(nullable NSString *)nodeId
                                        nodeRegion:(nullable NSString *)nodeRegion
                                          nodeZone:(nullable NSString *)nodeZone
@@ -117,7 +110,6 @@ NS_ASSUME_NONNULL_BEGIN
                            xdsGrpcInitialMetadata:
                                (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
-                                           xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                         enableCds:(BOOL)enableCds

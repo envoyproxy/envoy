@@ -25,8 +25,10 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::direct_response::v3::Config& config,
       Server::Configuration::FactoryContext& context) override {
-    return [config, &context](Network::FilterManager& filter_manager) -> void {
-      auto content = Config::DataSource::read(config.response(), true, context.api());
+    auto content =
+        Config::DataSource::read(config.response(), true, context.serverFactoryContext().api());
+
+    return [content](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(content));
     };
   }

@@ -63,7 +63,8 @@ void mergeResource(Resource& old_resource, const Resource& updating_resource) {
   // The schemaUrl is merged, regardless if the resources being merged
   // have attributes or not. This behavior is compliant with the OTel spec.
   // see: https://github.com/envoyproxy/envoy/pull/29547#discussion_r1344540427
-  old_resource.schemaUrl_ = resolveSchemaUrl(old_resource.schemaUrl_, updating_resource.schemaUrl_);
+  old_resource.schema_url_ =
+      resolveSchemaUrl(old_resource.schema_url_, updating_resource.schema_url_);
 
   if (isEmptyResource(updating_resource)) {
     return;

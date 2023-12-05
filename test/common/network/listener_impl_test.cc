@@ -40,8 +40,10 @@ static void errorCallbackTest(Address::IpVersion version) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
   Server::ThreadLocalOverloadStateOptRef overload_state;
-  Network::ListenerPtr listener = dispatcher->createListener(socket, listener_callbacks, runtime,
-                                                             listener_config, overload_state);
+  Network::ListenerPtr listener = std::make_unique<Network::TcpListenerImpl>(
+      *dispatcher, api->randomGenerator(), runtime, socket, listener_callbacks,
+      listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -75,8 +77,8 @@ public:
                       Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
                       bool bind_to_port, bool ignore_global_conn_limit,
                       Server::ThreadLocalOverloadStateOptRef overload_state)
-      : TestTcpListenerImpl(dispatcher, random_generator, runtime, std::move(socket), cb,
-                            bind_to_port, ignore_global_conn_limit,
+      : TestTcpListenerImpl(dispatcher, random_generator, runtime, socket, cb, bind_to_port,
+                            ignore_global_conn_limit,
                             Network::DefaultMaxConnectionsToAcceptPerSocketEvent, overload_state) {}
 
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
@@ -84,7 +86,7 @@ public:
                       bool bind_to_port, bool ignore_global_conn_limit,
                       uint32_t max_connections_to_accept_per_socket_event,
                       Server::ThreadLocalOverloadStateOptRef overload_state)
-      : TcpListenerImpl(dispatcher, random_generator, runtime, std::move(socket), cb, bind_to_port,
+      : TcpListenerImpl(dispatcher, random_generator, runtime, socket, cb, bind_to_port,
                         ignore_global_conn_limit, max_connections_to_accept_per_socket_event,
                         overload_state) {}
 
@@ -145,8 +147,10 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
   Server::ThreadLocalOverloadStateOptRef overload_state;
-  Network::ListenerPtr listener = dispatcher_->createListener(
-      socket, listener_callbacks, scoped_runtime.loader(), listener_config, overload_state);
+  Network::ListenerPtr listener = std::make_unique<Network::TcpListenerImpl>(
+      *dispatcher_, api_->randomGenerator(), scoped_runtime.loader(), socket, listener_callbacks,
+      listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -216,8 +220,10 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   NiceMock<Network::MockListenerConfig> listener_config;
   EXPECT_CALL(listener_config, ignoreGlobalConnLimit()).WillOnce(Return(true));
   Server::ThreadLocalOverloadStateOptRef overload_state;
-  Network::ListenerPtr listener = dispatcher_->createListener(
-      socket, listener_callbacks, scoped_runtime.loader(), listener_config, overload_state);
+  Network::ListenerPtr listener = std::make_unique<Network::TcpListenerImpl>(
+      *dispatcher_, api_->randomGenerator(), scoped_runtime.loader(), socket, listener_callbacks,
+      listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;

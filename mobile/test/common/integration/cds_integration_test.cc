@@ -2,6 +2,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "test/common/integration/xds_integration_test.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -13,9 +14,13 @@ using envoy::config::cluster::v3::Cluster;
 
 class CdsIntegrationTest : public XdsIntegrationTest {
 public:
-  CdsIntegrationTest() {
-    use_lds_ = false;
+  void initialize() override {
+    setUpstreamProtocol(Http::CodecType::HTTP1);
+
+    XdsIntegrationTest::initialize();
+
     default_request_headers_.setScheme("http");
+    initializeXdsStream();
   }
 
   void createEnvoy() override {
@@ -27,17 +32,14 @@ public:
       cds_namespace_ = "xdstp://" + target_uri + "/envoy.config.cluster.v3.Cluster";
       cds_resources_locator = cds_namespace_ + "/*";
     }
-    xds_builder.addClusterDiscoveryService(cds_resources_locator, /*timeout_in_seconds=*/1);
+    xds_builder.addClusterDiscoveryService(cds_resources_locator, /*timeout_in_seconds=*/1)
+        .setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
 
     XdsIntegrationTest::createEnvoy();
   }
 
-  void SetUp() override {
-    setUpstreamProtocol(Http::CodecType::HTTP1);
-    initialize();
-    initializeXdsStream();
-  }
+  void SetUp() override { initialize(); }
 
 protected:
   Cluster createCluster() {
