@@ -27,7 +27,7 @@ createStreamAccessLogInstance(const Protobuf::Message& config, AccessLog::Filter
   Filesystem::FilePathAndType file_info{destination_type, ""};
   return std::make_shared<AccessLoggers::File::FileAccessLog>(
       file_info, std::move(filter), std::move(formatter),
-      context.getServerFactoryContext().accessLogManager());
+      context.serverFactoryContext().accessLogManager());
 }
 
 } // namespace AccessLoggers

@@ -1286,7 +1286,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
+        helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
                                           http_filter_factories_));

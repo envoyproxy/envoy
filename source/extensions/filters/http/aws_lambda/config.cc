@@ -37,7 +37,7 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {

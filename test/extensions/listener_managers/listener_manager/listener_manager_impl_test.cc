@@ -5771,7 +5771,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_EQ(&listener_factory_context->initManager(), &listener.initManager());
   EXPECT_EQ(&listener_factory_context->lifecycleNotifier(), &server_.lifecycleNotifier());
   EXPECT_EQ(&listener_factory_context->messageValidationContext(),
-            &listener_factory_context->getServerFactoryContext().messageValidationContext());
+            &listener_factory_context->serverFactoryContext().messageValidationContext());
   EXPECT_EQ(&listener_factory_context->mainThreadDispatcher(),
             &parent_context.mainThreadDispatcher());
   EXPECT_EQ(&listener_factory_context->options(), &parent_context.options());

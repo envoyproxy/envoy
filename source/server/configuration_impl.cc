@@ -268,7 +268,7 @@ void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstr
                                           admin.access_log_path()};
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
         file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
-        factory_context.getServerFactoryContext().accessLogManager()));
+        factory_context.serverFactoryContext().accessLogManager()));
   }
 }
 
