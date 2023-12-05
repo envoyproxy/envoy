@@ -32,7 +32,7 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
   const UpstreamKafkaConfigurationSharedPtr configuration =
       std::make_shared<UpstreamKafkaConfigurationImpl>(config);
 
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   // Shared upstream facade (connects us to upstream Kafka clusters).
   const UpstreamKafkaFacadeSharedPtr upstream_kafka_facade =

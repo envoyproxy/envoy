@@ -19,7 +19,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
     const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
 
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(

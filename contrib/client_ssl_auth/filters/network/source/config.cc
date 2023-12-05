@@ -18,7 +18,7 @@ Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProt
   ASSERT(!proto_config.auth_api_cluster().empty());
   ASSERT(!proto_config.stat_prefix().empty());
 
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   ClientSslAuthConfigSharedPtr filter_config(ClientSslAuthConfig::create(
       proto_config, server_context.threadLocal(), server_context.clusterManager(),

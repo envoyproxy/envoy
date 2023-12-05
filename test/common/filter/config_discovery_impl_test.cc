@@ -185,7 +185,7 @@ template <class FactoryCb, class FactoryCtx, class CfgProviderMgrImpl, class Fil
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() : inject_factory_(filter_factory_) {
-    ON_CALL(factory_context_, getServerFactoryContext())
+    ON_CALL(factory_context_, serverFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();

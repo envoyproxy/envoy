@@ -24,7 +24,7 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit&
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   ASSERT(!proto_config.domain().empty());
   ConfigSharedPtr config(new Config(proto_config, server_context.localInfo(), context.scope(),

@@ -22,7 +22,7 @@ public:
 
   const Network::ListenerConfig& listenerConfig() const override { return listener_config_; }
   MOCK_METHOD(const Network::ListenerConfig&, listenerConfig_, (), (const));
-  MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
   MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());

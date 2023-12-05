@@ -77,7 +77,7 @@ public:
 
   Event::Dispatcher* dispatcher() { return dispatcher_; }
   Upstream::ClusterManager& clusterManager() {
-    return context_.getServerFactoryContext().clusterManager();
+    return context_.serverFactoryContext().clusterManager();
   }
 
   std::string getLocalAddrStr() const { return local_addr_; }
