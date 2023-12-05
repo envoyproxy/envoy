@@ -2003,10 +2003,10 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
                                std::function<void(Http::ResponseHeaderMap&)>& modify_headers) {
   if (cluster.dropOverload().value()) {
-    ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}\n", *callbacks_,
+    ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}", *callbacks_,
                      cluster.dropOverload().value());
     if (config_.random_.bernoulli(cluster.dropOverload())) {
-      ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD\n", *callbacks_);
+      ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DropOverLoad);
       chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
       callbacks_->sendLocalReply(
