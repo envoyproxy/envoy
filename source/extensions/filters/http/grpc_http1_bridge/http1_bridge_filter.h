@@ -20,7 +20,7 @@ namespace GrpcHttp1Bridge {
 class Http1BridgeFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::http> {
 public:
   explicit Http1BridgeFilter(
-      Grpc::Context& ,
+      Grpc::Context&,
       const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config)
       : upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()) {}
 
