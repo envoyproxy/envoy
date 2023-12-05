@@ -2,8 +2,8 @@
 
 #include "envoy/network/filter.h"
 
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
-#include "source/common/tcp/listener_manager/connection_handler_impl.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"

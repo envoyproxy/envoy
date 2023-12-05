@@ -22,7 +22,7 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
-#include "source/common/tcp/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"

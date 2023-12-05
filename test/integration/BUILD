@@ -1076,6 +1076,8 @@ envoy_cc_test_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:codec_stats_lib",
+        "//source/common/listener_manager:active_raw_udp_listener_config",
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -1084,8 +1086,6 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/common/tcp/listener_manager:active_raw_udp_listener_config",
-        "//source/common/tcp/listener_manager:connection_handler_lib",
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -1101,7 +1101,7 @@ envoy_cc_test_library(
         "//source/common/quic:quic_server_factory_lib",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]) + envoy_select_envoy_mobile_listener([
-        "//source/common/tcp/listener_manager:listener_manager_lib",
+        "//source/common/listener_manager:listener_manager_lib",
     ]),
 )
 
@@ -1279,6 +1279,7 @@ envoy_cc_test_library(
         "//source/common/http:headers_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -1286,7 +1287,6 @@ envoy_cc_test_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
-        "//source/common/tcp/listener_manager:connection_handler_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",

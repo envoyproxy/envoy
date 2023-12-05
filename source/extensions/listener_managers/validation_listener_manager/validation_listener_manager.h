@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/tcp/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/server/listener_manager_factory.h"
 
 namespace Envoy {

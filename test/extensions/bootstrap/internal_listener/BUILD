@@ -72,12 +72,12 @@ envoy_extension_cc_test(
     srcs = ["active_internal_listener_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
-        "//source/common/tcp/listener_manager:connection_handler_lib",
         "//source/extensions/bootstrap/internal_listener:active_internal_listener",
         "//source/extensions/bootstrap/internal_listener:thread_local_registry",
         "//source/extensions/transport_sockets/raw_buffer:config",

@@ -23,6 +23,6 @@ envoy_cc_extension(
         "//test:__subpackages__",
     ],
     deps = [
-        "//source/common/tcp/listener_manager:listener_manager_lib",
+        "//source/common/listener_manager:listener_manager_lib",
     ],
 )

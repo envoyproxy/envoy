@@ -13,6 +13,8 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/listener_manager/active_raw_udp_listener_config.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -20,8 +22,6 @@
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/tcp/listener_manager/active_raw_udp_listener_config.h"
-#include "source/common/tcp/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
