@@ -20,9 +20,9 @@ namespace GrpcHttp1Bridge {
 class Http1BridgeFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::http> {
 public:
   explicit Http1BridgeFilter(
-      Grpc::Context& context,
+      Grpc::Context& ,
       const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config)
-      : context_(context), upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()) {}
+      : upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -60,7 +60,6 @@ private:
   Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
   bool do_framing_{};
-  Grpc::Context& context_;
   bool upgrade_protobuf_{};
 };
 
