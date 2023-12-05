@@ -116,7 +116,7 @@ private:
                      if (!context.request_) {
                        return absl::nullopt;
                      }
-                     auto optional_view = context.request_->getByKey(key);
+                     auto optional_view = context.request_->get(key);
                      if (!optional_view.has_value()) {
                        return absl::nullopt;
                      }
@@ -132,7 +132,7 @@ private:
                      if (!context.response_) {
                        return absl::nullopt;
                      }
-                     auto optional_view = context.response_->getByKey(key);
+                     auto optional_view = context.response_->get(key);
                      if (!optional_view.has_value()) {
                        return absl::nullopt;
                      }

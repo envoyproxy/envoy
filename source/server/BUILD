@@ -562,3 +562,12 @@ envoy_cc_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "generic_factory_context_lib",
+    srcs = ["generic_factory_context.cc"],
+    hdrs = ["generic_factory_context.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+    ],
+)

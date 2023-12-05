@@ -68,21 +68,17 @@ TEST(DubboRequestTest, DubboRequestTest) {
     EXPECT_EQ("fake_service", request.host());
     EXPECT_EQ("fake_service", request.path());
     EXPECT_EQ("fake_method", request.method());
-    EXPECT_EQ("fake_version", request.getByKey("version").value());
+    EXPECT_EQ("fake_version", request.get("version").value());
   }
 
   // Get and set headers.
   {
-    EXPECT_EQ("fake_group", request.getByKey("group").value());
+    EXPECT_EQ("fake_group", request.get("group").value());
 
-    EXPECT_EQ(false, request.getByKey("custom_key").has_value());
+    EXPECT_EQ(false, request.get("custom_key").has_value());
 
-    request.setByKey("custom_key", "custom_value");
-    EXPECT_EQ("custom_value", request.getByKey("custom_key").value());
-    request.setByReference("custom_key1", "custom_value1");
-    EXPECT_EQ("custom_value1", request.getByKey("custom_key1").value());
-    request.setByReferenceKey("custom_key2", "custom_value2");
-    EXPECT_EQ("custom_value2", request.getByKey("custom_key2").value());
+    request.set("custom_key", "custom_value");
+    EXPECT_EQ("custom_value", request.get("custom_key").value());
   }
 
   // Iterate headers.
@@ -92,8 +88,8 @@ TEST(DubboRequestTest, DubboRequestTest) {
       attachment_size++;
       return true;
     });
-    // Version is not part of attachments. So there are only 4 attachments.
-    EXPECT_EQ(4, attachment_size);
+    // Version is not part of attachments. So there are only 2 attachments.
+    EXPECT_EQ(2, attachment_size);
   }
 }
 
@@ -185,13 +181,9 @@ TEST(DubboResponseTest, DubboResponseTest) {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
 
-    EXPECT_EQ(false, response.getByKey("custom_key").has_value());
-    response.setByKey("custom_key", "custom_value");
-    EXPECT_EQ(false, response.getByKey("custom_key").has_value());
-    response.setByReference("custom_key", "custom_value");
-    EXPECT_EQ(false, response.getByKey("custom_key").has_value());
-    response.setByReferenceKey("custom_key", "custom_value");
-    EXPECT_EQ(false, response.getByKey("custom_key").has_value());
+    EXPECT_EQ(false, response.get("custom_key").has_value());
+    response.set("custom_key", "custom_value");
+    EXPECT_EQ(false, response.get("custom_key").has_value());
   }
 
   // Iterate headers.
