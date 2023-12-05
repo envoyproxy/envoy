@@ -153,7 +153,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
-  http_validation_policy.disallow_header_continuation_lines = true;
+  http_validation_policy.disallow_header_continuation_lines = false;
   http_validation_policy.require_header_colon = true;
   http_validation_policy.disallow_multiple_content_length = true;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
@@ -396,12 +396,11 @@ void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
 
 void BalsaParser::validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers,
                                                           bool trailers) {
-  for (const std::pair<absl::string_view, absl::string_view>& key_value : headers.lines()) {
+  for (const auto& [key, value] : headers.lines()) {
     if (status_ == ParserStatus::Error) {
       return;
     }
 
-    absl::string_view key = key_value.first;
     if (!isHeaderNameValid(key)) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_HEADER_TOKEN";
@@ -417,8 +416,22 @@ void BalsaParser::validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHea
       return;
     }
 
-    absl::string_view value = key_value.second;
-    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
+    // Remove CR and LF characters to match http-parser behavior.
+    auto is_cr_or_lf = [](char c) { return c == '\r' || c == '\n'; };
+    if (std::any_of(value.begin(), value.end(), is_cr_or_lf)) {
+      std::string value_without_cr_or_lf;
+      value_without_cr_or_lf.reserve(value.size());
+      for (char c : value) {
+        if (!is_cr_or_lf(c)) {
+          value_without_cr_or_lf.push_back(c);
+        }
+      }
+      status_ = convertResult(connection_->onHeaderValue(value_without_cr_or_lf.data(),
+                                                         value_without_cr_or_lf.length()));
+    } else {
+      // No need to copy if header value does not contain CR or LF.
+      status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
+    }
   }
 }
 
