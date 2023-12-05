@@ -37,7 +37,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   ProcessContextOptRef processContext() override { return server_.processContext(); }
 
-  Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+  Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_.serverFactoryContext();
   }
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {

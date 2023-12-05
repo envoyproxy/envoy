@@ -237,5 +237,8 @@ new_features:
     or in :ref:`specified header
     <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.name>` respectively
     is not available, Envoy will return ``503`` instead of selecting another destination from the cluster.
+- area: stream info
+  change: |
+    Added time spent reading request headers to ``DownstreamTiming``.
 
 deprecated:

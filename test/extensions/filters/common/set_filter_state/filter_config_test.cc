@@ -1,5 +1,6 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -55,7 +56,7 @@ public:
         life_span, context_);
   }
   void update() { config_->updateFilterState({&header_map_}, info_); }
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   Http::TestRequestHeaderMapImpl header_map_{{"test-header", "test-value"}};
   NiceMock<StreamInfo::MockStreamInfo> info_;
   ConfigSharedPtr config_;

@@ -32,7 +32,7 @@ class TestCommandFactory : public CommandParserFactory {
 public:
   CommandParserPtr
   createCommandParserFromProto(const Protobuf::Message&,
-                               Server::Configuration::CommonFactoryContext&) override;
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;
@@ -60,7 +60,7 @@ class AdditionalCommandFactory : public CommandParserFactory {
 public:
   CommandParserPtr
   createCommandParserFromProto(const Protobuf::Message&,
-                               Server::Configuration::CommonFactoryContext&) override;
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;
@@ -70,7 +70,7 @@ class FailCommandFactory : public CommandParserFactory {
 public:
   CommandParserPtr
   createCommandParserFromProto(const Protobuf::Message&,
-                               Server::Configuration::CommonFactoryContext&) override;
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;

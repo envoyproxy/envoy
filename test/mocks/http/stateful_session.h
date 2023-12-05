@@ -32,7 +32,7 @@ public:
   }
 
   MOCK_METHOD(SessionStateFactorySharedPtr, createSessionStateFactory,
-              (const Protobuf::Message&, Server::Configuration::CommonFactoryContext&));
+              (const Protobuf::Message&, Server::Configuration::GenericFactoryContext&));
 
   std::string name() const override { return "envoy.http.stateful_session.mock"; }
 };
