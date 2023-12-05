@@ -60,8 +60,8 @@ enum class RequestCacheability {
   // - `requestCacheability` returns `NoStore`.
   // - CacheFilter looks in cache and finds response 2, which matches.
   // - CacheFilter serves response 2 from cache.
-  // To summarize, all 3 requests were eligble for serving from cache (though only request 3 found a
-  // match to serve), but only request 2 was allowed to have its response stored into cache.
+  // To summarize, all 3 requests were eligible for serving from cache (though only request 3 found
+  // a match to serve), but only request 2 was allowed to have its response stored into cache.
   NoStore,
 };
 
