@@ -324,7 +324,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   }
 }
 
-void UdpProxyFilter::ActiveSession::onSessionComplete() {
+void UdpProxyFilter::ActiveSession::onSessionComplete() const {
   for (auto& active_read_filter : read_filters_) {
     active_read_filter->read_filter_->onSessionComplete();
   }
