@@ -21,6 +21,8 @@ mkdir -p certs
 openssl req -batch -new -x509 -nodes -keyout certs/key.pem -out certs/cert.pem
 openssl pkcs12 -export -passout pass: -out certs/output.pkcs12 -inkey certs/key.pem -in certs/cert.pem
 
+UPARGS="proxy-ws proxy-wss-wss proxy-wss-passthrough service-ws service-wss"
+
 bring_up_example
 
 run_log "Interact with web socket ws -> ws"
