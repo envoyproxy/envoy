@@ -559,28 +559,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Support DROP_OVERLOAD config from control plane to drop certain percentage of traffic.
-  if (cluster->dropOverload().value()) {
-    ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}\n", *callbacks_,
-                     cluster->dropOverload().value())
-    if (config_.random_.bernoulli(cluster->dropOverload())) {
-      ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD\n", *callbacks_);
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DropOverLoad);
-      chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-      callbacks_->sendLocalReply(
-          Http::Code::ServiceUnavailable, "drop overload",
-          [modify_headers, this](Http::ResponseHeaderMap& headers) {
-            if (!config_.suppress_envoy_headers_) {
-              headers.addReference(Http::Headers::get().EnvoyDropOverload,
-                                   Http::Headers::get().EnvoyDropOverloadValues.True);
-            }
-            // Note: append_cluster_info does not respect suppress_envoy_headers.
-            modify_headers(headers);
-          },
-          absl::nullopt, StreamInfo::ResponseCodeDetails::get().DropOverload);
-
-      cluster_->loadReportStats().upstream_rq_drop_overload_.inc();
-      return Http::FilterHeadersStatus::StopIteration;
-    }
+  if (checkDropOverload(*cluster, modify_headers)) {
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // Fetch a connection pool for the upstream cluster.
@@ -2018,6 +1998,33 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 uint32_t Filter::numRequestsAwaitingHeaders() {
   return std::count_if(upstream_requests_.begin(), upstream_requests_.end(),
                        [](const auto& req) -> bool { return req->awaitingHeaders(); });
+}
+
+bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
+                               std::function<void(Http::ResponseHeaderMap&)>& modify_headers) {
+  if (cluster.dropOverload().value()) {
+    ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}\n", *callbacks_,
+                     cluster.dropOverload().value());
+    if (config_.random_.bernoulli(cluster.dropOverload())) {
+      ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD\n", *callbacks_);
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DropOverLoad);
+      chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
+      callbacks_->sendLocalReply(
+          Http::Code::ServiceUnavailable, "drop overload",
+          [modify_headers, this](Http::ResponseHeaderMap& headers) {
+            if (!config_.suppress_envoy_headers_) {
+              headers.addReference(Http::Headers::get().EnvoyDropOverload,
+                                   Http::Headers::get().EnvoyDropOverloadValues.True);
+            }
+            modify_headers(headers);
+          },
+          absl::nullopt, StreamInfo::ResponseCodeDetails::get().DropOverload);
+
+      cluster.info()->loadReportStats().upstream_rq_drop_overload_.inc();
+      return true;
+    }
+  }
+  return false;
 }
 
 RetryStatePtr
