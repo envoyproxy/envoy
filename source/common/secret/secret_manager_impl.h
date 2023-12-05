@@ -19,7 +19,7 @@ namespace Secret {
 class SecretManagerImpl : public SecretManager {
 public:
   SecretManagerImpl(OptRef<Server::ConfigTracker> config_tracker);
-  void
+  absl::Status
   addStaticSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
 
   TlsCertificateConfigProviderSharedPtr
