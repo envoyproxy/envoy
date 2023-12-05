@@ -45,6 +45,9 @@ public:
    */
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
+  /**
+   * Returns whether the first DNS resolving attempt is completed or not.
+   */
   virtual bool firstResolveComplete() const PURE;
 
   /**
