@@ -31,10 +31,6 @@ minor_behavior_changes:
     To get the protocol, please use GetProperty("request.protocol") instead.
 - area: aws
   change: |
-    uses http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers instead of libcurl
-    which is deprecated. To revert this behavior set ``envoy.reloadable_features.use_libcurl_to_fetch_aws_credentials`` to true.
-- area: aws
-  change: |
     Added support to use http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers
     instead of libcurl which is deprecated. By default this behavior is disabled. To enable set
     ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to true.
