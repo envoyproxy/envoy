@@ -23,8 +23,8 @@ public:
 
 } // namespace
 
-StatefulSessionConfig::StatefulSessionConfig(
-    const ProtoConfig& config, Server::Configuration::GenericFactoryContext& context)
+StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
+                                             Server::Configuration::GenericFactoryContext& context)
     : strict_(config.strict()) {
   if (!config.has_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
