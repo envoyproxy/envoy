@@ -265,7 +265,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
   Buffer::BufferMemoryAccountSharedPtr account() const override;
-  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost&&) override;
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC

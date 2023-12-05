@@ -758,7 +758,7 @@ public:
    * host list of the routed cluster, the host should be selected first.
    * @param host The override host address.
    */
-  virtual void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost&&) PURE;
+  virtual void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) PURE;
 
   /**
    * @return absl::optional<absl::string_view> optional override host for the upstream
