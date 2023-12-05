@@ -195,6 +195,40 @@ public:
 };
 
 /**
+ * Generic factory context for multiple scenarios. This context provides a server factory context
+ * reference and other resources. Note that except for server factory context, other resources are
+ * not guaranteed to be available for the entire server lifetime. For example, context powered by a
+ * listener is only available for the lifetime of the listener.
+ */
+class GenericFactoryContext {
+public:
+  virtual ~GenericFactoryContext() = default;
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server and provides
+   *         access to the server's resources.
+   */
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+
+  /**
+   * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   */
+  virtual Init::Manager& initManager() const PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   */
+  virtual Stats::Scope& scope() const PURE;
+};
+
+/**
  * Factory context for access loggers that need access to listener properties.
  * This context is supplied to the access log factory when called with the listener context
  * available, such as from downstream HTTP filters.
