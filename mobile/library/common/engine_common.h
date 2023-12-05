@@ -7,7 +7,7 @@
 #include "source/exe/platform_impl.h"
 #include "source/exe/stripped_main_base.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
+#include "source/server/options_impl_base.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "source/common/signal/signal_action.h"
@@ -22,7 +22,7 @@ namespace Envoy {
  */
 class EngineCommon {
 public:
-  EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options);
+  EngineCommon(std::unique_ptr<Envoy::OptionsImplBase>&& options);
   bool run() {
     base_->runServer();
     return true;
@@ -41,7 +41,7 @@ private:
   Envoy::SignalAction handle_sigs_;
   Envoy::TerminateHandler log_on_terminate_;
 #endif
-  std::unique_ptr<Envoy::OptionsImpl> options_;
+  std::unique_ptr<Envoy::OptionsImplBase> options_;
   Event::RealTimeSystem real_time_system_; // NO_CHECK_FORMAT(real_time)
   DefaultListenerHooks default_listener_hooks_;
   ProdComponentFactory prod_component_factory_;

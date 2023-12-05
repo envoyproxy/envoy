@@ -41,18 +41,17 @@ Factory::routeConfigProviderFromProto(const ProxyConfig& config,
     }
 
     return route_config_provider_manager.createRdsRouteConfigProvider(
-        config.generic_rds(), context.getServerFactoryContext(), config.stat_prefix(),
+        config.generic_rds(), context.serverFactoryContext(), config.stat_prefix(),
         context.initManager());
   } else {
     return route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context.getServerFactoryContext());
+        config.route_config(), context.serverFactoryContext());
   }
 }
 
 std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
     const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
     const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-
   std::vector<NamedFilterFactoryCb> factories;
   bool has_terminal_filter = false;
   std::string terminal_filter_name;
@@ -87,11 +86,14 @@ std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
 Envoy::Network::FilterFactoryCb
 Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
                                            Envoy::Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.serverFactoryContext();
 
   std::shared_ptr<RouteConfigProviderManager> route_config_provider_manager =
-      context.singletonManager().getTyped<RouteConfigProviderManager>(
+      server_context.singletonManager().getTyped<RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(generic_route_config_provider_manager),
-          [&context] { return std::make_shared<RouteConfigProviderManagerImpl>(context.admin()); });
+          [&server_context] {
+            return std::make_shared<RouteConfigProviderManagerImpl>(server_context.admin());
+          });
 
   auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
@@ -122,7 +124,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context),
       std::move(tracer), std::move(tracing_config), std::move(access_logs), context);
 
-  return [route_config_provider_manager, tracer_manager, config, &context,
+  return [route_config_provider_manager, tracer_manager, config, &server_context,
           custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {
     // Create filter by the custom filter factory if the custom filter factory is not null.
     if (custom_proxy_factory != nullptr) {
@@ -131,7 +133,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
     }
 
     filter_manager.addReadFilter(std::make_shared<Filter>(
-        config, context.mainThreadDispatcher().timeSource(), context.runtime()));
+        config, server_context.mainThreadDispatcher().timeSource(), server_context.runtime()));
   };
 }
 

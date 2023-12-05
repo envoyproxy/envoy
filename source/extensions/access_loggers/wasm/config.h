@@ -17,11 +17,7 @@ class WasmAccessLogFactory : public AccessLog::AccessLogInstanceFactory,
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::ListenerAccessLogFactoryContext& context) override;
-
-  AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::CommonFactoryContext& context) override;
+                          Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

@@ -66,7 +66,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(2);
   GeoipFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "geoip", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "geoip", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback,
               addStreamDecoderFilter(AllOf(HasUseXff(false), HasXffNumTrustedHops(0))));
@@ -90,7 +91,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(2);
   GeoipFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "geoip", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "geoip", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback,
               addStreamDecoderFilter(AllOf(HasUseXff(true), HasXffNumTrustedHops(1))));
@@ -111,9 +113,9 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingProvider) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   GeoipFilterFactory factory;
-  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(filter_config, "geoip", context),
-                          ProtoValidationException,
-                          "Proto constraint validation failed.*value is required.*");
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(filter_config, "geoip", context).value(),
+      ProtoValidationException, "Proto constraint validation failed.*value is required.*");
 }
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {

@@ -244,7 +244,7 @@ public:
   // HTTP
   WasmResult httpCall(std::string_view cluster, const Pairs& request_headers,
                       std::string_view request_body, const Pairs& request_trailers,
-                      int timeout_millisconds, uint32_t* token_ptr) override;
+                      int timeout_milliseconds, uint32_t* token_ptr) override;
 
   // Stats/Metrics
   WasmResult defineMetric(uint32_t type, std::string_view name, uint32_t* metric_id_ptr) override;

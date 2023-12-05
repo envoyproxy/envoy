@@ -32,15 +32,18 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
   const UpstreamKafkaConfigurationSharedPtr configuration =
       std::make_shared<UpstreamKafkaConfigurationImpl>(config);
 
+  auto& server_context = context.serverFactoryContext();
+
   // Shared upstream facade (connects us to upstream Kafka clusters).
   const UpstreamKafkaFacadeSharedPtr upstream_kafka_facade =
-      std::make_shared<UpstreamKafkaFacadeImpl>(*configuration, context.threadLocal(),
-                                                context.api().threadFactory());
+      std::make_shared<UpstreamKafkaFacadeImpl>(*configuration, server_context.threadLocal(),
+                                                server_context.api().threadFactory());
 
   // Manager for consumers shared across downstream connections
   // (connects us to upstream Kafka clusters).
   const RecordCallbackProcessorSharedPtr shared_consumer_manager =
-      std::make_shared<SharedConsumerManagerImpl>(*configuration, context.api().threadFactory());
+      std::make_shared<SharedConsumerManagerImpl>(*configuration,
+                                                  server_context.api().threadFactory());
 
   return [configuration, upstream_kafka_facade,
           shared_consumer_manager](Network::FilterManager& filter_manager) -> void {

@@ -3,6 +3,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/set_filter_state/config.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -38,9 +39,26 @@ public:
   void runFilter(const std::string& yaml_config) {
     envoy::extensions::filters::http::set_filter_state::v3::Config proto_config;
     TestUtility::loadFromYaml(yaml_config, proto_config);
+
+    // Test the factory method.
+    {
+      SetFilterStateConfig factory;
+      auto cb_1 = factory.createFilterFactoryFromProto(proto_config, "", context_);
+      auto cb_2 = factory.createFilterFactoryFromProtoWithServerContext(
+          proto_config, "", context_.server_factory_context_);
+
+      NiceMock<Http::MockFilterChainFactoryCallbacks> filter_chain_factory_callbacks;
+
+      EXPECT_CALL(filter_chain_factory_callbacks, addStreamDecoderFilter(_)).Times(2);
+      cb_1.value()(filter_chain_factory_callbacks);
+      cb_2(filter_chain_factory_callbacks);
+    }
+
+    Server::GenericFactoryContextImpl generic_context(context_);
+
     auto config = std::make_shared<Filters::Common::SetFilterState::Config>(
         proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-        context_);
+        generic_context);
     auto filter = std::make_shared<SetFilterState>(config);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter->setDecoderFilterCallbacks(decoder_callbacks);

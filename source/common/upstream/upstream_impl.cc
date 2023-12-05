@@ -354,7 +354,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
                                                                                  false);
   }
-  return local_address_selector_factory->createLocalAddressSelector(
+  auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       parseBindConfig(
           bind_config, cluster_name,
           buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
@@ -362,6 +362,8 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{}))),
       cluster_name);
+  THROW_IF_STATUS_NOT_OK(selector_or_error, throw);
+  return selector_or_error.value();
 }
 
 } // namespace
@@ -1284,7 +1286,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
+        helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
                                           http_filter_factories_));

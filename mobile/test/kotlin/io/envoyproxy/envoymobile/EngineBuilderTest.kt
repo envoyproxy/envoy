@@ -25,16 +25,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `specifying stats domain overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addGrpcStatsDomain("stats.envoyproxy.io")
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.grpcStatsDomain).isEqualTo("stats.envoyproxy.io")
-  }
-
-  @Test
   fun `enabling interface binding overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
@@ -146,16 +136,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `specifying stats flush overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addStatsFlushSeconds(1234)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.statsFlushSeconds).isEqualTo(1234)
-  }
-
-  @Test
   fun `specifying stream idle timeout overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
@@ -212,7 +192,6 @@ class EngineBuilderTest {
       .addInitialStreamHeader("x-goog-api-key", "A1B2C3")
       .addInitialStreamHeader("x-android-package", "com.google.myapp")
     xdsBuilder.setSslRootCerts("my_root_certs")
-    xdsBuilder.setSni("fake_test_address")
     xdsBuilder.addRuntimeDiscoveryService("some_rtds_resource")
     xdsBuilder.addClusterDiscoveryService(
       "xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz"
@@ -226,7 +205,6 @@ class EngineBuilderTest {
     assertThat(engine.envoyConfiguration.xdsGrpcInitialMetadata)
       .isEqualTo(mapOf("x-goog-api-key" to "A1B2C3", "x-android-package" to "com.google.myapp"))
     assertThat(engine.envoyConfiguration.xdsRootCerts).isEqualTo("my_root_certs")
-    assertThat(engine.envoyConfiguration.xdsSni).isEqualTo("fake_test_address")
     assertThat(engine.envoyConfiguration.rtdsResourceName).isEqualTo("some_rtds_resource")
     assertThat(engine.envoyConfiguration.cdsResourcesLocator)
       .isEqualTo("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")

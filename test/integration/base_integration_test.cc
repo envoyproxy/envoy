@@ -180,10 +180,11 @@ void BaseIntegrationTest::createUpstream(Network::Address::InstanceConstSharedPt
       upstream_tls_ ? createUpstreamTlsContext(config)
                     : Network::Test::createRawBufferDownstreamSocketFactory();
   if (autonomous_upstream_) {
-    fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
-                                                        autonomous_allow_incomplete_streams_));
+    fake_upstreams_.emplace_back(std::make_unique<AutonomousUpstream>(
+        std::move(factory), endpoint, config, autonomous_allow_incomplete_streams_));
   } else {
-    fake_upstreams_.emplace_back(new FakeUpstream(std::move(factory), endpoint, config));
+    fake_upstreams_.emplace_back(
+        std::make_unique<FakeUpstream>(std::move(factory), endpoint, config));
   }
 }
 

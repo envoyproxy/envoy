@@ -119,8 +119,8 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   RequestMatchDataInputMatcherFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
-  auto matcher = factory.createInputMatcherFactoryCb(*proto_config,
-                                                     factory_context.getServerFactoryContext())();
+  auto matcher =
+      factory.createInputMatcherFactoryCb(*proto_config, factory_context.serverFactoryContext())();
 
   {
     Matcher::MatchingDataType input;

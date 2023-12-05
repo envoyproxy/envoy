@@ -32,7 +32,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
-/*/extensions/transport_sockets/alts @adisuissa @yangminzhu
+/*/extensions/transport_sockets/alts @adisuissa @matthewstevenson88
 # tcp_stats transport socket extension
 /*/extensions/transport_sockets/tcp_stats @ggreenway @mattklein123
 # tls transport socket extension
@@ -305,10 +305,10 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
 # upstream load balancing policies
-/*/extensions/load_balancing_policies/common @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/least_request @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/random @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/round_robin @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/common @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/random @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en
 /*/extensions/load_balancing_policies/ring_hash @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher

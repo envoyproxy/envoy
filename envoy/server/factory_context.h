@@ -154,12 +154,17 @@ public:
   ~ServerFactoryContext() override = default;
 
   /**
-   * @return the server-wide grpc context.
+   * @return Http::Context& the server-wide HTTP context.
+   */
+  virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return Grpc::Context& the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return Router::Context& a reference to the router context.
+   * @return Router::Context& the server-wide router context.
    */
   virtual Router::Context& routerContext() PURE;
 
@@ -177,6 +182,50 @@ public:
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
+
+  /**
+   * @return OverloadManager& the overload manager for the server.
+   */
+  virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return whether external healthchecks are currently failed or not.
+   */
+  virtual bool healthCheckFailed() const PURE;
+};
+
+/**
+ * Generic factory context for multiple scenarios. This context provides a server factory context
+ * reference and other resources. Note that except for server factory context, other resources are
+ * not guaranteed to be available for the entire server lifetime. For example, context powered by a
+ * listener is only available for the lifetime of the listener.
+ */
+class GenericFactoryContext {
+public:
+  virtual ~GenericFactoryContext() = default;
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server and provides
+   *         access to the server's resources.
+   */
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+
+  /**
+   * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   */
+  virtual Init::Manager& initManager() const PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   */
+  virtual Stats::Scope& scope() const PURE;
 };
 
 /**
@@ -218,7 +267,7 @@ public:
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
 
   /**
    * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
@@ -330,7 +379,7 @@ public:
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
 
   /**
    * @return the init manager of the particular context. This can be used for extensions that need

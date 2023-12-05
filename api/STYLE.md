@@ -60,13 +60,14 @@ In addition, the following conventions should be followed:
 * Always use upper camel case names for message types and enum types without embedded
   acronyms, such as `HttpRequest`.
 
-* Prefer `oneof` selections to boolean overloads of fields, for example, prefer:
+* Prefer multiple fields with defined precedence over boolean overloads of fields or
+  `oneof`. For example, prefer:
 
   ```proto
-  oneof path_specifier {
-    string simple_path = 1;
-    string regex_path = 2;
-  }
+  // Simple path matcher. If regex_path is set, this field is not used.
+  string simple_path = 1;
+  // Regex path matcher. If set, takes precedence over simple_path.
+  string regex_path = 2;
   ```
 
   to
@@ -76,7 +77,17 @@ In addition, the following conventions should be followed:
   bool path_is_regex = 2;
   ```
 
-  This is more efficient, extendable and self-describing.
+  or
+
+  ```
+  oneof path_specifier {
+    string simple_path = 1;
+    string regex_path = 2;
+  }
+  ```
+
+  This is more efficient on the wire. It also allows new alternatives to be
+  added later in a way that allows control planes to be backward-compatible.
 
 * The API includes two types for representing [percents](envoy/type/percent.proto). `Percent` is
   effectively a double value in the range 0.0-100.0. `FractionalPercent` is an integral fraction
@@ -180,8 +191,6 @@ metadata. We describe these annotations below by category.
   been disallowed by default as per the [breaking change policy](../CONTRIBUTING.md#breaking-change-policy).
 * `[(udpa.annotations.field_migrate).rename = "<new field name>"]` to denote that
   the field will be renamed to a given name in the next API major version.
-* `[(udpa.annotations.field_migrate).oneof_promotion = "<oneof name>"]` to denote that
-  the field will be promoted to a given `oneof` in the next API major version.
 * `[(udpa.annotations.sensitive) = true]` to denote sensitive fields that
   should be redacted in output such as logging or configuration dumps.
 * [PGV annotations](https://github.com/bufbuild/protoc-gen-validate) to denote field
@@ -258,8 +267,7 @@ xDS APIs:
   breaking changes where there is no substantial gain in functionality,
   performance, security or implementation simplification. We will tolerate
   technical debt in the API itself, e.g. in the form of vestigial deprecated
-  fields or reduced ergonomics (such as not using `oneof` when we would prefer
-  to), in order to meet this principle.
+  fields or reduced ergonomics in order to meet this principle.
 
 * Namespaces for extensions, metadata, etc. use a reverse DNS naming scheme,
   e.g. `com.google.widget`, `com.lyft.widget`. Client built-ins may be prefixed

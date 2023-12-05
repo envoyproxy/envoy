@@ -283,6 +283,7 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                      std::make_shared<Network::ConnectionInfoSetterImpl>(
                                          addresses_.local_, addresses_.peer_))),
       session_id_(next_global_session_id_++) {
+  udp_session_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
   cluster_.filter_.config_->stats().downstream_sess_active_.inc();
   cluster_.cluster_.info()
@@ -308,10 +309,14 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
       .connections()
       .dec();
 
+  disableAccessLogFlushTimer();
+
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
+    const Formatter::HttpFormatterContext log_context{
+        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpSessionEnd};
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log({}, udp_session_info_);
+      access_log->log(log_context, udp_session_info_);
     }
   }
 }
@@ -383,6 +388,18 @@ void UdpProxyFilter::UdpActiveSession::onReadReady() {
 }
 
 bool UdpProxyFilter::ActiveSession::onNewSession() {
+  if (cluster_.filter_.config_->accessLogFlushInterval().has_value() &&
+      !cluster_.filter_.config_->sessionAccessLogs().empty()) {
+    access_log_flush_timer_ =
+        cluster_.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
+            [this] { onAccessLogFlushInterval(); });
+    rearmAccessLogFlushTimer();
+  }
+
+  // Set UUID for the session. This is used for logging and tracing.
+  udp_session_info_.setStreamIdProvider(std::make_shared<StreamInfo::StreamIdProviderImpl>(
+      cluster_.filter_.config_->randomGenerator().uuid()));
+
   for (auto& active_read_filter : read_filters_) {
     if (active_read_filter->initialized_) {
       // The filter may call continueFilterChain() in onNewSession(), causing next
@@ -507,6 +524,7 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
     }
   }
 
+  udp_session_info_.upstreamInfo()->setUpstreamHost(host_);
   cluster_.addSession(host_.get(), this);
   createUdpSocket(host_);
   return true;
@@ -636,6 +654,32 @@ void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_d
   }
 }
 
+void UdpProxyFilter::ActiveSession::onAccessLogFlushInterval() {
+  fillSessionStreamInfo();
+  const Formatter::HttpFormatterContext log_context{
+      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpPeriodic};
+  for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
+    access_log->log(log_context, udp_session_info_);
+  }
+
+  rearmAccessLogFlushTimer();
+}
+
+void UdpProxyFilter::ActiveSession::rearmAccessLogFlushTimer() {
+  if (access_log_flush_timer_ != nullptr) {
+    ASSERT(cluster_.filter_.config_->accessLogFlushInterval().has_value());
+    access_log_flush_timer_->enableTimer(
+        cluster_.filter_.config_->accessLogFlushInterval().value());
+  }
+}
+
+void UdpProxyFilter::ActiveSession::disableAccessLogFlushTimer() {
+  if (access_log_flush_timer_ != nullptr) {
+    access_log_flush_timer_->disableTimer();
+    access_log_flush_timer_.reset();
+  }
+}
+
 void HttpUpstreamImpl::encodeData(Buffer::Instance& data) {
   if (!request_encoder_) {
     return;
@@ -735,9 +779,12 @@ void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_down
 TunnelingConnectionPoolImpl::TunnelingConnectionPoolImpl(
     Upstream::ThreadLocalCluster& thread_local_cluster, Upstream::LoadBalancerContext* context,
     const UdpTunnelingConfig& tunnel_config, UpstreamTunnelCallbacks& upstream_callbacks,
-    StreamInfo::StreamInfo& downstream_info)
+    StreamInfo::StreamInfo& downstream_info, bool flush_access_log_on_tunnel_connected,
+    const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs)
     : upstream_callbacks_(upstream_callbacks), tunnel_config_(tunnel_config),
-      downstream_info_(downstream_info) {
+      downstream_info_(downstream_info),
+      flush_access_log_on_tunnel_connected_(flush_access_log_on_tunnel_connected),
+      session_access_logs_(session_access_logs) {
   // TODO(ohadvano): support upstream HTTP/3.
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   conn_pool_data_ =
@@ -763,6 +810,8 @@ void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailur
                                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
   callbacks_->onStreamFailure(reason, failure_reason, host);
+  downstream_info_.upstreamInfo()->setUpstreamHost(host);
+  downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
 }
 
 void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -780,14 +829,25 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   bool is_ssl = upstream_host->transportSocketFactory().implementsSecureTransport();
   upstream_->setRequestEncoder(request_encoder, is_ssl);
   upstream_->setTunnelCreationCallbacks(*this);
+  downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
+
+  if (flush_access_log_on_tunnel_connected_) {
+    const Formatter::HttpFormatterContext log_context{
+        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpTunnelUpstreamConnected};
+    for (const auto& access_log : session_access_logs_) {
+      access_log->log(log_context, downstream_info_);
+    }
+  }
 }
 
 TunnelingConnectionPoolPtr TunnelingConnectionPoolFactory::createConnPool(
     Upstream::ThreadLocalCluster& thread_local_cluster, Upstream::LoadBalancerContext* context,
     const UdpTunnelingConfig& tunnel_config, UpstreamTunnelCallbacks& upstream_callbacks,
-    StreamInfo::StreamInfo& downstream_info) const {
+    StreamInfo::StreamInfo& downstream_info, bool flush_access_log_on_tunnel_connected,
+    const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const {
   auto pool = std::make_unique<TunnelingConnectionPoolImpl>(
-      thread_local_cluster, context, tunnel_config, upstream_callbacks, downstream_info);
+      thread_local_cluster, context, tunnel_config, upstream_callbacks, downstream_info,
+      flush_access_log_on_tunnel_connected, session_access_logs);
   return (pool->valid() ? std::move(pool) : nullptr);
 }
 
@@ -828,28 +888,33 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
            ->resourceManager(Upstream::ResourcePriority::Default)
            .connections()
            .canCreate()) {
+    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     cluster_.cluster_.info()->trafficStats()->upstream_cx_overflow_.inc();
     return false;
   }
 
   if (connect_attempts_ >= cluster_.filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
+    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     cluster_.cluster_.info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
     return false;
   } else if (connect_attempts_ >= 1) {
     cluster_.cluster_.info()->trafficStats()->upstream_rq_retry_.inc();
   }
 
-  conn_pool_ = conn_pool_factory_->createConnPool(cluster_.cluster_, load_balancer_context_.get(),
-                                                  *cluster_.filter_.config_->tunnelingConfig(),
-                                                  *this, udp_session_info_);
+  conn_pool_ = conn_pool_factory_->createConnPool(
+      cluster_.cluster_, load_balancer_context_.get(), *cluster_.filter_.config_->tunnelingConfig(),
+      *this, udp_session_info_, cluster_.filter_.config_->flushAccessLogOnTunnelConnected(),
+      cluster_.filter_.config_->sessionAccessLogs());
 
   if (conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
+    udp_session_info_.setAttemptCount(connect_attempts_);
     conn_pool_->newStream(*this);
     return true;
   }
 
+  udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
   return false;
 }
 
@@ -867,7 +932,13 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     onUpstreamEvent(Network::ConnectionEvent::LocalClose);
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
+    udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+    onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
+    break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    if (connecting_) {
+      udp_session_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+    }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   }

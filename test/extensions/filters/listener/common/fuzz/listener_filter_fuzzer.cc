@@ -45,7 +45,7 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
   EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
               getListenSocket(_))
       .WillOnce(Return(socket_));
-  connection_handler_->addListener(absl::nullopt, *this, runtime_);
+  connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
   conn_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, nullptr);

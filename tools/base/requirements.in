@@ -23,6 +23,7 @@ flake8>=6
 frozendict>=2.3.7
 gitpython
 gsutil
+icalendar
 jinja2
 multidict>=6.0.2
 orjson

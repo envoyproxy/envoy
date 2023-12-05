@@ -55,11 +55,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void flushStats() {
-    JniLibrary.flushStats(engineHandle);
-  }
-
-  @Override
   public String dumpStats() {
     return JniLibrary.dumpStats(engineHandle);
   }

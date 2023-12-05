@@ -44,6 +44,22 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
+// Meaningless case to improve coverage rate.
+TEST(PerFilterChainFactoryContextImplTest, NopTest) {
+  NiceMock<Configuration::MockFactoryContext> parent_context;
+
+  PerFilterChainFactoryContextImpl context(parent_context, parent_context.init_manager_);
+
+  context.messageValidationContext();
+  context.grpcContext();
+  context.healthCheckFailed();
+  context.httpContext();
+  context.routerContext();
+  context.overloadManager();
+  context.timeSource();
+  context.lifecycleNotifier();
+}
+
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   MockFilterChainFactoryBuilder() {
@@ -273,8 +289,7 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   EXPECT_CALL(not_a_draining_manager, drainClose).WillRepeatedly(Return(false));
   Configuration::MockServerFactoryContext mock_server_context;
   EXPECT_CALL(mock_server_context, drainManager).WillRepeatedly(ReturnRef(not_a_draining_manager));
-  EXPECT_CALL(parent_context_, getServerFactoryContext)
-      .WillRepeatedly(ReturnRef(mock_server_context));
+  EXPECT_CALL(parent_context_, serverFactoryContext).WillRepeatedly(ReturnRef(mock_server_context));
 
   EXPECT_FALSE(context0->drainDecision().drainClose());
   EXPECT_FALSE(context1->drainDecision().drainClose());

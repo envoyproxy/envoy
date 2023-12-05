@@ -10,7 +10,10 @@ envoy_contrib_package()
 
 envoy_cc_test(
     name = "config_test",
-    srcs = ["config_test.cc"],
+    srcs = select({
+        "//bazel:linux_x86_64": ["config_test.cc"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//contrib/dlb/source:connection_balancer",
         "//source/common/protobuf:utility_lib",
