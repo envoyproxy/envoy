@@ -60,18 +60,15 @@ bool reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Messa
 
 // Takes a field of scalar type, which may be a repeated field, and hashes
 // it (or each of it).
-template <typename T>
+template <typename T, std::enable_if_t<std::is_scalar_v<T>, bool> = true>
 uint64_t hashScalarField(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
                          const Protobuf::FieldDescriptor& field, uint64_t seed) {
   if (field.is_repeated()) {
-    for (const T& q : reflection.GetRepeatedFieldRef<T>(message, &field)) {
-      seed =
-          HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed);
+    for (const T& scalar : reflection.GetRepeatedFieldRef<T>(message, &field)) {
+      seed = HashUtil::xxHash64Value(scalar, seed);
     }
   } else {
-    const T q = reflectionGet<T>(reflection, message, field);
-    seed =
-        HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed);
+    seed = HashUtil::xxHash64Value(reflectionGet<T>(reflection, message, field), seed);
   }
   return seed;
 }
@@ -99,20 +96,14 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
     entry_hash = reflectionHashField(entry, value_field, entry_hash);
     combined_hash += entry_hash;
   }
-  return HashUtil::xxHash64(
-      absl::string_view{reinterpret_cast<const char*>(&combined_hash), sizeof(combined_hash)},
-      seed);
+  return HashUtil::xxHash64Value(combined_hash, seed);
 }
 
 uint64_t reflectionHashField(const Protobuf::Message& message,
                              const Protobuf::FieldDescriptor& field, uint64_t seed) {
   using Protobuf::FieldDescriptor;
   const Protobuf::Reflection& reflection = *message.GetReflection();
-  {
-    const int q = field.number();
-    seed =
-        HashUtil::xxHash64(absl::string_view{reinterpret_cast<const char*>(&q), sizeof(q)}, seed);
-  }
+  seed = HashUtil::xxHash64Value(field.number(), seed);
   switch (field.cpp_type()) {
   case FieldDescriptor::CPPTYPE_INT32:
     seed = hashScalarField<int32_t>(reflection, message, field, seed);
@@ -139,12 +130,10 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
     if (field.is_repeated()) {
       int c = reflection.FieldSize(message, &field);
       for (int i = 0; i < c; i++) {
-        int v = reflection.GetRepeatedEnumValue(message, &field, i);
-        seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<char*>(&v), sizeof(v)}, seed);
+        seed = HashUtil::xxHash64Value(reflection.GetRepeatedEnumValue(message, &field, i), seed);
       }
     } else {
-      int v = reflection.GetEnumValue(message, &field);
-      seed = HashUtil::xxHash64(absl::string_view{reinterpret_cast<char*>(&v), sizeof(v)}, seed);
+      seed = HashUtil::xxHash64Value(reflection.GetEnumValue(message, &field), seed);
     }
     break;
   case FieldDescriptor::CPPTYPE_STRING: {
