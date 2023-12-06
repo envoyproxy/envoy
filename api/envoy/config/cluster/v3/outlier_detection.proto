@@ -9,6 +9,8 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
+import "envoy/type/v3/range.proto";
+
 option java_package = "io.envoyproxy.envoy.config.cluster.v3";
 option java_outer_classname = "OutlierDetectionProto";
 option java_multiple_files = true;
@@ -16,10 +18,37 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/cluster
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Outlier detection]
+// Error bucket for HTTP codes
+// [#not-implemented-hide:]
+message HttpErrorsBucket {
+  string name = 1;
+  type.v3.Int32Range range = 2;
+}
+
+// Error bucket for locally originated errors
+// [#not-implemented-hide:]
+message LocalOriginEvents {
+}
+
+// Error bucket for database errors.
+// Sub-parameters may be added later, like malformed response, error on write, etc.
+// [#not-implemented-hide:]
+message DatabaseTransactions {
+}
+
+// Union of possible error buckets.
+// [#not-implemented-hide:]
+message ErrorBucket {
+  oneof bucket {
+    HttpErrorsBucket http_errors = 1;
+    LocalOriginEvents local_origin_events = 2;
+    DatabaseTransactions database_transactions = 3;
+  }
+}
 
 // See the :ref:`architecture overview <arch_overview_outlier_detection>` for
 // more information on outlier detection.
-// [#next-free-field: 24]
+// [#next-free-field: 23]
 message OutlierDetection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.cluster.OutlierDetection";
@@ -167,4 +196,48 @@ message OutlierDetection {
   // To change this default behavior set this config to ``false`` where active health checking will not uneject the host.
   // Defaults to true.
   google.protobuf.BoolValue successful_active_health_check_uneject_host = 23;
+
+  // Monitor which counts consecutive errors.
+  // If number of consecutive errors exceeds the threshold, monitor will report that the host
+  // is unhealthy.
+  // [#not-implemented-hide:]
+  message ConsecutiveErrors {
+    // Monitor name.
+    string name = 1;
+    // The number of consecutive errors before ejection occurs.
+    google.protobuf.UInt32Value threshold = 2 [(validate.rules).uint32 = {lte: 100}];
+    // The % chance that a host is actually ejected. Defaults to 100.
+    google.protobuf.UInt32Value enforcing = 3 [(validate.rules).uint32 = {lte: 100}];
+    // List of error buckets.
+    repeated ErrorBucket error_buckets = 4;
+  }
+
+  // Monitor which counts percentage of failed requests.
+  // Percentage of failed requests is calculated at each interval. If the percentage of failed requests is larger than
+  // defined threshold, the monitor will report that the host is unhealthy.
+  // [#not-implemented-hide:]
+  message FailurePercentage {
+    // Monitor name.
+    string name = 1;
+    // The percentage of failed requests required to mark the host as unhealthy. Defaults to 85.
+    google.protobuf.UInt32Value threshold = 2 [(validate.rules).uint32 = {lte: 100}];
+    // The % chance that a host is actually ejected. Defaults to 100.
+    google.protobuf.UInt32Value enforcing = 3 [(validate.rules).uint32 = {lte: 100}];
+    // List of error buckets.
+    repeated ErrorBucket error_buckets = 4;
+  }
+
+
+  // Set of passive monitors.
+  // [#not-implemented-hide:]
+  message Monitors {
+    // Set of monitors counting consecutive errors.
+    repeated ConsecutiveErrors consecutive_errors = 1;
+    // Set of failure percentage monitors.
+    repeated FailurePercentage failure_percantage = 2;
+  }
+
+  // Set of host's passive monitors.
+  // [#not-implemented-hide:]
+  Monitors monitors = 24;
 }
