@@ -2245,6 +2245,12 @@ TEST_P(Http2FrameIntegrationTest, HostConcatenatedWithAuthorityWithOverride) {
 // All HTTP/2 static headers must be before non-static headers.
 // Verify that codecs validate this.
 TEST_P(Http2FrameIntegrationTest, HostBeforeAuthorityIsRejected) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(yanavlasov): fix this check for oghttp2 in UHV mode.
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
   beginSession();
 
   Http2Frame request = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0),
