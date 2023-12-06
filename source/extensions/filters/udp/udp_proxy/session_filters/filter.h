@@ -79,9 +79,7 @@ protected:
   /**
    * This routine is called by onSessionComplete to enrich the data passed in to the log handlers.
    */
-  virtual void onSessionCompleteInternal() {
-    ASSERT(!on_session_complete_already_called_);
-  }
+  virtual void onSessionCompleteInternal() { ASSERT(!on_session_complete_already_called_); }
 
 private:
   bool on_session_complete_already_called_{false};
