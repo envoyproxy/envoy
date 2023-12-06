@@ -264,7 +264,7 @@ public:
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
    */
-  virtual DnsCacheSharedPtr
+  virtual absl::StatusOr<DnsCacheSharedPtr>
   getCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
 
   /**
