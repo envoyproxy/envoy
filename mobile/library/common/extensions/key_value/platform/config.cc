@@ -22,9 +22,12 @@ public:
 
   ~PlatformInterfaceImpl() override {}
 
+  envoy_kv_store* bridgedStore() const {
+    return static_cast<envoy_kv_store*>(Api::External::retrieveApi(std::string(PlatformStoreName)));
+  }
+
   std::string read(const std::string& key) const override {
-    envoy_kv_store& bridged_store =
-        *static_cast<envoy_kv_store*>(Api::External::retrieveApi(std::string(PlatformStoreName)));
+    envoy_kv_store& bridged_store = *bridgedStore();
     envoy_data bridged_key = Data::Utility::copyToBridgeData(key);
     envoy_data bridged_value = bridged_store.read(bridged_key, bridged_store.context);
     std::string result = Data::Utility::copyToString(bridged_value);
@@ -33,8 +36,7 @@ public:
   }
 
   void save(const std::string& key, const std::string& contents) override {
-    envoy_kv_store& bridged_store =
-        *static_cast<envoy_kv_store*>(Api::External::retrieveApi(std::string(PlatformStoreName)));
+    envoy_kv_store& bridged_store = *bridgedStore();
     envoy_data bridged_key = Data::Utility::copyToBridgeData(key);
     envoy_data bridged_value = Data::Utility::copyToBridgeData(contents);
     bridged_store.save(bridged_key, bridged_value, bridged_store.context);
