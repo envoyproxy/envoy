@@ -24,27 +24,6 @@ TEST(AdminFactoryContextTest, AdminFactoryContextTest) {
   context.messageValidationVisitor();
   context.initManager();
   context.drainDecision();
-
-  context.accessLogManager();
-  context.clusterManager();
-  context.mainThreadDispatcher();
-  context.options();
-  context.grpcContext();
-  context.healthCheckFailed();
-  context.httpContext();
-  context.routerContext();
-  context.localInfo();
-  context.runtime();
-  context.serverScope();
-  context.messageValidationContext();
-  context.singletonManager();
-  context.overloadManager();
-  context.threadLocal();
-  context.admin();
-  context.timeSource();
-  context.api();
-  context.lifecycleNotifier();
-  context.processContext();
 }
 
 } // namespace

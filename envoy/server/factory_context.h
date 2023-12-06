@@ -39,10 +39,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-// Shared factory context between server factories and cluster factories
-class FactoryContextBase {
+/**
+ * Common interface for downstream and upstream network filters to access server
+ * wide resources. This could be treated as limited form of server factory context.
+ */
+class CommonFactoryContext {
 public:
-  virtual ~FactoryContextBase() = default;
+  virtual ~CommonFactoryContext() = default;
 
   /**
    * @return Server::Options& the command-line options that Envoy was started with.
@@ -81,6 +84,12 @@ public:
   virtual Singleton::Manager& singletonManager() PURE;
 
   /**
+   * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
+
+  /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
@@ -100,23 +109,11 @@ public:
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
-};
 
-/**
- * Common interface for downstream and upstream network filters.
- */
-class CommonFactoryContext : public FactoryContextBase {
-public:
   /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.
    */
   virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
    * @return TimeSource& a reference to the time source.
@@ -132,16 +129,6 @@ public:
    * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
    */
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
-
-  /**
-   * @return the init manager of the cluster. This can be used for extensions that need
-   *         to initialize after cluster manager init but before the server starts listening.
-   *         All extensions should register themselves during configuration load. initialize()
-   *         will be called on  each registered target after cluster manager init but before the
-   *         server starts listening. Once all targets have initialized and invoked their callbacks,
-   *         the server will start listening.
-   */
-  virtual Init::Manager& initManager() PURE;
 };
 
 /**
@@ -173,6 +160,16 @@ public:
    * process context. Will be unset when running in validation mode.
    */
   virtual ProcessContextOptRef processContext() PURE;
+
+  /**
+   * @return the init manager of the cluster. This can be used for extensions that need
+   *         to initialize after cluster manager init but before the server starts listening.
+   *         All extensions should register themselves during configuration load. initialize()
+   *         will be called on  each registered target after cluster manager init but before the
+   *         server starts listening. Once all targets have initialized and invoked their callbacks,
+   *         the server will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
 
   /**
    * @return DrainManager& the server-wide drain manager.
@@ -232,17 +229,6 @@ public:
    *         backend implementation.
    */
   virtual Stats::Scope& scope() PURE;
-};
-
-/**
- * Factory context for access loggers that need access to listener properties.
- * This context is supplied to the access log factory when called with the listener context
- * available, such as from downstream HTTP filters.
- * NOTE: this interface is used in proprietary access loggers, please do not delete
- * without reaching to Envoy maintainers first.
- */
-class ListenerAccessLogFactoryContext : public virtual CommonFactoryContext {
-public:
 };
 
 /**

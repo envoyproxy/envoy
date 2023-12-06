@@ -18,7 +18,7 @@ namespace Envoy {
 class SetResponseCodeFilterConfig {
 public:
   SetResponseCodeFilterConfig(const std::string& prefix, uint32_t code, const std::string& body,
-                              Server::Configuration::FactoryContextBase& context)
+                              Server::Configuration::CommonFactoryContext& context)
       : prefix_(prefix), code_(code), body_(body), tls_slot_(context.threadLocal()) {}
 
   const std::string prefix_;
@@ -32,7 +32,7 @@ class SetResponseCodeFilterRouteSpecificConfig : public Envoy::Router::RouteSpec
 public:
   SetResponseCodeFilterRouteSpecificConfig(const std::string& prefix, uint32_t code,
                                            const std::string& body,
-                                           Server::Configuration::FactoryContextBase& context)
+                                           Server::Configuration::CommonFactoryContext& context)
       : prefix_(prefix), code_(code), body_(body), tls_slot_(context.threadLocal()) {}
 
   const std::string prefix_;
