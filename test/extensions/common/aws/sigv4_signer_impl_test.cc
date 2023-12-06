@@ -48,8 +48,9 @@ public:
     headers.setPath("/");
     headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
-    SigV4SignerImpl signer(service_name, "region", CredentialsProviderSharedPtr{credentials_provider},
-                      time_system_, Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+    SigV4SignerImpl signer(service_name, "region",
+                           CredentialsProviderSharedPtr{credentials_provider}, time_system_,
+                           Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
     if (use_unsigned_payload) {
       signer.signUnsignedPayload(headers, override_region);
     } else {
@@ -123,9 +124,10 @@ TEST_F(SigV4SignerImplTest, SignSecurityTokenHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_);
-  EXPECT_EQ(
-      "token",
-      message_->headers().get(SigV4SignatureHeaders::get().SecurityToken)[0]->value().getStringView());
+  EXPECT_EQ("token", message_->headers()
+                         .get(SigV4SignatureHeaders::get().SecurityToken)[0]
+                         ->value()
+                         .getStringView());
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
             "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-security-token, "
             "Signature=1d42526aabf7d8b6d7d33d9db43b03537300cc7e6bb2817e349749e0a08f5b5e",
@@ -141,9 +143,11 @@ TEST_F(SigV4SignerImplTest, SignEmptyContentHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_, true);
-  EXPECT_EQ(
-      SigV4SignatureConstants::get().HashedEmptyString,
-      message_->headers().get(SigV4SignatureHeaders::get().ContentSha256)[0]->value().getStringView());
+  EXPECT_EQ(SigV4SignatureConstants::get().HashedEmptyString,
+            message_->headers()
+                .get(SigV4SignatureHeaders::get().ContentSha256)[0]
+                ->value()
+                .getStringView());
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
             "SignedHeaders=x-amz-content-sha256;x-amz-date, "
             "Signature=4ee6aa9355259c18133f150b139ea9aeb7969c9408ad361b2151f50a516afe42",
@@ -160,9 +164,11 @@ TEST_F(SigV4SignerImplTest, SignContentHeader) {
   addPath("/");
   setBody("test1234");
   signer_.sign(*message_, true);
-  EXPECT_EQ(
-      "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
-      message_->headers().get(SigV4SignatureHeaders::get().ContentSha256)[0]->value().getStringView());
+  EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+            message_->headers()
+                .get(SigV4SignatureHeaders::get().ContentSha256)[0]
+                ->value()
+                .getStringView());
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
             "SignedHeaders=x-amz-content-sha256;x-amz-date, "
             "Signature=4eab89c36f45f2032d6010ba1adab93f8510ddd6afe540821f3a05bb0253e27b",
@@ -179,9 +185,11 @@ TEST_F(SigV4SignerImplTest, SignContentHeaderOverrideRegion) {
   addPath("/");
   setBody("test1234");
   signer_.sign(*message_, true, "region1");
-  EXPECT_EQ(
-      "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
-      message_->headers().get(SigV4SignatureHeaders::get().ContentSha256)[0]->value().getStringView());
+  EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+            message_->headers()
+                .get(SigV4SignatureHeaders::get().ContentSha256)[0]
+                ->value()
+                .getStringView());
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region1/service/aws4_request, "
             "SignedHeaders=x-amz-content-sha256;x-amz-date, "
             "Signature=fe8136ed21972d8618171e051f4023b7c06b85d61b4d4325be869846f404b399",

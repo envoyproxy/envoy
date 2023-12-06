@@ -35,7 +35,7 @@ public:
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"};
   const std::string SigV4ASignatureVersion{"AWS4A"};
   const std::string SigV4AStringToSignFormat{"AWS4-ECDSA-P256-SHA256\n{}\n{}\n{}"};
-  const std::string SigV4ALabel="AWS4-ECDSA-P256-SHA256";
+  const std::string SigV4ALabel = "AWS4-ECDSA-P256-SHA256";
 
   const std::string LongDateFormat{"%Y%m%dT%H%M00Z"};
   const std::string ShortDateFormat{"%Y%m%d"};
@@ -43,9 +43,9 @@ public:
 };
 
 enum SigV4AKeyDerivationResult {
-    AkdrSuccess,
-    AkdrNextCounter,
-    AkdrFailure,
+  AkdrSuccess,
+  AkdrNextCounter,
+  AkdrFailure,
 };
 
 using SigV4ASignatureConstants = ConstSingleton<SigV4ASignatureConstantValues>;
@@ -63,7 +63,8 @@ public:
                    const CredentialsProviderSharedPtr& credentials_provider,
                    TimeSource& time_source, const AwsSigningHeaderExclusionVector& matcher_config)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
-        time_source_(time_source), long_date_formatter_(SigV4ASignatureConstants::get().LongDateFormat),
+        time_source_(time_source),
+        long_date_formatter_(SigV4ASignatureConstants::get().LongDateFormat),
         short_date_formatter_(SigV4ASignatureConstants::get().ShortDateFormat) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
@@ -89,7 +90,7 @@ private:
   std::string createStringToSign(absl::string_view canonical_request, absl::string_view long_date,
                                  absl::string_view credential_scope) const;
 
-  std::string createSignature(absl::string_view access_key_id, absl::string_view secret_access_key, 
+  std::string createSignature(absl::string_view access_key_id, absl::string_view secret_access_key,
                               absl::string_view string_to_sign) const;
 
   std::string createAuthorizationHeader(absl::string_view access_key_id,
@@ -109,12 +110,10 @@ private:
     return matcher_ptrs;
   }
 
+  bool constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
+                                     std::vector<uint8_t> rhs_raw_be_bigint) const;
 
-  bool constantTimeLessThanOrEqualTo(
-    std::vector<uint8_t> lhs_raw_be_bigint,
-    std::vector<uint8_t> rhs_raw_be_bigint) const;
-
-  void constantTimeAddOne(std::vector<uint8_t> *raw_be_bigint) const;
+  void constantTimeAddOne(std::vector<uint8_t>* raw_be_bigint) const;
 
   const std::string service_name_;
   const std::string region_;
@@ -127,7 +126,6 @@ private:
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
 };
-
 
 } // namespace Aws
 } // namespace Common

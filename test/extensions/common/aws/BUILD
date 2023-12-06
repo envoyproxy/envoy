@@ -47,6 +47,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],

@@ -52,10 +52,11 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SigV4SignerImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
-             const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-             const AwsSigningHeaderExclusionVector& matcher_config)
+                  const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
+                  const AwsSigningHeaderExclusionVector& matcher_config)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
-        time_source_(time_source), long_date_formatter_(SigV4SignatureConstants::get().LongDateFormat),
+        time_source_(time_source),
+        long_date_formatter_(SigV4SignatureConstants::get().LongDateFormat),
         short_date_formatter_(SigV4SignatureConstants::get().ShortDateFormat) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
@@ -114,7 +115,6 @@ private:
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
 };
-
 
 } // namespace Aws
 } // namespace Common

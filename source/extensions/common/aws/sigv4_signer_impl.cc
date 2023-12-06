@@ -1,5 +1,9 @@
 #include "source/extensions/common/aws/sigv4_signer_impl.h"
 
+#include <openssl/ssl.h>
+
+#include <cstddef>
+
 #include "envoy/common/exception.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -10,9 +14,6 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
-#include <cstddef>
-
-#include <openssl/ssl.h>
 
 namespace Envoy {
 namespace Extensions {
@@ -20,28 +21,28 @@ namespace Common {
 namespace Aws {
 
 void SigV4SignerImpl::sign(Http::RequestMessage& message, bool sign_body,
-                      const absl::string_view override_region) {
+                           const absl::string_view override_region) {
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
   sign(headers, content_hash, override_region);
 }
 
 void SigV4SignerImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
-                                  const absl::string_view override_region) {
+                                       const absl::string_view override_region) {
   headers.setReference(SigV4SignatureHeaders::get().ContentSha256,
                        SigV4SignatureConstants::get().HashedEmptyString);
   sign(headers, SigV4SignatureConstants::get().HashedEmptyString, override_region);
 }
 
 void SigV4SignerImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
-                                     const absl::string_view override_region) {
+                                          const absl::string_view override_region) {
   headers.setReference(SigV4SignatureHeaders::get().ContentSha256,
                        SigV4SignatureConstants::get().UnsignedPayload);
   sign(headers, SigV4SignatureConstants::get().UnsignedPayload, override_region);
 }
 
 void SigV4SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-                      const absl::string_view override_region) {
+                           const absl::string_view override_region) {
   headers.setReferenceKey(SigV4SignatureHeaders::get().ContentSha256, content_hash);
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
@@ -83,7 +84,8 @@ void SigV4SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& c
   headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 }
 
-std::string SigV4SignerImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {
+std::string SigV4SignerImpl::createContentHash(Http::RequestMessage& message,
+                                               bool sign_body) const {
   if (!sign_body) {
     return SigV4SignatureConstants::get().HashedEmptyString;
   }
@@ -95,24 +97,26 @@ std::string SigV4SignerImpl::createContentHash(Http::RequestMessage& message, bo
 }
 
 std::string SigV4SignerImpl::createCredentialScope(absl::string_view short_date,
-                                              absl::string_view override_region) const {
-  return fmt::format(fmt::runtime(SigV4SignatureConstants::get().SigV4CredentialScopeFormat), short_date,
-                     override_region.empty() ? region_ : override_region, service_name_);
+                                                   absl::string_view override_region) const {
+  return fmt::format(fmt::runtime(SigV4SignatureConstants::get().SigV4CredentialScopeFormat),
+                     short_date, override_region.empty() ? region_ : override_region,
+                     service_name_);
 }
 
 std::string SigV4SignerImpl::createStringToSign(absl::string_view canonical_request,
-                                           absl::string_view long_date,
-                                           absl::string_view credential_scope) const {
+                                                absl::string_view long_date,
+                                                absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   return fmt::format(
-      fmt::runtime(SigV4SignatureConstants::get().SigV4StringToSignFormat), long_date, credential_scope,
+      fmt::runtime(SigV4SignatureConstants::get().SigV4StringToSignFormat), long_date,
+      credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
 std::string SigV4SignerImpl::createSignature(absl::string_view secret_access_key,
-                                        absl::string_view short_date,
-                                        absl::string_view string_to_sign,
-                                        absl::string_view override_region) const {
+                                             absl::string_view short_date,
+                                             absl::string_view string_to_sign,
+                                             absl::string_view override_region) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto secret_key =
       absl::StrCat(SigV4SignatureConstants::get().SigV4SignatureVersion, secret_access_key);
@@ -126,11 +130,10 @@ std::string SigV4SignerImpl::createSignature(absl::string_view secret_access_key
   return Hex::encode(crypto_util.getSha256Hmac(signing_key, string_to_sign));
 }
 
-std::string
-SigV4SignerImpl::createAuthorizationHeader(absl::string_view access_key_id,
-                                      absl::string_view credential_scope,
-                                      const std::map<std::string, std::string>& canonical_headers,
-                                      absl::string_view signature) const {
+std::string SigV4SignerImpl::createAuthorizationHeader(
+    absl::string_view access_key_id, absl::string_view credential_scope,
+    const std::map<std::string, std::string>& canonical_headers,
+    absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
   return fmt::format(fmt::runtime(SigV4SignatureConstants::get().SigV4AuthorizationHeaderFormat),
                      access_key_id, credential_scope, signed_headers, signature);
