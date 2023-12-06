@@ -1131,6 +1131,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.http.aws_lambda",
             "envoy.filters.http.aws_request_signing",
             "envoy.grpc_credentials.aws_iam",
+            "envoy.tracers.opencensus",
         ],
         release_date = "2023-10-11",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
