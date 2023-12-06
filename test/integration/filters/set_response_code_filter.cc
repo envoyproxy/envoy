@@ -88,7 +88,8 @@ private:
       const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
-        proto_config.prefix(), proto_config.code(), proto_config.body(), context);
+        proto_config.prefix(), proto_config.code(), proto_config.body(),
+        context.serverFactoryContext());
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
