@@ -13,7 +13,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/region_provider_impl.h"
-#include "source/extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
@@ -58,7 +58,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
             config.service_name(), region, credentials_provider, api.timeSource(),
             // TODO: extend API to allow specifying header exclusion. ref:
             // https://github.com/envoyproxy/envoy/pull/18998
-            Common::Aws::AwsSigV4HeaderExclusionVector{});
+            Common::Aws::AwsSigningHeaderExclusionVector{});
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<AwsIamHeaderAuthenticator>(std::move(signer)));
         if (call_creds == nullptr) {

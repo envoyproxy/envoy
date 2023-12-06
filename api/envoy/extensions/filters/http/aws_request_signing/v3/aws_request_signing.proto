@@ -26,10 +26,10 @@ message AwsRequestSigning {
 
   enum SigningAlgorithm {
     // Use SigV4 for signing
-    SigV4 = 0;
+    AWS_SigV4 = 0;
 
     // Use SigV4A for signing
-    SigV4A = 1;
+    AWS_SigV4A = 1;
   }
 
   // The `service namespace

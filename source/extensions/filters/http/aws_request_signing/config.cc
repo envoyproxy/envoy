@@ -8,7 +8,8 @@
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/sigv4a_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 #include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
@@ -24,11 +25,11 @@ SigningAlgorithm getSigningAlgorithm(
 
   switch (config.signing_algorithm()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case AwsRequestSigning_SigningAlgorithm_SigV4:
+  case AwsRequestSigning_SigningAlgorithm_AWS_SigV4:
     ENVOY_LOG_TO_LOGGER(logger, debug, "Signing Algorithm is SigV4");
 
     return SigningAlgorithm::SigV4;
-  case AwsRequestSigning_SigningAlgorithm_SigV4A:
+  case AwsRequestSigning_SigningAlgorithm_AWS_SigV4A:
     ENVOY_LOG_TO_LOGGER(logger, debug, "Signing Algorithm is SigV4A");
     return SigningAlgorithm::SigV4A;
   }
@@ -45,7 +46,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
           server_context.api(), makeOptRef(server_context), config.region(),
           Extensions::Common::Aws::Utility::fetchMetadata);
-  const auto matcher_config = Extensions::Common::Aws::AwsSigV4HeaderExclusionVector(
+  const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
 
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
@@ -55,7 +56,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
         config.service_name(), config.region(), credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
-    signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
+    signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         config.service_name(), config.region(), credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
   }
@@ -88,7 +89,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
         per_route_config.aws_request_signing().region(), credentials_provider,
         context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
-    signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
+    signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         per_route_config.aws_request_signing().service_name(),
         per_route_config.aws_request_signing().region(), credentials_provider,
         context.mainThreadDispatcher().timeSource(), matcher_config);
