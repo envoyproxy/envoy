@@ -100,16 +100,13 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
-  ON_CALL(*this, emitLogTime()).WillByDefault(ReturnPointee(&emit_log_time_));
+  ON_CALL(*this, emitLogTime()).WillByDefault(ReturnPointee(&ts_.systemTime()));
   ON_CALL(*this, currentDuration()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
     end_time_ = absl::make_optional<std::chrono::nanoseconds>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(ts_.systemTime() - start_time_)
             .count());
-  }));
-  ON_CALL(*this, onEmitLog()).WillByDefault(Invoke([this]() {
-    emit_log_time_ = ts_.systemTime();
   }));
   ON_CALL(*this, downstreamTiming()).WillByDefault(Invoke([this]() -> DownstreamTiming& {
     return downstream_timing_;

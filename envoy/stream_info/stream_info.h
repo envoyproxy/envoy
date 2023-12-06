@@ -727,11 +727,6 @@ public:
   virtual void onRequestComplete() PURE;
 
   /**
-   * Sets the emit log time. This method is called once the access log has been emitted.
-   */
-  virtual void onEmitLog() PURE;
-
-  /**
    * @return the downstream timing information.
    */
   virtual DownstreamTiming& downstreamTiming() PURE;

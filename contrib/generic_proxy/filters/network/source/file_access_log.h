@@ -23,8 +23,7 @@ public:
     log_file_ = log_manager.createAccessLog(access_log_file_info);
   }
 
-  void log(const Context& context, StreamInfo::StreamInfo& stream_info) override {
-    stream_info.onEmitLog();
+  void log(const Context& context, const StreamInfo::StreamInfo& stream_info) override {
     if (filter_ != nullptr && !filter_->evaluate(context, stream_info)) {
       return;
     }

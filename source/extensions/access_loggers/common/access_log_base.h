@@ -27,7 +27,7 @@ public:
    * Log a completed request if the underlying AccessLog `filter_` allows it.
    */
   void log(const Formatter::HttpFormatterContext& log_context,
-           StreamInfo::StreamInfo& stream_info) override;
+           const StreamInfo::StreamInfo& stream_info) override;
 
 private:
   /**

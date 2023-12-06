@@ -1477,10 +1477,9 @@ void Context::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& call
 }
 
 void Context::log(const Formatter::HttpFormatterContext& log_context,
-                  StreamInfo::StreamInfo& stream_info) {
+                  const StreamInfo::StreamInfo& stream_info) {
   // `log` may be called multiple times due to mid-request logging -- we only want to run on the
   // last call.
-  stream_info.onEmitLog();
   if (!stream_info.requestComplete().has_value()) {
     return;
   }

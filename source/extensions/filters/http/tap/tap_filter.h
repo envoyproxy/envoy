@@ -122,7 +122,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 
   // AccessLog::Instance
-  void log(const Formatter::HttpFormatterContext&, StreamInfo::StreamInfo&) override;
+  void log(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&) override;
 
 private:
   FilterConfigSharedPtr config_;

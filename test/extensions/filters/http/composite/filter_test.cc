@@ -230,9 +230,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
 
   EXPECT_CALL(*access_log_1, log(_, _));
   EXPECT_CALL(*access_log_2, log(_, _));
-
-  auto stream_info = StreamInfo::MockStreamInfo();
-  filter_.log({}, stream_info);
+  filter_.log({}, StreamInfo::MockStreamInfo());
 }
 
 } // namespace

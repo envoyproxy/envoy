@@ -50,7 +50,7 @@ public:
   ~MockInstance() override;
 
   // AccessLog::Instance
-  MOCK_METHOD(void, log, (const Formatter::HttpFormatterContext&, StreamInfo::StreamInfo&));
+  MOCK_METHOD(void, log, (const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&));
 };
 
 } // namespace AccessLog

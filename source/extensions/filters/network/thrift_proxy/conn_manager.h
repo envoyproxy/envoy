@@ -383,7 +383,7 @@ private:
   void resetAllRpcs(bool local_reset);
   void emitLogEntry(const Http::RequestHeaderMap* request_headers,
                     const Http::ResponseHeaderMap* response_headers,
-                    StreamInfo::StreamInfo& stream_info);
+                    const StreamInfo::StreamInfo& stream_info);
 
   Config& config_;
   ThriftFilterStats& stats_;

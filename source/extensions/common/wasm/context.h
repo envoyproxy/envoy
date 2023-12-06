@@ -149,7 +149,7 @@ public:
 
   // AccessLog::Instance
   void log(const Formatter::HttpFormatterContext& log_context,
-           StreamInfo::StreamInfo& info) override;
+           const StreamInfo::StreamInfo& info) override;
 
   uint32_t getLogLevel() override;
 

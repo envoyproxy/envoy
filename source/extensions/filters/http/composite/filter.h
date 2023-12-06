@@ -76,7 +76,7 @@ public:
 
   // AccessLog::Instance
   void log(const Formatter::HttpFormatterContext& log_context,
-           StreamInfo::StreamInfo& info) override {
+           const StreamInfo::StreamInfo& info) override {
     for (const auto& log : access_loggers_) {
       log->log(log_context, info);
     }

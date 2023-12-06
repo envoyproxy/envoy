@@ -67,7 +67,7 @@ public:
 
   // AccessLog::Instance
   void log(const PluginSharedPtr& plugin, const Formatter::HttpFormatterContext& log_context,
-           StreamInfo::StreamInfo& info);
+           const StreamInfo::StreamInfo& info);
 
   void onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot);
 

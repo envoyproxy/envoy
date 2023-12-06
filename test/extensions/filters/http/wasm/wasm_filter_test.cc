@@ -675,7 +675,7 @@ TEST_P(WasmHttpFilterTest, AccessLog) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
   filter().continueStream(proxy_wasm::WasmStreamType::Response);
   filter().closeStream(proxy_wasm::WasmStreamType::Response);
-  NiceMock<StreamInfo::MockStreamInfo> log_stream_info;
+  StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete())
       .WillRepeatedly(testing::Return(std::chrono::milliseconds(30)));
   filter().log({&request_headers, &response_headers, &response_trailers}, log_stream_info);
@@ -694,7 +694,7 @@ TEST_P(WasmHttpFilterTest, AccessLogClientDisconnected) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
 
-  NiceMock<StreamInfo::MockStreamInfo> log_stream_info;
+  StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete())
       .WillRepeatedly(testing::Return(std::chrono::milliseconds(30)));
   filter().log({&request_headers}, log_stream_info);
@@ -712,7 +712,7 @@ TEST_P(WasmHttpFilterTest, AccessLogDisabledForIncompleteStream) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
 
-  NiceMock<StreamInfo::MockStreamInfo> log_stream_info;
+  StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete()).WillRepeatedly(testing::Return(absl::nullopt));
   filter().log({&request_headers}, log_stream_info);
   filter().onDestroy();
@@ -724,7 +724,7 @@ TEST_P(WasmHttpFilterTest, AccessLogCreate) {
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onLog 2 / 200"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
 
-  NiceMock<StreamInfo::MockStreamInfo> log_stream_info;
+  StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete())
       .WillRepeatedly(testing::Return(std::chrono::milliseconds(30)));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};

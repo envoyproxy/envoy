@@ -80,7 +80,6 @@ public:
   MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
   MOCK_METHOD(OptRef<const UpstreamInfo>, upstreamInfo, (), (const));
   MOCK_METHOD(void, onRequestComplete, ());
-  MOCK_METHOD(void, onEmitLog, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, currentDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
@@ -147,7 +146,6 @@ public:
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
-  absl::optional<SystemTime> emit_log_time_;
   absl::optional<std::chrono::nanoseconds> end_time_;
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;

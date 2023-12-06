@@ -134,7 +134,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
-  absl::optional<SystemTime> emitLogTime() const override { return emit_log_time_; }
+  SystemTime emitLogTime() const override { return time_source_.systemTime(); }
 
   absl::optional<std::chrono::nanoseconds> duration(absl::optional<MonotonicTime> time) const {
     if (!time) {
@@ -172,8 +172,6 @@ struct StreamInfoImpl : public StreamInfo {
     ASSERT(!final_time_);
     final_time_ = time_source_.monotonicTime();
   }
-
-  void onEmitLog() override { emit_log_time_ = time_source_.systemTime(); }
 
   DownstreamTiming& downstreamTiming() override {
     if (!downstream_timing_.has_value()) {
@@ -415,7 +413,6 @@ struct StreamInfoImpl : public StreamInfo {
   TimeSource& time_source_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
-  absl::optional<SystemTime> emit_log_time_;
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;

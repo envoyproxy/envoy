@@ -36,7 +36,7 @@ public:
   template <class FilterType> void runData(FilterType* filter, const test::fuzz::HttpData& data);
 
   // This executes the access logger with the fuzzed headers/trailers.
-  void accessLog(AccessLog::Instance* access_logger, StreamInfo::StreamInfo& stream_info) {
+  void accessLog(AccessLog::Instance* access_logger, const StreamInfo::StreamInfo& stream_info) {
     ENVOY_LOG_MISC(debug, "Access logging");
     access_logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info);
   }

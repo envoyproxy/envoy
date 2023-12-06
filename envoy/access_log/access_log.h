@@ -88,7 +88,7 @@ public:
    * @param stream_info supplies additional information about the request not
    * contained in the request headers.
    */
-  virtual void log(const Context& context, StreamInfo::StreamInfo& stream_info) PURE;
+  virtual void log(const Context& context, const StreamInfo::StreamInfo& stream_info) PURE;
 };
 template <class Context> using InstanceBaseSharedPtr = std::shared_ptr<InstanceBase<Context>>;
 

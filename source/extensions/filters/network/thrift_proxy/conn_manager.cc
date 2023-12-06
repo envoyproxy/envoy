@@ -53,7 +53,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 
 void ConnectionManager::emitLogEntry(const Http::RequestHeaderMap* request_headers,
                                      const Http::ResponseHeaderMap* response_headers,
-                                     StreamInfo::StreamInfo& stream_info) {
+                                     const StreamInfo::StreamInfo& stream_info) {
   const Formatter::HttpFormatterContext log_context{request_headers, response_headers};
 
   for (const auto& access_log : config_.accessLogs()) {

@@ -21,8 +21,7 @@ public:
       : plugin_(plugin), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
 
   void log(const Formatter::HttpFormatterContext& log_context,
-           StreamInfo::StreamInfo& stream_info) override {
-    stream_info.onEmitLog();
+           const StreamInfo::StreamInfo& stream_info) override {
     if (filter_) {
       if (!filter_->evaluate(log_context, stream_info)) {
         return;
