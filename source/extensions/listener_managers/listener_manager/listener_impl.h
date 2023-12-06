@@ -127,7 +127,7 @@ class ListenerFactoryContextBaseImpl final : public Server::FactoryContextImplBa
 public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 Server::ListenerInfoSharedPtr listener_info,
+                                 ListenerInfoConstSharedPtr listener_info,
                                  const envoy::config::listener::v3::Listener& config,
                                  Server::DrainManagerPtr drain_manager);
 
@@ -158,7 +158,7 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                const std::shared_ptr<const ListenerInfoImpl>& listener_info,
+                                ListenerInfoConstSharedPtr listener_info,
                                 ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
 
   PerListenerFactoryContextImpl(

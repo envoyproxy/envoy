@@ -229,7 +229,7 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Server::ListenerInfoSharedPtr listener_info,
+    Server::ListenerInfoConstSharedPtr listener_info,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : Server::FactoryContextImplBase(
           server, validation_visitor, server.stats().createScope(""),
@@ -810,10 +810,11 @@ void ListenerImpl::buildProxyProtocolListenerFilter(
 PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config_message,
-    const std::shared_ptr<const ListenerInfoImpl>& listener_info, ListenerImpl& listener_impl,
+    ListenerInfoConstSharedPtr listener_info, ListenerImpl& listener_impl,
     DrainManagerPtr drain_manager)
     : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-          server, validation_visitor, listener_info, config_message, std::move(drain_manager))),
+          server, validation_visitor, std::move(listener_info), config_message,
+          std::move(drain_manager))),
       listener_impl_(listener_impl) {}
 
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }
