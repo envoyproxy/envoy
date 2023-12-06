@@ -48,8 +48,9 @@ public:
     headers.setPath("/");
     headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
-    SigV4ASignerImpl signer(service_name, "region", CredentialsProviderSharedPtr{credentials_provider},
-                      time_system_, Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+    SigV4ASignerImpl signer(service_name, "region",
+                            CredentialsProviderSharedPtr{credentials_provider}, time_system_,
+                            Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
     if (use_unsigned_payload) {
       signer.signUnsignedPayload(headers, override_region);
     } else {
@@ -106,14 +107,14 @@ TEST_F(SigV4ASignerImplTest, SignDateHeader) {
   addPath("/");
   signer_.sign(*message_);
   EXPECT_FALSE(message_->headers().get(SigV4ASignatureHeaders::get().ContentSha256).empty());
-  EXPECT_EQ("20180102T030400Z",
-            message_->headers().get(SigV4ASignatureHeaders::get().Date)[0]->value().getStringView());
-  EXPECT_THAT(message_->headers()
-                .get(Http::CustomHeaders::get().Authorization)[0]
-                ->value()
-                .getStringView(), testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
-            "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
-            "Signature="));
+  EXPECT_EQ(
+      "20180102T030400Z",
+      message_->headers().get(SigV4ASignatureHeaders::get().Date)[0]->value().getStringView());
+  EXPECT_THAT(
+      message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
+                          "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
+                          "Signature="));
 }
 
 // Verify we sign the security token header if the token is present in the credentials
@@ -122,17 +123,16 @@ TEST_F(SigV4ASignerImplTest, SignSecurityTokenHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_);
-  EXPECT_EQ(
-      "token",
-      message_->headers().get(SigV4ASignatureHeaders::get().SecurityToken)[0]->value().getStringView());
-  EXPECT_THAT(message_->headers()
-                .get(Http::CustomHeaders::get().Authorization)[0]
-                ->value()
-                .getStringView(),
-                testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
-            "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set;x-amz-security-token, "
-            "Signature="
-            ));
+  EXPECT_EQ("token", message_->headers()
+                         .get(SigV4ASignatureHeaders::get().SecurityToken)[0]
+                         ->value()
+                         .getStringView());
+  EXPECT_THAT(
+      message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
+      testing::StartsWith(
+          "AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
+          "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set;x-amz-security-token, "
+          "Signature="));
 }
 
 // Verify we sign the content header as the hashed empty string if the body is empty
@@ -141,15 +141,16 @@ TEST_F(SigV4ASignerImplTest, SignEmptyContentHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_, true);
-  EXPECT_EQ(
-      SigV4ASignatureConstants::get().HashedEmptyString,
-      message_->headers().get(SigV4ASignatureHeaders::get().ContentSha256)[0]->value().getStringView());
-  EXPECT_THAT(message_->headers()
-                .get(Http::CustomHeaders::get().Authorization)[0]
+  EXPECT_EQ(SigV4ASignatureConstants::get().HashedEmptyString,
+            message_->headers()
+                .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
                 ->value()
-                .getStringView(),testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
-            "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
-            "Signature="));
+                .getStringView());
+  EXPECT_THAT(
+      message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
+                          "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
+                          "Signature="));
 }
 
 // Verify we sign the content header correctly when we have a body
@@ -159,15 +160,16 @@ TEST_F(SigV4ASignerImplTest, SignContentHeader) {
   addPath("/");
   setBody("test1234");
   signer_.sign(*message_, true);
-  EXPECT_EQ(
-      "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
-      message_->headers().get(SigV4ASignatureHeaders::get().ContentSha256)[0]->value().getStringView());
-  EXPECT_THAT(message_->headers()
-                .get(Http::CustomHeaders::get().Authorization)[0]
+  EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+            message_->headers()
+                .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
                 ->value()
-                .getStringView(), testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
-            "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
-            "Signature="));
+                .getStringView());
+  EXPECT_THAT(
+      message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
+                          "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
+                          "Signature="));
 }
 
 // Verify we sign the content header correctly when we have a body with region override
@@ -177,15 +179,16 @@ TEST_F(SigV4ASignerImplTest, SignContentHeaderOverrideRegion) {
   addPath("/");
   setBody("test1234");
   signer_.sign(*message_, true, "region1");
-  EXPECT_EQ(
-      "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
-      message_->headers().get(SigV4ASignatureHeaders::get().ContentSha256)[0]->value().getStringView());
-  EXPECT_THAT(message_->headers()
-                .get(Http::CustomHeaders::get().Authorization)[0]
+  EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+            message_->headers()
+                .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
                 ->value()
-                .getStringView(), testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
-            "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
-            "Signature="));
+                .getStringView());
+  EXPECT_THAT(
+      message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
+                          "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
+                          "Signature="));
 }
 
 // Verify we sign some extra headers
@@ -197,12 +200,11 @@ TEST_F(SigV4ASignerImplTest, SignExtraHeaders) {
   addHeader("b", "b_value");
   addHeader("c", "c_value");
   signer_.sign(*message_);
-  EXPECT_THAT(message_->headers()
-                .get(Http::CustomHeaders::get().Authorization)[0]
-                ->value()
-                .getStringView(), testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
-            "SignedHeaders=a;b;c;x-amz-content-sha256;x-amz-date;x-amz-region-set, "
-            "Signature="));
+  EXPECT_THAT(
+      message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
+                          "SignedHeaders=a;b;c;x-amz-content-sha256;x-amz-date;x-amz-region-set, "
+                          "Signature="));
 }
 
 // Verify signing a host header
@@ -212,33 +214,36 @@ TEST_F(SigV4ASignerImplTest, SignHostHeader) {
   addPath("/");
   addHeader("host", "www.example.com");
   signer_.sign(*message_);
-  EXPECT_THAT(message_->headers()
-                .get(Http::CustomHeaders::get().Authorization)[0]
-                ->value()
-                .getStringView(), testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
-            "SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-region-set, "
-            "Signature="));
+  EXPECT_THAT(
+      message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
+                          "SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-region-set, "
+                          "Signature="));
 }
 
 // // Verify signing headers for services.
 // TEST_F(SigV4ASignerImplTest, SignHeadersByService) {
 //   expectSignHeaders("s3", "d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
 //                     SigV4ASignatureConstants::get().UnsignedPayload, true);
-//   expectSignHeaders("service", "d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
+//   expectSignHeaders("service",
+//   "d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
 //                     SigV4ASignatureConstants::get().HashedEmptyString, false);
 //   expectSignHeaders("es", "0fd9c974bb2ad16c8d8a314dca4f6db151d32cbd04748d9c018afee2a685a02e",
 //                     SigV4ASignatureConstants::get().UnsignedPayload, true);
-//   expectSignHeaders("glacier", "8d1f241d77c64cda57b042cd312180f16e98dbd7a96e5545681430f8dbde45a0",
+//   expectSignHeaders("glacier",
+//   "8d1f241d77c64cda57b042cd312180f16e98dbd7a96e5545681430f8dbde45a0",
 //                     SigV4ASignatureConstants::get().UnsignedPayload, true);
 
 //   // with override region
 //   expectSignHeaders("s3", "70b80eaedfe73d9cf18a9d2f786f02a7dab013780a8cdc42a7c819a27bfd943c",
 //                     SigV4ASignatureConstants::get().UnsignedPayload, true, "region1");
-//   expectSignHeaders("service", "297ca067391806a1e3cdb25723082063d0bf66a6472b902dd986d540a2058a13",
+//   expectSignHeaders("service",
+//   "297ca067391806a1e3cdb25723082063d0bf66a6472b902dd986d540a2058a13",
 //                     SigV4ASignatureConstants::get().HashedEmptyString, false, "region1");
 //   expectSignHeaders("es", "cec43f0777c0d4cb2f3799a5c755dc4c3b893c23e268c1bd4e34f770fba3c1ca",
 //                     SigV4ASignatureConstants::get().UnsignedPayload, true, "region1");
-//   expectSignHeaders("glacier", "0792940297330f2930dc1c18d0b99c0b85429865c09e836f5c086f7f182e2809",
+//   expectSignHeaders("glacier",
+//   "0792940297330f2930dc1c18d0b99c0b85429865c09e836f5c086f7f182e2809",
 //                     SigV4ASignatureConstants::get().UnsignedPayload, true, "region1");
 // }
 

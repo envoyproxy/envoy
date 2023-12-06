@@ -1,5 +1,9 @@
 #include "source/extensions/common/aws/sigv4a_signer_impl.h"
 
+#include <openssl/ssl.h>
+
+#include <cstddef>
+
 #include "envoy/common/exception.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -10,9 +14,6 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
-#include <cstddef>
-
-#include <openssl/ssl.h>
 
 namespace Envoy {
 namespace Extensions {
@@ -60,7 +61,8 @@ void SigV4ASignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& 
     throw EnvoyException("Message is missing :path header");
   }
   if (credentials.sessionToken()) {
-    headers.addCopy(SigV4ASignatureHeaders::get().SecurityToken, credentials.sessionToken().value());
+    headers.addCopy(SigV4ASignatureHeaders::get().SecurityToken,
+                    credentials.sessionToken().value());
   }
   const auto long_date = long_date_formatter_.now(time_source_);
   const auto short_date = short_date_formatter_.now(time_source_);
@@ -75,20 +77,20 @@ void SigV4ASignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& 
       canonical_headers, content_hash);
 
   ENVOY_LOG(debug, "Canonical request:\n{}", canonical_request);
-  ENVOY_LOG(debug, "Canonical request hex:\n{}", Hex::encode(std::vector<uint8_t> (canonical_request.begin(), canonical_request.end())));
+  ENVOY_LOG(debug, "Canonical request hex:\n{}",
+            Hex::encode(std::vector<uint8_t>(canonical_request.begin(), canonical_request.end())));
   // Phase 2: Create a string to sign
   const auto credential_scope = createCredentialScope(short_date);
   const auto string_to_sign = createStringToSign(canonical_request, long_date, credential_scope);
-  
+
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
   // Phase 3: Create a signature
-  const auto signature = createSignature(credentials.accessKeyId().value(), credentials.secretAccessKey().value(), 
-                                                            string_to_sign);
-  if(signature == BlankStr )
-  {
+  const auto signature = createSignature(credentials.accessKeyId().value(),
+                                         credentials.secretAccessKey().value(), string_to_sign);
+  if (signature == BlankStr) {
     // We failed to generate a signature, so stop here
     return;
-  }            
+  }
 
   // Phase 4: Sign request
   const auto authorization_header = createAuthorizationHeader(
@@ -119,7 +121,8 @@ std::string SigV4ASignerImpl::createStringToSign(absl::string_view canonical_req
                                                  absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   return fmt::format(
-      fmt::runtime(SigV4ASignatureConstants::get().SigV4AStringToSignFormat), long_date, credential_scope,
+      fmt::runtime(SigV4ASignatureConstants::get().SigV4AStringToSignFormat), long_date,
+      credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
@@ -139,52 +142,51 @@ std::string SigV4ASignerImpl::createSignature(absl::string_view access_key_id,
   std::vector<uint8_t> fixed_input(required_fixed_input_length);
 
   const auto secret_key =
-  absl::StrCat(SigV4ASignatureConstants::get().SigV4ASignatureVersion, secret_access_key);
+      absl::StrCat(SigV4ASignatureConstants::get().SigV4ASignatureVersion, secret_access_key);
 
   enum SigV4AKeyDerivationResult result = AkdrNextCounter;
   uint8_t external_counter = 1;
 
-  BIGNUM *priv_key_num;
-  EC_KEY *ec_key;
+  BIGNUM* priv_key_num;
+  EC_KEY* ec_key;
 
-  while ((result == AkdrNextCounter) && (external_counter <= 254))  // MAX_KEY_DERIVATION_COUNTER_VALUE
+  while ((result == AkdrNextCounter) &&
+         (external_counter <= 254)) // MAX_KEY_DERIVATION_COUNTER_VALUE
   {
     fixed_input.clear();
 
-    fixed_input.insert(fixed_input.begin(),{0x00,0x00,0x00,0x01});
-    fixed_input.insert(fixed_input.end(),SigV4ASignatureConstants::get().SigV4ALabel.begin(),SigV4ASignatureConstants::get().SigV4ALabel.end());
+    fixed_input.insert(fixed_input.begin(), {0x00, 0x00, 0x00, 0x01});
+    fixed_input.insert(fixed_input.end(), SigV4ASignatureConstants::get().SigV4ALabel.begin(),
+                       SigV4ASignatureConstants::get().SigV4ALabel.end());
     fixed_input.insert(fixed_input.end(), 0x00);
     fixed_input.insert(fixed_input.end(), access_key_id.begin(), access_key_id.end());
     fixed_input.insert(fixed_input.end(), external_counter);
-    fixed_input.insert(fixed_input.end(), {0x00,0x00,0x01,0x00});
+    fixed_input.insert(fixed_input.end(), {0x00, 0x00, 0x01, 0x00});
 
-    auto k0 = crypto_util.getSha256Hmac(
-  std::vector<uint8_t>(secret_key.begin(), secret_key.end()), fixed_input);
+    auto k0 = crypto_util.getSha256Hmac(std::vector<uint8_t>(secret_key.begin(), secret_key.end()),
+                                        fixed_input);
 
     // ECDSA q - 2
     std::vector<uint8_t> s_n_minus_2 = {
-      0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00,
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-      0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17, 0x9E, 0x84,
-      0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x4F,
+        0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17,
+        0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x4F,
     };
 
     // check that k0 < s_n_minus_2
     bool lt_result = constantTimeLessThanOrEqualTo(k0, s_n_minus_2);
 
-    if(!lt_result)
-    {
+    if (!lt_result) {
       // Loop if k0 >= s_n_minus_2 and the counter will cause a new hmac to be generated
       external_counter++;
-    }
-    else {
-      result=SigV4AKeyDerivationResult::AkdrSuccess;
+    } else {
+      result = SigV4AKeyDerivationResult::AkdrSuccess;
       // PrivateKey d = c+1
       constantTimeAddOne(&k0);
 
       priv_key_num = BN_bin2bn(k0.data(), k0.size(), nullptr);
 
-       // Create a new OpenSSL EC_KEY by curve nid for secp256r1 (NIST P-256)
+      // Create a new OpenSSL EC_KEY by curve nid for secp256r1 (NIST P-256)
       ec_key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
 
       // And set the private key we calculated above
@@ -198,28 +200,21 @@ std::string SigV4ASignerImpl::createSignature(absl::string_view access_key_id,
     }
   }
 
-  if(result==SigV4AKeyDerivationResult::AkdrNextCounter) 
-  {
+  if (result == SigV4AKeyDerivationResult::AkdrNextCounter) {
     ENVOY_LOG(debug, "Key derivation exceeded retries, returning no signature");
     return BlankStr;
   }
 
-  uint8_t *signature;
+  uint8_t* signature;
   signature = new uint8_t[ECDSA_size(ec_key)];
   uint signature_size;
 
   // Sign the SHA256 hash of our calculated string_to_sign
   auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
 
-  ECDSA_sign(
-        0,
-        hash.data(),
-        hash.size(),
-        signature,
-        &signature_size,
-        ec_key);
-        
-  return Hex::encode(std::vector<uint8_t>(signature,signature+signature_size));
+  ECDSA_sign(0, hash.data(), hash.size(), signature, &signature_size, ec_key);
+
+  return Hex::encode(std::vector<uint8_t>(signature, signature + signature_size));
 }
 
 std::string SigV4ASignerImpl::createAuthorizationHeader(
@@ -231,43 +226,41 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
                      access_key_id, credential_scope, signed_headers, signature);
 }
 
-  // adapted from https://github.com/awslabs/aws-c-auth/blob/baeffa791d9d1cf61460662a6d9ac2186aaf05df/source/key_derivation.c#L152
+// adapted from
+// https://github.com/awslabs/aws-c-auth/blob/baeffa791d9d1cf61460662a6d9ac2186aaf05df/source/key_derivation.c#L152
 
-bool SigV4ASignerImpl::constantTimeLessThanOrEqualTo(
-  std::vector<uint8_t> lhs_raw_be_bigint,
-  std::vector<uint8_t> rhs_raw_be_bigint) const
-{
+bool SigV4ASignerImpl::constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
+                                                     std::vector<uint8_t> rhs_raw_be_bigint) const {
 
-    volatile uint8_t gt = 0;
-    volatile uint8_t eq = 1;
+  volatile uint8_t gt = 0;
+  volatile uint8_t eq = 1;
 
-    for (uint8_t i = 0; i < lhs_raw_be_bigint.size(); ++i) {
-        volatile int32_t lhs_digit = lhs_raw_be_bigint[i];
-        volatile int32_t rhs_digit = rhs_raw_be_bigint[i];
+  for (uint8_t i = 0; i < lhs_raw_be_bigint.size(); ++i) {
+    volatile int32_t lhs_digit = lhs_raw_be_bigint[i];
+    volatile int32_t rhs_digit = rhs_raw_be_bigint[i];
 
-        gt |= ((rhs_digit - lhs_digit) >> 31) & eq;
-        eq &= (((lhs_digit ^ rhs_digit) - 1) >> 31) & 0x01;
-    }
-    return (gt + gt + eq - 1)<=0;
-
+    gt |= ((rhs_digit - lhs_digit) >> 31) & eq;
+    eq &= (((lhs_digit ^ rhs_digit) - 1) >> 31) & 0x01;
+  }
+  return (gt + gt + eq - 1) <= 0;
 }
 
-void SigV4ASignerImpl::constantTimeAddOne(std::vector<uint8_t> *raw_be_bigint) const {
+void SigV4ASignerImpl::constantTimeAddOne(std::vector<uint8_t>* raw_be_bigint) const {
 
-    const uint8_t byte_count = raw_be_bigint->size();
+  const uint8_t byte_count = raw_be_bigint->size();
 
-    volatile uint32_t carry = 1;
+  volatile uint32_t carry = 1;
 
-    for (size_t i = 0; i < byte_count; ++i) {
-        const size_t index = byte_count - i - 1;
+  for (size_t i = 0; i < byte_count; ++i) {
+    const size_t index = byte_count - i - 1;
 
-        volatile uint32_t current_digit = (*raw_be_bigint)[index];
-        current_digit += carry;
+    volatile uint32_t current_digit = (*raw_be_bigint)[index];
+    current_digit += carry;
 
-        carry = (current_digit >> 8) & 0x01;
+    carry = (current_digit >> 8) & 0x01;
 
-        (*raw_be_bigint)[index] = (current_digit & 0xFF);
-    }
+    (*raw_be_bigint)[index] = (current_digit & 0xFF);
+  }
 }
 
 } // namespace Aws
