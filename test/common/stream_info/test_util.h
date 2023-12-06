@@ -25,12 +25,14 @@ public:
     stream_id_provider_ = std::make_shared<Envoy::StreamInfo::StreamIdProviderImpl>(random_.uuid());
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
+    emit_time_ = start_time_ + std::chrono::milliseconds(1);
     end_time_ = now + std::chrono::milliseconds(3);
     setUpstreamInfo(std::make_shared<Envoy::StreamInfo::UpstreamInfoImpl>());
   }
 
   SystemTime startTime() const override { return start_time_; }
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
+  SystemTime emitLogTime() const override { return emit_time_; }
 
   const Network::ConnectionInfoSetter& downstreamAddressProvider() const override {
     return *downstream_connection_info_provider_;
@@ -66,6 +68,7 @@ public:
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
+  SystemTime emit_time_;
   absl::optional<MonotonicTime> end_time_;
   absl::optional<std::string> virtual_cluster_name_;
   Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
