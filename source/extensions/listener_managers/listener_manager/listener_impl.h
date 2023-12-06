@@ -132,7 +132,6 @@ public:
                                  Server::DrainManagerPtr drain_manager);
 
   Init::Manager& initManager() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Network::DrainDecision& drainDecision() override;
 
   // DrainDecision
@@ -146,7 +145,6 @@ public:
   Server::DrainManager& drainManager();
 
 private:
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
 };
 

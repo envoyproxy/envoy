@@ -3,17 +3,21 @@
 namespace Envoy {
 namespace Server {
 
-FactoryContextImplBase::FactoryContextImplBase(Server::Instance& server,
-                                               Stats::ScopeSharedPtr scope,
-                                               Stats::ScopeSharedPtr listener_scope,
-                                               const envoy::config::core::v3::Metadata& metadata,
-                                               envoy::config::core::v3::TrafficDirection direction,
-                                               bool is_quic)
-    : server_(server), scope_(std::move(scope)), listener_scope_(std::move(listener_scope)),
-      metadata_(metadata), is_quic_(is_quic), direction_(direction) {}
+FactoryContextImplBase::FactoryContextImplBase(
+    Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
+    Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope,
+    const envoy::config::core::v3::Metadata& metadata,
+    envoy::config::core::v3::TrafficDirection direction, bool is_quic)
+    : server_(server), validation_visitor_(validation_visitor), scope_(std::move(scope)),
+      listener_scope_(std::move(listener_scope)), metadata_(metadata), is_quic_(is_quic),
+      direction_(direction) {}
 
 Configuration::ServerFactoryContext& FactoryContextImplBase::serverFactoryContext() const {
   return server_.serverFactoryContext();
+}
+
+ProtobufMessage::ValidationVisitor& FactoryContextImplBase::messageValidationVisitor() const {
+  return validation_visitor_;
 }
 
 Stats::Scope& FactoryContextImplBase::scope() { return *scope_; }
@@ -43,15 +47,12 @@ FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        Network::DrainDecision& drain_decision,
                                        Stats::ScopeSharedPtr scope,
                                        Stats::ScopeSharedPtr listener_scope, bool is_quic)
-    : FactoryContextImplBase(server, std::move(scope), std::move(listener_scope), config.metadata(),
+    : FactoryContextImplBase(server, server.messageValidationContext().staticValidationVisitor(),
+                             std::move(scope), std::move(listener_scope), config.metadata(),
                              config.traffic_direction(), is_quic),
       drain_decision_(drain_decision) {}
 
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
-
-ProtobufMessage::ValidationVisitor& FactoryContextImpl::messageValidationVisitor() const {
-  return server_.messageValidationContext().staticValidationVisitor();
-}
 
 Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
 

@@ -231,16 +231,11 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : Server::FactoryContextImplBase(
-          server, server.stats().createScope(""),
+          server, validation_visitor, server.stats().createScope(""),
           server.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config))),
           config.metadata(), config.traffic_direction(),
           config.udp_listener_config().has_quic_options()),
-      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
-
-ProtobufMessage::ValidationVisitor&
-ListenerFactoryContextBaseImpl::messageValidationVisitor() const {
-  return validation_visitor_;
-}
+      drain_manager_(std::move(drain_manager)) {}
 
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }

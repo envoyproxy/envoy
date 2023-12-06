@@ -11,15 +11,12 @@ namespace Server {
 class AdminFactoryContext final : public FactoryContextImplBase {
 public:
   AdminFactoryContext(Envoy::Server::Instance& server)
-      : FactoryContextImplBase(server, server.stats().createScope(""),
+      : FactoryContextImplBase(server, server.messageValidationContext().staticValidationVisitor(),
+                               server.stats().createScope(""),
                                server.stats().createScope("listener.admin."),
                                envoy::config::core::v3::Metadata::default_instance(),
                                envoy::config::core::v3::UNSPECIFIED, false) {}
 
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override {
-    // Always use the static validation visitor for the admin handler.
-    return server_.messageValidationContext().staticValidationVisitor();
-  }
   Init::Manager& initManager() override {
     // Reuse the server init manager to avoid creating a new one for this special listener.
     return server_.initManager();
