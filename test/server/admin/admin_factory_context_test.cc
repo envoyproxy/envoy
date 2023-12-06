@@ -17,10 +17,10 @@ TEST(AdminFactoryContextTest, AdminFactoryContextTest) {
   context.getTransportSocketFactoryContext();
   context.scope();
   context.listenerScope();
-  context.isQuicListener();
-  context.listenerMetadata();
-  context.listenerTypedMetadata();
-  context.direction();
+  context.listenerInfo().isQuic();
+  context.listenerInfo().metadata();
+  context.listenerInfo().typedMetadata();
+  context.listenerInfo().direction();
   context.messageValidationVisitor();
   context.initManager();
   context.drainDecision();

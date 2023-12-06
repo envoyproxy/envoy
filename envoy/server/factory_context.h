@@ -235,34 +235,25 @@ public:
  * NOTE: this interface is used in proprietary access loggers, please do not delete
  * without reaching to Envoy maintainers first.
  */
-class ListenerAccessLogFactoryContext : public virtual CommonFactoryContext {
+class FactoryContext : public virtual CommonFactoryContext {
 public:
+  ~FactoryContext() override = default;
+
   /**
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
-
-  /**
    * @return ProcessContextOptRef an optional reference to the
    * process context. Will be unset when running in validation mode.
    */
   virtual ProcessContextOptRef processContext() PURE;
-};
 
-/**
- * Context passed to network and HTTP filters to access server resources.
- * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
- * access the rest of the server via interfaces exposed here.
- */
-class FactoryContext : public virtual ListenerAccessLogFactoryContext {
-public:
-  ~FactoryContext() override = default;
+  /**
+   * @return ListenerInfo description of the listener.
+   */
+  virtual const Network::ListenerInfo& listenerInfo() const PURE;
 
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
@@ -275,12 +266,6 @@ public:
   virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
-   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
-   * the local proxy.
-   */
-  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
-
-  /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
    *         they should be doing graceful closes on connections when possible.
    */
@@ -290,17 +275,6 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() PURE;
-
-  /**
-   * @return bool if these filters are created under the scope of a Quic listener.
-   */
-  virtual bool isQuicListener() const PURE;
-
-  /**
-   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
-   * for this listener.
-   */
-  virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.
@@ -356,13 +330,7 @@ public:
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
  * and connections. It can be used to create ListenerFilterChain.
  */
-class ListenerFactoryContext : public virtual FactoryContext {
-public:
-  /**
-   * Give access to the listener configuration
-   */
-  virtual const Network::ListenerConfig& listenerConfig() const PURE;
-};
+class ListenerFactoryContext : public virtual FactoryContext {};
 
 /**
  * FactoryContext for ProtocolOptionsFactory.

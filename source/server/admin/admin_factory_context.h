@@ -3,7 +3,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
-#include "source/common/config/metadata.h"
+#include "source/extensions/listener_managers/listener_manager/listener_info_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -45,16 +45,7 @@ public:
   }
   Stats::Scope& scope() override { return *scope_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
-  bool isQuicListener() const override { return false; }
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override {
-    return metadata_.proto_metadata_;
-  }
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override {
-    return metadata_.typed_metadata_;
-  }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
-  }
+  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Always use the static validation visitor for the admin handler.
     return server_.messageValidationContext().staticValidationVisitor();
@@ -76,8 +67,7 @@ private:
   // Listener scope with the listener prefix.
   Stats::ScopeSharedPtr listener_scope_;
 
-  // Empty metadata for the admin handler.
-  Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
+  const ListenerInfoImpl listener_info_;
 };
 using AdminFactoryContextPtr = std::unique_ptr<AdminFactoryContext>;
 
