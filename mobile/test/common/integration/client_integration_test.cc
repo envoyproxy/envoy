@@ -209,6 +209,101 @@ TEST_P(ClientIntegrationTest, TrickleExplicitFlowControl) {
   ASSERT_LE(cc_.on_data_calls, 11);
 }
 
+TEST_P(ClientIntegrationTest, TrickleMinDelivery) {
+  trickleTest();
+  ASSERT_EQ(cc_.on_data_calls, 2);
+}
+
+TEST_P(ClientIntegrationTest, TrickleNoMinDeliveryExplicitFlowControl) {
+  explicit_flow_control_ = true;
+  trickleTest();
+  ASSERT_EQ(cc_.on_data_calls, 2);
+}
+
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
+  explicit_flow_control_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES,
+                                   std::to_string(1000));
+
+  uint32_t num_requests = 100;
+  std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
+  std::vector<Platform::StreamSharedPtr> streams;
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    Platform::StreamPrototypeSharedPtr stream_prototype;
+    {
+      absl::MutexLock l(&engine_lock_);
+      stream_prototype = engine_->streamClient()->newStreamPrototype();
+    }
+    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_, min_delivery_size_);
+    stream_prototype->setOnComplete(
+        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
+          cc_.on_complete_calls++;
+          if (cc_.on_complete_calls == num_requests) {
+            cc_.terminal_callback->setReady();
+          }
+        });
+
+    stream_prototype->setOnData([stream](envoy_data c_data, bool) {
+      // Allow reading up to 10 bytes.
+      stream->readData(100);
+      release_envoy_data(c_data);
+    });
+    stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    stream->readData(100);
+    prototype_streams.push_back(stream_prototype);
+    streams.push_back(stream);
+  }
+  ASSERT(streams.size() == num_requests);
+  ASSERT(prototype_streams.size() == num_requests);
+
+  terminal_callback_.waitReady();
+}
+
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
+  explicit_flow_control_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES,
+                                   std::to_string(1000));
+
+  uint32_t num_requests = 100;
+  std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
+  std::vector<Platform::StreamSharedPtr> streams;
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    Platform::StreamPrototypeSharedPtr stream_prototype;
+    {
+      absl::MutexLock l(&engine_lock_);
+      stream_prototype = engine_->streamClient()->newStreamPrototype();
+    }
+    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_, min_delivery_size_);
+    stream_prototype->setOnComplete(
+        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
+          cc_.on_complete_calls++;
+          if (cc_.on_complete_calls == num_requests) {
+            cc_.terminal_callback->setReady();
+          }
+        });
+
+    stream_prototype->setOnData([stream](envoy_data c_data, bool) {
+      // Allow reading up to 10 bytes.
+      stream->readData(100);
+      release_envoy_data(c_data);
+    });
+    stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    stream->readData(100);
+    prototype_streams.push_back(stream_prototype);
+    streams.push_back(stream);
+  }
+  ASSERT(streams.size() == num_requests);
+  ASSERT(prototype_streams.size() == num_requests);
+
+  terminal_callback_.waitReady();
+}
+
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).WillRepeatedly(Return(false));
 
