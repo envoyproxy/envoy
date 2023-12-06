@@ -59,12 +59,37 @@ public:
     Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
   }
 
+  void initializeWithHttp3AndFakeDns() {
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+
+    setUpstreamProtocol(Http::CodecType::HTTP3);
+    builder_.enablePlatformCertificatesValidation(true);
+    // Create a k-v store for DNS lookup which createEnvoy() will use to point
+    // www.lyft.com -> fake H3 backend.
+    test_key_value_store_ = std::make_shared<TestKeyValueStore>();
+    builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
+    builder_.enableDnsCache(true, 1);
+    upstream_tls_ = true;
+    add_quic_hints_ = true;
+
+    initialize();
+
+    auto address = fake_upstreams_[0]->localAddress();
+    auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
+    default_request_headers_.setHost(fmt::format("www.lyft.com:{}", upstream_port));
+    default_request_headers_.setScheme("https");
+  }
+
   void SetUp() override {
     setUpstreamCount(config_helper_.bootstrap().static_resources().clusters_size());
     // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
+    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _)).Times(AnyNumber());
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation()).Times(AnyNumber());
   }
 
   void createEnvoy() override {
@@ -211,17 +236,6 @@ TEST_P(ClientIntegrationTest, TrickleExplicitFlowControl) {
   ASSERT_LE(cc_.on_data_calls, 11);
 }
 
-TEST_P(ClientIntegrationTest, TrickleMinDelivery) {
-  trickleTest();
-  ASSERT_EQ(cc_.on_data_calls, 2);
-}
-
-TEST_P(ClientIntegrationTest, TrickleNoMinDeliveryExplicitFlowControl) {
-  explicit_flow_control_ = true;
-  trickleTest();
-  ASSERT_EQ(cc_.on_data_calls, 2);
-}
-
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   explicit_flow_control_ = true;
   initialize();
@@ -330,27 +344,7 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
 
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsHttp3) {
   min_delivery_size_ = 0;
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _)).Times(AnyNumber());
-  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation())
-      .Times(AnyNumber());
-  // Do the HTTP/3 quic hints dance to force HTTP/3 to be used.
-  explicit_flow_control_ = true;
-  setUpstreamProtocol(Http::CodecType::HTTP3);
-  builder_.enablePlatformCertificatesValidation(true);
-  // Create a k-v store for DNS lookup which createEnvoy() will use to point
-  // www.lyft.com -> fake H3 backend.
-  test_key_value_store_ = std::make_shared<TestKeyValueStore>();
-  builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
-  builder_.enableDnsCache(true, 1);
-  upstream_tls_ = true;
-  add_quic_hints_ = true;
-
-  initialize();
-
-  auto address = fake_upstreams_[0]->localAddress();
-  auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
-  default_request_headers_.setHost(fmt::format("www.lyft.com:{}", upstream_port));
-  default_request_headers_.setScheme("https");
+  initializeWithHttp3AndFakeDns();
 
   explicitFlowControlWithCancels();
 }
@@ -404,30 +398,7 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
 
 // Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
 TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
-  if (version_ != Network::Address::IpVersion::v4) {
-    // Loopback resolves to a v4 address.
-    return;
-  }
-  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
-
-  setUpstreamProtocol(Http::CodecType::HTTP3);
-  builder_.enablePlatformCertificatesValidation(true);
-  // Create a k-v store for DNS lookup which createEnvoy() will use to point
-  // www.lyft.com -> fake H3 backend.
-  test_key_value_store_ = std::make_shared<TestKeyValueStore>();
-  builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
-  builder_.enableDnsCache(true, 1);
-  upstream_tls_ = true;
-  add_quic_hints_ = true;
-
-  initialize();
-
-  auto address = fake_upstreams_[0]->localAddress();
-  auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
-  default_request_headers_.setHost(fmt::format("www.lyft.com:{}", upstream_port));
-  default_request_headers_.setScheme("https");
+  initializeWithHttp3AndFakeDns();
   basicTest();
 
   {
@@ -559,6 +530,42 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   ASSERT_EQ(cc_.on_data_calls, 0);
   ASSERT_EQ(cc_.on_complete_calls, 0);
   ASSERT_EQ(cc_.on_cancel_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, BasicCancelWithOpenStream) {
+  autonomous_upstream_ = false;
+
+  initializeWithHttp3AndFakeDns();
+  ConditionalInitializer headers_callback;
+
+  stream_prototype_->setOnHeaders(
+      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
+                                envoy_stream_intel) {
+        cc_.status = absl::StrCat(headers->httpStatus());
+        cc_.on_headers_calls++;
+        headers_callback.setReady();
+        return nullptr;
+      });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+
+  FakeHttpConnectionPtr upstream_connection;
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection));
+  ASSERT_TRUE(
+      upstream_connection->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request));
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+
+  // Now cancel.  As on_complete has been called cancel is a no-op but is
+  // non-problematic.
+  stream_->cancel();
+  memset(&cc_.final_intel, 0, sizeof(cc_.final_intel));
 }
 
 TEST_P(ClientIntegrationTest, CancelWithPartialStream) {

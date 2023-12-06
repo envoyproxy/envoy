@@ -18,28 +18,29 @@ constexpr absl::string_view PlatformStoreName{"reserved.platform_store"};
 class PlatformInterfaceImpl : public PlatformInterface,
                               public Logger::Loggable<Logger::Id::filter> {
 public:
-  PlatformInterfaceImpl()
-      : bridged_store_(*static_cast<envoy_kv_store*>(
-            Api::External::retrieveApi(std::string(PlatformStoreName)))) {}
+  PlatformInterfaceImpl() = default;
 
   ~PlatformInterfaceImpl() override {}
 
+  envoy_kv_store* bridgedStore() const {
+    return static_cast<envoy_kv_store*>(Api::External::retrieveApi(std::string(PlatformStoreName)));
+  }
+
   std::string read(const std::string& key) const override {
+    envoy_kv_store& bridged_store = *bridgedStore();
     envoy_data bridged_key = Data::Utility::copyToBridgeData(key);
-    envoy_data bridged_value = bridged_store_.read(bridged_key, bridged_store_.context);
+    envoy_data bridged_value = bridged_store.read(bridged_key, bridged_store.context);
     std::string result = Data::Utility::copyToString(bridged_value);
     release_envoy_data(bridged_value);
     return result;
   }
 
   void save(const std::string& key, const std::string& contents) override {
+    envoy_kv_store& bridged_store = *bridgedStore();
     envoy_data bridged_key = Data::Utility::copyToBridgeData(key);
     envoy_data bridged_value = Data::Utility::copyToBridgeData(contents);
-    bridged_store_.save(bridged_key, bridged_value, bridged_store_.context);
+    bridged_store.save(bridged_key, bridged_value, bridged_store.context);
   }
-
-private:
-  envoy_kv_store& bridged_store_;
 };
 
 PlatformInterfaceImpl& getPlatformInterfaceImplSingleton() {
