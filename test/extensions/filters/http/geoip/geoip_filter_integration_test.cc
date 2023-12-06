@@ -61,6 +61,14 @@ class GeoipFilterIntegrationTest : public testing::TestWithParam<Network::Addres
                                    public HttpIntegrationTest {
 public:
   GeoipFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  std::function<absl::string_view(std::string)> header_value =
+      [&](absl::string_view name) -> absl::string_view {
+    return upstream_request_->headers()
+        .get(Http::LowerCaseString(name))[0]
+        ->value()
+        .getStringView();
+  };
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GeoipFilterIntegrationTest,
@@ -74,22 +82,10 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedNoXff) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-  EXPECT_EQ("Boxford", upstream_request_->headers()
-                           .get(Http::LowerCaseString("x-geo-city"))[0]
-                           ->value()
-                           .getStringView());
-  EXPECT_EQ("ENG", upstream_request_->headers()
-                       .get(Http::LowerCaseString("x-geo-region"))[0]
-                       ->value()
-                       .getStringView());
-  EXPECT_EQ("GB", upstream_request_->headers()
-                      .get(Http::LowerCaseString("x-geo-country"))[0]
-                      ->value()
-                      .getStringView());
-  EXPECT_EQ("15169", upstream_request_->headers()
-                         .get(Http::LowerCaseString("x-geo-asn"))[0]
-                         ->value()
-                         .getStringView());
+  EXPECT_EQ("Boxford", header_value("x-geo-city"));
+  EXPECT_EQ("ENG", header_value("x-geo-region"));
+  EXPECT_EQ("GB", header_value("x-geo-country"));
+  EXPECT_EQ("15169", header_value("x-geo-asn"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
@@ -109,30 +105,12 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXff) {
                                                  {":authority", "host"},
                                                  {"x-forwarded-for", "1.2.0.0,9.10.11.12"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-  EXPECT_EQ("Boxford", upstream_request_->headers()
-                           .get(Http::LowerCaseString("x-geo-city"))[0]
-                           ->value()
-                           .getStringView());
-  EXPECT_EQ("ENG", upstream_request_->headers()
-                       .get(Http::LowerCaseString("x-geo-region"))[0]
-                       ->value()
-                       .getStringView());
-  EXPECT_EQ("GB", upstream_request_->headers()
-                      .get(Http::LowerCaseString("x-geo-country"))[0]
-                      ->value()
-                      .getStringView());
-  EXPECT_EQ("15169", upstream_request_->headers()
-                         .get(Http::LowerCaseString("x-geo-asn"))[0]
-                         ->value()
-                         .getStringView());
-  EXPECT_EQ("true", upstream_request_->headers()
-                        .get(Http::LowerCaseString("x-geo-anon"))[0]
-                        ->value()
-                        .getStringView());
-  EXPECT_EQ("true", upstream_request_->headers()
-                        .get(Http::LowerCaseString("x-geo-anon-vpn"))[0]
-                        ->value()
-                        .getStringView());
+  EXPECT_EQ("Boxford", header_value("x-geo-city"));
+  EXPECT_EQ("ENG", header_value("x-geo-region"));
+  EXPECT_EQ("GB", header_value("x-geo-country"));
+  EXPECT_EQ("15169", header_value("x-geo-asn"));
+  EXPECT_EQ("true", header_value("x-geo-anon"));
+  EXPECT_EQ("true", header_value("x-geo-anon-vpn"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
@@ -156,14 +134,8 @@ TEST_P(GeoipFilterIntegrationTest, GeoHeadersOverridenInRequest) {
                                                  {"x-geo-city", "Berlin"},
                                                  {"x-geo-country", "Germany"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-  EXPECT_EQ("London", upstream_request_->headers()
-                          .get(Http::LowerCaseString("x-geo-city"))[0]
-                          ->value()
-                          .getStringView());
-  EXPECT_EQ("GB", upstream_request_->headers()
-                      .get(Http::LowerCaseString("x-geo-country"))[0]
-                      ->value()
-                      .getStringView());
+  EXPECT_EQ("London", header_value("x-geo-city"));
+  EXPECT_EQ("GB", header_value("x-geo-country"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
@@ -214,14 +186,8 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-  EXPECT_EQ("Boxford", upstream_request_->headers()
-                           .get(Http::LowerCaseString("x-geo-city"))[0]
-                           ->value()
-                           .getStringView());
-  EXPECT_EQ("ENG", upstream_request_->headers()
-                       .get(Http::LowerCaseString("x-geo-region"))[0]
-                       ->value()
-                       .getStringView());
+  EXPECT_EQ("Boxford", header_value("x-geo-city"));
+  EXPECT_EQ("ENG", header_value("x-geo-region"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
