@@ -35,7 +35,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     extra_visibility = [
-        "//test/common/tcp:__subpackages__",
+        "//test/common/listener_manager:__subpackages__",
     ],
     deps = [
         ":original_dst_lib",

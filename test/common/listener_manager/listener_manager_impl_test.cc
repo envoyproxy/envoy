@@ -1,4 +1,4 @@
-#include "test/common/tcp/listener_manager/listener_manager_impl_test.h"
+#include "test/common/listener_manager/listener_manager_impl_test.h"
 
 #include <chrono>
 #include <memory>
@@ -29,8 +29,8 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "test/common/tcp/listener_manager/config.pb.h"
-#include "test/common/tcp/listener_manager/config.pb.validate.h"
+#include "test/common/listener_manager/config.pb.h"
+#include "test/common/listener_manager/config.pb.validate.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/server/utility.h"

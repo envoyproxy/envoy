@@ -3,7 +3,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
-#include "source/extensions/listener_managers/listener_manager/listener_info_impl.h"
+#include "source/common/listener_manager/listener_info_impl.h"
 
 namespace Envoy {
 namespace Server {
