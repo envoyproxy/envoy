@@ -305,10 +305,10 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
 # upstream load balancing policies
-/*/extensions/load_balancing_policies/common @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/least_request @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/random @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/round_robin @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/common @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/random @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en
 /*/extensions/load_balancing_policies/ring_hash @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher

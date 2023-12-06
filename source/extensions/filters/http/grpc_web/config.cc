@@ -14,7 +14,7 @@ Http::FilterFactoryCb GrpcWebFilterConfig::createFilterFactoryFromProtoTyped(
     Server::Configuration::FactoryContext& factory_context) {
   return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(
-        std::make_shared<GrpcWebFilter>(factory_context.getServerFactoryContext().grpcContext()));
+        std::make_shared<GrpcWebFilter>(factory_context.serverFactoryContext().grpcContext()));
   };
 }
 

@@ -7,7 +7,7 @@ namespace Wasm {
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context) {
-  auto& server = context.getServerFactoryContext();
+  auto& server = context.serverFactoryContext();
   tls_slot_ = ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
       server.threadLocal());
 

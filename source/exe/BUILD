@@ -33,7 +33,7 @@ envoy_cc_binary(
 )
 
 envoy_cc_library(
-    name = "envoy_common_lib",
+    name = "all_extensions_lib",
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/network:utility_lib",
@@ -103,7 +103,6 @@ envoy_cc_library(
         "main_common.h",
     ],
     deps = [
-        ":envoy_common_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
         ":stripped_main_base_lib",
@@ -119,11 +118,30 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "main_common_with_all_extensions_lib",
+    deps = [
+        ":all_extensions_lib",
+        ":main_common_lib",
+        ":platform_impl_lib",
+        ":process_wide_lib",
+        ":stripped_main_base_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/grpc:google_grpc_context_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
+        "//source/server:options_lib",
+        "//source/server/config_validation:server_lib",
+    ],
+)
+
 # provides a library target for Envoy server builds with the versioning information set up correctly.
 envoy_cc_library(
     name = "envoy_main_common_lib",
     deps = [
-        ":main_common_lib",
+        ":main_common_with_all_extensions_lib",
         # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
         # Envoy requires them.
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
@@ -144,13 +162,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_common_with_core_extensions_lib",
-    srcs = [
-        "main_common.cc",
-    ],
-    hdrs = [
-        "main_common.h",
-    ],
     deps = [
+               ":main_common_lib",
                ":platform_impl_lib",
                ":process_wide_lib",
                ":stripped_main_base_lib",
@@ -255,7 +268,7 @@ envoy_cc_library(
     }),
     deps = select({
         "//bazel:windows_x86_64": [
-            ":main_common_lib",
+            ":main_common_with_all_extensions_lib",
             "//source/common/buffer:buffer_lib",
             "//source/common/common:assert_lib",
             "//source/common/common:thread_lib",

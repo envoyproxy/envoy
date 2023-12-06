@@ -178,8 +178,8 @@ ProcessContextOptRef PerFilterChainFactoryContextImpl::processContext() {
 }
 
 Configuration::ServerFactoryContext&
-PerFilterChainFactoryContextImpl::getServerFactoryContext() const {
-  return parent_context_.getServerFactoryContext();
+PerFilterChainFactoryContextImpl::serverFactoryContext() const {
+  return parent_context_.serverFactoryContext();
 }
 
 Configuration::TransportSocketFactoryContext&
@@ -314,7 +314,7 @@ void FilterChainManagerImpl::addFilterChains(
     filter_chains_by_name_ = filter_chains_by_name;
     FilterChain::FilterChainNameActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
-        parent_context_.getServerFactoryContext(), parent_context_.getServerFactoryContext(),
+        parent_context_.serverFactoryContext(), parent_context_.serverFactoryContext(),
         validation_visitor);
     matcher_ = factory.create(*filter_chain_matcher)();
   }
