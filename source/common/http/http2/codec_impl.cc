@@ -2133,7 +2133,7 @@ int ServerConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
     StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
     if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
       // Check if there is already the :authority header
-      auto result = stream->headers().get(Http::Headers::get().Host);
+      const auto result = stream->headers().get(Http::Headers::get().Host);
       if (!result.empty()) {
         // Discard the host header value
         return 0;

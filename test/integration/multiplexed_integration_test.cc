@@ -2242,6 +2242,29 @@ TEST_P(Http2FrameIntegrationTest, HostConcatenatedWithAuthorityWithOverride) {
   tcp_client_->close();
 }
 
+// All HTTP/2 static headers must be before non-static headers.
+// Verify that codecs validate this.
+TEST_P(Http2FrameIntegrationTest, HostBeforeAuthorityIsRejected) {
+  beginSession();
+
+  Http2Frame request = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0),
+                                                         Http2Frame::HeadersFlags::EndHeaders);
+  request.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodPost);
+  request.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  request.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Path, "/path");
+  // Add the `host` header before `:authority`
+  request.appendHeaderWithoutIndexing({"host", "two.example.com"});
+  request.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "one.example.com");
+  request.adjustPayloadSize();
+
+  sendFrame(request);
+
+  // By default codec treats stream errors as protocol errors and closes the connection.
+  tcp_client_->waitForDisconnect();
+  tcp_client_->close();
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
+}
+
 TEST_P(Http2FrameIntegrationTest, MultipleHeaderOnlyRequests) {
   const int kRequestsSentPerIOCycle = 20;
   autonomous_upstream_ = true;
