@@ -1200,24 +1200,24 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
   config1.set_name("foo");
 
-  auto cache1 = cache_manager.getCache(config1);
+  auto cache1 = cache_manager.getCache(config1).value();
   EXPECT_NE(cache1, nullptr);
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config2;
   config2.set_name("foo");
-  EXPECT_EQ(cache1, cache_manager.getCache(config2));
+  EXPECT_EQ(cache1, cache_manager.getCache(config2).value());
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config3;
   config3.set_name("bar");
-  auto cache2 = cache_manager.getCache(config3);
+  auto cache2 = cache_manager.getCache(config3).value();
   EXPECT_NE(cache2, nullptr);
   EXPECT_NE(cache1, cache2);
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config4;
   config4.set_name("foo");
   config4.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V6_ONLY);
-  EXPECT_THROW_WITH_MESSAGE(cache_manager.getCache(config4), EnvoyException,
-                            "config specified DNS cache 'foo' with different settings");
+  EXPECT_EQ(cache_manager.getCache(config4).status().message(),
+            "config specified DNS cache 'foo' with different settings");
 }
 
 TEST(DnsCacheManagerImplTest, LookupByName) {
@@ -1229,7 +1229,7 @@ TEST(DnsCacheManagerImplTest, LookupByName) {
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
   config1.set_name("foo");
 
-  auto cache1 = cache_manager.getCache(config1);
+  auto cache1 = cache_manager.getCache(config1).value();
   EXPECT_NE(cache1, nullptr);
 
   auto cache2 = cache_manager.lookUpCacheByName("foo");
@@ -1608,7 +1608,7 @@ TEST(DnsCacheManagerImplTest, TestLifetime) {
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
   config1.set_name("foo");
 
-  EXPECT_TRUE(cache_manager->getCache(config1) != nullptr);
+  EXPECT_TRUE(cache_manager->getCache(config1).value() != nullptr);
 }
 
 TEST(NoramlizeHost, NormalizeHost) {

@@ -18,7 +18,7 @@ public:
   DnsCacheManagerImpl(Server::Configuration::GenericFactoryContext& context) : context_(context) {}
 
   // DnsCacheManager
-  DnsCacheSharedPtr getCache(
+  absl::StatusOr<DnsCacheSharedPtr> getCache(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) override;
   DnsCacheSharedPtr lookUpCacheByName(absl::string_view cache_name) override;
 
