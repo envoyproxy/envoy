@@ -17,6 +17,7 @@
 #include "library/common/types/c_types.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -96,6 +97,7 @@ public:
 
   void basicTest();
   void trickleTest();
+  void explicitFlowControlWithCancels();
 
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
@@ -224,8 +226,7 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   explicit_flow_control_ = true;
   initialize();
 
-  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES,
-                                   std::to_string(1000));
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1000));
 
   uint32_t num_requests = 100;
   std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
@@ -237,7 +238,8 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
       absl::MutexLock l(&engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
-    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_, min_delivery_size_);
+    Platform::StreamSharedPtr stream =
+        (*stream_prototype).start(explicit_flow_control_, min_delivery_size_);
     stream_prototype->setOnComplete(
         [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
           cc_.on_complete_calls++;
@@ -260,48 +262,97 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   ASSERT(prototype_streams.size() == num_requests);
 
   terminal_callback_.waitReady();
+  ASSERT_EQ(num_requests, cc_.on_complete_calls);
+}
+
+void ClientIntegrationTest::explicitFlowControlWithCancels() {
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1000));
+
+  uint32_t num_requests = 100;
+  std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
+  std::vector<Platform::StreamSharedPtr> streams;
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    Platform::StreamPrototypeSharedPtr stream_prototype;
+    {
+      absl::MutexLock l(&engine_lock_);
+      stream_prototype = engine_->streamClient()->newStreamPrototype();
+    }
+    Platform::StreamSharedPtr stream =
+        (*stream_prototype).start(explicit_flow_control_, min_delivery_size_);
+    stream_prototype->setOnComplete(
+        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
+          cc_.on_complete_calls++;
+          if (cc_.on_complete_calls + cc_.on_cancel_calls == num_requests) {
+            cc_.terminal_callback->setReady();
+          }
+        });
+    stream_prototype->setOnCancel(
+        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
+          cc_.on_cancel_calls++;
+          if (cc_.on_complete_calls + cc_.on_cancel_calls == num_requests) {
+            cc_.terminal_callback->setReady();
+          }
+        });
+    stream_prototype->setOnData([stream](envoy_data c_data, bool) {
+      // Allow reading up to 10 bytes.
+      stream->readData(100);
+      release_envoy_data(c_data);
+    });
+    stream_prototype_->setOnError(
+        [](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
+          RELEASE_ASSERT(0, "unexpected");
+        });
+
+    stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    prototype_streams.push_back(stream_prototype);
+    streams.push_back(stream);
+    if (i % 2 == 0) {
+      stream->cancel();
+    } else {
+      stream->readData(100);
+    }
+  }
+  ASSERT(streams.size() == num_requests);
+  ASSERT(prototype_streams.size() == num_requests);
+
+  terminal_callback_.waitReady();
+  ASSERT_EQ(num_requests / 2, cc_.on_complete_calls);
+  ASSERT_EQ(num_requests / 2, cc_.on_cancel_calls);
 }
 
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
+  min_delivery_size_ = 0;
   explicit_flow_control_ = true;
   initialize();
+  explicitFlowControlWithCancels();
+}
 
-  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES,
-                                   std::to_string(1000));
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsHttp3) {
+  min_delivery_size_ = 0;
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _)).Times(AnyNumber());
+  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation())
+      .Times(AnyNumber());
+  // Do the HTTP/3 quic hints dance to force HTTP/3 to be used.
+  explicit_flow_control_ = true;
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  builder_.enablePlatformCertificatesValidation(true);
+  // Create a k-v store for DNS lookup which createEnvoy() will use to point
+  // www.lyft.com -> fake H3 backend.
+  test_key_value_store_ = std::make_shared<TestKeyValueStore>();
+  builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
+  builder_.enableDnsCache(true, 1);
+  upstream_tls_ = true;
+  add_quic_hints_ = true;
 
-  uint32_t num_requests = 100;
-  std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
-  std::vector<Platform::StreamSharedPtr> streams;
+  initialize();
 
-  for (uint32_t i = 0; i < num_requests; ++i) {
-    Platform::StreamPrototypeSharedPtr stream_prototype;
-    {
-      absl::MutexLock l(&engine_lock_);
-      stream_prototype = engine_->streamClient()->newStreamPrototype();
-    }
-    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_, min_delivery_size_);
-    stream_prototype->setOnComplete(
-        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
-          cc_.on_complete_calls++;
-          if (cc_.on_complete_calls == num_requests) {
-            cc_.terminal_callback->setReady();
-          }
-        });
+  auto address = fake_upstreams_[0]->localAddress();
+  auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
+  default_request_headers_.setHost(fmt::format("www.lyft.com:{}", upstream_port));
+  default_request_headers_.setScheme("https");
 
-    stream_prototype->setOnData([stream](envoy_data c_data, bool) {
-      // Allow reading up to 10 bytes.
-      stream->readData(100);
-      release_envoy_data(c_data);
-    });
-    stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
-    stream->readData(100);
-    prototype_streams.push_back(stream_prototype);
-    streams.push_back(stream);
-  }
-  ASSERT(streams.size() == num_requests);
-  ASSERT(prototype_streams.size() == num_requests);
-
-  terminal_callback_.waitReady();
+  explicitFlowControlWithCancels();
 }
 
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
