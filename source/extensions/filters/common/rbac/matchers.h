@@ -14,6 +14,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/path/match/uri_template/uri_template_match.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -281,6 +282,19 @@ public:
 
 private:
   const Matchers::PathMatcher path_matcher_;
+};
+
+class GlobTemplateMatcher : public Matcher {
+public:
+  GlobTemplateMatcher(
+      const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig& config)
+      : glob_matcher_(config) {}
+
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo&) const override;
+
+private:
+  const Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher glob_matcher_;
 };
 
 } // namespace RBAC

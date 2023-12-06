@@ -516,6 +516,32 @@ TEST(PathMatcher, ValidPathInHeader) {
   checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
 }
 
+TEST(GlobTemplateMatcher, SingleLevelWildcard) {
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig config;
+  config.set_path_template("/test/*/path");
+
+  headers.setPath("/test/foo/path");
+  checkMatcher(GlobTemplateMatcher(config), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/test/path");
+  checkMatcher(GlobTemplateMatcher(config), false, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/test/foo#path");
+  checkMatcher(GlobTemplateMatcher(config), false, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(GlobTemplateMatcher, MultiLevelWildcard) {
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig config;
+  config.set_path_template("/test/**/path");
+
+  headers.setPath("/test/foo/path");
+  checkMatcher(GlobTemplateMatcher(config), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/test/foo/bar/path");
+  checkMatcher(GlobTemplateMatcher(config), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/test/path");
+  checkMatcher(GlobTemplateMatcher(config), false, Envoy::Network::MockConnection(), headers);
+}
+
 class TestObject : public StreamInfo::FilterState::Object {
 public:
   absl::optional<std::string> serializeAsString() const override { return "test.value"; }
