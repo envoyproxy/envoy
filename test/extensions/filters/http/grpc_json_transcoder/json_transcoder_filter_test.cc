@@ -69,8 +69,10 @@ protected:
 
   std::string makeProtoDescriptor(std::function<void(FileDescriptorSet&)> process) {
     FileDescriptorSet descriptor_set;
-    descriptor_set.ParseFromString(api_->fileSystem().fileReadToEnd(
-        TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+    descriptor_set.ParseFromString(
+        api_->fileSystem()
+            .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
+            .value());
 
     process(descriptor_set);
 
@@ -131,8 +133,10 @@ TEST_F(GrpcJsonTranscoderConfigTest, ParseConfigSkipRecalculating) {
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
-  proto_config.set_proto_descriptor_bin(api_->fileSystem().fileReadToEnd(
-      TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  proto_config.set_proto_descriptor_bin(
+      api_->fileSystem()
+          .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
+          .value());
   proto_config.add_services("bookstore.Bookstore");
   EXPECT_NO_THROW(JsonTranscoderConfig config(proto_config, *api_));
 }

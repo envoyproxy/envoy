@@ -30,8 +30,7 @@
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
 #include "contrib/generic_proxy/filters/network/source/stats.h"
-#include "contrib/generic_proxy/filters/network/source/upstream.h"
-#include "stats.h"
+#include "contrib/generic_proxy/filters/network/source/tracing.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -63,7 +62,8 @@ public:
         codec_factory_(std::move(codec)), route_config_provider_(std::move(route_config_provider)),
         factories_(std::move(factories)), drain_decision_(context.drainDecision()),
         tracer_(std::move(tracer)), tracing_config_(std::move(tracing_config)),
-        access_logs_(std::move(access_logs)), time_source_(context.timeSource()) {}
+        access_logs_(std::move(access_logs)),
+        time_source_(context.serverFactoryContext().timeSource()) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
@@ -115,7 +115,7 @@ private:
 class ActiveStream : public FilterChainManager,
                      public LinkedObject<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
-                     public ResponseEncoderCallback,
+                     public EncodingCallbacks,
                      public Tracing::Config,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
@@ -139,12 +139,6 @@ public:
     StreamInfo::StreamInfo& streamInfo() override { return parent_.stream_info_; }
     Tracing::Span& activeSpan() override { return parent_.activeSpan(); }
     OptRef<const Tracing::Config> tracingConfig() const override { return parent_.tracingConfig(); }
-    absl::optional<ExtendedOptions> requestOptions() const override {
-      return parent_.downstream_request_options_;
-    }
-    absl::optional<ExtendedOptions> responseOptions() const override {
-      return parent_.local_or_upstream_response_options_;
-    }
     const Network::Connection* connection() const override;
 
     bool isDualFilter() const { return is_dual_; }
@@ -167,12 +161,18 @@ public:
       parent_.sendLocalReply(status, std::move(func));
     }
     void continueDecoding() override { parent_.continueDecoding(); }
-    void upstreamResponse(ResponsePtr response, ExtendedOptions options) override {
-      parent_.upstreamResponse(std::move(response), options);
+    void onResponseStart(ResponsePtr response) override {
+      parent_.onResponseStart(std::move(response));
+    }
+    void onResponseFrame(StreamFramePtr frame) override {
+      parent_.onResponseFrame(std::move(frame));
+    }
+    void setRequestFramesHandler(StreamFrameHandler& handler) override {
+      ASSERT(parent_.request_stream_frame_handler_ == nullptr,
+             "request frames handler is already set");
+      parent_.request_stream_frame_handler_ = &handler;
     }
     void completeDirectly() override { parent_.completeDirectly(); }
-    void bindUpstreamConn(Upstream::TcpPoolData&& pool_data) override;
-    OptRef<UpstreamManager> boundUpstreamConn() override;
 
     DecoderFilterSharedPtr filter_;
   };
@@ -219,7 +219,7 @@ public:
     FilterContext context_;
   };
 
-  ActiveStream(Filter& parent, RequestPtr request, ExtendedOptions request_options);
+  ActiveStream(Filter& parent, StreamRequestPtr request);
 
   void addDecoderFilter(ActiveDecoderFilterPtr filter) {
     decoder_filters_.emplace_back(std::move(filter));
@@ -237,7 +237,8 @@ public:
 
   void sendLocalReply(Status status, ResponseUpdateFunction&&);
   void continueDecoding();
-  void upstreamResponse(ResponsePtr response, ExtendedOptions options);
+  void onResponseStart(StreamResponsePtr response);
+  void onResponseFrame(StreamFramePtr frame);
   void completeDirectly();
 
   void continueEncoding();
@@ -249,7 +250,9 @@ public:
   }
 
   // ResponseEncoderCallback
-  void onEncodingSuccess(Buffer::Instance& buffer) override;
+  void onEncodingSuccess(Buffer::Instance& buffer, bool end_stream) override;
+
+  void onRequestFrame(StreamFramePtr frame);
 
   std::vector<ActiveDecoderFilterPtr>& decoderFiltersForTest() { return decoder_filters_; }
   std::vector<ActiveEncoderFilterPtr>& encoderFiltersForTest() { return encoder_filters_; }
@@ -273,6 +276,10 @@ public:
 
   void completeRequest();
 
+  uint64_t requestStreamId() const {
+    return request_stream_->frameFlags().streamFlags().streamId();
+  }
+
 private:
   // Keep these methods private to ensure that these methods are only called by the reference
   // returned by the public tracingConfig() method.
@@ -281,16 +288,30 @@ private:
   const Tracing::CustomTagMap* customTags() const override;
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
+  bool spawnUpstreamSpan() const override;
+
+  void sendRequestFrameToUpstream();
+
+  void sendResponseStartToDownstream();
+  void sendResponseFrameToDownstream();
 
   bool active_stream_reset_{false};
 
+  bool registered_in_frame_handlers_{false};
+
   Filter& parent_;
 
-  RequestPtr downstream_request_stream_;
-  absl::optional<ExtendedOptions> downstream_request_options_;
+  StreamRequestPtr request_stream_;
+  std::list<StreamFramePtr> request_stream_frames_;
+  bool request_stream_end_{false};
+  bool request_filter_chain_complete_{false};
 
-  ResponsePtr local_or_upstream_response_stream_;
-  absl::optional<ExtendedOptions> local_or_upstream_response_options_;
+  StreamFrameHandler* request_stream_frame_handler_{nullptr};
+
+  StreamResponsePtr response_stream_;
+  std::list<StreamFramePtr> response_stream_frames_;
+  bool response_stream_end_{false};
+  bool response_filter_chain_complete_{false};
 
   RouteEntryConstSharedPtr cached_route_entry_;
 
@@ -309,49 +330,16 @@ private:
 };
 using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
-class UpstreamManagerImpl : public UpstreamConnection,
-                            public UpstreamManager,
-                            public ResponseDecoderCallback {
-public:
-  UpstreamManagerImpl(Filter& parent, Upstream::TcpPoolData&& tcp_pool_data);
-
-  // UpstreamConnection
-  void onPoolSuccessImpl() override;
-  void onPoolFailureImpl(ConnectionPool::PoolFailureReason reason,
-                         absl::string_view transport_failure_reason) override;
-  void onEventImpl(Network::ConnectionEvent event) override;
-
-  // ResponseDecoderCallback
-  void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
-  void onDecodingFailure() override;
-  void writeToConnection(Buffer::Instance& buffer) override;
-  OptRef<Network::Connection> connection() override;
-
-  // UpstreamManager
-  void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) override;
-  void registerUpstreamCallback(uint64_t stream_id, UpstreamBindingCallback& cb) override;
-  void unregisterResponseCallback(uint64_t stream_id) override;
-  void unregisterUpstreamCallback(uint64_t stream_id) override;
-
-  Filter& parent_;
-
-  absl::flat_hash_map<uint64_t, PendingResponseCallback*> registered_response_callbacks_;
-  absl::flat_hash_map<uint64_t, UpstreamBindingCallback*> registered_upstream_callbacks_;
-};
-
 class Filter : public Envoy::Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
-               public RequestDecoderCallback {
+               public ServerCodecCallbacks {
 public:
   Filter(FilterConfigSharedPtr config, TimeSource& time_source, Runtime::Loader& runtime)
       : config_(std::move(config)), stats_(config_->stats()),
         drain_decision_(config_->drainDecision()), time_source_(time_source), runtime_(runtime) {
-    request_decoder_ = config_->codecFactory().requestDecoder();
-    request_decoder_->setDecoderCallback(*this);
-    response_encoder_ = config_->codecFactory().responseEncoder();
-    message_creator_ = config_->codecFactory().messageCreator();
-    protocol_options_ = config_->codecFactory().protocolOptions();
+    server_codec_ = config_->codecFactory().createServerCodec();
+    server_codec_->setCodecCallbacks(*this);
   }
 
   // Envoy::Network::ReadFilter
@@ -365,7 +353,7 @@ public:
   }
 
   // RequestDecoderCallback
-  void onDecodingSuccess(RequestPtr request, ExtendedOptions options) override;
+  void onDecodingSuccess(StreamFramePtr request) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;
   OptRef<Network::Connection> connection() override;
@@ -379,18 +367,11 @@ public:
     }
     downstream_connection_closed_ = true;
     resetStreamsForUnexpectedError();
-
-    // If these is bound upstream connection, clean it up.
-    if (upstream_manager_ != nullptr) {
-      upstream_manager_->cleanUp(true);
-      downstreamConnection().dispatcher().deferredDelete(std::move(upstream_manager_));
-      upstream_manager_ = nullptr;
-    }
   }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  void sendReplyDownstream(Response& response, ResponseEncoderCallback& callback);
+  void sendFrameToDownstream(StreamFrame& frame, EncodingCallbacks& callbacks);
 
   Network::Connection& downstreamConnection() {
     ASSERT(callbacks_ != nullptr);
@@ -400,9 +381,8 @@ public:
   /**
    * Create a new active stream and add it to the active stream list.
    * @param request the request to be processed.
-   * @param options the extended options for the request.
    */
-  void newDownstreamRequest(RequestPtr request, ExtendedOptions options);
+  void newDownstreamRequest(StreamRequestPtr request);
 
   /**
    * Move the stream to the deferred delete stream list. This is called when the stream is reset
@@ -416,6 +396,7 @@ public:
   }
 
   std::list<ActiveStreamPtr>& activeStreamsForTest() { return active_streams_; }
+  const auto& frameHandlersForTest() { return frame_handlers_; }
 
   // This may be called multiple times in some scenarios. But it is safe.
   void resetStreamsForUnexpectedError();
@@ -423,13 +404,6 @@ public:
   void closeDownstreamConnection();
 
   void mayBeDrainClose();
-
-  void bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data);
-  OptRef<UpstreamManager> boundUpstreamConn() {
-    return makeOptRefFromPtr<UpstreamManager>(upstream_manager_.get());
-  }
-
-  void onBoundUpstreamConnectionEvent(Network::ConnectionEvent event);
 
 protected:
   // This will be called when drain decision is made and all active streams are handled.
@@ -442,6 +416,9 @@ private:
   friend class ActiveStream;
   friend class UpstreamManagerImpl;
 
+  void registerFrameHandler(uint64_t stream_id, ActiveStream* stream);
+  void unregisterFrameHandler(uint64_t stream_id);
+
   bool downstream_connection_closed_{};
 
   FilterConfigSharedPtr config_{};
@@ -451,17 +428,12 @@ private:
   TimeSource& time_source_;
   Runtime::Loader& runtime_;
 
-  RequestDecoderPtr request_decoder_;
-  ResponseEncoderPtr response_encoder_;
-  MessageCreatorPtr message_creator_;
-  ProtocolOptions protocol_options_;
+  ServerCodecPtr server_codec_;
 
   Buffer::OwnedImpl response_buffer_;
 
-  // The upstream connection manager.
-  std::unique_ptr<UpstreamManagerImpl> upstream_manager_;
-
   std::list<ActiveStreamPtr> active_streams_;
+  absl::flat_hash_map<uint64_t, ActiveStream*> frame_handlers_;
 };
 
 } // namespace GenericProxy

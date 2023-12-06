@@ -233,6 +233,7 @@ TEST_F(AccessLogManagerImplTest, FlushCountsIOErrors) {
 }
 
 TEST_F(AccessLogManagerImplTest, ReopenFile) {
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
@@ -275,12 +276,14 @@ TEST_F(AccessLogManagerImplTest, ReopenFile) {
   log_file->write("reopened");
   timer->invokeCallback();
 
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 2));
   EXPECT_TRUE(file_->waitForEventCount(file_->num_opens_, 2));
 }
 
 // Test that the `reopen()` will trigger file reopen even if no data is waiting.
 TEST_F(AccessLogManagerImplTest, ReopenFileNoWrite) {
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
@@ -299,6 +302,7 @@ TEST_F(AccessLogManagerImplTest, ReopenFileNoWrite) {
 
   log_file->write("before");
   timer->invokeCallback();
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 1));
 
   EXPECT_CALL(*file_, close_())
@@ -318,6 +322,7 @@ TEST_F(AccessLogManagerImplTest, ReopenFileNoWrite) {
 }
 
 TEST_F(AccessLogManagerImplTest, ReopenRetry) {
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
@@ -384,6 +389,7 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
   log_file->write("after reopen");
   timer->invokeCallback();
 
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 3));
   waitForCounterEq("filesystem.reopen_failed", 2);
   waitForGaugeEq("filesystem.write_total_buffered", 0);

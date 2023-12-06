@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/common/network:filter_state_dst_address_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:context_lib",
         "//test/mocks/network:network_mocks",

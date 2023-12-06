@@ -27,6 +27,7 @@ Extensions
   http/header_validators
   http/original_ip_detection
   http/stateful_session
+  geoip_provider/geoip_provider
   trace/trace
   internal_redirect/internal_redirect
   path/match/path_matcher

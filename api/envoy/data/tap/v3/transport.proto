@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.data.tap.v3;
 
-import "envoy/config/core/v3/address.proto";
 import "envoy/data/tap/v3/common.proto";
 
 import "google/protobuf/timestamp.proto";
@@ -19,17 +18,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Transport tap data]
 // Trace format for the tap transport socket extension. This dumps plain text read/write
 // sequences on a socket.
-
-// Connection properties.
-message Connection {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.data.tap.v2alpha.Connection";
-
-  // Local address.
-  config.core.v3.Address local_address = 2;
-
-  // Remote address.
-  config.core.v3.Address remote_address = 3;
-}
 
 // Event in a socket trace.
 message SocketEvent {

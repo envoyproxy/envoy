@@ -42,6 +42,17 @@ namespace Envoy {
 namespace Router {
 using ::testing::NiceMock;
 
+struct MockRouteMetadataObj : public Envoy::Config::TypedMetadata::Object {};
+class MockRouteMetadata : public Envoy::Config::TypedMetadata {
+public:
+  const Envoy::Config::TypedMetadata::Object* getData(const std::string&) const override {
+    return &object_;
+  }
+
+private:
+  MockRouteMetadataObj object_;
+};
+
 class MockDirectResponseEntry : public DirectResponseEntry {
 public:
   MockDirectResponseEntry();
@@ -313,6 +324,8 @@ public:
   MOCK_METHOD(void, traversePerFilterConfig,
               (const std::string&, std::function<void(const Router::RouteSpecificFilterConfig&)>),
               (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   Stats::StatName statName() const override {
     stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), *symbol_table_);
@@ -324,6 +337,8 @@ public:
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestCorsPolicy cors_policy_;
+  envoy::config::core::v3::Metadata metadata_;
+  MockRouteMetadata typed_metadata_;
 };
 
 class MockHashPolicy : public Http::HashPolicy {
@@ -486,16 +501,6 @@ public:
 
 class MockRoute : public Route {
 public:
-  struct MockRouteMetadataObj : public Envoy::Config::TypedMetadata::Object {};
-  class MockRouteMetadata : public Envoy::Config::TypedMetadata {
-  public:
-    const Envoy::Config::TypedMetadata::Object* getData(const std::string&) const override {
-      return &object_;
-    }
-
-  private:
-    MockRouteMetadataObj object_;
-  };
   MockRoute();
   ~MockRoute() override;
 
@@ -504,7 +509,7 @@ public:
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(const Decorator*, decorator, (), (const));
   MOCK_METHOD(const RouteTracing*, tracingConfig, (), (const));
-  MOCK_METHOD(bool, filterDisabled, (absl::string_view), (const));
+  MOCK_METHOD(absl::optional<bool>, filterDisabled, (absl::string_view), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (const std::string&),
               (const));
@@ -543,10 +548,14 @@ public:
   MOCK_METHOD(bool, usesVhds, (), (const));
   MOCK_METHOD(bool, mostSpecificHeaderMutationsWins, (), (const));
   MOCK_METHOD(uint32_t, maxDirectResponseBodySizeBytes, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::string name_{"fake_config"};
+  envoy::config::core::v3::Metadata metadata_;
+  MockRouteMetadata typed_metadata_;
 };
 
 class MockRouteConfigProvider : public RouteConfigProvider {
@@ -573,12 +582,10 @@ public:
 
   MOCK_METHOD(RouteConfigProviderSharedPtr, createRdsRouteConfigProvider,
               (const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-               const OptionalHttpFilters& optional_http_filters,
                Server::Configuration::ServerFactoryContext& factory_context,
                const std::string& stat_prefix, Init::Manager& init_manager));
   MOCK_METHOD(RouteConfigProviderPtr, createStaticRouteConfigProvider,
               (const envoy::config::route::v3::RouteConfiguration& route_config,
-               const OptionalHttpFilters& optional_http_filters,
                Server::Configuration::ServerFactoryContext& factory_context,
                ProtobufMessage::ValidationVisitor& validator));
 };

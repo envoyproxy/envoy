@@ -448,6 +448,15 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%UPSTREAM_CONNECTION_POOL_READY_DURATION%
+  HTTP/TCP
+    Total duration in milliseconds from when the upstream request was created to when the connection pool is ready.
+
+  UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 .. _config_access_log_format_response_flags:
 
 %RESPONSE_FLAGS% / %RESPONSE_FLAGS_LONG%
@@ -511,8 +520,11 @@ UDP
   TCP/UDP
     Not implemented ("-")
 
+.. _config_access_log_format_upstream_host:
+
 %UPSTREAM_HOST%
-  Upstream host URL (e.g., tcp://ip:port for TCP connections).
+  Upstream host URL (e.g., tcp://ip:port for TCP connections). Identical to the :ref:`UPSTREAM_REMOTE_ADDRESS
+  <config_access_log_format_upstream_remote_address>` value.
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
@@ -530,9 +542,11 @@ UDP
   Local port of the upstream connection.
   IP addresses are the only address type with a port component.
 
+.. _config_access_log_format_upstream_remote_address:
+
 %UPSTREAM_REMOTE_ADDRESS%
   Remote address of the upstream connection. If the address is an IP address it includes both
-  address and port.
+  address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value.
 
 %UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
   Remote address of the upstream connection, without any port component.
@@ -1133,6 +1147,10 @@ UDP
   * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
   * UpstreamPeriodic - On any HTTP Router filter periodic log record.
   * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
+  * UdpTunnelUpstreamConnected - When UDP Proxy filter has successfully established an upstream connection.
+                                 Note: It is only relevant for UDP tunneling over HTTP.
+  * UdpPeriodic - On any UDP Proxy filter periodic log record.
+  * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

@@ -11,6 +11,10 @@ parameters:
   displayName: "Artifact suffix"
   type: string
   default:
+- name: runTests
+  displayName: "Run release tests"
+  type: string
+  default: true
 - name: rbe
   displayName: "Use RBE"
   type: boolean
@@ -22,6 +26,9 @@ parameters:
 - name: bazelBuildExtraOptions
   type: string
   default: ""
+- name: bazelConfigRBE
+  type: string
+  default: --config=remote-ci --config=rbe-google --jobs=$(RbeJobs)
 
 - name: managedAgent
   type: boolean
@@ -45,11 +52,21 @@ jobs:
   timeoutInMinutes: ${{ parameters.timeoutBuild }}
   pool: ${{ parameters.pool }}
   steps:
-  - template: ../bazel.yml
+  - bash: |
+      if [[ "${{ parameters.runTests }}" == "false" ]]; then
+          CI_TARGET="release.server_only"
+      else
+          CI_TARGET="release"
+      fi
+      echo "${CI_TARGET}"
+      echo "##vso[task.setvariable variable=value;isoutput=true]${CI_TARGET}"
+    name: target
+  - template: ../ci.yml
     parameters:
       managedAgent: ${{ parameters.managedAgent }}
-      ciTarget: release
+      ciTarget: $(target.value)
       cacheName: "release"
+      bazelConfigRBE: ${{ parameters.bazelConfigRBE }}
       bazelBuildExtraOptions: ${{ parameters.bazelBuildExtraOptions }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)

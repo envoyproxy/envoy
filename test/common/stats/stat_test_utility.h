@@ -152,6 +152,9 @@ public:
   // Returns whether the given histogram has recorded any value since it was
   // created.
   bool histogramRecordedValues(const std::string& name) const;
+  const TagVector& fixedTags() override { return fixed_tags_; }
+
+  TagVector fixed_tags_;
 
 protected:
   ScopeSharedPtr makeScope(StatName name) override;

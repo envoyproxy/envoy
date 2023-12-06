@@ -24,12 +24,13 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
 
   // Quota bucket TLS object is created on the main thread and shared between worker threads.
   std::shared_ptr<QuotaBucket> bucket_cache = std::make_shared<QuotaBucket>(context);
-
-  return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache)](
-             Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+      Grpc::GrpcServiceConfigWithHashKey(config->rlqs_server());
+  return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache),
+          config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
         config, context, bucket_cache->tls.get()->quotaBuckets(),
-        bucket_cache->tls.get()->rateLimitClient()));
+        bucket_cache->tls.get()->rateLimitClient(), config_with_hash_key));
   };
 }
 

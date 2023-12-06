@@ -1087,6 +1087,28 @@ TEST(HeaderMapImplTest, HttpTraceContextTest) {
     // 'host' will be converted to ':authority'.
     EXPECT_EQ(23, size);
     EXPECT_EQ(23, request_headers.byteSize());
+
+    request_headers.removeByKey("non-existent-header");
+    EXPECT_EQ(23, request_headers.byteSize());
+
+    request_headers.removeByKey("ok");
+    EXPECT_EQ(19, request_headers.byteSize());
+    EXPECT_TRUE(request_headers.get(Http::LowerCaseString("ok")).empty());
+
+    // Appending will append to the existing value if it exists using "," as the
+    // delimiter.
+    request_headers.appendCopy(Http::LowerCaseString("bar"), "baz");
+    EXPECT_EQ(23, request_headers.byteSize());
+    EXPECT_EQ(1, request_headers.get(Http::LowerCaseString("bar")).size());
+
+    // Adding will store both key and value.
+    request_headers.addCopy(Http::LowerCaseString("bar"), "qux");
+    EXPECT_EQ(29, request_headers.byteSize());
+    EXPECT_EQ(2, request_headers.get(Http::LowerCaseString("bar")).size());
+
+    request_headers.removeByKey("bar");
+    EXPECT_EQ(13, request_headers.byteSize());
+    EXPECT_TRUE(request_headers.get(Http::LowerCaseString("bar")).empty());
   }
 
   {

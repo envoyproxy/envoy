@@ -46,6 +46,10 @@ void PostgresFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks&
   read_callbacks_ = &callbacks;
 }
 
+void PostgresFilter::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) {
+  write_callbacks_ = &callbacks;
+}
+
 // Network::WriteFilter
 Network::FilterStatus PostgresFilter::onWrite(Buffer::Instance& data, bool) {
 
@@ -229,7 +233,7 @@ bool PostgresFilter::onSSLRequest() {
     }
     return true;
   });
-  read_callbacks_->connection().write(buf, false);
+  write_callbacks_->injectWriteDataToFilterChain(buf, false);
 
   return false;
 }

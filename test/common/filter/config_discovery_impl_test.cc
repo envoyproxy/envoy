@@ -32,7 +32,6 @@
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
-using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -50,13 +49,13 @@ class TestHttpFilterFactory : public TestFilterFactory,
                               public Server::Configuration::NamedHttpFilterConfigFactory,
                               public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
     created_ = true;
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::UpstreamFactoryContext&) override {
     created_ = true;
@@ -186,7 +185,7 @@ template <class FactoryCb, class FactoryCtx, class CfgProviderMgrImpl, class Fil
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() : inject_factory_(filter_factory_) {
-    ON_CALL(factory_context_, getServerFactoryContext())
+    ON_CALL(factory_context_, serverFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
@@ -290,7 +289,7 @@ public:
   }
 };
 
-// HTTP upstream filter test
+// Upstream HTTP filter test
 class HttpUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           NamedHttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
@@ -324,7 +323,7 @@ public:
   }
 };
 
-// Network upstream filter test
+// Upstream network filter test
 class NetworkUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           Network::FilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
@@ -655,9 +654,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   }
 
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(config_discovery_test.callbacks_
-                      ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
-                      .ok()),
+      config_discovery_test.callbacks_
+          ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
+          .IgnoreError(),
       EnvoyException,
       "Error: terminal filter named foo of type envoy.test.filter must be the last filter "
       "in a " +

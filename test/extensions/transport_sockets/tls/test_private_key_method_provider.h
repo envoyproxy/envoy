@@ -44,7 +44,7 @@ public:
                            bssl::UniquePtr<EVP_PKEY> pkey,
                            TestPrivateKeyConnectionTestOptions& test_options);
   EVP_PKEY* getPrivateKey() { return pkey_.get(); }
-  void delayed_op();
+  void delayedOp();
   // Store the output data temporarily.
   std::vector<uint8_t> output_;
   // The complete callback can return other value than "retry" only after

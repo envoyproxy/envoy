@@ -52,7 +52,7 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
 absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
-  if (resources.size() == 0) {
+  if (resources.empty()) {
     ENVOY_LOG(debug, "Missing {} RouteConfiguration for {} in onConfigUpdate()", rds_type_,
               route_config_name_);
     stats_.update_empty_.inc();

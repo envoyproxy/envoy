@@ -19,7 +19,7 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
+      pull-requests: read
 
   cc_test_no_yaml:
     needs: env
@@ -47,6 +47,35 @@ jobs:
             --define=envoy_full_protos=disabled \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             //test/common/integration:client_integration_test
+  cc_build_no_exceptions:
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: cc_test_no_yaml
+    runs-on: ubuntu-20.04
+    timeout-minutes: 120
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Running C++ build with exceptions disabled'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
+      run: |
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-ci \
+             --define envoy_exceptions=disabled \
+             --define=envoy_yaml=disabled \
+             --copt=-fno-unwind-tables \
+             --copt=-fno-exceptions \
+             --define=google_grpc=disabled \
+             --define=envoy_mobile_xds=disabled \
+             //test/performance:test_binary_size //library/cc/...
 
   cc_test:
     needs: env
@@ -72,9 +101,8 @@ jobs:
             --test_output=all \
             --config=mobile-remote-ci \
             --define=signal_trace=disabled \
-            --define=envoy_mobile_request_compression=disabled \
-            --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
+            --define=envoy_mobile_xds=disabled \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             $TARGETS
 
@@ -103,11 +131,10 @@ jobs:
             --config=ios \
             --config=mobile-remote-ci-macos \
             --define=signal_trace=disabled \
-            --define=envoy_mobile_request_compression=disabled \
             --define=envoy_mobile_stats_reporting=disabled \
             --define=envoy_mobile_swift_cxx_interop=disabled \
-            --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
+            --define=envoy_mobile_xds=disabled \
             --@envoy//bazel:http3=False \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //library/swift:ios_framework
@@ -123,7 +150,7 @@ jobs:
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
+    - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
       with:
         java-version: '8'
         java-package: jdk
@@ -142,9 +169,9 @@ jobs:
             --config=mobile-remote-ci-macos \
             --fat_apk_cpu=x86_64 \
             --define=signal_trace=disabled \
-            --define=envoy_mobile_request_compression=disabled \
             --define=envoy_enable_http_datagrams=disabled \
             --define=google_grpc=disabled \
+            --define=envoy_mobile_xds=disabled \
             --define=envoy_yaml=disabled \
             --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
             //:android_dist

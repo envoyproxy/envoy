@@ -279,10 +279,16 @@ public:
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
-  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
-                     ProcessorState::CallbackState new_state, bool end_stream);
+  envoy::service::ext_proc::v3::ProcessingRequest
+  setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
+  void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
+                     envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+  bool inHeaderProcessState() {
+    return (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
+            encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
+  }
 
 private:
   void mergePerRouteConfig();

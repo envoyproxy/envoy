@@ -99,8 +99,13 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     HttpTapConfigSharedPtr config = config_->currentConfig();
-    tapper_ = config ? config->createPerRequestTapper(config_->getTapConfig(), callbacks.streamId())
-                     : nullptr;
+    if (config != nullptr) {
+      auto streamId = callbacks.streamId();
+      auto connection = callbacks.connection();
+      tapper_ = config->createPerRequestTapper(config_->getTapConfig(), streamId, connection);
+    } else {
+      tapper_ = nullptr;
+    }
   }
 
   // Http::StreamEncoderFilter
@@ -117,11 +122,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           AccessLog::AccessLogType access_log_type) override;
+  void log(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&) override;
 
 private:
   FilterConfigSharedPtr config_;

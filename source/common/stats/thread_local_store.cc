@@ -258,7 +258,7 @@ ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
   // is because many tests will not populate rejected_stats_.
   ASSERT(symbol_table_.toString(StatNameManagedStorage("Hello.world", symbol_table_).statName()) ==
          "Hello.world");
-  rejected_stats_.free(symbol_table_);
+  rejected_stats_.free(symbol_table_); // NOLINT(clang-analyzer-unix.Malloc)
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {

@@ -43,9 +43,9 @@ private:
   void OnHeaderInput(absl::string_view input) override;
   void OnHeader(absl::string_view key, absl::string_view value) override;
   void OnTrailerInput(absl::string_view input) override;
-  void OnTrailers(std::unique_ptr<quiche::BalsaHeaders> /*trailers*/) override{};
+  void OnTrailers(std::unique_ptr<quiche::BalsaHeaders> trailers) override;
   void ProcessHeaders(const quiche::BalsaHeaders& headers) override;
-  void ProcessTrailers(const quiche::BalsaHeaders& trailer) override;
+  void ProcessTrailers(const quiche::BalsaHeaders& /*trailer*/) override{};
   void OnRequestFirstLineInput(absl::string_view line_input, absl::string_view method_input,
                                absl::string_view request_uri,
                                absl::string_view version_input) override;
@@ -61,7 +61,7 @@ private:
   void HandleError(quiche::BalsaFrameEnums::ErrorCode error_code) override;
   void HandleWarning(quiche::BalsaFrameEnums::ErrorCode error_code) override;
 
-  // Shared implementation for ProcessHeaders() and ProcessTrailers().
+  // Shared implementation for ProcessHeaders() and OnTrailers().
   void validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers, bool trailers);
 
   // Return ParserStatus::Error if `result` is CallbackResult::Error.
@@ -71,7 +71,6 @@ private:
 
   quiche::BalsaFrame framer_;
   quiche::BalsaHeaders headers_;
-  quiche::BalsaHeaders trailers_;
 
   const MessageType message_type_ = MessageType::Request;
   ParserCallbacks* connection_ = nullptr;

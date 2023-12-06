@@ -32,6 +32,7 @@ envoy_cc_library(
     srcs = ["application_protocol.cc"],
     hdrs = ["application_protocol.h"],
     deps = [
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],
@@ -242,11 +243,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "default_socket_interface_lib",
     srcs = [
+        "io_socket_handle_base_impl.cc",
         "io_socket_handle_impl.cc",
         "socket_interface_impl.cc",
         "win32_socket_handle_impl.cc",
     ],
     hdrs = [
+        "io_socket_handle_base_impl.h",
         "io_socket_handle_impl.h",
         "socket_interface_impl.h",
         "win32_socket_handle_impl.h",
@@ -345,6 +348,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/event:dispatcher_includes",
+        "//source/common/runtime:runtime_keys_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -507,9 +511,10 @@ envoy_cc_library(
     hdrs = ["filter_state_dst_address.h"],
     deps = [
         ":utility_lib",
+        "//envoy/common:hashable_interface",
         "//envoy/network:address_interface",
-        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:hash_lib",
         "//source/common/common:macros",
     ],
 )
@@ -519,6 +524,7 @@ envoy_cc_library(
     srcs = ["upstream_server_name.cc"],
     hdrs = ["upstream_server_name.h"],
     deps = [
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],
@@ -529,6 +535,7 @@ envoy_cc_library(
     srcs = ["upstream_subject_alt_names.cc"],
     hdrs = ["upstream_subject_alt_names.h"],
     deps = [
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],

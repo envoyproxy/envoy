@@ -170,9 +170,11 @@ public:
   // If a value is present, that value overrides
   // ResponseDirectionConfig::compressionEnabled.
   absl::optional<bool> responseCompressionEnabled() const { return response_compression_enabled_; }
+  absl::optional<bool> removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
 
 private:
   absl::optional<bool> response_compression_enabled_;
+  absl::optional<bool> remove_accept_encoding_header_;
 };
 
 /**
@@ -196,7 +198,10 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
-  bool compressionEnabled(const CompressorFilterConfig::ResponseDirectionConfig& config) const;
+  bool compressionEnabled(const CompressorFilterConfig::ResponseDirectionConfig& config,
+                          const CompressorPerRouteFilterConfig* per_route_config) const;
+  bool removeAcceptEncodingHeader(const CompressorFilterConfig::ResponseDirectionConfig& config,
+                                  const CompressorPerRouteFilterConfig* per_route_config) const;
   bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
   bool isAcceptEncodingAllowed(bool maybe_compress, const Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;

@@ -490,6 +490,8 @@ TEST(Context, ConnectionAttributes) {
   const absl::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));
+  const std::string downstream_transport_failure_reason = "TlsError";
+  info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
@@ -673,6 +675,13 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = connection[CelValue::CreateStringView(DownstreamTransportFailureReason)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(downstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+
+  {
     auto value = upstream[CelValue::CreateStringView(TLSVersion)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
@@ -794,7 +803,7 @@ TEST(Context, FilterStateAttributes) {
   const std::string ip_string = "ip";
   const std::string port_string = "port";
   filter_state.setData(address_key,
-                       std::make_unique<Network::DestinationAddress>(
+                       std::make_unique<Network::AddressObject>(
                            std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
                        StreamInfo::FilterState::StateType::ReadOnly);
   {

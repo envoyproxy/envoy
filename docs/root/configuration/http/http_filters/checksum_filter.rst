@@ -1,5 +1,5 @@
 
-.. _config_http_filters_language:
+.. _config_http_filters_checksum:
 
 Checksum
 ========

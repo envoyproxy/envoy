@@ -1,0 +1,196 @@
+name: Envoy/release
+
+permissions:
+  contents: read
+
+on:
+  release:
+    types:
+    - published
+    branches:
+    - main
+    - release/v*
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Select a task
+        required: true
+        default: create-release
+        type: choice
+        options:
+        - create-release
+        - sync-version-histories
+      pr:
+        type: boolean
+        default: true
+        description: Create a PR
+      pr-message:
+        description: Additional message for PR, eg to fix an issue or additional signoff (optional)
+      wip:
+        type: boolean
+        default: false
+        description: WIP
+      author:
+        description: >-
+          Author: User/email, eg 'Myname <me@mymail.com>'
+          (used by create-release, default: `changelogs/summary.md` last committer)
+      summary:
+        type: boolean
+        default: true
+        description: Use changelog summary (required to publish release)
+
+env:
+  COMMITTER_NAME: publish-envoy[bot]
+  COMMITTER_EMAIL: 140627008+publish-envoy[bot]@users.noreply.github.com
+
+
+jobs:
+  ## Triggerable actions
+
+  # Create a release commit, when landed this will publish.
+  create_release:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch' && inputs.task == 'create-release'
+    name: Create release
+    steps:
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
+      with:
+        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+        app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+        strip-prefix: release/
+    - run: |
+        if [[ ! -s "changelogs/summary.md" ]]; then
+            if [[ "${{ inputs.summary }}" == "false" ]]; then
+                echo "::warning::Changelog summary (changelogs/summary.md) is empty!"
+                exit 0
+            fi
+            echo "::error::Changelog summary (changelogs/summary.md) is empty!"
+            exit 1
+        fi
+        COMMITTER=$(git log -n 1 --format='%an <%ae>' -- changelogs/summary.md)
+        echo "committer=${COMMITTER}" >> $GITHUB_OUTPUT
+      id: changelog
+      name: Check changelog summary
+    - if: ${{ inputs.author }}
+      name: Validate signoff email
+      uses: envoyproxy/toolshed/gh-actions/email/validate@actions-v0.1.8
+      with:
+        email: ${{ inputs.author }}
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.8
+      name: Create release
+      with:
+        source: |
+          BAZEL_ARGS=(--)
+          BAZEL_RUN_ARGS=(--config=ci)
+          if [[ -n "${{ inputs.author }}" ]]; then
+              BAZEL_ARGS+=(
+                  "--release-author=${{ inputs.author }}"
+                  "--signoff=${{ steps.changelog.outputs.committer }}")
+          else
+              BAZEL_ARGS+=("--release-author=${{ steps.changelog.outputs.committer }}")
+          fi
+        command: >-
+          bazel
+          run
+          "${BAZEL_RUN_ARGS[@]}"
+          @envoy_repo//:release
+          "${BAZEL_ARGS[@]}"
+    - run: |
+        VERSION=$(cat VERSION.txt)
+        echo "version=v${VERSION}" >> $GITHUB_OUTPUT
+      name: Release version
+      id: release
+    - name: Create a PR
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.8
+      with:
+        base: ${{ github.ref_name }}
+        commit: false
+        append-commit-message: true
+        body: |
+          Created by Envoy publish bot for @${{ github.actor }}
+          ${{ ! inputs.summary && ':warning: Created without changelog summary, this will need to be updated before publishing' || '' }}
+        branch: release/create/${{ steps.checkout.outputs.branch_name }}
+        diff-upload: release-${{ steps.checkout.outputs.branch_name }}
+        diff-show: true
+        dry-run: ${{ ! inputs.pr }}
+        wip: ${{ ! inputs.summary || inputs.wip }}
+        title: >-
+          [${{ (! inputs.summary || inputs.wip) && 'WIP/' || '' }}release/${{ steps.branch.outputs.name }}]
+          repo: Release ${{ steps.release.outputs.version }}
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+
+  sync_version_histories:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch' && inputs.task == 'sync-version-histories'
+    name: Sync version histories
+    steps:
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
+      with:
+        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+        app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.1.8
+      name: Sync version histories
+      with:
+        command: >-
+          bazel
+          run
+          --config=ci @envoy_repo//:sync
+          --
+          --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
+    - name: Create a PR
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.8
+      with:
+        append-commit-message: true
+        base: ${{ github.ref_name }}
+        commit: false
+        body: |
+          Created by Envoy publish bot for @${{ github.actor }}
+        branch: release/sync/${{ steps.checkout.outputs.branch_name }}
+        diff-upload: version-histories-${{ steps.checkout.outputs.branch_name }}
+        diff-show: true
+        dry-run: ${{ ! inputs.pr }}
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+        title: >-
+          ${{ steps.branch.outputs.name != 'main' && '[${{ steps.branch.outputs.name }}]' || '' }}
+          repo: Sync version histories
+
+
+  ## Triggered actions
+
+  # On release to `main`:
+  # - fork the branch to a release branch
+  # - add an initial dev commit
+  # - remove anything unwanted
+  # - push branch
+  create_release_branch:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release' && endsWith(github.ref, '.0')
+    name: Create release branch
+    steps:
+    - name: Checkout repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
+      with:
+        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+        app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+    - name: Create release branch
+      run: |
+        version="$(cut -d- -f1 < VERSION.txt | cut -d. -f-2)"
+        release_branch="release/v${version}"
+        commit_sha="$(git rev-parse HEAD)"
+        echo "Creating ${release_branch} from ${commit_sha}"
+        git checkout -b "$release_branch"
+        bazel run @envoy_repo//:dev -- --patch
+        git rm -rf .github/workflows/mobile*yml
+        git commit . -m "repo: Remove mobile ci for release branch"
+        git log
+        git push origin "$release_branch"

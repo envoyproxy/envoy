@@ -22,16 +22,18 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
   std::call_once(store.init_once_, [&context, &tls, &store]() {
     // should be the singleton for use by the entire server.
     ClusterManagerContainer& cluster_manager_container = clusterManagerContainer();
-    cluster_manager_container.cluster_manager_ = &context.clusterManager();
+    cluster_manager_container.cluster_manager_ = &context.serverFactoryContext().clusterManager();
 
     SlotPtrContainer& slot_ptr_container = slotPtrContainer();
     slot_ptr_container.slot_ = tls.allocateSlot();
 
-    Thread::ThreadId main_thread_id = context.api().threadFactory().currentThreadId();
+    Thread::ThreadId main_thread_id =
+        context.serverFactoryContext().api().threadFactory().currentThreadId();
     slot_ptr_container.slot_->set(
         [&context, main_thread_id,
          &store](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-          if (context.api().threadFactory().currentThreadId() == main_thread_id) {
+          if (context.serverFactoryContext().api().threadFactory().currentThreadId() ==
+              main_thread_id) {
             return nullptr;
           }
 
@@ -46,9 +48,8 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
 }
 
 UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_lib,
-                           unsigned long long int goConnID, // NOLINT(readability-identifier-naming)
-                           Event::Dispatcher* dispatcher)
-    : dynamic_lib_(dynamic_lib), goConnID_(goConnID), dispatcher_(dispatcher), addr_(addr) {
+                           unsigned long long int go_conn_id, Event::Dispatcher* dispatcher)
+    : dynamic_lib_(dynamic_lib), go_conn_id_(go_conn_id), dispatcher_(dispatcher), addr_(addr) {
   if (dispatcher_ == nullptr) {
     DispatcherStore& store = dispatcherStore();
     Thread::LockGuard guard(store.lock_);
@@ -59,8 +60,8 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
   stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info_->filterState()->setData(
-      Network::DestinationAddress::key(),
-      std::make_shared<Network::DestinationAddress>(
+      "envoy.network.transport_socket.original_dst_address",
+      std::make_shared<Network::AddressObject>(
           Network::Utility::parseInternetAddressAndPort(addr, false)),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
       StreamInfo::StreamSharingMayImpactPooling::None);
@@ -130,7 +131,7 @@ void UpstreamConn::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
   conn_->addUpstreamCallbacks(*this);
   remote_addr_ = conn_->connection().connectionInfoProvider().directRemoteAddress()->asString();
 
-  dynamic_lib_->envoyGoFilterOnUpstreamConnectionReady(wrapper_, goConnID_);
+  dynamic_lib_->envoyGoFilterOnUpstreamConnectionReady(wrapper_, go_conn_id_);
 }
 
 void UpstreamConn::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
@@ -143,7 +144,7 @@ void UpstreamConn::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
   }
 
   dynamic_lib_->envoyGoFilterOnUpstreamConnectionFailure(wrapper_, static_cast<int>(reason),
-                                                         goConnID_);
+                                                         go_conn_id_);
 }
 
 void UpstreamConn::onEvent(Network::ConnectionEvent event) {

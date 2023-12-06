@@ -2,6 +2,7 @@
 #include "source/common/network/filter_state_dst_address.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/extensions/clusters/original_dst/original_dst_cluster.h"
 #include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
@@ -21,7 +22,7 @@ class TestContext : public Context {};
 
 class ForeignTest : public testing::Test {
 public:
-  ForeignTest() {}
+  ForeignTest() = default;
 
   void initializeFilterCallbacks() { ctx_.initializeReadFilterCallbacks(read_filter_callbacks_); }
 
@@ -102,14 +103,14 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
   EXPECT_TRUE(stream_info->filterState()->hasData<TcpProxy::PerConnectionCluster>(
       TcpProxy::PerConnectionCluster::key()));
 
-  args.set_path(Network::DestinationAddress::key());
+  args.set_path(Upstream::OriginalDstClusterFilterStateKey);
   args.set_value("1.2.3.4:80");
   args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest);
   args.SerializeToString(&in);
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::Ok);
-  EXPECT_TRUE(stream_info->filterState()->hasData<Network::DestinationAddress>(
-      Network::DestinationAddress::key()));
+  EXPECT_TRUE(stream_info->filterState()->hasData<Network::AddressObject>(
+      Upstream::OriginalDstClusterFilterStateKey));
 }
 
 } // namespace Wasm

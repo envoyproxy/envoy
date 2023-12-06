@@ -18,9 +18,12 @@ Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProt
   ASSERT(!proto_config.auth_api_cluster().empty());
   ASSERT(!proto_config.stat_prefix().empty());
 
+  auto& server_context = context.serverFactoryContext();
+
   ClientSslAuthConfigSharedPtr filter_config(ClientSslAuthConfig::create(
-      proto_config, context.threadLocal(), context.clusterManager(), context.mainThreadDispatcher(),
-      context.scope(), context.api().randomGenerator()));
+      proto_config, server_context.threadLocal(), server_context.clusterManager(),
+      server_context.mainThreadDispatcher(), context.scope(),
+      server_context.api().randomGenerator()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ClientSslAuthFilter>(filter_config));
   };

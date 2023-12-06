@@ -30,17 +30,13 @@ class ResponseHeadersTest {
 
   @Test
   fun `adding HTTP status code sets the appropriate header`() {
-    val headers = ResponseHeadersBuilder()
-      .addHttpStatus(200)
-      .build()
+    val headers = ResponseHeadersBuilder().addHttpStatus(200).build()
     assertThat(headers.value(":status")).containsExactly("200")
   }
 
   @Test
   fun `adding negative HTTP status code no-ops`() {
-    val headers = ResponseHeadersBuilder()
-      .addHttpStatus(-123)
-      .build()
+    val headers = ResponseHeadersBuilder().addHttpStatus(-123).build()
     assertThat(headers.value(":status")).isNull()
   }
 

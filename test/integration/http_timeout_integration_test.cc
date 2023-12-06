@@ -1,5 +1,7 @@
 #include "test/integration/http_timeout_integration_test.h"
 
+#include "test/test_common/test_runtime.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -15,6 +17,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HttpTimeoutIntegrationTest,
 TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
@@ -49,7 +55,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("504", response->headers().getStatusValue());
   EXPECT_EQ(response->headers().getProxyStatusValue(),
-            "envoy; error=connection_timeout; details=\"response_timeout; UT\"");
+            "envoy; error=http_response_timeout; details=\"response_timeout; UT\"");
 }
 
 // Testing that `x-envoy-expected-timeout-ms` header, set by egress envoy, is respected by ingress

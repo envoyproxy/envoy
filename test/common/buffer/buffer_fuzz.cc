@@ -204,7 +204,7 @@ public:
     return absl::StartsWith(asStringView(), data);
   }
 
-  std::string toString() const override { return std::string(data_.data() + start_, size_); }
+  std::string toString() const override { return {data_.data() + start_, size_}; }
 
   size_t addFragments(absl::Span<const absl::string_view> fragments) override {
     size_t total_size_to_write = 0;

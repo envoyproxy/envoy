@@ -19,7 +19,7 @@ jobs:
     uses: ./.github/workflows/_env.yml
     permissions:
       contents: read
-      statuses: write
+      pull-requests: read
 
   tsan:
     if: ${{ needs.env.outputs.mobile_tsan == 'true' }}
@@ -47,4 +47,5 @@ jobs:
         ./bazelw test \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             --config=mobile-remote-ci-linux-tsan \
-            //test/common/...
+            //test/common/... \
+            //test/cc/...

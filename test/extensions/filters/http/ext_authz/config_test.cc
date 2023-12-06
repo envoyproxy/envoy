@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
@@ -15,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using envoy::config::bootstrap::v3::Bootstrap;
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -30,8 +32,9 @@ class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
   TestAsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
                              TimeSource& time_source, Api::Api& api,
-                             const Grpc::StatNames& stat_names)
-      : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names) {}
+                             const Grpc::StatNames& stat_names,
+                             const Bootstrap::GrpcAsyncClientManagerConfig& config)
+      : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names, config) {}
   Grpc::AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService&,
                                                     Stats::Scope&, bool) override {
     return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
@@ -45,7 +48,8 @@ public:
   ExtAuthzFilterTest() : RealThreadsTestHelper(5), stat_names_(symbol_table_) {
     runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-          context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_);
+          context_.server_factory_context_.cluster_manager_, tls(), api().timeSource(), api(),
+          stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
     });
   }
 
@@ -62,8 +66,7 @@ public:
   Http::FilterFactoryCb createFilterFactory(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config) {
     // Delegate call to mock async client manager to real async client manager.
-    ON_CALL(context_, getServerFactoryContext()).WillByDefault(testing::ReturnRef(server_context_));
-    ON_CALL(server_context_.cluster_manager_.async_client_manager_,
+    ON_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillByDefault(
             Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
@@ -71,8 +74,8 @@ public:
               return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
                   config_with_hash_key, scope, skip_cluster_check);
             }));
-    ExtAuthzFilterFactory factory;
-    return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_);
+    ExtAuthzFilterConfig factory;
+    return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_).value();
   }
 
   Http::StreamFilterSharedPtr createFilterFromFilterFactory(Http::FilterFactoryCb filter_factory) {
@@ -85,7 +88,6 @@ public:
   }
 
 private:
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::SymbolTableImpl symbol_table_;
   Grpc::StatNames stat_names_;
 
@@ -93,29 +95,6 @@ protected:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::unique_ptr<TestAsyncClientManagerImpl> async_client_manager_;
 };
-
-TEST_F(ExtAuthzFilterTest, DisallowedConfigurationFieldsAsUpstreamFilter) {
-  NiceMock<Server::Configuration::MockUpstreamFactoryContext> context;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  ON_CALL(context, getServerFactoryContext()).WillByDefault(testing::ReturnRef(server_context));
-
-  ExtAuthzFilterFactory factory;
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
-  ext_authz_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-  ext_authz_config.set_clear_route_cache(true);
-  EXPECT_THROW(factory.createFilterFactoryFromProto(ext_authz_config, "stats", context),
-               EnvoyException);
-
-  ext_authz_config.set_clear_route_cache(false);
-  ext_authz_config.set_include_peer_certificate(true);
-  EXPECT_THROW(factory.createFilterFactoryFromProto(ext_authz_config, "stats", context),
-               EnvoyException);
-
-  ext_authz_config.set_include_peer_certificate(false);
-  ext_authz_config.set_include_tls_session(true);
-  EXPECT_THROW(factory.createFilterFactoryFromProto(ext_authz_config, "stats", context),
-               EnvoyException);
-}
 
 class ExtAuthzFilterHttpTest : public ExtAuthzFilterTest {
 public:

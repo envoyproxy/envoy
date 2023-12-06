@@ -599,7 +599,7 @@ public:
 
   static VirtualClusterStats generateStats(Stats::Scope& scope,
                                            const VirtualClusterStatNames& stat_names) {
-    return VirtualClusterStats(stat_names, scope);
+    return {stat_names, scope};
   }
 };
 
@@ -677,6 +677,18 @@ public:
   virtual void traversePerFilterConfig(
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
+   * this virtual host.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this virtual host.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 };
 
 /**
@@ -1193,9 +1205,10 @@ public:
    * Check if the filter is disabled for this route.
    * @param config_name supplies the name of the filter config in the HTTP filter chain. This name
    * may be different from the filter extension qualified name.
-   * @return true if the filter is disabled for this route, false otherwise.
+   * @return true if the filter is disabled for this route, false if the filter is enabled.
+   *         nullopt if no decision can be made explicitly for the filter.
    */
-  virtual bool filterDisabled(absl::string_view config_name) const PURE;
+  virtual absl::optional<bool> filterDisabled(absl::string_view config_name) const PURE;
 
   /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
@@ -1313,6 +1326,18 @@ public:
    * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
    */
   virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
+   * this route configuration.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this route configuration.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 };
 
 /**
@@ -1358,7 +1383,7 @@ class GenericConnectionPoolCallbacks;
 class GenericUpstream;
 
 /**
- * An API for wrapping either an HTTP or a TCP connection pool.
+ * An API for wrapping either an HTTP, TCP, or UDP connection pool.
  *
  * The GenericConnPool exists to create a GenericUpstream handle via a call to
  * newStream resulting in an eventual call to onPoolReady
@@ -1368,7 +1393,8 @@ public:
   virtual ~GenericConnPool() = default;
 
   /**
-   * Called to create a new HTTP stream or TCP connection for "CONNECT streams".
+   * Called to create a new HTTP stream, TCP connection for CONNECT streams, or UDP socket for
+   * CONNECT-UDP streams.
    *
    * The implementation of the GenericConnPool will either call
    * GenericConnectionPoolCallbacks::onPoolReady
@@ -1418,7 +1444,7 @@ public:
 };
 
 /**
- * An API for wrapping callbacks from either an HTTP or a TCP connection pool.
+ * An API for wrapping callbacks from either an HTTP, TCP, or UDP connection pool.
  *
  * Just like the connection pool callbacks, the GenericConnectionPoolCallbacks
  * will either call onPoolReady when a GenericUpstream is ready, or
@@ -1464,7 +1490,7 @@ public:
 };
 
 /**
- * An API for sending information to either a TCP or HTTP upstream.
+ * An API for sending information to either a TCP, UDP, or HTTP upstream.
  *
  * It is similar logically to RequestEncoder, only without the getStream interface.
  */
@@ -1537,7 +1563,7 @@ public:
   virtual GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        const RouteEntry& route_entry,
+                        Upstream::ResourcePriority priority,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;
 };

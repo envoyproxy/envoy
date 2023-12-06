@@ -489,7 +489,8 @@ class DynamicRouterOrClusterFiltersIntegrationTest
       public UpstreamHttpExtensionDiscoveryIntegrationTestBase {
 public:
   DynamicRouterOrClusterFiltersIntegrationTest()
-      : UpstreamHttpExtensionDiscoveryIntegrationTestBase(ipVersion(), std::get<1>(GetParam())) {}
+      : UpstreamHttpExtensionDiscoveryIntegrationTestBase(
+            DynamicRouterOrClusterFiltersIntegrationTest::ipVersion(), std::get<1>(GetParam())) {}
 
   Network::Address::IpVersion ipVersion() const override {
     return std::get<0>(std::get<0>(GetParam()));
@@ -741,7 +742,8 @@ class DynamicRouterAndClusterFiltersIntegrationTest
       public UpstreamHttpExtensionDiscoveryIntegrationTestBase {
 public:
   DynamicRouterAndClusterFiltersIntegrationTest()
-      : UpstreamHttpExtensionDiscoveryIntegrationTestBase(ipVersion(), false) {}
+      : UpstreamHttpExtensionDiscoveryIntegrationTestBase(
+            DynamicRouterAndClusterFiltersIntegrationTest::ipVersion(), false) {}
 
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }

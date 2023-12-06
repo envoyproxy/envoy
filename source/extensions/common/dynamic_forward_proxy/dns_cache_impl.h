@@ -11,6 +11,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -46,8 +47,11 @@ class DnsCacheImplTest;
 
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  DnsCacheImpl(Server::Configuration::FactoryContextBase& context,
-               const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+  // Create a DnsCacheImpl or return a failed status;
+  static absl::StatusOr<std::shared_ptr<DnsCacheImpl>> createDnsCacheImpl(
+      const Server::Configuration::GenericFactoryContext& context,
+      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
   static Network::DnsResolverSharedPtr selectDnsResolver(
@@ -66,6 +70,8 @@ public:
   void forceRefreshHosts() override;
 
 private:
+  DnsCacheImpl(const Server::Configuration::GenericFactoryContext& context,
+               const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   struct LoadDnsCacheEntryHandleImpl
       : public LoadDnsCacheEntryHandle,
         RaiiMapOfListElement<std::string, LoadDnsCacheEntryHandleImpl*> {

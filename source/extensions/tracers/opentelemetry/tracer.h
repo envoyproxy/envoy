@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/api/api.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -11,9 +12,11 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
+#include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
 
 #include "absl/strings/escaping.h"
-#include "span_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,17 +36,23 @@ struct OpenTelemetryTracerStats {
  */
 class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
-  Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
+  Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-         OpenTelemetryTracerStats tracing_stats, const std::string& service_name);
+         OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
+         SamplerSharedPtr sampler);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
-  Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,
-                             SystemTime start_time, const Tracing::Decision tracing_decision);
+  Tracing::SpanPtr startSpan(const std::string& operation_name, SystemTime start_time,
 
-  Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,
-                             SystemTime start_time, const SpanContext& previous_span_context);
+                             Tracing::Decision tracing_decision,
+                             OptRef<const Tracing::TraceContext> trace_context,
+                             OTelSpanKind span_kind);
+
+  Tracing::SpanPtr startSpan(const std::string& operation_name, SystemTime start_time,
+                             const SpanContext& previous_span_context,
+                             OptRef<const Tracing::TraceContext> trace_context,
+                             OTelSpanKind span_kind);
 
 private:
   /**
@@ -55,14 +64,15 @@ private:
    */
   void flushSpans();
 
-  OpenTelemetryGrpcTraceExporterPtr exporter_;
+  OpenTelemetryTraceExporterPtr exporter_;
   Envoy::TimeSource& time_source_;
   Random::RandomGenerator& random_;
   std::vector<::opentelemetry::proto::trace::v1::Span> span_buffer_;
   Runtime::Loader& runtime_;
   Event::TimerPtr flush_timer_;
   OpenTelemetryTracerStats tracing_stats_;
-  std::string service_name_;
+  const ResourceConstSharedPtr resource_;
+  SamplerSharedPtr sampler_;
 };
 
 /**
@@ -71,8 +81,8 @@ private:
  */
 class Span : Logger::Loggable<Logger::Id::tracing>, public Tracing::Span {
 public:
-  Span(const Tracing::Config& config, const std::string& name, SystemTime start_time,
-       Envoy::TimeSource& time_source, Tracer& parent_tracer);
+  Span(const std::string& name, SystemTime start_time, Envoy::TimeSource& time_source,
+       Tracer& parent_tracer, OTelSpanKind span_kind);
 
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override{};
@@ -109,6 +119,8 @@ public:
 
   std::string getTraceIdAsHex() const override { return absl::BytesToHexString(span_.trace_id()); };
 
+  OTelSpanKind spankind() const { return span_.kind(); }
+
   /**
    * Sets the span's id.
    */
@@ -125,7 +137,7 @@ public:
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
-  std::string tracestate() { return span_.trace_state(); }
+  std::string tracestate() const { return span_.trace_state(); }
 
   /**
    * Sets the span's tracestate.
@@ -133,6 +145,11 @@ public:
   void setTracestate(const absl::string_view& tracestate) {
     span_.set_trace_state(std::string{tracestate});
   }
+
+  /**
+   * Method to access the span for testing.
+   */
+  const ::opentelemetry::proto::trace::v1::Span& spanForTest() const { return span_; }
 
 private:
   ::opentelemetry::proto::trace::v1::Span span_;

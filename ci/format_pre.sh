@@ -57,7 +57,7 @@ CURRENT=spelling
 "${ENVOY_SRCDIR}/tools/spelling/check_spelling_pedantic.py" --mark check
 
 # TODO(phlax): move clang/buildifier checks to bazel rules (/aspects)
-if [[ -n "$AZP_BRANCH" ]]; then
+if [[ -n "$CI_BRANCH" ]]; then
     CURRENT=check_format_test
     "${ENVOY_SRCDIR}/tools/code_format/check_format_test_helper.sh" --log=WARN
 fi

@@ -19,16 +19,9 @@ then
   # Check the version_history.rst contains current release version.
   grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst \
     || (echo "Git tag not found in version_history.rst" && exit 1)
-
-  # Now that we now there is a match, we can use the tag.
-  export ENVOY_DOCS_VERSION_STRING="tag-$GITHUB_REF_NAME"
-  export ENVOY_DOCS_RELEASE_LEVEL=tagged
-  export ENVOY_BLOB_SHA="$GITHUB_REF_NAME"
+  DOCS_TARGET=//docs
 else
-  BUILD_SHA=$(git rev-parse HEAD)
-  export ENVOY_DOCS_VERSION_STRING="${VERSION_NUMBER}"-"${BUILD_SHA:0:6}"
-  export ENVOY_DOCS_RELEASE_LEVEL=pre-release
-  export ENVOY_BLOB_SHA="$BUILD_SHA"
+  DOCS_TARGET=//docs:html
 fi
 
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
@@ -37,10 +30,7 @@ rm -rf "${DOCS_OUTPUT_DIR}"
 mkdir -p "${DOCS_OUTPUT_DIR}"
 DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
 
-./bazelw build \
-      --action_env=ENVOY_BLOB_SHA \
-      --action_env=ENVOY_DOCS_RELEASE_LEVEL \
-      --action_env=ENVOY_DOCS_VERSION_STRING \
-      //docs
-
-tar xf bazel-bin/docs/docs.tar.gz -C "$DOCS_OUTPUT_DIR" .
+./bazelw run \
+         "--@envoy//tools/tarball:target=$DOCS_TARGET" \
+         @envoy//tools/tarball:unpack \
+         "$DOCS_OUTPUT_DIR"

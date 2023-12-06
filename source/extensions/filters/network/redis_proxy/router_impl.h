@@ -50,7 +50,7 @@ public:
              route,
          Upstreams& upstreams, Runtime::Loader& runtime);
 
-  ConnPool::InstanceSharedPtr upstream() const override { return upstream_; }
+  ConnPool::InstanceSharedPtr upstream(const std::string& command) const override;
   const MirrorPolicies& mirrorPolicies() const override { return mirror_policies_; };
   const std::string& prefix() const { return prefix_; }
   bool removePrefix() const { return remove_prefix_; }
@@ -62,6 +62,7 @@ private:
   const bool remove_prefix_;
   const ConnPool::InstanceSharedPtr upstream_;
   MirrorPolicies mirror_policies_;
+  ConnPool::InstanceSharedPtr read_upstream_;
 };
 
 using PrefixSharedPtr = std::shared_ptr<Prefix>;

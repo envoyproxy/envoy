@@ -28,6 +28,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":http_capsule_filter_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:factory_base_lib",

@@ -225,7 +225,7 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   bool last_config_valid = false;
   if (subscription->lastConfig()) {
     TRY_ASSERT_MAIN_THREAD {
-      THROW_IF_NOT_OK(provider.validateTypeUrl(subscription->lastTypeUrl()))
+      THROW_IF_NOT_OK(provider.validateTypeUrl(subscription->lastTypeUrl()));
       provider.validateMessage(filter_config_name, *subscription->lastConfig(),
                                subscription->lastFactoryName());
       last_config_valid = true;
@@ -252,9 +252,10 @@ void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
     const bool null_default_factory, const std::string& filter_config_name,
     absl::string_view type_url) const {
   if (null_default_factory) {
-    throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                     "configuration with type URL {}.",
-                                     filter_config_name, type_url));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("Error: cannot find filter factory {} for default filter "
+                    "configuration with type URL {}.",
+                    filter_config_name, type_url));
   }
 }
 

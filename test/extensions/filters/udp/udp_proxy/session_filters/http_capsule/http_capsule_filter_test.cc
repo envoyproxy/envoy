@@ -5,9 +5,7 @@
 #include "test/extensions/filters/udp/udp_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"
 
-using testing::Eq;
 using testing::NiceMock;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {

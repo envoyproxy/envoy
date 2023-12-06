@@ -167,7 +167,9 @@ message ProcessingResponse {
   // for the duration of this particular request/response only. Servers
   // may use this to intelligently control how requests are processed
   // based on the headers and other metadata that they see.
-  // This field is ignored by Envoy when the ext_proc filter config
+  // This field is only applicable when servers responding to the header requests.
+  // If it is set in the response to the body or trailer requests, it will be ignored by Envoy.
+  // It is also ignored by Envoy when the ext_proc filter config
   // :ref:`allow_mode_override
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
   // is set to false.

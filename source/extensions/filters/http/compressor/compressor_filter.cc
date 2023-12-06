@@ -179,6 +179,10 @@ CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
       // Consequently, if `response_direction_config.common_direction_config.enabled` ever gets
       // added, its absence must enable compression.
       response_compression_enabled_ = true;
+      if (config.overrides().response_direction_config().has_remove_accept_encoding_header()) {
+        remove_accept_encoding_header_ =
+            config.overrides().response_direction_config().remove_accept_encoding_header().value();
+      }
     }
     break;
   case CompressorPerRoute::OVERRIDE_NOT_SET:
@@ -198,7 +202,11 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   }
 
   const auto& response_config = config_->responseDirectionConfig();
-  if (compressionEnabled(response_config) && response_config.removeAcceptEncodingHeader()) {
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
+          decoder_callbacks_);
+  if (compressionEnabled(response_config, per_route_config) &&
+      removeAcceptEncodingHeader(response_config, per_route_config)) {
     headers.removeInline(accept_encoding_handle.handle());
   }
 
@@ -266,10 +274,13 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
+          decoder_callbacks_);
 
   // This is used to decide whether stats for accept-encoding header should be touched.
   const bool isEnabledAndContentLengthBigEnough =
-      compressionEnabled(config) && config.isMinimumContentLength(headers);
+      compressionEnabled(config, per_route_config) && config.isMinimumContentLength(headers);
 
   const bool isCompressible =
       isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
@@ -630,13 +641,19 @@ void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
 
 // True if response compression is enabled.
 bool CompressorFilter::compressionEnabled(
-    const CompressorFilterConfig::ResponseDirectionConfig& config) const {
-  const CompressorPerRouteFilterConfig* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
-          decoder_callbacks_);
+    const CompressorFilterConfig::ResponseDirectionConfig& config,
+    const CompressorPerRouteFilterConfig* per_route_config) const {
   return per_route_config && per_route_config->responseCompressionEnabled().has_value()
              ? *per_route_config->responseCompressionEnabled()
              : config.compressionEnabled();
+}
+
+bool CompressorFilter::removeAcceptEncodingHeader(
+    const CompressorFilterConfig::ResponseDirectionConfig& config,
+    const CompressorPerRouteFilterConfig* per_route_config) const {
+  return per_route_config && per_route_config->removeAcceptEncodingHeader().has_value()
+             ? *per_route_config->removeAcceptEncodingHeader()
+             : config.removeAcceptEncodingHeader();
 }
 
 } // namespace Compressor

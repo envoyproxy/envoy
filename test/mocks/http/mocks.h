@@ -269,6 +269,11 @@ public:
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
   MOCK_METHOD(absl::string_view, filterConfigName, (), (const override));
+  MOCK_METHOD(RequestHeaderMapOptRef, requestHeaders, ());
+  MOCK_METHOD(RequestTrailerMapOptRef, requestTrailers, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, informationalHeaders, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
 
   // Http::StreamDecoderFilterCallbacks
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -278,15 +283,12 @@ public:
                        absl::string_view details);
 
   void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override { encode1xxHeaders_(*headers); }
-  MOCK_METHOD(ResponseHeaderMapOptRef, informationalHeaders, (), (const));
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override {
     stream_info_.setResponseCodeDetails(details);
     encodeHeaders_(*headers, end_stream);
   }
-  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, (), (const));
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override { encodeTrailers_(*trailers); }
-  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, (), (const));
   void encodeMetadata(MetadataMapPtr&& metadata_map) override {
     encodeMetadata_(std::move(metadata_map));
   }
@@ -361,6 +363,11 @@ public:
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
   MOCK_METHOD(absl::string_view, filterConfigName, (), (const override));
+  MOCK_METHOD(RequestHeaderMapOptRef, requestHeaders, ());
+  MOCK_METHOD(RequestTrailerMapOptRef, requestTrailers, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, informationalHeaders, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));

@@ -161,10 +161,10 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {":status", "200"},
       };
 
-      const Http::RequestHeaderMap* request_headers_pointer =
+      Http::RequestHeaderMap* request_headers_pointer =
           Http::StaticEmptyHeaders::get().request_headers.get();
-      EXPECT_CALL(encoder_callbacks.stream_info_, getRequestHeaders())
-          .WillOnce(testing::Return(request_headers_pointer));
+      EXPECT_CALL(encoder_callbacks, requestHeaders())
+          .WillOnce(testing::Return(makeOptRefFromPtr(request_headers_pointer)));
 
       EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, true));
 
@@ -196,8 +196,8 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {":status", "200"},
       };
 
-      EXPECT_CALL(encoder_callbacks.stream_info_, getRequestHeaders())
-          .WillOnce(testing::Return(nullptr));
+      EXPECT_CALL(encoder_callbacks, requestHeaders())
+          .WillOnce(testing::Return(Http::RequestHeaderMapOptRef{}));
 
       EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, true));
 

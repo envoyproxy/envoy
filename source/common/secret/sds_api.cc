@@ -119,8 +119,9 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
         for (auto const& filename : files) {
           // Watch for directory instead of file. This allows users to do atomic renames
           // on directory level (e.g. Kubernetes secret update).
-          const auto result = api_.fileSystem().splitPathFromFilename(filename);
-          watcher_->addWatch(absl::StrCat(result.directory_, "/"),
+          const auto result_or_error = api_.fileSystem().splitPathFromFilename(filename);
+          THROW_IF_STATUS_NOT_OK(result_or_error, throw);
+          watcher_->addWatch(absl::StrCat(result_or_error.value().directory_, "/"),
                              Filesystem::Watcher::Events::MovedTo,
                              [this](uint32_t) { onWatchUpdate(); });
         }
@@ -175,7 +176,9 @@ SdsApi::SecretData SdsApi::secretData() { return secret_data_; }
 SdsApi::FileContentMap SdsApi::loadFiles() {
   FileContentMap files;
   for (auto const& filename : getDataSourceFilenames()) {
-    files[filename] = api_.fileSystem().fileReadToEnd(filename);
+    auto file_or_error = api_.fileSystem().fileReadToEnd(filename);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    files[filename] = file_or_error.value();
   }
   return files;
 }

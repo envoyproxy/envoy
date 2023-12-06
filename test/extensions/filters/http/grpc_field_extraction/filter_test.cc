@@ -45,8 +45,9 @@ protected:
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(config.empty() ? protoConfig() : config,
                                                       &proto_config_));
     *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() =
-        api_->fileSystem().fileReadToEnd(
-            TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
+        api_->fileSystem()
+            .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+            .value();
     ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
     filter_config_ = std::make_unique<FilterConfig>(

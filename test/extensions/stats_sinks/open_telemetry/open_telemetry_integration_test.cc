@@ -38,7 +38,7 @@ public:
   void setStatPrefix(const std::string& stat_prefix) { stat_prefix_ = stat_prefix; }
 
   const std::string getFullStatName(const std::string& stat_name) {
-    if (stat_prefix_ == "") {
+    if (stat_prefix_.empty()) {
       return stat_name;
     }
 
@@ -61,7 +61,7 @@ public:
       metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
-          Protobuf::util::TimeUtil::MillisecondsToDuration(300));
+          Protobuf::util::TimeUtil::MillisecondsToDuration(500));
     });
 
     HttpIntegrationTest::initialize();

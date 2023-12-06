@@ -26,8 +26,7 @@ public:
   EnvoyQuicClientSession(
       const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
       std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
-      std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
-      quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
+      std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
       uint32_t send_buffer_limit,
       EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
       QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,

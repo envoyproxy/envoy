@@ -9,6 +9,8 @@ responses and events in the payload. Most opcodes known in
 `ZooKeeper 3.5 <https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java>`_
 are supported. The unsupported ones are related to SASL authentication.
 
+:ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy>`
+
 .. attention::
 
    The zookeeper_proxy filter is experimental and is currently under active
@@ -32,7 +34,15 @@ Statistics
 ----------
 
 Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*.
-*_resp_fast* and *_resp_slow* metrics will only be emitted when ``enable_latency_threshold_metrics`` is set to ``true``.
+
+*_resp_fast* and *_resp_slow* are per-opcode metrics and will only be emitted when :ref:`enable_latency_threshold_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_latency_threshold_metrics>` is set to ``true``.
+
+*_rq_bytes* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_request_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>` is set to ``true``.
+
+*_resp_bytes* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>` is set to ``true``.
+
+*_decoder_error* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_decoder_error_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>` is set to ``true``.
+
 The following counters are available:
 
 .. csv-table::
@@ -40,7 +50,62 @@ The following counters are available:
   :widths: 1, 1, 2
 
   decoder_error, Counter, Number of times a message wasn't decoded
+  connect_decoder_error, Counter, Number of times a connect request message wasn't decoded
+  ping_decoder_error, Counter, Number of times a ping request message wasn't decoded
+  auth_decoder_error, Counter, Number of times a auth request message wasn't decoded
+  getdata_decoder_error, Counter, Number of times a getdata request message wasn't decoded
+  create_decoder_error, Counter, Number of times a create request message wasn't decoded
+  create2_decoder_error, Counter, Number of times a create2 request message wasn't decoded
+  createcontainer_decoder_error, Counter, Number of times a createcontainer request message wasn't decoded
+  createttl_decoder_error, Counter, Number of times a createttl request message wasn't decoded
+  setdata_decoder_error, Counter, Number of times a setdata request message wasn't decoded
+  getchildren_decoder_error, Counter, Number of times a getchildren request message wasn't decoded
+  getchildren2_decoder_error, Counter, Number of times a getchildren2 request message wasn't decoded
+  getephemerals_decoder_error, Counter, Number of times a getephemerals request message wasn't decoded
+  getallchildrennumber_decoder_error, Counter, Number of times a getallchildrennumber request message wasn't decoded
+  delete_decoder_error, Counter, Number of times a delete request message wasn't decoded
+  exists_decoder_error, Counter, Number of times a exists request message wasn't decoded
+  getacl_decoder_error, Counter, Number of times a getacl request message wasn't decoded
+  setacl_decoder_error, Counter, Number of times a setacl request message wasn't decoded
+  sync_decoder_error, Counter, Number of times a sync request message wasn't decoded
+  multi_decoder_error, Counter, Number of times a multi request message wasn't decoded
+  reconfig_decoder_error, Counter, Number of times a reconfig request message wasn't decoded
+  close_decoder_error, Counter, Number of times a close request message wasn't decoded
+  setauth_decoder_error, Counter, Number of times a setauth request message wasn't decoded
+  setwatches_decoder_error, Counter, Number of times a setwatches request message wasn't decoded
+  setwatches2_decoder_error, Counter, Number of times a setwatches2 request message wasn't decoded
+  addwatch_decoder_error, Counter, Number of times a addwatch request message wasn't decoded
+  checkwatches_decoder_error, Counter, Number of times a checkwatches request message wasn't decoded
+  removewatches_decoder_error, Counter, Number of times a removewatches request message wasn't decoded
+  check_decoder_error, Counter, Number of times a check request message wasn't decoded
   request_bytes, Counter, Number of bytes in decoded request messages
+  connect_rq_bytes, Counter, Number of bytes in decoded connect request messages
+  ping_rq_bytes, Counter, Number of bytes in decoded ping request messages
+  auth_rq_bytes, Counter, Number of bytes in decoded auth request messages
+  getdata_rq_bytes, Counter, Number of bytes in decoded getdata request messages
+  create_rq_bytes, Counter, Number of bytes in decoded create request messages
+  create2_rq_bytes, Counter, Number of bytes in decoded create2 request messages
+  createcontainer_rq_bytes, Counter, Number of bytes in decoded createcontainer request messages
+  createttl_rq_bytes, Counter, Number of bytes in decoded createttl request messages
+  setdata_rq_bytes, Counter, Number of bytes in decoded setdata request messages
+  getchildren_rq_bytes, Counter, Number of bytes in decoded getchildren request messages
+  getchildren2_rq_bytes, Counter, Number of bytes in decoded getchildren2 request messages
+  delete_rq_bytes, Counter, Number of bytes in decoded delete request messages
+  exists_rq_bytes, Counter, Number of bytes in decoded exists request messages
+  getacl_rq_bytes, Counter, Number of bytes in decoded getacl request messages
+  setacl_rq_bytes, Counter, Number of bytes in decoded setacl request messages
+  sync_rq_bytes, Counter, Number of bytes in decoded sync request messages
+  check_rq_bytes, Counter, Number of bytes in decoded check request messages
+  multi_rq_bytes, Counter, Number of bytes in decoded multi request messages
+  reconfig_rq_bytes, Counter, Number of bytes in decoded reconfig request messages
+  setwatches_rq_bytes, Counter, Number of bytes in decoded setwatches request messages
+  setwatches2_rq_bytes, Counter, Number of bytes in decoded setwatches2 request messages
+  addwatch_rq_bytes, Counter, Number of bytes in decoded addwatch request messages
+  checkwatches_rq_bytes, Counter, Number of bytes in decoded checkwatches request messages
+  removewatches_rq_bytes, Counter, Number of bytes in decoded removewatches request messages
+  getephemerals_rq_bytes, Counter, Number of bytes in decoded getephemerals request messages
+  getallchildrennumber_rq_bytes, Counter, Number of bytes in decoded getallchildrennumber request messages
+  close_rq_bytes, Counter, Number of bytes in decoded close request messages
   connect_rq, Counter, Number of regular connect (non-readonly) requests
   connect_readonly_rq, Counter, Number of connect requests with the readonly flag set
   ping_rq, Counter, Number of ping requests
@@ -70,6 +135,33 @@ The following counters are available:
   getallchildrennumber_rq, Counter, Number of getallchildrennumber requests
   close_rq, Counter, Number of close requests
   response_bytes, Counter, Number of bytes in decoded response messages
+  connect_resp_bytes, Counter, Number of bytes in decoded connect response messages
+  ping_resp_bytes, Counter, Number of bytes in decoded ping response messages
+  auth_resp_bytes, Counter, Number of bytes in decoded auth response messages
+  getdata_resp_bytes, Counter, Number of bytes in decoded getdata response messages
+  create_resp_bytes, Counter, Number of bytes in decoded create response messages
+  create2_resp_bytes, Counter, Number of bytes in decoded create2 response messages
+  createcontainer_resp_bytes, Counter, Number of bytes in decoded createcontainer response messages
+  createttl_resp_bytes, Counter, Number of bytes in decoded createttl response messages
+  setdata_resp_bytes, Counter, Number of bytes in decoded setdata response messages
+  getchildren_resp_bytes, Counter, Number of bytes in decoded getchildren response messages
+  getchildren2_resp_bytes, Counter, Number of bytes in decoded getchildren2 response messages
+  delete_resp_bytes, Counter, Number of bytes in decoded delete response messages
+  exists_resp_bytes, Counter, Number of bytes in decoded exists response messages
+  getacl_resp_bytes, Counter, Number of bytes in decoded getacl response messages
+  setacl_resp_bytes, Counter, Number of bytes in decoded setacl response messages
+  sync_resp_bytes, Counter, Number of bytes in decoded sync response messages
+  check_resp_bytes, Counter, Number of bytes in decoded check response messages
+  multi_resp_bytes, Counter, Number of bytes in decoded multi response messages
+  reconfig_resp_bytes, Counter, Number of bytes in decoded reconfig response messages
+  setwatches_resp_bytes, Counter, Number of bytes in decoded setwatches response messages
+  setwatches2_resp_bytes, Counter, Number of bytes in decoded setwatches2 response messages
+  addwatch_resp_bytes, Counter, Number of bytes in decoded addwatch response messages
+  checkwatches_resp_bytes, Counter, Number of bytes in decoded checkwatches response messages
+  removewatches_resp_bytes, Counter, Number of bytes in decoded removewatches response messages
+  getephemerals_resp_bytes, Counter, Number of bytes in decoded getephemerals response messages
+  getallchildrennumber_resp_bytes, Counter, Number of bytes in decoded getallchildrennumber response messages
+  close_resp_bytes, Counter, Number of bytes in decoded close response messages
   connect_resp, Counter, Number of connect responses
   ping_resp, Counter, Number of ping responses
   auth_resp, Counter, Number of auth responses

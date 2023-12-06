@@ -7,7 +7,6 @@
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
-using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using Envoy::Http::TestRequestHeaderMapImpl;
 
 namespace Envoy {

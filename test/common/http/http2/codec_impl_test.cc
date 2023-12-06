@@ -1645,6 +1645,7 @@ TEST_P(Http2CodecImplTest, ShouldRestoreCrashDumpInfoWhenHandlingDeferredProcess
 
   process_buffered_data_callback->invokeCallback();
 
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   EXPECT_THAT(ostream.contents(), HasSubstr("Http2::ConnectionImpl "));
   EXPECT_THAT(ostream.contents(),
               HasSubstr("Dumping current stream:\n  stream: \n    ConnectionImpl::StreamImpl"));
@@ -4016,6 +4017,7 @@ TEST_P(Http2CodecImplTest,
     InSequence seq;
     EXPECT_CALL(request_decoder_, decodeTrailers_(_));
     process_buffered_data_callback->invokeCallback();
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
     EXPECT_FALSE(process_buffered_data_callback->enabled_);
   }
 }
@@ -4162,6 +4164,7 @@ TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
 
     EXPECT_CALL(request_decoder_, decodeData(_, true));
     process_buffered_data_callback->invokeCallback();
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
     EXPECT_FALSE(process_buffered_data_callback->enabled_);
   }
 }

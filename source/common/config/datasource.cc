@@ -15,12 +15,29 @@ static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
 static constexpr uint32_t RetryCount = 1;
 
-std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
-                 Api::Api& api) {
+std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty, Api::Api& api,
+                 uint64_t max_size) {
   std::string data;
+  absl::StatusOr<std::string> file_or_error;
   switch (source.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename:
-    data = api.fileSystem().fileReadToEnd(source.filename());
+    if (max_size > 0) {
+      if (!api.fileSystem().fileExists(source.filename())) {
+        throwEnvoyExceptionOrPanic(fmt::format("file {} does not exist", source.filename()));
+      }
+      const ssize_t size = api.fileSystem().fileSize(source.filename());
+      if (size < 0) {
+        throwEnvoyExceptionOrPanic(
+            absl::StrCat("cannot determine size of file ", source.filename()));
+      }
+      if (static_cast<uint64_t>(size) > max_size) {
+        throwEnvoyExceptionOrPanic(fmt::format("file {} size is {} bytes; maximum is {}",
+                                               source.filename(), size, max_size));
+      }
+    }
+    file_or_error = api.fileSystem().fileReadToEnd(source.filename());
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    data = file_or_error.value();
     break;
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes:
     data = source.inline_bytes();
@@ -31,7 +48,7 @@ std::string read(const envoy::config::core::v3::DataSource& source, bool allow_e
   case envoy::config::core::v3::DataSource::SpecifierCase::kEnvironmentVariable: {
     const char* environment_variable = std::getenv(source.environment_variable().c_str());
     if (environment_variable == nullptr) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Environment variable doesn't exist: {}", source.environment_variable()));
     }
     data = environment_variable;
@@ -39,12 +56,12 @@ std::string read(const envoy::config::core::v3::DataSource& source, bool allow_e
   }
   default:
     if (!allow_empty) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
     }
   }
   if (!allow_empty && data.empty()) {
-    throw EnvoyException("DataSource cannot be empty");
+    throwEnvoyExceptionOrPanic("DataSource cannot be empty");
   }
   return data;
 }

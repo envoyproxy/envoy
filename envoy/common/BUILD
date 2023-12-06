@@ -29,6 +29,9 @@ envoy_basic_cc_library(
     hdrs = [
         "exception.h",
     ],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_basic_cc_library(

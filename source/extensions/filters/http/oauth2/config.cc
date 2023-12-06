@@ -50,7 +50,7 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
   const auto& token_secret = credentials.token_secret();
   const auto& hmac_secret = credentials.hmac_secret();
 
-  auto& cluster_manager = context.clusterManager();
+  auto& cluster_manager = context.serverFactoryContext().clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
   auto secret_provider_token_secret = secretsProvider(
@@ -64,8 +64,9 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
     throw EnvoyException("invalid HMAC secret configuration");
   }
 
-  auto secret_reader = std::make_shared<SDSSecretReader>(
-      secret_provider_token_secret, secret_provider_hmac_secret, context.api());
+  auto secret_reader =
+      std::make_shared<SDSSecretReader>(secret_provider_token_secret, secret_provider_hmac_secret,
+                                        context.serverFactoryContext().api());
   auto config = std::make_shared<FilterConfig>(proto_config, cluster_manager, secret_reader,
                                                context.scope(), stats_prefix);
 
@@ -73,8 +74,8 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
       [&context, config, &cluster_manager](Http::FilterChainFactoryCallbacks& callbacks) -> void {
         std::unique_ptr<OAuth2Client> oauth_client =
             std::make_unique<OAuth2ClientImpl>(cluster_manager, config->oauthTokenEndpoint());
-        callbacks.addStreamDecoderFilter(
-            std::make_shared<OAuth2Filter>(config, std::move(oauth_client), context.timeSource()));
+        callbacks.addStreamFilter(std::make_shared<OAuth2Filter>(
+            config, std::move(oauth_client), context.serverFactoryContext().timeSource()));
       };
 }
 

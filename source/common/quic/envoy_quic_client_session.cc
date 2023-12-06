@@ -46,8 +46,7 @@ private:
 EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
-    std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
-    quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
+    std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
     QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
     Stats::Scope& scope,
@@ -59,7 +58,7 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
               dispatcher.timeSource(),
               connection->connectionSocket()->connectionInfoProviderSharedPtr())),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
-                                  crypto_config.get(), push_promise_index),
+                                  crypto_config.get()),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
       quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope),
       transport_socket_options_(transport_socket_options) {
@@ -212,7 +211,7 @@ void EnvoyQuicClientSession::setHttp3Options(
   }
   static_cast<EnvoyQuicClientConnection*>(connection())
       ->setNumPtosForPortMigration(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 1));
+          http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 4));
 
   if (http3_options_->quic_protocol_options().has_connection_keepalive()) {
     const uint64_t initial_interval = PROTOBUF_GET_MS_OR_DEFAULT(

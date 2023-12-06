@@ -1820,7 +1820,6 @@ TEST_F(EdsTest, EndpointLocality) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
 TEST_F(EdsTest, EndpointCombineDuplicateLocalities) {
@@ -1869,7 +1868,6 @@ TEST_F(EdsTest, EndpointCombineDuplicateLocalities) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
 // Validate that onConfigUpdate() updates the endpoint locality of an existing endpoint.
@@ -1912,7 +1910,6 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 
   // Update locality now
   locality->set_region("space");
@@ -1934,6 +1931,12 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when
 // locality weighted balancing isn't configured and the cluster does not use LB policy extensions.
 TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.convert_legacy_lb_config", "false"}});
+
+  // Reset the cluster after the runtime change.
+  resetCluster();
+
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 

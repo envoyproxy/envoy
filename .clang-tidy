@@ -56,9 +56,39 @@ CheckOptions:
   value: 'CamelCase'
 # Ignore GoogleTest function macros.
 - key: readability-identifier-naming.FunctionIgnoredRegexp
-  value: '(TEST|TEST_F|TEST_P|INSTANTIATE_TEST_SUITE_P|MOCK_METHOD|TYPED_TEST)'
+  # To have the regex chomped correctly fence all items with `|` (other than first/last)
+  value: >-
+    (^AbslHashValue$|
+    |^called_count$|
+    |^case_sensitive$|
+    |^Create$|
+    |^envoy_resolve_dns$|
+    |^evconnlistener_free$|
+    |^event_base_free$|
+    |^(get|set)EVP_PKEY$|
+    |^has_value$|
+    |^Ip6(ntohl|htonl)$|
+    |^get_$|
+    |^HeaderHasValue(Ref)?$|
+    |^HeaderValueOf$|
+    |^Is(Superset|Subset)OfHeaders$|
+    |^LLVMFuzzerInitialize$|
+    |^LLVMFuzzerTestOneInput$|
+    |^Locality$|
+    |^MOCK_METHOD$|
+    |^PrepareCall$|
+    |^PrintTo$|
+    |^resolve_dns$|
+    |^result_type$|
+    |Returns(Default)?WorkerId$|
+    |^sched_getaffinity$|
+    |^shutdownThread_$|
+    |TEST|
+    |^use_count$)
 - key: readability-identifier-naming.ParameterCase
   value: 'lower_case'
+- key: readability-identifier-naming.ParameterIgnoredRegexp
+  value: (^cname_ttl_$)
 - key: readability-identifier-naming.PrivateMemberCase
   value: 'lower_case'
 - key: readability-identifier-naming.PrivateMemberSuffix
@@ -67,11 +97,21 @@ CheckOptions:
   value: 'CamelCase'
 - key: readability-identifier-naming.TypeAliasCase
   value: 'CamelCase'
+- key: readability-identifier-naming.TypeAliasIgnoredRegexp
+  value: '(result_type)'
 - key: readability-identifier-naming.UnionCase
   value: 'CamelCase'
 - key: readability-identifier-naming.FunctionCase
   value: 'camelBack'
 
+HeaderFilterRegex: '^./source/.*|^./contrib/.*|^./test/.*|^./envoy/.*'
+
 UseColor: true
 
 WarningsAsErrors: '*'
+
+## The version here is arbitrary since any change to this file will
+## trigger a full run of clang-tidy against all files.
+## It can be useful as it seems some header changes may not trigger the
+## expected rerun.
+# v0

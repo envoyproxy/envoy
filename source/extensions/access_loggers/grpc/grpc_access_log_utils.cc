@@ -2,6 +2,7 @@
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/utility.h"
@@ -300,16 +301,11 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   for (const auto& key : config.filter_state_objects_to_log()) {
-    if (auto state = stream_info.filterState().getDataReadOnlyGeneric(key); state != nullptr) {
-      ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
-      if (serialized_proto != nullptr) {
-        auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
-        ProtobufWkt::Any& any = filter_state_objects[key];
-        if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
-          any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
-        } else {
-          any.PackFrom(*serialized_proto);
-        }
+    if (!(extractFilterStateData(stream_info.filterState(), key, common_access_log))) {
+      if (stream_info.upstreamInfo().has_value() &&
+          stream_info.upstreamInfo()->upstreamFilterState() != nullptr) {
+        extractFilterStateData(*(stream_info.upstreamInfo()->upstreamFilterState()), key,
+                               common_access_log);
       }
     }
   }
@@ -340,6 +336,24 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   common_access_log.set_access_log_type(access_log_type);
+}
+
+bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const std::string& key,
+                            envoy::data::accesslog::v3::AccessLogCommon& common_access_log) {
+  if (auto state = filter_state.getDataReadOnlyGeneric(key); state != nullptr) {
+    ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
+    if (serialized_proto != nullptr) {
+      auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
+      ProtobufWkt::Any& any = filter_state_objects[key];
+      if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
+        any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
+      } else {
+        any.PackFrom(*serialized_proto);
+      }
+    }
+    return true;
+  }
+  return false;
 }
 
 } // namespace GrpcCommon

@@ -10,7 +10,6 @@ go_library(
     srcs = [
         "api.h",
         "capi.go",
-        "cgocheck.go",
         "filter.go",
         "logger.go",
         "type.go",

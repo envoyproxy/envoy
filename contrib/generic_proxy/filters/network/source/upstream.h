@@ -21,7 +21,8 @@ public:
 
   void newConnection() { tcp_pool_handle_ = tcp_pool_data_.newConnection(*this); }
 
-  void cleanUp(bool close_connection);
+  void initialize();
+  virtual void cleanUp(bool close_connection);
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason, absl::string_view,
@@ -35,9 +36,11 @@ public:
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
   void onEvent(Network::ConnectionEvent) override;
 
+  ClientCodecPtr& clientCodec() { return client_codec_; }
+
 protected:
-  UpstreamConnection(Upstream::TcpPoolData&& tcp_pool_data, ResponseDecoderPtr&& response_decoder)
-      : tcp_pool_data_(std::move(tcp_pool_data)), response_decoder_(std::move(response_decoder)) {}
+  UpstreamConnection(Upstream::TcpPoolData&& tcp_pool_data, ClientCodecPtr&& client_codec)
+      : tcp_pool_data_(std::move(tcp_pool_data)), client_codec_(std::move(client_codec)) {}
 
   virtual void onEventImpl(Network::ConnectionEvent event) PURE;
   virtual void onPoolSuccessImpl() PURE;
@@ -45,9 +48,12 @@ protected:
                                  absl::string_view transport_failure_reason) PURE;
 
   Upstream::TcpPoolData tcp_pool_data_;
-  ResponseDecoderPtr response_decoder_;
+  ClientCodecPtr client_codec_;
 
   bool is_cleaned_up_{};
+  // Whether the upstream connection is created. This will be set to true when the initialize()
+  // is called.
+  bool initialized_{};
 
   Tcp::ConnectionPool::Cancellable* tcp_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr owned_conn_data_;

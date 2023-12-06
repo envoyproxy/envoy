@@ -20,7 +20,6 @@ using testing::Eq;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
-using testing::Values;
 using testing::WhenDynamicCastTo;
 
 namespace Envoy {

@@ -412,6 +412,86 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   rlqs_stream_->sendGrpcMessage(rlqs_response2);
 }
 
+TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+  int max_token = 1;
+  int tokens_per_fill = 30;
+  int fill_interval_sec = 60;
+  int fill_one_token_in_ms = fill_interval_sec / tokens_per_fill * 1000;
+  // First  request: allowed; fail-open, default no assignment policy.
+  // Second request: allowed; one token remaining, token bucket's max_token is 1.
+  // Third  request: allowed; token bucket has been refilled by advancing 2s.
+  // Fourth request: rejected; no token left and no token refilled.
+  // Fifth  request: allowed; token bucket has been refilled by advancing 2s.
+  // Sixth  request: rejected; no token left and no token refilled.
+  for (int i = 0; i < 6; ++i) {
+    // We advance time by 2s for 3rd and 5th requests so that token bucket can
+    // be refilled.
+    if (i == 2 || i == 4) {
+      simTime().advanceTimeAndRun(std::chrono::milliseconds(fill_one_token_in_ms), *dispatcher_,
+                                  Envoy::Event::Dispatcher::RunType::NonBlock);
+    }
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers);
+
+    // Only first downstream client request will trigger the reports to RLQS
+    // server as the subsequent requests will find the entry in the cache.
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+
+      // Build the response.
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+      absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
+      custom_headers_cpy.insert({"name", "prod"});
+      auto* bucket_action = rlqs_response.add_bucket_action();
+      for (const auto& [key, value] : custom_headers_cpy) {
+        (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+        auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
+        quota_assignment->mutable_assignment_time_to_live()->set_seconds(120);
+        auto* strategy = quota_assignment->mutable_rate_limit_strategy();
+        auto* token_bucket = strategy->mutable_token_bucket();
+        token_bucket->set_max_tokens(max_token);
+        token_bucket->mutable_tokens_per_fill()->set_value(30);
+        token_bucket->mutable_fill_interval()->set_seconds(60);
+      }
+
+      // Send the response from RLQS server.
+      rlqs_stream_->sendGrpcMessage(rlqs_response);
+    }
+
+    // 4th and 6th request are throttled.
+    if (i == 3 || i == 5) {
+      ASSERT_TRUE(response_->waitForEndStream());
+      EXPECT_TRUE(response_->complete());
+      EXPECT_EQ(response_->headers().getStatusValue(), "429");
+    } else {
+      // Handle the request received by upstream.
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      upstream_request_->encodeData(100, true);
+
+      // Verify the response to downstream.
+      ASSERT_TRUE(response_->waitForEndStream());
+      EXPECT_TRUE(response_->complete());
+      EXPECT_EQ(response_->headers().getStatusValue(), "200");
+    }
+
+    cleanUp();
+  }
+}
+
 } // namespace
 } // namespace RateLimitQuota
 } // namespace HttpFilters

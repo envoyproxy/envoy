@@ -1,5 +1,7 @@
 #include "test/fuzz/fuzz_runner.h"
 
+#include <cstdlib>
+
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/event/libevent.h"
@@ -88,5 +90,6 @@ extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv) {
   testing::GMOCK_FLAG(verbose) = "error";
   testing::InitGoogleMock(argc, *argv);
   Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::critical);
+  atexit(Envoy::Fuzz::runCleanupHooks);
   return 0;
 }

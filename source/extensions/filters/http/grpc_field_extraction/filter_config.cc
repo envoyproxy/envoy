@@ -56,8 +56,8 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
 
   switch (descriptor_config.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
-    if (!descriptor_set.ParseFromString(
-            api.fileSystem().fileReadToEnd(descriptor_config.filename()))) {
+    auto file_or_error = api.fileSystem().fileReadToEnd(descriptor_config.filename());
+    if (!file_or_error.status().ok() || !descriptor_set.ParseFromString(file_or_error.value())) {
       throw Envoy::EnvoyException(fmt::format("unable to parse proto descriptor from file `{}`",
                                               descriptor_config.filename()));
     }

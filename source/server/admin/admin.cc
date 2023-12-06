@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -48,27 +50,26 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
-                                  const std::string& address_out_path,
+void AdminImpl::startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
                                   Network::Address::InstanceConstSharedPtr address,
-                                  const Network::Socket::OptionsSharedPtr& socket_options,
-                                  Stats::ScopeSharedPtr&& listener_scope) {
-  for (const auto& access_log : access_logs) {
-    access_logs_.emplace_back(access_log);
-  }
+                                  Network::Socket::OptionsSharedPtr socket_options) {
+  access_logs_ = std::move(access_logs);
+
   null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   RELEASE_ASSERT(0 == socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_,
                  "listen() failed on admin listener");
   socket_factories_.emplace_back(std::make_unique<AdminListenSocketFactory>(socket_));
-  listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
+  listener_ = std::make_unique<AdminListener>(*this, factory_context_.listenerScope());
+
   ENVOY_LOG(info, "admin address: {}",
             socket().connectionInfoProvider().localAddress()->asString());
-  if (!address_out_path.empty()) {
-    std::ofstream address_out_file(address_out_path);
+
+  if (!server_.options().adminAddressPath().empty()) {
+    std::ofstream address_out_file(server_.options().adminAddressPath());
     if (!address_out_file) {
       ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
-                address_out_path);
+                server_.options().adminAddressPath());
     } else {
       address_out_file << socket_->connectionInfoProvider().localAddress()->asString();
     }
@@ -82,16 +83,37 @@ std::vector<absl::string_view> prepend(const absl::string_view first,
   strings.insert(strings.begin(), first);
   return strings;
 }
+
+Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
+    [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
+  Http::HeaderValidatorFactoryPtr header_validator_factory;
+#ifdef ENVOY_ENABLE_UHV
+  // Default UHV config matches the admin HTTP validation and normalization config
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig uhv_config;
+
+  ::envoy::config::core::v3::TypedExtensionConfig config;
+  config.set_name("default_universal_header_validator_for_admin");
+  config.mutable_typed_config()->PackFrom(uhv_config);
+
+  auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(config);
+  ENVOY_BUG(factory != nullptr, "Default UHV is not linked into binary.");
+
+  header_validator_factory = factory->createFromProto(config.typed_config(), context);
+  ENVOY_BUG(header_validator_factory != nullptr, "Unable to create default UHV.");
+#endif
+  return header_validator_factory;
+}
+
 } // namespace
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                      bool ignore_global_conn_limit)
-    : server_(server),
+    : server_(server), factory_context_(server),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
       profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
                                        "http.admin.", *server_.stats().rootScope())),
-      null_overload_manager_(server_.threadLocal()),
+      null_overload_manager_(server_.threadLocal(), false),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.",
                                                                        *no_op_store_.rootScope())),
       route_config_provider_(server.timeSource()),
@@ -178,6 +200,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                 "When draining listeners, enter a graceful drain period prior to closing "
                 "listeners. This behaviour and duration is configurable via server options "
                 "or CLI"},
+               {ParamDescriptor::Type::Boolean, "skip_exit",
+                "When draining listeners, do not exit after the drain period. "
+                "This must be used with graceful"},
                {ParamDescriptor::Type::Boolean, "inboundonly",
                 "Drains all inbound listeners. traffic_direction field in "
                 "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
@@ -228,7 +253,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
       local_reply_(LocalReply::Factory::createDefault()),
-      ignore_global_conn_limit_(ignore_global_conn_limit) {
+      ignore_global_conn_limit_(ignore_global_conn_limit),
+      header_validator_factory_(createHeaderValidatorFactory(server.serverFactoryContext())) {
 #ifndef NDEBUG
   // Verify that no duplicate handlers exist.
   absl::flat_hash_set<absl::string_view> handlers;
@@ -272,7 +298,6 @@ bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool,
 }
 
 namespace {
-
 // Implements a chunked request for static text.
 class StaticTextRequest : public Admin::Request {
 public:
@@ -489,9 +514,28 @@ void AdminImpl::closeSocket() {
 
 void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
-    handler->addListener(absl::nullopt, *listener_, server_.runtime());
+    handler->addListener(absl::nullopt, *listener_, server_.runtime(),
+                         server_.api().randomGenerator());
   }
 }
+
+#ifdef ENVOY_ENABLE_UHV
+::Envoy::Http::HeaderValidatorStats&
+AdminImpl::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) {
+  switch (protocol) {
+  case Http::Protocol::Http10:
+  case Http::Protocol::Http11:
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *server_.stats().rootScope());
+  case Http::Protocol::Http3:
+    IS_ENVOY_BUG("HTTP/3 is not supported for admin UI");
+    // Return H/2 stats object, since we do not have H/3 stats.
+    ABSL_FALLTHROUGH_INTENDED;
+  case Http::Protocol::Http2:
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *server_.stats().rootScope());
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+#endif
 
 } // namespace Server
 } // namespace Envoy

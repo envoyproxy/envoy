@@ -661,9 +661,10 @@ ConnectionImpl::StreamDataFrameSource::SelectPayloadLength(size_t max_length) {
     if (stream_.local_end_stream_ && length == stream_.pending_send_data_->length()) {
       end_data = true;
       if (stream_.pending_trailers_to_encode_) {
-        send_fin_ = false;
         stream_.submitTrailers(*stream_.pending_trailers_to_encode_);
         stream_.pending_trailers_to_encode_.reset();
+      } else {
+        send_fin_ = true;
       }
     }
     return {static_cast<int64_t>(length), end_data};

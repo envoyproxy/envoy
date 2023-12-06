@@ -25,7 +25,7 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "filesystem_subscription_test_harness",
-    srcs = ["filesystem_subscription_test_harness.h"],
+    hdrs = ["filesystem_subscription_test_harness.h"],
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",

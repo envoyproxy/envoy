@@ -19,6 +19,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 
@@ -159,8 +160,11 @@ protected:
     }
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(address);
     NiceMock<Network::MockListenerConfig> listener_config;
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config);
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    listener_ = std::make_unique<Network::TcpListenerImpl>(
+        *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
+        listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
         createTransportSocket(), socket_options_, transport_socket_options_);
@@ -1866,7 +1870,11 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
   NiceMock<Network::MockListenerConfig> listener_config;
-  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  listener_ = std::make_unique<Network::TcpListenerImpl>(
+      *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
+      listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -3416,8 +3424,11 @@ public:
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     NiceMock<Network::MockListenerConfig> listener_config;
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config);
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    listener_ = std::make_unique<Network::TcpListenerImpl>(
+        *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
+        listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_->connectionInfoProvider().localAddress(),

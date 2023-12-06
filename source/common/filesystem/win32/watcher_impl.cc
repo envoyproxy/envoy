@@ -55,7 +55,9 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
     return;
   }
 
-  const PathSplitResult result = file_system_.splitPathFromFilename(path);
+  const absl::StatusOr<PathSplitResult> result_or_error = file_system_.splitPathFromFilename(path);
+  THROW_IF_STATUS_NOT_OK(result_or_error, throw);
+  const PathSplitResult& result = result_or_error.value();
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
   const std::wstring directory = wstring_converter_.from_bytes(std::string(result.directory_));

@@ -235,13 +235,17 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     decoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (!decoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "decodeHeaders: Skipped");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (decoding_state_.sendHeaders()) {
+    status = onHeaders(decoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
   }
 
-  const auto status = onHeaders(decoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
+  if (!processing_complete_ && decoding_state_.shouldRemoveContentLength()) {
+    headers.removeContentLength();
+  }
   return status;
 }
 
@@ -271,22 +275,6 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     state.requestWatermark();
     return FilterDataStatus::StopIterationAndWatermark;
   }
-  if (state.callbackState() == ProcessorState::CallbackState::StreamedBodyCallbackFinishing) {
-    // We were previously streaming the body, but there are more chunks waiting
-    // to be processed, so we can't send the body yet.
-    // Move the data for our chunk into a queue so that we can re-inject it later
-    // when the processor returns. See the comments below for more details on how
-    // this works in general.
-    ENVOY_LOG(trace, "Enqueuing data while we wait for processing to finish");
-    state.enqueueStreamingChunk(data, end_stream, false);
-    if (end_stream) {
-      // But we need to buffer the last chunk because it's our last chance to do stuff
-      state.setPaused(true);
-      return FilterDataStatus::StopIterationNoBuffer;
-    } else {
-      return FilterDataStatus::Continue;
-    }
-  }
 
   FilterDataStatus result;
   switch (state.bodyMode()) {
@@ -305,8 +293,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // The body has been buffered and we need to send the buffer
       ENVOY_LOG(debug, "Sending request body message");
       state.addBufferedData(data);
-      sendBodyChunk(state, *state.bufferedData(),
-                    ProcessorState::CallbackState::BufferedBodyCallback, true);
+      auto req = setupBodyChunk(state, *state.bufferedData(), end_stream);
+      sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
       // Since we just just moved the data into the buffer, return NoBuffer
       // so that we do not buffer this chunk twice.
       state.setPaused(true);
@@ -343,10 +331,11 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // Fall through
       break;
     }
-    // Send the chunk on the gRPC stream
-    sendBodyChunk(state, data, ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
-    // Move the data to the queue and optionally raise the watermark.
-    state.enqueueStreamingChunk(data, end_stream, true);
+
+    // Need to first enqueue the data into the chunk queue before sending.
+    auto req = setupBodyChunk(state, data, end_stream);
+    state.enqueueStreamingChunk(data, end_stream);
+    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
 
     // At this point we will continue, but with no data, because that will come later
     if (end_stream) {
@@ -383,12 +372,12 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
                ProcessorState::CallbackState::BufferedPartialBodyCallback) {
       // More data came in while we were waiting for a callback result. We need
       // to queue it and deliver it later in case the callback changes the data.
-      state.enqueueStreamingChunk(data, end_stream, false);
+      state.enqueueStreamingChunk(data, end_stream);
       ENVOY_LOG(trace, "Call in progress for partial mode");
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
-      state.enqueueStreamingChunk(data, end_stream, false);
+      state.enqueueStreamingChunk(data, end_stream);
       if (end_stream || state.queueOverHighLimit()) {
         // At either end of stream or when the buffer is full, it's time to send what we have
         // to the processor.
@@ -425,8 +414,8 @@ std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& 
   const auto& all_data = state.consolidateStreamedChunks();
   ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
             state.chunkQueue().receivedData().length(), all_data.end_stream);
-  sendBodyChunk(state, state.chunkQueue().receivedData(),
-                ProcessorState::CallbackState::BufferedPartialBodyCallback, all_data.end_stream);
+  auto req = setupBodyChunk(state, state.chunkQueue().receivedData(), all_data.end_stream);
+  sendBodyChunk(state, ProcessorState::CallbackState::BufferedPartialBodyCallback, req);
   state.setPaused(true);
   return {false, FilterDataStatus::StopIterationNoBuffer};
 }
@@ -469,17 +458,20 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
       break;
     }
 
+    // We would like to process the body in a buffered way, but until now the complete
+    // body has not arrived. With the arrival of trailers, we now know that the body
+    // has arrived.
     if (state.bodyMode() == ProcessingMode::BUFFERED) {
       // Sending data left over in the buffer.
-      sendBodyChunk(state, *state.bufferedData(),
-                    ProcessorState::CallbackState::BufferedBodyCallback, false);
+      auto req = setupBodyChunk(state, *state.bufferedData(), false);
+      sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
     } else {
       // Sending data left over in the queue.
       const auto& all_data = state.consolidateStreamedChunks();
+      auto req = setupBodyChunk(state, state.chunkQueue().receivedData(), false);
       ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
                 state.chunkQueue().receivedData().length(), all_data.end_stream);
-      sendBodyChunk(state, state.chunkQueue().receivedData(),
-                    ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
+      sendBodyChunk(state, ProcessorState::CallbackState::BufferedPartialBodyCallback, req);
     }
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
@@ -521,13 +513,22 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     encoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (processing_complete_ || !encoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "encodeHeaders: Continue");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (!processing_complete_ && encoding_state_.sendHeaders()) {
+    status = onHeaders(encoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
   }
 
-  const auto status = onHeaders(encoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
+  // The content-length header will be kept when either one of the following conditions is met:
+  // (1) `shouldRemoveContentLength` returns false.
+  // (2) side stream processing has been completed. For example, it could be caused by stream error
+  // that triggers the local reply or due to spurious message that skips the side stream
+  // mutation.
+  if (!processing_complete_ && encoding_state_.shouldRemoveContentLength()) {
+    headers.removeContentLength();
+  }
   return status;
 }
 
@@ -545,15 +546,20 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   return status;
 }
 
-void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
-                           ProcessorState::CallbackState new_state, bool end_stream) {
+ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::Instance& data,
+                                         bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
-  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             new_state);
   ProcessingRequest req;
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
+  return req;
+}
+
+void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
+                           ProcessingRequest& req) {
+  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             new_state);
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
@@ -631,8 +637,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
-  // set to true. Otherwise, the response mode_override proto field is ignored.
-  if (config_->allowModeOverride() && response->has_mode_override()) {
+  // set to true and filter is waiting for header processing response.
+  // Otherwise, the response mode_override proto field is ignored.
+  if (config_->allowModeOverride() && inHeaderProcessState() && response->has_mode_override()) {
     ENVOY_LOG(debug, "Processing mode overridden by server for this request");
     decoding_state_.setProcessingMode(response->mode_override());
     encoding_state_.setProcessingMode(response->mode_override());
@@ -669,14 +676,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // We won't be sending anything more to the stream after we
       // receive this message.
       ENVOY_LOG(debug, "Sending immediate response");
-      // TODO(tyxia) For immediate response case here and below, logging is needed because
-      // `onFinishProcessorCalls` is called after `closeStream` below.
-      // Investigate to see if we can switch the order of those two so that the logging here can be
-      // avoided.
-      logGrpcStreamInfo();
       processing_complete_ = true;
-      closeStream();
       onFinishProcessorCalls(Grpc::Status::Ok);
+      closeStream();
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
     }
@@ -709,9 +711,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
-    logGrpcStreamInfo();
-    closeStream();
     onFinishProcessorCalls(processing_status.raw_code());
+    closeStream();
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
@@ -734,10 +735,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
-    closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
     onFinishProcessorCalls(status);
+    closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));

@@ -27,8 +27,10 @@ envoy_cc_test_library(
     name = "router_check_main_lib",
     srcs = [
         "coverage.cc",
-        "coverage.h",
         "router.cc",
+    ],
+    hdrs = [
+        "coverage.h",
         "router.h",
     ],
     copts = ["-DHAVE_LONG_LONG"],

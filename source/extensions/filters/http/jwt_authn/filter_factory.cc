@@ -42,7 +42,7 @@ Http::FilterFactoryCb
 FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_config,
                                                  const std::string& prefix,
                                                  Server::Configuration::FactoryContext& context) {
-  validateJwtConfig(proto_config, context.api());
+  validateJwtConfig(proto_config, context.serverFactoryContext().api());
   auto filter_config = std::make_shared<FilterConfigImpl>(proto_config, prefix, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(filter_config));

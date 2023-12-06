@@ -46,7 +46,7 @@ template <class ResponseType> using ResponseTypePtr = std::unique_ptr<ResponseTy
 template <class ResponseType>
 class MockAsyncRequestCallbacks : public AsyncRequestCallbacks<ResponseType> {
 public:
-  void onSuccess(ResponseTypePtr<ResponseType>&& response, Tracing::Span& span) {
+  void onSuccess(ResponseTypePtr<ResponseType>&& response, Tracing::Span& span) override {
     onSuccess_(*response, span);
   }
 
@@ -59,13 +59,15 @@ public:
 template <class ResponseType>
 class MockAsyncStreamCallbacks : public AsyncStreamCallbacks<ResponseType> {
 public:
-  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
     onReceiveInitialMetadata_(*metadata);
   }
 
-  void onReceiveMessage(ResponseTypePtr<ResponseType>&& message) { onReceiveMessage_(*message); }
+  void onReceiveMessage(ResponseTypePtr<ResponseType>&& message) override {
+    onReceiveMessage_(*message);
+  }
 
-  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override {
     onReceiveTrailingMetadata_(*metadata);
   }
 

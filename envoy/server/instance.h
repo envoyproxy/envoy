@@ -47,6 +47,11 @@ public:
   virtual ~Instance() = default;
 
   /**
+   * Runs the server.
+   */
+  virtual void run() PURE;
+
+  /**
    * @return OptRef<Admin> the global HTTP admin endpoint for the server.
    */
   virtual OptRef<Admin> admin() PURE;

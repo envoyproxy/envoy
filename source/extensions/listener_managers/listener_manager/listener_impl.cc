@@ -289,8 +289,7 @@ ServerLifecycleNotifier& ListenerFactoryContextBaseImpl::lifecycleNotifier() {
 ProcessContextOptRef ListenerFactoryContextBaseImpl::processContext() {
   return server_.processContext();
 }
-Configuration::ServerFactoryContext&
-ListenerFactoryContextBaseImpl::getServerFactoryContext() const {
+Configuration::ServerFactoryContext& ListenerFactoryContextBaseImpl::serverFactoryContext() const {
   return server_.serverFactoryContext();
 }
 Configuration::TransportSocketFactoryContext&
@@ -924,7 +923,7 @@ const Network::ListenerConfig& PerListenerFactoryContextImpl::listenerConfig() c
   return *listener_config_;
 }
 ProtobufMessage::ValidationContext& PerListenerFactoryContextImpl::messageValidationContext() {
-  return getServerFactoryContext().messageValidationContext();
+  return serverFactoryContext().messageValidationContext();
 }
 ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValidationVisitor() {
   return listener_factory_context_base_->messageValidationVisitor();
@@ -936,9 +935,8 @@ ServerLifecycleNotifier& PerListenerFactoryContextImpl::lifecycleNotifier() {
 ProcessContextOptRef PerListenerFactoryContextImpl::processContext() {
   return listener_factory_context_base_->processContext();
 }
-Configuration::ServerFactoryContext&
-PerListenerFactoryContextImpl::getServerFactoryContext() const {
-  return listener_factory_context_base_->getServerFactoryContext();
+Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() const {
+  return listener_factory_context_base_->serverFactoryContext();
 }
 Configuration::TransportSocketFactoryContext&
 PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
