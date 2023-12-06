@@ -24,7 +24,7 @@ configure_make(
     ],
     env = select({
         "//bazel:clang_build": {
-            "CFLAGS": "-Wno-error=newline-eof",
+            "CFLAGS": "-Wno-error=newline-eof -Wno-error=strict-prototypes -Wno-error=unused-but-set-variable",
         },
         "//conditions:default": {},
     }),
