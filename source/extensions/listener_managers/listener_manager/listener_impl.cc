@@ -230,74 +230,18 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
-    : server_(server), metadata_(config.metadata()), typed_metadata_(config.metadata()),
-      direction_(config.traffic_direction()), global_scope_(server.stats().createScope("")),
-      listener_scope_(
-          server_.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config)))),
-      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
-      is_quic_(config.udp_listener_config().has_quic_options()) {}
+    : Server::FactoryContextImplBase(
+          server, server.stats().createScope(""),
+          server.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config))),
+          config.metadata(), config.traffic_direction(),
+          config.udp_listener_config().has_quic_options()),
+      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
 
-AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
-  return server_.accessLogManager();
-}
-Upstream::ClusterManager& ListenerFactoryContextBaseImpl::clusterManager() {
-  return server_.clusterManager();
-}
-Event::Dispatcher& ListenerFactoryContextBaseImpl::mainThreadDispatcher() {
-  return server_.dispatcher();
-}
-const Server::Options& ListenerFactoryContextBaseImpl::options() { return server_.options(); }
-Grpc::Context& ListenerFactoryContextBaseImpl::grpcContext() { return server_.grpcContext(); }
-bool ListenerFactoryContextBaseImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
-Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.httpContext(); }
-Router::Context& ListenerFactoryContextBaseImpl::routerContext() { return server_.routerContext(); }
-const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
-  return server_.localInfo();
-}
-Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
-Stats::Scope& ListenerFactoryContextBaseImpl::scope() { return *global_scope_; }
-Singleton::Manager& ListenerFactoryContextBaseImpl::singletonManager() {
-  return server_.singletonManager();
-}
-OverloadManager& ListenerFactoryContextBaseImpl::overloadManager() {
-  return server_.overloadManager();
-}
-ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
-  return server_.threadLocal();
-}
-OptRef<Admin> ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
-const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
-  return metadata_;
-};
-const Envoy::Config::TypedMetadata& ListenerFactoryContextBaseImpl::listenerTypedMetadata() const {
-  return typed_metadata_;
-}
-envoy::config::core::v3::TrafficDirection ListenerFactoryContextBaseImpl::direction() const {
-  return direction_;
-};
-TimeSource& ListenerFactoryContextBaseImpl::timeSource() { return api().timeSource(); }
-ProtobufMessage::ValidationContext& ListenerFactoryContextBaseImpl::messageValidationContext() {
-  return server_.messageValidationContext();
-}
-ProtobufMessage::ValidationVisitor& ListenerFactoryContextBaseImpl::messageValidationVisitor() {
+ProtobufMessage::ValidationVisitor&
+ListenerFactoryContextBaseImpl::messageValidationVisitor() const {
   return validation_visitor_;
 }
-Api::Api& ListenerFactoryContextBaseImpl::api() { return server_.api(); }
-ServerLifecycleNotifier& ListenerFactoryContextBaseImpl::lifecycleNotifier() {
-  return server_.lifecycleNotifier();
-}
-ProcessContextOptRef ListenerFactoryContextBaseImpl::processContext() {
-  return server_.processContext();
-}
-Configuration::ServerFactoryContext& ListenerFactoryContextBaseImpl::serverFactoryContext() const {
-  return server_.serverFactoryContext();
-}
-Configuration::TransportSocketFactoryContext&
-ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
-  return server_.transportSocketFactoryContext();
-}
-Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
-bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
+
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { return server_.initManager(); }
@@ -341,8 +285,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
-          std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
-          cx_limit_runtime_key_)),
+          std::numeric_limits<uint64_t>::max(),
+          listener_factory_context_->serverFactoryContext().runtime(), cx_limit_runtime_key_)),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
                           [this] {
                             if (workers_started_) {
@@ -397,7 +341,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 
   const absl::optional<std::string> runtime_val =
-      listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
+      listener_factory_context_->serverFactoryContext().runtime().snapshot().get(
+          cx_limit_runtime_key_);
   if (runtime_val && runtime_val->empty()) {
     ENVOY_LOG(warn,
               "Listener connection limit runtime key {} is empty. There are currently no "
@@ -621,7 +566,7 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_, listener_factory_context_->processContext());
+        validation_visitor_, listener_factory_context_->serverFactoryContext().processContext());
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
@@ -863,51 +808,10 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
   }
 }
 
-AccessLog::AccessLogManager& PerListenerFactoryContextImpl::accessLogManager() {
-  return listener_factory_context_base_->accessLogManager();
-}
-Upstream::ClusterManager& PerListenerFactoryContextImpl::clusterManager() {
-  return listener_factory_context_base_->clusterManager();
-}
-Event::Dispatcher& PerListenerFactoryContextImpl::mainThreadDispatcher() {
-  return listener_factory_context_base_->mainThreadDispatcher();
-}
-const Server::Options& PerListenerFactoryContextImpl::options() {
-  return listener_factory_context_base_->options();
-}
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }
-Grpc::Context& PerListenerFactoryContextImpl::grpcContext() {
-  return listener_factory_context_base_->grpcContext();
-}
-bool PerListenerFactoryContextImpl::healthCheckFailed() {
-  return listener_factory_context_base_->healthCheckFailed();
-}
-Http::Context& PerListenerFactoryContextImpl::httpContext() {
-  return listener_factory_context_base_->httpContext();
-}
-Router::Context& PerListenerFactoryContextImpl::routerContext() {
-  return listener_factory_context_base_->routerContext();
-}
-const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
-  return listener_factory_context_base_->localInfo();
-}
-Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {
-  return listener_factory_context_base_->runtime();
-}
+
 Stats::Scope& PerListenerFactoryContextImpl::scope() {
   return listener_factory_context_base_->scope();
-}
-Singleton::Manager& PerListenerFactoryContextImpl::singletonManager() {
-  return listener_factory_context_base_->singletonManager();
-}
-OverloadManager& PerListenerFactoryContextImpl::overloadManager() {
-  return listener_factory_context_base_->overloadManager();
-}
-ThreadLocal::Instance& PerListenerFactoryContextImpl::threadLocal() {
-  return listener_factory_context_base_->threadLocal();
-}
-OptRef<Admin> PerListenerFactoryContextImpl::admin() {
-  return listener_factory_context_base_->admin();
 }
 const envoy::config::core::v3::Metadata& PerListenerFactoryContextImpl::listenerMetadata() const {
   return listener_factory_context_base_->listenerMetadata();
@@ -918,22 +822,13 @@ const Envoy::Config::TypedMetadata& PerListenerFactoryContextImpl::listenerTyped
 envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
   return listener_factory_context_base_->direction();
 };
-TimeSource& PerListenerFactoryContextImpl::timeSource() { return api().timeSource(); }
 const Network::ListenerConfig& PerListenerFactoryContextImpl::listenerConfig() const {
   return *listener_config_;
 }
-ProtobufMessage::ValidationContext& PerListenerFactoryContextImpl::messageValidationContext() {
-  return serverFactoryContext().messageValidationContext();
-}
-ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValidationVisitor() {
+
+ProtobufMessage::ValidationVisitor&
+PerListenerFactoryContextImpl::messageValidationVisitor() const {
   return listener_factory_context_base_->messageValidationVisitor();
-}
-Api::Api& PerListenerFactoryContextImpl::api() { return listener_factory_context_base_->api(); }
-ServerLifecycleNotifier& PerListenerFactoryContextImpl::lifecycleNotifier() {
-  return listener_factory_context_base_->lifecycleNotifier();
-}
-ProcessContextOptRef PerListenerFactoryContextImpl::processContext() {
-  return listener_factory_context_base_->processContext();
 }
 Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() const {
   return listener_factory_context_base_->serverFactoryContext();
@@ -997,7 +892,7 @@ void ListenerImpl::debugLog(const std::string& message) {
 }
 
 void ListenerImpl::initialize() {
-  last_updated_ = listener_factory_context_->timeSource().systemTime();
+  last_updated_ = listener_factory_context_->serverFactoryContext().timeSource().systemTime();
   // If workers have already started, we shift from using the global init manager to using a local
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // by resetting the watcher.

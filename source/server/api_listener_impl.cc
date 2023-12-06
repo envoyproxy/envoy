@@ -20,9 +20,9 @@ ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::List
                                          Server::Instance& server, const std::string& name)
     : config_(config), name_(name),
       address_(Network::Address::resolveProtoAddress(config.address())),
-      global_scope_(server.stats().createScope("")),
-      listener_scope_(server.stats().createScope(fmt::format("listener.api.{}.", name_))),
-      factory_context_(server, config_, *this, *global_scope_, *listener_scope_, isQuic(config)) {}
+      factory_context_(server, config_, *this, server.stats().createScope(""),
+                       server.stats().createScope(fmt::format("listener.api.{}.", name_)),
+                       isQuic(config)) {}
 
 void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConnectionEvent(
     Network::ConnectionEvent event) {

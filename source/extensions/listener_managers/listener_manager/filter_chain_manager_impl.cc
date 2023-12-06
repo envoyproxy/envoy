@@ -88,10 +88,6 @@ Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { retu
 
 Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }
 
-ThreadLocal::SlotAllocator& PerFilterChainFactoryContextImpl::threadLocal() {
-  return parent_context_.threadLocal();
-}
-
 const envoy::config::core::v3::Metadata&
 PerFilterChainFactoryContextImpl::listenerMetadata() const {
   return parent_context_.listenerMetadata();
@@ -106,76 +102,12 @@ envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::dire
   return parent_context_.direction();
 }
 
-ProtobufMessage::ValidationContext& PerFilterChainFactoryContextImpl::messageValidationContext() {
-  return parent_context_.messageValidationContext();
-}
-ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
+ProtobufMessage::ValidationVisitor&
+PerFilterChainFactoryContextImpl::messageValidationVisitor() const {
   return parent_context_.messageValidationVisitor();
 }
 
-AccessLog::AccessLogManager& PerFilterChainFactoryContextImpl::accessLogManager() {
-  return parent_context_.accessLogManager();
-}
-
-Upstream::ClusterManager& PerFilterChainFactoryContextImpl::clusterManager() {
-  return parent_context_.clusterManager();
-}
-
-Event::Dispatcher& PerFilterChainFactoryContextImpl::mainThreadDispatcher() {
-  return parent_context_.mainThreadDispatcher();
-}
-
-const Server::Options& PerFilterChainFactoryContextImpl::options() {
-  return parent_context_.options();
-}
-
-Grpc::Context& PerFilterChainFactoryContextImpl::grpcContext() {
-  return parent_context_.grpcContext();
-}
-
-bool PerFilterChainFactoryContextImpl::healthCheckFailed() {
-  return parent_context_.healthCheckFailed();
-}
-
-Http::Context& PerFilterChainFactoryContextImpl::httpContext() {
-  return parent_context_.httpContext();
-}
-
-Router::Context& PerFilterChainFactoryContextImpl::routerContext() {
-  return parent_context_.routerContext();
-}
-
-const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const {
-  return parent_context_.localInfo();
-}
-
-Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
-  return parent_context_.runtime();
-}
-
 Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
-
-Singleton::Manager& PerFilterChainFactoryContextImpl::singletonManager() {
-  return parent_context_.singletonManager();
-}
-
-OverloadManager& PerFilterChainFactoryContextImpl::overloadManager() {
-  return parent_context_.overloadManager();
-}
-
-OptRef<Admin> PerFilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
-
-TimeSource& PerFilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }
-
-Api::Api& PerFilterChainFactoryContextImpl::api() { return parent_context_.api(); }
-
-ServerLifecycleNotifier& PerFilterChainFactoryContextImpl::lifecycleNotifier() {
-  return parent_context_.lifecycleNotifier();
-}
-
-ProcessContextOptRef PerFilterChainFactoryContextImpl::processContext() {
-  return parent_context_.processContext();
-}
 
 Configuration::ServerFactoryContext&
 PerFilterChainFactoryContextImpl::serverFactoryContext() const {

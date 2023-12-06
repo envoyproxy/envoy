@@ -23,6 +23,7 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/extensions/listener_managers/listener_manager/filter_chain_manager_impl.h"
+#include "source/server/factory_context_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -122,44 +123,17 @@ private:
  * The common functionality shared by PerListenerFilterFactoryContexts and
  * PerFilterChainFactoryFactoryContexts.
  */
-class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContext,
+class ListenerFactoryContextBaseImpl final : public Server::FactoryContextImplBase,
                                              public Network::DrainDecision {
 public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
                                  Server::DrainManagerPtr drain_manager);
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Server::Options& options() override;
-  Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  bool healthCheckFailed() override;
-  Http::Context& httpContext() override;
-  Router::Context& routerContext() override;
+
   Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& serverScope() override { return *server_.stats().rootScope(); }
-  Stats::Scope& scope() override;
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::Instance& threadLocal() override;
-  OptRef<Admin> admin() override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  ProcessContextOptRef processContext() override;
-  Configuration::ServerFactoryContext& serverFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
-  Stats::Scope& listenerScope() override;
-  bool isQuicListener() const override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
+  Network::DrainDecision& drainDecision() override;
 
   // DrainDecision
   bool drainClose() const override {
@@ -172,16 +146,8 @@ public:
   Server::DrainManager& drainManager();
 
 private:
-  Envoy::Server::Instance& server_;
-  const envoy::config::core::v3::Metadata metadata_;
-  const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
-      typed_metadata_;
-  envoy::config::core::v3::TrafficDirection direction_;
-  Stats::ScopeSharedPtr global_scope_;
-  Stats::ScopeSharedPtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
-  bool is_quic_;
 };
 
 class ListenerImpl;
@@ -206,33 +172,13 @@ public:
         listener_config_(listener_config), listener_impl_(listener_impl) {}
 
   // FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Options& options() override;
   Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  bool healthCheckFailed() override;
-  Http::Context& httpContext() override;
-  Router::Context& routerContext() override;
   Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
-  Stats::Scope& serverScope() override { return listener_factory_context_base_->serverScope(); }
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::Instance& threadLocal() override;
-  OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  ProcessContextOptRef processContext() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 

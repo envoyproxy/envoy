@@ -169,6 +169,12 @@ public:
   virtual Router::Context& routerContext() PURE;
 
   /**
+   * @return ProcessContextOptRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
+   */
+  virtual ProcessContextOptRef processContext() PURE;
+
+  /**
    * @return DrainManager& the server-wide drain manager.
    */
   virtual Envoy::Server::DrainManager& drainManager() PURE;
@@ -219,13 +225,13 @@ public:
    * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
    *         backend implementation.
    */
-  virtual Init::Manager& initManager() const PURE;
+  virtual Init::Manager& initManager() PURE;
 
   /**
    * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
    *         backend implementation.
    */
-  virtual Stats::Scope& scope() const PURE;
+  virtual Stats::Scope& scope() PURE;
 };
 
 /**
@@ -237,22 +243,6 @@ public:
  */
 class ListenerAccessLogFactoryContext : public virtual CommonFactoryContext {
 public:
-  /**
-   * @return Stats::Scope& the listener's stats scope.
-   */
-  virtual Stats::Scope& listenerScope() PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
-
-  /**
-   * @return ProcessContextOptRef an optional reference to the
-   * process context. Will be unset when running in validation mode.
-   */
-  virtual ProcessContextOptRef processContext() PURE;
 };
 
 /**
@@ -260,14 +250,9 @@ public:
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext : public virtual ListenerAccessLogFactoryContext {
+class FactoryContext : public virtual GenericFactoryContext {
 public:
   ~FactoryContext() override = default;
-
-  /**
-   * @return ServerFactoryContext which lifetime is no shorter than the server.
-   */
-  virtual ServerFactoryContext& serverFactoryContext() const PURE;
 
   /**
    * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
@@ -287,14 +272,15 @@ public:
   virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
-   * @return whether external healthchecks are currently failed or not.
-   */
-  virtual bool healthCheckFailed() PURE;
-
-  /**
    * @return bool if these filters are created under the scope of a Quic listener.
    */
   virtual bool isQuicListener() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
+   * listener.
+   */
+  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
 
   /**
    * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
@@ -303,24 +289,9 @@ public:
   virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
 
   /**
-   * @return OverloadManager& the overload manager for the server.
+   * @return Stats::Scope& the listener's stats scope.
    */
-  virtual OverloadManager& overloadManager() PURE;
-
-  /**
-   * @return Http::Context& a reference to the http context.
-   */
-  virtual Http::Context& httpContext() PURE;
-
-  /**
-   * @return Grpc::Context& a reference to the grpc context.
-   */
-  virtual Grpc::Context& grpcContext() PURE;
-
-  /**
-   * @return Router::Context& a reference to the router context.
-   */
-  virtual Router::Context& routerContext() PURE;
+  virtual Stats::Scope& listenerScope() PURE;
 };
 
 /**

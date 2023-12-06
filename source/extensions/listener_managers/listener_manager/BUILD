@@ -66,6 +66,7 @@ envoy_cc_extension(
         "//source/server:api_listener_lib",
         "//source/server:configuration_lib",
         "//source/server:drain_manager_lib",
+        "//source/server:factory_context_lib",
         "//source/server:listener_manager_factory_lib",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

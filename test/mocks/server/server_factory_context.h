@@ -74,6 +74,7 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
+  MOCK_METHOD(ProcessContextOptRef, processContext, ());
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
