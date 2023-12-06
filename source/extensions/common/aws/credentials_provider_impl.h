@@ -87,10 +87,11 @@ public:
   using CurlMetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
-  MetadataCredentialsProviderBase(Api::Api& api, ServerFactoryContextOptRef context,
-                                  const CurlMetadataFetcher& fetch_metadata_using_curl,
-                                  CreateMetadataFetcherCb create_metadata_fetcher_cb,
-                                  absl::string_view cluster_name, absl::string_view uri);
+  MetadataCredentialsProviderBase(
+      Api::Api& api, ServerFactoryContextOptRef context,
+      const CurlMetadataFetcher& fetch_metadata_using_curl,
+      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
+      const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri);
 
   Credentials getCredentials() override;
 
@@ -127,6 +128,10 @@ protected:
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
   // The cluster name to use for internal static cluster pointing towards the credentials provider.
   const std::string cluster_name_;
+  // The cluster type to use for internal static cluster pointing towards the credentials provider.
+  const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type_;
+  // The uri of internal static cluster credentials provider.
+  const std::string uri_;
   // The cache duration of the fetched credentials.
   const std::chrono::seconds cache_duration_;
   // The thread local slot for cache.
@@ -219,6 +224,36 @@ private:
 };
 
 /**
+ * Retrieve AWS credentials from Security Token Service using a web identity token (e.g. OAuth,
+ * OpenID)
+ */
+class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase,
+                                       public MetadataFetcher::MetadataReceiver {
+public:
+  WebIdentityCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                 const CurlMetadataFetcher& fetch_metadata_using_curl,
+                                 CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                 absl::string_view token_file_path, absl::string_view sts_endpoint,
+                                 absl::string_view role_arn, absl::string_view role_session_name,
+                                 absl::string_view cluster_name);
+
+  // Following functions are for MetadataFetcher::MetadataReceiver interface
+  void onMetadataSuccess(const std::string&& body) override;
+  void onMetadataError(Failure reason) override;
+
+private:
+  SystemTime expiration_time_;
+  const std::string token_file_path_;
+  const std::string sts_endpoint_;
+  const std::string role_arn_;
+  const std::string role_session_name_;
+
+  bool needsRefresh() override;
+  void refresh() override;
+  void extractCredentials(const std::string&& credential_document_value);
+};
+
+/**
  * AWS credentials provider chain, able to fallback between multiple credential providers.
  */
 class CredentialsProviderChain : public CredentialsProvider,
@@ -245,6 +280,13 @@ public:
   virtual CredentialsProviderSharedPtr
   createCredentialsFileCredentialsProvider(Api::Api& api) const PURE;
 
+  virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+      Api::Api& api, ServerFactoryContextOptRef context,
+      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
+      absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
+      absl::string_view role_session_name) const PURE;
+
   virtual CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
@@ -268,12 +310,12 @@ class DefaultCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl)
-      : DefaultCredentialsProviderChain(api, context, fetch_metadata_using_curl, *this) {}
+      : DefaultCredentialsProviderChain(api, context, region, fetch_metadata_using_curl, *this) {}
 
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       const CredentialsProviderChainFactories& factories);
 
@@ -305,10 +347,22 @@ private:
     return std::make_shared<InstanceProfileCredentialsProvider>(
         api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, cluster_name);
   }
+
+  CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+      Api::Api& api, ServerFactoryContextOptRef context,
+      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
+      absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
+      absl::string_view role_session_name) const override {
+    return std::make_shared<WebIdentityCredentialsProvider>(
+        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path,
+        sts_endpoint, role_arn, role_session_name, cluster_name);
+  }
 };
 
 using InstanceProfileCredentialsProviderPtr = std::shared_ptr<InstanceProfileCredentialsProvider>;
 using TaskRoleCredentialsProviderPtr = std::shared_ptr<TaskRoleCredentialsProvider>;
+using WebIdentityCredentialsProviderPtr = std::shared_ptr<WebIdentityCredentialsProvider>;
 
 } // namespace Aws
 } // namespace Common
