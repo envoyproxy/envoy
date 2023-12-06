@@ -323,10 +323,7 @@ public:
         return *internal_listener_config_;
       }
     }
-    envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
-    void setDirection(envoy::config::core::v3::TrafficDirection direction) {
-      direction_ = direction;
-    }
+    const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return *connection_balancer_;
     }
@@ -362,7 +359,7 @@ public:
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
-    envoy::config::core::v3::TrafficDirection direction_;
+    testing::NiceMock<Network::MockListenerInfo> listener_info_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;

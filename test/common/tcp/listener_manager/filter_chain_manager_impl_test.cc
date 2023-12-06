@@ -58,6 +58,7 @@ TEST(PerFilterChainFactoryContextImplTest, NopTest) {
   context.overloadManager();
   context.timeSource();
   context.lifecycleNotifier();
+  context.serverScope();
 }
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

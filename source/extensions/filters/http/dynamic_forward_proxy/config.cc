@@ -11,14 +11,23 @@ namespace Extensions {
 namespace HttpFilters {
 namespace DynamicForwardProxy {
 
-Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(context);
+  Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
+      cache_manager_factory.get();
+  auto cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
+  if (!cache_or_error.status().ok()) {
+    return cache_or_error.status();
+  }
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
-      proto_config, cache_manager_factory, cluster_store_factory, context));
+      proto_config, std::move(cache_or_error.value()), std::move(cache_manager),
+      cluster_store_factory, context));
+
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<ProxyFilter>(filter_config));
   };

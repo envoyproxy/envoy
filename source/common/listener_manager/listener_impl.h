@@ -18,10 +18,10 @@
 
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
+#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -127,6 +127,7 @@ class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContex
 public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                 const std::shared_ptr<const ListenerInfoImpl>& listener_info,
                                  const envoy::config::listener::v3::Listener& config,
                                  Server::DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -147,9 +148,7 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   OptRef<Admin> admin() override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
+  const Network::ListenerInfo& listenerInfo() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
@@ -159,7 +158,6 @@ public:
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
-  bool isQuicListener() const override;
 
   // DrainDecision
   bool drainClose() const override {
@@ -173,15 +171,11 @@ public:
 
 private:
   Envoy::Server::Instance& server_;
-  const envoy::config::core::v3::Metadata metadata_;
-  const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
-      typed_metadata_;
-  envoy::config::core::v3::TrafficDirection direction_;
+  const std::shared_ptr<const ListenerInfoImpl> listener_info_;
   Stats::ScopeSharedPtr global_scope_;
   Stats::ScopeSharedPtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
-  bool is_quic_;
 };
 
 class ListenerImpl;
@@ -194,16 +188,14 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                const Network::ListenerConfig* listener_config,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
-      : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-            server, validation_visitor, config_message, std::move(drain_manager))),
-        listener_config_(listener_config), listener_impl_(listener_impl) {}
+                                const std::shared_ptr<const ListenerInfoImpl>& listener_info,
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
+
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
-      const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl)
+      ListenerImpl& listener_impl)
       : listener_factory_context_base_(listener_factory_context_base),
-        listener_config_(listener_config), listener_impl_(listener_impl) {}
+        listener_impl_(listener_impl) {}
 
   // FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -224,9 +216,7 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   OptRef<Admin> admin() override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
+  const Network::ListenerInfo& listenerInfo() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
@@ -237,17 +227,12 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
   Stats::Scope& listenerScope() override;
-  bool isQuicListener() const override;
-
-  // ListenerFactoryContext
-  const Network::ListenerConfig& listenerConfig() const override;
 
   ListenerFactoryContextBaseImpl& parentFactoryContext() { return *listener_factory_context_base_; }
   friend class ListenerImpl;
 
 private:
   std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base_;
-  const Network::ListenerConfig* listener_config_;
   ListenerImpl& listener_impl_;
 };
 
@@ -287,7 +272,7 @@ public:
   /**
    * Determine if in place filter chain update could be executed at this moment.
    */
-  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
+  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& new_config,
                                 bool worker_started);
 
   /**
@@ -306,7 +291,7 @@ public:
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
     return addresses_;
   }
-  const envoy::config::listener::v3::Listener& config() const { return config_; }
+  const envoy::config::listener::v3::Listener& config() const { return listener_info_->config(); }
   const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
     return socket_factories_;
   }
@@ -381,9 +366,7 @@ public:
   }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return config().traffic_direction();
-  }
+  const Network::ListenerInfo& listenerInfo() const override { return *listener_info_; }
 
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {
@@ -449,21 +432,24 @@ private:
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
   // Helpers for constructor.
-  void buildAccessLog();
-  void buildInternalListener();
+  void buildAccessLog(const envoy::config::listener::v3::Listener& config);
+  void buildInternalListener(const envoy::config::listener::v3::Listener& config);
   void validateConfig();
   bool buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
-  void buildUdpListenerFactory(uint32_t concurrency);
-  void buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
+  void buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
+                               uint32_t concurrency);
+  void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config,
+                                std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
                                     envoy::config::core::v3::SocketOption>>>& address_opts_list);
-  void createListenerFilterFactories();
-  void validateFilterChains();
-  void buildFilterChains();
-  void buildConnectionBalancer(const Network::Address::Instance& address);
-  void buildSocketOptions();
-  void buildOriginalDstListenerFilter();
-  void buildProxyProtocolListenerFilter();
+  void createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
+  void validateFilterChains(const envoy::config::listener::v3::Listener& config);
+  void buildFilterChains(const envoy::config::listener::v3::Listener& config);
+  void buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
+                               const Network::Address::Instance& address);
+  void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
+  void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
+  void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);
   void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                               const envoy::config::core::v3::Address& proto_address);
 
@@ -502,7 +488,7 @@ private:
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   Filter::QuicListenerFilterFactoriesList quic_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
-  const envoy::config::listener::v3::Listener config_;
+  const std::shared_ptr<const ListenerInfoImpl> listener_info_;
   const std::string version_info_;
   // Using std::vector instead of hash map for supporting multiple zero port addresses.
   std::vector<Network::Socket::OptionsSharedPtr> listen_socket_options_list_;

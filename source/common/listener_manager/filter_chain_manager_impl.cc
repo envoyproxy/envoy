@@ -92,18 +92,8 @@ ThreadLocal::SlotAllocator& PerFilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
 }
 
-const envoy::config::core::v3::Metadata&
-PerFilterChainFactoryContextImpl::listenerMetadata() const {
-  return parent_context_.listenerMetadata();
-}
-
-const Envoy::Config::TypedMetadata&
-PerFilterChainFactoryContextImpl::listenerTypedMetadata() const {
-  return parent_context_.listenerTypedMetadata();
-}
-
-envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::direction() const {
-  return parent_context_.direction();
+const Network::ListenerInfo& PerFilterChainFactoryContextImpl::listenerInfo() const {
+  return parent_context_.listenerInfo();
 }
 
 ProtobufMessage::ValidationContext& PerFilterChainFactoryContextImpl::messageValidationContext() {
@@ -188,10 +178,6 @@ PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 
 Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
-
-bool PerFilterChainFactoryContextImpl::isQuicListener() const {
-  return parent_context_.isQuicListener();
-}
 
 FilterChainManagerImpl::FilterChainManagerImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
