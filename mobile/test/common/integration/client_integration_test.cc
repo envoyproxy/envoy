@@ -271,10 +271,6 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
 
 // Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
 TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
-  if (version_ != Network::Address::IpVersion::v4) {
-    // Loopback resolves to a v4 address.
-    return;
-  }
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
   EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
