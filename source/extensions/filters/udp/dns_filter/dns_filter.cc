@@ -499,7 +499,7 @@ bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRe
   size_t cluster_endpoints = 0;
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(lookup_name);
   if (cluster != nullptr) {
-    // TODO(abaptiste): consider using host weights when returning answer addresses
+    // TODO(suniltheta): consider using host weights when returning answer addresses
     const std::chrono::seconds ttl = getDomainTTL(lookup_name);
 
     for (const auto& hostsets : cluster->prioritySet().hostSetsPerPriority()) {

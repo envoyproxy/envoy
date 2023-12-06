@@ -1722,7 +1722,7 @@ TEST_F(DnsFilterTest, InvalidQueryNameTest2) {
   EXPECT_FALSE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
 
-  // TODO(abaptiste): underflow/overflow stats
+  // TODO(suniltheta): underflow/overflow stats
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
 }
 
