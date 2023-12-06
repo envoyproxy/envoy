@@ -4,31 +4,28 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/config/metadata.h"
+#include "source/extensions/listener_managers/listener_manager/listener_info_impl.h"
 
 namespace Envoy {
 namespace Server {
 
-using ListenerMetadataPack =
-    Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory>;
+using ListenerInfoSharedPtr = std::shared_ptr<Network::ListenerInfo>;
 
 class FactoryContextImplBase : virtual public Configuration::FactoryContext {
 public:
   FactoryContextImplBase(Server::Instance& server,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
                          Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope,
-                         const envoy::config::core::v3::Metadata& metadata,
-                         envoy::config::core::v3::TrafficDirection direction, bool is_quic);
+                         ListenerInfoSharedPtr listener_info = nullptr);
 
   // Configuration::FactoryContext
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Stats::Scope& scope() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
+  const Network::ListenerInfo& listenerInfo() const override;
+
   Stats::Scope& listenerScope() override;
-  bool isQuicListener() const override;
 
 protected:
   Server::Instance& server_;
@@ -37,10 +34,7 @@ protected:
   Stats::ScopeSharedPtr scope_;
   // Listener scope with the listener prefix.
   Stats::ScopeSharedPtr listener_scope_;
-
-  const ListenerMetadataPack metadata_;
-  const bool is_quic_;
-  const envoy::config::core::v3::TrafficDirection direction_;
+  ListenerInfoSharedPtr listener_info_;
 };
 
 /**
@@ -48,9 +42,9 @@ protected:
  */
 class FactoryContextImpl : public FactoryContextImplBase {
 public:
-  FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
-                     Network::DrainDecision& drain_decision, Stats::ScopeSharedPtr global_scope,
-                     Stats::ScopeSharedPtr listener_scope, bool is_quic);
+  FactoryContextImpl(Server::Instance& server, Network::DrainDecision& drain_decision,
+                     Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope,
+                     ListenerInfoSharedPtr listener_info);
 
   // Configuration::FactoryContext
   Init::Manager& initManager() override;

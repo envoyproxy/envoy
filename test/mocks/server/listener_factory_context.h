@@ -15,24 +15,21 @@
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
 class MockListenerFactoryContext : public ListenerFactoryContext {
 public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext() override;
 
-  const Network::ListenerConfig& listenerConfig() const override { return listener_config_; }
-  MOCK_METHOD(const Network::ListenerConfig&, listenerConfig_, (), (const));
   MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
   MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
-  MOCK_METHOD(bool, isQuicListener, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
-  MOCK_METHOD(const Envoy::Config::TypedMetadata&, listenerTypedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (const));
+  MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
 
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<MockDrainManager> drain_manager_;
@@ -40,9 +37,8 @@ public:
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
   Stats::Scope& scope_{*store_.rootScope()};
   Stats::IsolatedStoreImpl listener_scope_;
-
-  Network::MockListenerConfig listener_config_;
 };
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

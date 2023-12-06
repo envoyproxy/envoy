@@ -61,14 +61,11 @@ public:
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
   Stats::Scope& scope() override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
+  const Network::ListenerInfo& listenerInfo() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
-  bool isQuicListener() const override;
 
   void startDraining() override { is_draining_.store(true); }
 

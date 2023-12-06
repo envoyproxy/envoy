@@ -44,7 +44,6 @@ envoy_cc_extension(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:basic_resource_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
@@ -242,6 +241,22 @@ envoy_cc_library(
         "//source/common/network:generic_listener_filter_impl_base_lib",
         "//source/common/stats:timespan_lib",
         "//source/server:active_listener_base",
+    ],
+)
+
+envoy_cc_extension(
+    name = "listener_info_lib",
+    srcs = ["listener_info_impl.cc"],
+    hdrs = [
+        "listener_info_impl.h",
+    ],
+    extra_visibility = [
+        "//source/server:__subpackages__",
+    ],
+    deps = [
+        "//envoy/network:listener_interface",
+        "//source/common/config:metadata_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

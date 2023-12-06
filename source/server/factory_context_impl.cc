@@ -6,11 +6,13 @@ namespace Server {
 FactoryContextImplBase::FactoryContextImplBase(
     Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope,
-    const envoy::config::core::v3::Metadata& metadata,
-    envoy::config::core::v3::TrafficDirection direction, bool is_quic)
+    ListenerInfoSharedPtr listener_info)
     : server_(server), validation_visitor_(validation_visitor), scope_(std::move(scope)),
-      listener_scope_(std::move(listener_scope)), metadata_(metadata), is_quic_(is_quic),
-      direction_(direction) {}
+      listener_scope_(std::move(listener_scope)), listener_info_(std::move(listener_info)) {
+  if (listener_info == nullptr) {
+    listener_info_ = std::make_shared<ListenerInfoImpl>();
+  }
+}
 
 Configuration::ServerFactoryContext& FactoryContextImplBase::serverFactoryContext() const {
   return server_.serverFactoryContext();
@@ -27,29 +29,19 @@ FactoryContextImplBase::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 
-const envoy::config::core::v3::Metadata& FactoryContextImplBase::listenerMetadata() const {
-  return metadata_.proto_metadata_;
-}
-const Envoy::Config::TypedMetadata& FactoryContextImplBase::listenerTypedMetadata() const {
-  return metadata_.typed_metadata_;
-}
-
-envoy::config::core::v3::TrafficDirection FactoryContextImplBase::direction() const {
-  return direction_;
-}
-
 Stats::Scope& FactoryContextImplBase::listenerScope() { return *listener_scope_; }
 
-bool FactoryContextImplBase::isQuicListener() const { return is_quic_; }
+const Network::ListenerInfo& FactoryContextImplBase::listenerInfo() const {
+  return *listener_info_;
+}
 
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
-                                       const envoy::config::listener::v3::Listener& config,
                                        Network::DrainDecision& drain_decision,
                                        Stats::ScopeSharedPtr scope,
-                                       Stats::ScopeSharedPtr listener_scope, bool is_quic)
+                                       Stats::ScopeSharedPtr listener_scope,
+                                       ListenerInfoSharedPtr listener_info)
     : FactoryContextImplBase(server, server.messageValidationContext().staticValidationVisitor(),
-                             std::move(scope), std::move(listener_scope), config.metadata(),
-                             config.traffic_direction(), is_quic),
+                             std::move(scope), std::move(listener_scope), std::move(listener_info)),
       drain_decision_(drain_decision) {}
 
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }

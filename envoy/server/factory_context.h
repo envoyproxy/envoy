@@ -241,15 +241,14 @@ public:
   ~FactoryContext() override = default;
 
   /**
+   * @return Stats::Scope& the listener's stats scope.
+   */
+  virtual Stats::Scope& listenerScope() PURE;
+
+  /**
    * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
    */
   virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
-
-  /**
-   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
-   * the local proxy.
-   */
-  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -258,26 +257,9 @@ public:
   virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
-   * @return bool if these filters are created under the scope of a Quic listener.
+   * @return ListenerInfo description of the listener.
    */
-  virtual bool isQuicListener() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
-
-  /**
-   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
-   * for this listener.
-   */
-  virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
-
-  /**
-   * @return Stats::Scope& the listener's stats scope.
-   */
-  virtual Stats::Scope& listenerScope() PURE;
+  virtual const Network::ListenerInfo& listenerInfo() const PURE;
 };
 
 /**
@@ -313,13 +295,7 @@ public:
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
  * and connections. It can be used to create ListenerFilterChain.
  */
-class ListenerFactoryContext : public virtual FactoryContext {
-public:
-  /**
-   * Give access to the listener configuration
-   */
-  virtual const Network::ListenerConfig& listenerConfig() const PURE;
-};
+class ListenerFactoryContext : public virtual FactoryContext {};
 
 /**
  * FactoryContext for ProtocolOptionsFactory.

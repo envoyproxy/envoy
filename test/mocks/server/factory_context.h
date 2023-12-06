@@ -31,13 +31,7 @@ public:
   MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
-  MOCK_METHOD(bool, isQuicListener, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
-  MOCK_METHOD(const Envoy::Config::TypedMetadata&, listenerTypedMetadata, (), (const));
-  MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
-
-  // Server::Configuration::ListenerFactoryContext
-  MOCK_METHOD(const Network::ListenerConfig&, listenerConfig, (), (const));
+  MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
 
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<MockTransportSocketFactoryContext> transport_socket_factory_context_;

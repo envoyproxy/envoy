@@ -13,9 +13,7 @@ public:
   AdminFactoryContext(Envoy::Server::Instance& server)
       : FactoryContextImplBase(server, server.messageValidationContext().staticValidationVisitor(),
                                server.stats().createScope(""),
-                               server.stats().createScope("listener.admin."),
-                               envoy::config::core::v3::Metadata::default_instance(),
-                               envoy::config::core::v3::UNSPECIFIED, false) {}
+                               server.stats().createScope("listener.admin.")) {}
 
   Init::Manager& initManager() override {
     // Reuse the server init manager to avoid creating a new one for this special listener.
