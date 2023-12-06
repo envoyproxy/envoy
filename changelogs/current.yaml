@@ -22,6 +22,10 @@ behavior_changes:
     Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
     is properly extracted. This changes the Prometheus name from
     dns_filter_myprefix_local_a_record_answers{} to dns_filter_local_a_record_answers{envoy.dns_filter_prefix="myprefix"}.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
+    requests and responses. This behavior can be reverted by setting the feature to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -101,6 +105,11 @@ bug_fixes:
     used for retrieval. This caused cache misses on initial use, even though the host DNS entry
     was pre-resolved. The fix is guarded by runtime guard ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns``,
     which defaults to true.
+- area: DNS
+  change: |
+    Fixed a race condition that when multiple requests with the same authority header are sent to Envoy, sometimes some requests
+    may receive 503 response with no_healthy_upstream from Envoy. The fix is guarded by runtime guard
+    ``envoy.reloadable_features.dns_cache_set_first_resolve_complete``, which defaults to true.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -135,6 +144,14 @@ removed_config_or_runtime:
     runtime flag and legacy code path.
 
 new_features:
+- area: aws
+  change: |
+    Added support for AWS common utility to fetch metadata credentials from AWS STS by using ``WebIdentityToken``. To enable
+    you need to set ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to ``true`` so that web identity
+    credentials provider can use http async client to fetch credentials. Web identity credentials provider cannot use current
+    default libcurl credentials fetcher which is under deprecation and will soon be removed. Web identity credentials provider
+    is not compatible with :ref:`Grpc Credentials AWS IAM <envoy_v3_api_file_envoy/config/grpc_credential/v3/aws_iam.proto>`
+    plugin which can only support deprecated libcurl credentials fetcher, see https://github.com/envoyproxy/envoy/pull/30626.
 - area: filters
   change: |
     Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to
@@ -219,6 +236,9 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.
+- area: compression
+  change: |
+    Added qatzip :ref:`compressor <envoy_v3_api_msg_extensions.compression.qatzip.compressor.v3alpha.Qatzip>`.
 - area: udp_proxy
   change: |
     add :ref:`access log options
@@ -229,6 +249,12 @@ new_features:
   change: |
     Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
     <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
+- area: stream info
+  change: |
+    Added time spent reading request headers to ``DownstreamTiming``.
+- area: redis
+  change: |
+    Added support for the watch command (aborts multi transactions if watched keys change).
 - area: access_log
   change: |
     Added new access log command operator ``%EMIT_TIME%`` to get the time when the log entry is emitted.

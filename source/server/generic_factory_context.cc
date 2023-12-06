@@ -11,7 +11,7 @@ GenericFactoryContextImpl::GenericFactoryContextImpl(
 
 GenericFactoryContextImpl::GenericFactoryContextImpl(
     Server::Configuration::FactoryContext& factory_context)
-    : server_context_(factory_context.getServerFactoryContext()),
+    : server_context_(factory_context.serverFactoryContext()),
       validation_visitor_(factory_context.messageValidationVisitor()),
       scope_(factory_context.scope()), init_manager_(factory_context.initManager()) {}
 

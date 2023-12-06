@@ -40,7 +40,7 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
   const auto& certificate = proto_config.certificate();
   const auto& private_key = proto_config.private_key();
 
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   auto& cluster_manager = server_context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();

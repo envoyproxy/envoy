@@ -53,9 +53,13 @@ ProxyFilterConfig::ProxyFilterConfig(
 
 Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::getCache(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config) {
-  return config.settings().has_dns_cache_config()
-             ? dns_cache_manager_->getCache(config.settings().dns_cache_config())
-             : nullptr;
+  if (config.settings().has_dns_cache_config()) {
+    auto cache_or_error = dns_cache_manager_->getCache(config.settings().dns_cache_config());
+    if (cache_or_error.status().ok()) {
+      return cache_or_error.value();
+    }
+  }
+  return nullptr;
 }
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {

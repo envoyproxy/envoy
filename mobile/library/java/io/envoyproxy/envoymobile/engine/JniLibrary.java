@@ -62,13 +62,11 @@ public class JniLibrary {
    *                 callbacks.
    * @param explicitFlowControl, whether explicit flow control should be enabled
    *                             for the stream.
-   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
-   *     should be delivered sans end stream.
    * @return envoy_stream, with a stream handle and a success status, or a failure
    * status.
    */
   protected static native int startStream(long engine, long stream, JvmCallbackContext context,
-                                          boolean explicitFlowControl, long minDeliverySize);
+                                          boolean explicitFlowControl);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and

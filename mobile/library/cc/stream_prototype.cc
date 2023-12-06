@@ -9,10 +9,10 @@ StreamPrototype::StreamPrototype(EngineSharedPtr engine) : engine_(engine) {
   callbacks_ = std::make_shared<StreamCallbacks>();
 }
 
-StreamSharedPtr StreamPrototype::start(bool explicit_flow_control, uint64_t min_delivery_size) {
+StreamSharedPtr StreamPrototype::start(bool explicit_flow_control) {
   auto envoy_stream = init_stream(engine_->engine_);
   start_stream(engine_->engine_, envoy_stream, callbacks_->asEnvoyHttpCallbacks(),
-               explicit_flow_control, min_delivery_size);
+               explicit_flow_control);
   return std::make_shared<Stream>(engine_->engine_, envoy_stream);
 }
 
