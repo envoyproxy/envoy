@@ -696,7 +696,7 @@ public:
   /**
    * @return the time that the access log was emitted.
    */
-  virtual absl::optional<SystemTime> emitLogTime() const PURE;
+  virtual SystemTime emitLogTime() const PURE;
 
   /**
    * Sets the upstream information for this stream.
