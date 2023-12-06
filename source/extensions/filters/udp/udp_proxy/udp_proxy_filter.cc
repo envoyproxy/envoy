@@ -112,7 +112,7 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
   ASSERT(host_to_sessions_.empty());
 }
 
-void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
+void UdpProxyFilter::ClusterInfo::removeSession(ActiveSession* session) {
   if (session->host().has_value()) {
     // First remove from the host to sessions map, in case the host was resolved.
     ASSERT(host_to_sessions_[&session->host().value().get()].count(session) == 1);
@@ -301,7 +301,7 @@ UdpProxyFilter::UdpActiveSession::UdpActiveSession(
     : ActiveSession(cluster, std::move(addresses), std::move(host)),
       use_original_src_ip_(cluster.filter_.config_->usingOriginalSrcIp()) {}
 
-UdpProxyFilter::ActiveSession::~ActiveSession() {
+void UdpProxyFilter::ActiveSession::onSessionComplete() {
   ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
@@ -314,24 +314,20 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
 
   disableAccessLogFlushTimer();
 
+  for (auto& active_read_filter : read_filters_) {
+    active_read_filter->read_filter_->onSessionComplete();
+  }
+
+  for (auto& active_write_filter : write_filters_) {
+    active_write_filter->write_filter_->onSessionComplete();
+  }
+
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     const Formatter::HttpFormatterContext log_context{
         nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::UdpSessionEnd};
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
       access_log->log(log_context, udp_session_info_);
-    }
-  }
-}
-
-void UdpProxyFilter::ActiveSession::onSessionComplete() const {
-  for (auto& active_read_filter : read_filters_) {
-    active_read_filter->read_filter_->onSessionComplete();
-  }
-
-  for (auto& active_write_filter : write_filters_) {
-    if (!active_write_filter->is_read_write_filter_) {
-      active_write_filter->write_filter_->onSessionComplete();
     }
   }
 }

@@ -32,7 +32,7 @@ public:
         stop_iteration_on_first_read_(stop_iteration_on_first_read),
         continue_filter_chain_(continue_filter_chain) {}
 
-  void onSessionComplete() override {
+  void onSessionCompleteInternal() override {
     read_callbacks_->streamInfo().filterState()->setData(
         "test.udp_session.drainer.on_session_complete",
         std::make_shared<Envoy::Router::StringAccessorImpl>("session_complete"),

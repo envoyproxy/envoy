@@ -68,7 +68,23 @@ public:
    * This routine is called before the access log handlers' final log() is called. Filters can use
    * this callback to enrich the data passed in to the log handlers.
    */
-  virtual void onSessionComplete() {}
+  void onSessionComplete() {
+    if (!on_session_complete_already_called_) {
+      onSessionCompleteInternal();
+      on_session_complete_already_called_ = true;
+    }
+  }
+
+protected:
+  /**
+   * This routine is called by onSessionComplete to enrich the data passed in to the log handlers.
+   */
+  virtual void onSessionCompleteInternal() {
+    ASSERT(!on_session_complete_already_called_);
+  }
+
+private:
+  bool on_session_complete_already_called_{false};
 };
 
 /**

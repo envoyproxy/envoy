@@ -475,9 +475,8 @@ private:
   class ClusterInfo;
 
   struct ActiveReadFilter : public virtual ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
-    ActiveReadFilter(ActiveSession& parent, ReadFilterSharedPtr filter, bool is_read_write_filter)
-        : parent_(parent), read_filter_(std::move(filter)),
-          is_read_write_filter_(is_read_write_filter) {}
+    ActiveReadFilter(ActiveSession& parent, ReadFilterSharedPtr filter)
+        : parent_(parent), read_filter_(std::move(filter)) {}
 
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
@@ -490,15 +489,13 @@ private:
     ActiveSession& parent_;
     ReadFilterSharedPtr read_filter_;
     bool initialized_{false};
-    const bool is_read_write_filter_;
   };
 
   using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
 
   struct ActiveWriteFilter : public virtual WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
-    ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter, bool is_read_write_filter)
-        : parent_(parent), write_filter_(std::move(filter)),
-          is_read_write_filter_(is_read_write_filter) {}
+    ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter)
+        : parent_(parent), write_filter_(std::move(filter)) {}
 
     // SessionFilters::WriteFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
@@ -509,7 +506,6 @@ private:
 
     ActiveSession& parent_;
     WriteFilterSharedPtr write_filter_;
-    const bool is_read_write_filter_;
   };
 
   using ActiveWriteFilterPtr = std::unique_ptr<ActiveWriteFilter>;
@@ -526,7 +522,6 @@ private:
   public:
     ActiveSession(ClusterInfo& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
                   const Upstream::HostConstSharedPtr& host);
-    ~ActiveSession() override;
 
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     absl::optional<std::reference_wrapper<const Upstream::Host>> host() const {
@@ -556,31 +551,27 @@ private:
     bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
-    void onSessionComplete() const;
-
-    void onAccessLogFlushInterval();
-    void rearmAccessLogFlushTimer();
-    void disableAccessLogFlushTimer();
+    void onSessionComplete();
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {
-      ActiveReadFilterPtr wrapper = std::make_unique<ActiveReadFilter>(*this, filter, false);
+      ActiveReadFilterPtr wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
       filter->initializeReadFilterCallbacks(*wrapper);
       LinkedList::moveIntoListBack(std::move(wrapper), read_filters_);
     };
 
     void addWriteFilter(WriteFilterSharedPtr filter) override {
-      ActiveWriteFilterPtr wrapper = std::make_unique<ActiveWriteFilter>(*this, filter, false);
+      ActiveWriteFilterPtr wrapper = std::make_unique<ActiveWriteFilter>(*this, filter);
       filter->initializeWriteFilterCallbacks(*wrapper);
       LinkedList::moveIntoList(std::move(wrapper), write_filters_);
     };
 
     void addFilter(FilterSharedPtr filter) override {
-      ActiveReadFilterPtr read_wrapper = std::make_unique<ActiveReadFilter>(*this, filter, true);
+      ActiveReadFilterPtr read_wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
       filter->initializeReadFilterCallbacks(*read_wrapper);
       LinkedList::moveIntoListBack(std::move(read_wrapper), read_filters_);
 
-      ActiveWriteFilterPtr write_wrapper = std::make_unique<ActiveWriteFilter>(*this, filter, true);
+      ActiveWriteFilterPtr write_wrapper = std::make_unique<ActiveWriteFilter>(*this, filter);
       filter->initializeWriteFilterCallbacks(*write_wrapper);
       LinkedList::moveIntoList(std::move(write_wrapper), write_filters_);
     };
@@ -618,6 +609,11 @@ private:
     uint64_t session_id_;
     std::list<ActiveReadFilterPtr> read_filters_;
     std::list<ActiveWriteFilterPtr> write_filters_;
+
+  private:
+    void onAccessLogFlushInterval();
+    void rearmAccessLogFlushTimer();
+    void disableAccessLogFlushTimer();
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
@@ -793,7 +789,7 @@ private:
                 SessionStorageType&& sessions);
     virtual ~ClusterInfo();
     virtual Network::FilterStatus onData(Network::UdpRecvData& data) PURE;
-    void removeSession(const ActiveSession* session);
+    void removeSession(ActiveSession* session);
     void addSession(const Upstream::Host* host, const ActiveSession* session) {
       host_to_sessions_[host].emplace(session);
     }
