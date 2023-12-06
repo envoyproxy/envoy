@@ -790,7 +790,7 @@ private:
     virtual ~ClusterInfo();
     virtual Network::FilterStatus onData(Network::UdpRecvData& data) PURE;
     void removeSession(ActiveSession* session);
-    void addSession(const Upstream::Host* host, const ActiveSession* session) {
+    void addSession(const Upstream::Host* host, ActiveSession* session) {
       host_to_sessions_[host].emplace(session);
     }
 
@@ -820,7 +820,7 @@ private:
                                   const Upstream::HostConstSharedPtr& host);
 
     Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
-    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
+    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<ActiveSession*>>
         host_to_sessions_;
   };
 

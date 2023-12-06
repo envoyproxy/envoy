@@ -94,7 +94,8 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
               // left. It would be nice to unify the logic but that can be cleaned up later.
               auto host_sessions_it = host_to_sessions_.find(host.get());
               if (host_sessions_it != host_to_sessions_.end()) {
-                for (const auto& session : host_sessions_it->second) {
+                for (auto& session : host_sessions_it->second) {
+                  session->onSessionComplete();
                   ASSERT(sessions_.count(session) == 1);
                   sessions_.erase(session);
                 }
