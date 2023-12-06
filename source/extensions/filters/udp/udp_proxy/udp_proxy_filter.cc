@@ -302,6 +302,10 @@ UdpProxyFilter::UdpActiveSession::UdpActiveSession(
     : ActiveSession(cluster, std::move(addresses), std::move(host)),
       use_original_src_ip_(cluster.filter_.config_->usingOriginalSrcIp()) {}
 
+UdpProxyFilter::ActiveSession::~ActiveSession() {
+  ENVOY_BUG(on_session_complete_called_, "onSessionComplete() not called");
+}
+
 void UdpProxyFilter::ActiveSession::onSessionComplete() {
   ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
@@ -331,6 +335,8 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
       access_log->log(log_context, udp_session_info_);
     }
   }
+
+  on_session_complete_called_ = true;
 }
 
 void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {

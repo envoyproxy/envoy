@@ -522,6 +522,7 @@ private:
   public:
     ActiveSession(ClusterInfo& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
                   const Upstream::HostConstSharedPtr& host);
+    ~ActiveSession() override;
 
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     absl::optional<std::reference_wrapper<const Upstream::Host>> host() const {
@@ -614,6 +615,8 @@ private:
     void onAccessLogFlushInterval();
     void rearmAccessLogFlushTimer();
     void disableAccessLogFlushTimer();
+
+    bool on_session_complete_called_{false};
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
