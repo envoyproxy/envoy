@@ -227,10 +227,10 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
 - area: router
   change: |
-    Allow empty :ref:`FilterConfig <envoy_v3_api_msg_config.route.v3.FilterConfig>` be configured in the
-    ``typed_per_filter_config`` field of route configuration to enable a HTTP filter that be configured
-    to be disabled by default. See doc :ref:`Route based filter chain
+    Allow an empty :ref:`FilterConfig <envoy_v3_api_msg_config.route.v3.FilterConfig>` in the
+    ``typed_per_filter_config`` field of s route configuration to enable a HTTP filter that is
+    disabled by default. See doc :ref:`Route based filter chain
     <arch_overview_http_filters_route_based_filter_chain>`
-    for more specific detail and examples.
+    for more specific details and examples.
 
 deprecated:
