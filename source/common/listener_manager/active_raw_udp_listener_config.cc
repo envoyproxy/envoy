@@ -1,9 +1,9 @@
-#include "source/extensions/listener_managers/listener_manager/active_raw_udp_listener_config.h"
+#include "source/common/listener_manager/active_raw_udp_listener_config.h"
 
 #include <memory>
 #include <string>
 
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/server/active_udp_listener.h"
 
 namespace Envoy {
