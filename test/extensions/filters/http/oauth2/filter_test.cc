@@ -86,7 +86,8 @@ public:
 class OAuth2Test : public testing::TestWithParam<int> {
 public:
   OAuth2Test() : request_(&cm_.thread_local_cluster_.async_client_) {
-    factory_context_.cluster_manager_.initializeClusters({"auth.example.com"}, {});
+    factory_context_.server_factory_context_.cluster_manager_.initializeClusters(
+        {"auth.example.com"}, {});
     init();
   }
 
@@ -145,8 +146,9 @@ public:
 
     // Create filter config.
     auto secret_reader = std::make_shared<MockSecretReader>();
-    FilterConfigSharedPtr c = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_,
-                                                             secret_reader, scope_, "test.");
+    FilterConfigSharedPtr c =
+        std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_.cluster_manager_,
+                                       secret_reader, scope_, "test.");
 
     return c;
   }
@@ -292,7 +294,7 @@ generic_secret:
 }
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
-  ON_CALL(factory_context_.cluster_manager_, clusters())
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, clusters())
       .WillByDefault(Return(Upstream::ClusterManager::ClusterInfoMaps()));
 
   EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
@@ -310,8 +312,8 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
   auto secret_reader = std::make_shared<MockSecretReader>();
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader, scope_,
-                                     "test."),
+      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_.cluster_manager_,
+                                     secret_reader, scope_, "test."),
       EnvoyException, "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config.");
 }
 
@@ -343,8 +345,8 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
-                                                scope_, "test.");
+  test_config_ = std::make_shared<FilterConfig>(
+      p, factory_context_.server_factory_context_.cluster_manager_, secret_reader, scope_, "test.");
 
   // resource is optional
   EXPECT_EQ(test_config_->encodedResourceQueryParams(), "");
@@ -401,8 +403,8 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
-                                                scope_, "test.");
+  test_config_ = std::make_shared<FilterConfig>(
+      p, factory_context_.server_factory_context_.cluster_manager_, secret_reader, scope_, "test.");
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/not/_oauth"},
@@ -457,8 +459,8 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
-                                                scope_, "test.");
+  test_config_ = std::make_shared<FilterConfig>(
+      p, factory_context_.server_factory_context_.cluster_manager_, secret_reader, scope_, "test.");
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/not/_oauth"},
