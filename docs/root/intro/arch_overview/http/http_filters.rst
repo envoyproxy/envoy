@@ -157,7 +157,7 @@ Route based filter chain
 There is support for having different filter chains for different routes. There are two different modes for this:
 
 * Disabling a filter in the filter chain for specific routes.
-* Setting parts of the filters in the filter chain to be disabled by default and then enabling them for specific
+* Overriding a filter in the filter chain that is disabled by default and enabling it for specific
   routes.
 
 By default, the filter chain is the same for all routes and all filters are enabled. However, they
