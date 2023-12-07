@@ -76,7 +76,7 @@ bool RequestMatchInputMatcher::match(const Request& request) {
   }
 
   for (const auto& property : properties_) {
-    if (auto val = request.getByKey(property.first); val.has_value()) {
+    if (auto val = request.get(property.first); val.has_value()) {
       if (!property.second->match(val.value())) {
         // Property does not match.
         return false;

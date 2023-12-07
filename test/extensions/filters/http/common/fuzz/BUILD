@@ -51,6 +51,7 @@ envoy_cc_test_library(
         "//source/common/tracing:http_tracer_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:registry_lib",

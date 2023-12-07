@@ -3,6 +3,8 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
+#include "source/common/config/metadata.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -39,22 +41,36 @@ public:
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
   ProcessContextOptRef processContext() override;
-  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
+  const Network::ListenerInfo& listenerInfo() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
-  bool isQuicListener() const override;
 
 private:
+  class ListenerInfoImpl : public Network::ListenerInfo {
+  public:
+    explicit ListenerInfoImpl(bool is_quic) : is_quic_(is_quic) {}
+    const envoy::config::core::v3::Metadata& metadata() const override {
+      return metadata_.proto_metadata_;
+    }
+    const Envoy::Config::TypedMetadata& typedMetadata() const override {
+      return metadata_.typed_metadata_;
+    }
+    envoy::config::core::v3::TrafficDirection direction() const override {
+      return envoy::config::core::v3::UNSPECIFIED;
+    }
+    bool isQuic() const override { return is_quic_; }
+
+  private:
+    const bool is_quic_;
+    Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
+  };
   Server::Instance& server_;
-  const envoy::config::listener::v3::Listener& config_;
   Network::DrainDecision& drain_decision_;
   Stats::Scope& global_scope_;
   Stats::Scope& listener_scope_;
-  bool is_quic_;
+  ListenerInfoImpl listener_info_;
 };
 
 } // namespace Server

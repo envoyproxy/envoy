@@ -26,14 +26,14 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
 
   auto plugin = std::make_shared<Common::Wasm::Plugin>(
       config.config(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
-      context.getServerFactoryContext().localInfo(), nullptr /* listener_metadata */);
+      context.serverFactoryContext().localInfo(), nullptr /* listener_metadata */);
 
   auto access_log = std::make_shared<WasmAccessLog>(plugin, nullptr, std::move(filter));
 
   auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
     auto tls_slot = ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocal>::makeUnique(
-        context.getServerFactoryContext().threadLocal());
+        context.serverFactoryContext().threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
       return std::make_shared<PluginHandleSharedPtrThreadLocal>(
           Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
@@ -41,18 +41,16 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
     access_log->setTlsSlot(std::move(tls_slot));
   };
 
-  if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""),
-                                context.getServerFactoryContext().clusterManager(),
-                                context.initManager(),
-                                context.getServerFactoryContext().mainThreadDispatcher(),
-                                context.getServerFactoryContext().api(),
-                                context.getServerFactoryContext().lifecycleNotifier(),
-                                remote_data_provider_, std::move(callback))) {
+  if (!Common::Wasm::createWasm(
+          plugin, context.scope().createScope(""), context.serverFactoryContext().clusterManager(),
+          context.initManager(), context.serverFactoryContext().mainThreadDispatcher(),
+          context.serverFactoryContext().api(), context.serverFactoryContext().lifecycleNotifier(),
+          remote_data_provider_, std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm access log {}", plugin->name_));
   }
 
-  context.getServerFactoryContext().api().customStatNamespaces().registerStatNamespace(
+  context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
       Extensions::Common::Wasm::CustomStatNamespace);
   return access_log;
 }

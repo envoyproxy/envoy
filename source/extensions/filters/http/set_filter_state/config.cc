@@ -8,6 +8,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,16 +25,31 @@ Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& 
 
 Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  return createFilterFactoryFromProtoWithServerContextTyped(proto_config, stat_prefix,
-                                                            context.getServerFactoryContext());
+    const std::string&, Server::Configuration::FactoryContext& context) {
+
+  Server::GenericFactoryContextImpl generic_context(context);
+
+  const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+      generic_context);
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(
+        Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});
+  };
 }
 
 Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServerContextTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {
+
+  // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
+  // of server context should not be used here directly. But this is bug of
+  // 'createFilterFactoryFromProtoWithServerContext' and will be fixed in the future.
+  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+
   const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain, context);
+      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+      generic_context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});

@@ -33,7 +33,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   HealthCheckCacheManagerSharedPtr cache_manager;
   if (cache_time_ms > 0) {
     cache_manager = std::make_shared<HealthCheckCacheManager>(
-        context.getServerFactoryContext().mainThreadDispatcher(),
+        context.serverFactoryContext().mainThreadDispatcher(),
         std::chrono::milliseconds(cache_time_ms));
   }
 
@@ -49,7 +49,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   return [&context, pass_through_mode, cache_manager, header_match_data,
           cluster_min_healthy_percentages](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<HealthCheckFilter>(
-        context.getServerFactoryContext(), pass_through_mode, cache_manager, header_match_data,
+        context.serverFactoryContext(), pass_through_mode, cache_manager, header_match_data,
         cluster_min_healthy_percentages));
   };
 }

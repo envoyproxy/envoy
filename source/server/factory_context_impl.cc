@@ -4,12 +4,12 @@ namespace Envoy {
 namespace Server {
 
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
-                                       const envoy::config::listener::v3::Listener& config,
+                                       const envoy::config::listener::v3::Listener&,
                                        Network::DrainDecision& drain_decision,
                                        Stats::Scope& global_scope, Stats::Scope& listener_scope,
                                        bool is_quic)
-    : server_(server), config_(config), drain_decision_(drain_decision),
-      global_scope_(global_scope), listener_scope_(listener_scope), is_quic_(is_quic) {}
+    : server_(server), drain_decision_(drain_decision), global_scope_(global_scope),
+      listener_scope_(listener_scope), listener_info_(is_quic) {}
 
 AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -41,26 +41,16 @@ ServerLifecycleNotifier& FactoryContextImpl::lifecycleNotifier() {
   return server_.lifecycleNotifier();
 }
 ProcessContextOptRef FactoryContextImpl::processContext() { return server_.processContext(); }
-Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
+Configuration::ServerFactoryContext& FactoryContextImpl::serverFactoryContext() const {
   return server_.serverFactoryContext();
 }
 Configuration::TransportSocketFactoryContext&
 FactoryContextImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
-const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
-  return config_.metadata();
-}
-const Envoy::Config::TypedMetadata& FactoryContextImpl::listenerTypedMetadata() const {
-  // TODO(nareddyt): Needs an implementation for this context. Currently not used.
-  PANIC("not implemented");
-}
-envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const {
-  return config_.traffic_direction();
-}
+const Network::ListenerInfo& FactoryContextImpl::listenerInfo() const { return listener_info_; }
 Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
 Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
-bool FactoryContextImpl::isQuicListener() const { return is_quic_; }
 
 } // namespace Server
 } // namespace Envoy
