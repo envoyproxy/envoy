@@ -87,17 +87,13 @@ public:
       printTrace(std::cerr);
       return;
     }
-
-    ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
-    ENVOY_LOG(critical, "Envoy version: {}", VersionInfo::version());
-
-    visitTrace([](int index, const char* symbol, void* address) {
-      if (symbol != nullptr) {
-        ENVOY_LOG(critical, "#{}: {} [{}]", index, symbol, address);
-      } else {
-        ENVOY_LOG(critical, "#{}: [{}]", index, address);
-      }
-    });
+    std::stringstream stack_stream;
+    printTrace(stack_stream);
+    ENVOY_LOG(
+        critical,
+        absl::StrCat(
+            "Backtrace (use tools/stack_decode.py to get line numbers):\nEnvoy version: {}\n{}",
+            VersionInfo::version(), stack_stream.str()));
   }
 
   void logFault(const char* signame, const void* addr) {
