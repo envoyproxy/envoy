@@ -126,6 +126,9 @@ build:mobile-release-common --copt=-fvisibility=hidden
 # Disable google_grpc in production by default
 build:mobile-release-common --define=google_grpc=disabled
 
+# Disable envoy_mobile_xds in production by default
+build:mobile-release-common --define=envoy_mobile_xds=disabled
+
 # Enable automatic extension factory registration for release builds
 build:mobile-release-common --define=static_extension_registration=enabled
 

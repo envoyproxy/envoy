@@ -38,7 +38,7 @@ is set to true the filter will send over a
 cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`` header will be populated
 with the same value.
 
-The OAuth filer encodes URLs in query parameters using the
+The OAuth filter encodes URLs in query parameters using the
 `URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
 
 When receiving request redirected from the authorization service the Oauth filer decodes URLs from query parameters.

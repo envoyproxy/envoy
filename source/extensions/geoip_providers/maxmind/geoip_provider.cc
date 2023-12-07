@@ -10,8 +10,8 @@ namespace Maxmind {
 
 namespace {
 static constexpr const char* MMDB_CITY_LOOKUP_ARGS[] = {"city", "names", "en"};
-static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "names", "en"};
-static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "names", "en"};
+static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "iso_code"};
+static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "iso_code"};
 static constexpr const char* MMDB_ASN_LOOKUP_ARGS[] = {"autonomous_system_number"};
 static constexpr const char* MMDB_ANON_LOOKUP_ARGS[] = {"is_anonymous", "is_anonymous_vpn",
                                                         "is_hosting_provider", "is_tor_exit_node",
@@ -145,13 +145,12 @@ void GeoipProvider::lookupInCityDb(
         if (config_->isLookupEnabledForHeader(config_->regionHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->regionHeader().value(), MMDB_REGION_LOOKUP_ARGS[0],
-                                  MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2],
-                                  MMDB_REGION_LOOKUP_ARGS[3]);
+                                  MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2]);
         }
         if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
-                                  MMDB_COUNTRY_LOOKUP_ARGS[1], MMDB_COUNTRY_LOOKUP_ARGS[2]);
+                                  MMDB_COUNTRY_LOOKUP_ARGS[1]);
         }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit("city_db");

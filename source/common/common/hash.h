@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
 
 #include "source/common/common/macros.h"
 #include "source/common/common/safe_memcpy.h"
@@ -27,6 +28,58 @@ public:
   }
 
   /**
+   * Return 64-bit hash from deterministically serializing a value in
+   * an endian-independent way and hashing it with the xxHash algorithm.
+   *
+   * enums are excluded because they're not needed; if they were to be
+   * supported later they should have a separate function because enum
+   * sizes are implementation-specific.
+   *
+   * bools have an inlined specialization below because they too have
+   * implementation-specific sizes.
+   *
+   * floating point values have a specialization because just endian-
+   * ordering the binary leaves many possible binary representations of
+   * NaN, for example.
+   *
+   * @param input supplies the value to hash.
+   * @param seed supplies the hash seed which defaults to 0.
+   * See https://github.com/Cyan4973/xxHash for details.
+   */
+  template <
+      typename ValueType,
+      std::enable_if_t<std::is_scalar_v<ValueType> && !std::is_enum_v<ValueType>, bool> = true>
+  static uint64_t xxHash64Value(ValueType input, uint64_t seed = 0) {
+#if defined(ABSL_IS_LITTLE_ENDIAN)
+    return XXH64(reinterpret_cast<const char*>(&input), sizeof(input), seed);
+#else
+    char buf[sizeof(input)];
+    const char* p = reinterpret_cast<const char*>(&input);
+    for (size_t i = 0; i < sizeof(input); i++) {
+      buf[i] = p[sizeof(input) - i - 1];
+    }
+    return XXH64(buf, sizeof(input), seed);
+#endif
+  }
+  template <typename FloatingPoint,
+            std::enable_if_t<std::is_floating_point_v<FloatingPoint>, bool> = true>
+  static uint64_t xxHash64FloatingPoint(FloatingPoint input, uint64_t seed = 0) {
+    if (std::isnan(input)) {
+      return XXH64("NaN", 3, seed);
+    }
+    if (std::isinf(input)) {
+      return XXH64("Inf", 3, seed);
+    }
+    int exp;
+    FloatingPoint frac = std::frexp(input, &exp);
+    seed = xxHash64Value(exp, seed);
+    // Turn the fraction between -1 and 1 we have into an integer we can
+    // hash endian-independently, using the largest possible range.
+    int64_t mantissa = frac * 9223372036854775808.0; // 2^63
+    return xxHash64Value(mantissa, seed);
+  }
+
+  /**
    * Return 64-bit hash from the xxHash algorithm for a collection of strings.
    * @param input supplies the absl::Span<absl::string_view> to hash.
    * @param seed supplies the hash seed which defaults to 0.
@@ -50,6 +103,20 @@ public:
     return hash;
   }
 };
+
+// Explicit specialization for bool because its size may be implementation dependent.
+template <> inline uint64_t HashUtil::xxHash64Value(bool input, uint64_t seed) {
+  char b = input ? 1 : 0;
+  return XXH64(&b, sizeof(b), seed);
+}
+// Explicit specialization for float and double because IEEE binary representation of NaN
+// can be inconsistent.
+template <> inline uint64_t HashUtil::xxHash64Value(double input, uint64_t seed) {
+  return xxHash64FloatingPoint(input, seed);
+}
+template <> inline uint64_t HashUtil::xxHash64Value(float input, uint64_t seed) {
+  return xxHash64FloatingPoint(input, seed);
+}
 
 /**
  * From

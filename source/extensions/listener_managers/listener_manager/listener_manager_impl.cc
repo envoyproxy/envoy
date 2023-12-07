@@ -93,7 +93,7 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
       ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
       ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
           proto_config.config_discovery(), proto_config.name(),
-          filter_chain_factory_context.getServerFactoryContext(), filter_chain_factory_context,
+          filter_chain_factory_context.serverFactoryContext(), filter_chain_factory_context,
           filter_chain_factory_context.clusterManager(), is_terminal, "network", nullptr));
       continue;
     }
@@ -113,7 +113,7 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
     Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
         factory.isTerminalFilterByProto(*message,
-                                        filter_chain_factory_context.getServerFactoryContext()),
+                                        filter_chain_factory_context.serverFactoryContext()),
         is_terminal);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
@@ -157,9 +157,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         }
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.getServerFactoryContext(), context,
-          context.clusterManager(), false, "tcp-listener",
-          createListenerFilterMatcher(proto_config));
+          config_discovery, name, context.serverFactoryContext(), context, context.clusterManager(),
+          false, "tcp-listener", createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",
@@ -245,9 +244,8 @@ ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
         }
       }
       ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.getServerFactoryContext(), context,
-          context.clusterManager(), false, "quic-listener",
-          createListenerFilterMatcher(proto_config)));
+          config_discovery, name, context.serverFactoryContext(), context, context.clusterManager(),
+          false, "quic-listener", createListenerFilterMatcher(proto_config)));
     } else {
       ENVOY_LOG(debug, "  config: {}",
                 MessageUtil::getJsonStringFromMessageOrError(
@@ -761,7 +759,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
           }
         });
       },
-      server_.runtime());
+      server_.runtime(), server_.api().randomGenerator());
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
@@ -925,7 +923,7 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
   return true;
 }
 
-void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()> callback) {
+void ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
   workers_started_ = true;

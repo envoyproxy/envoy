@@ -685,7 +685,7 @@ void FakeUpstream::initializeServer() {
 
   dispatcher_->post([this]() -> void {
     socket_factories_[0]->doFinalPreWorkerInit();
-    handler_->addListener(absl::nullopt, listener_, runtime_);
+    handler_->addListener(absl::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
   });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });

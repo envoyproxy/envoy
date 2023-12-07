@@ -12,7 +12,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.golang.v3alpha";
 option java_outer_classname = "GolangProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/golang/v3alpha";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/http/golang/v3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 

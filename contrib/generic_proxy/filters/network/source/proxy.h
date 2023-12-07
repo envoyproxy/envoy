@@ -30,7 +30,7 @@
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
 #include "contrib/generic_proxy/filters/network/source/stats.h"
-#include "contrib/generic_proxy/filters/network/source/upstream.h"
+#include "contrib/generic_proxy/filters/network/source/tracing.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,7 +62,8 @@ public:
         codec_factory_(std::move(codec)), route_config_provider_(std::move(route_config_provider)),
         factories_(std::move(factories)), drain_decision_(context.drainDecision()),
         tracer_(std::move(tracer)), tracing_config_(std::move(tracing_config)),
-        access_logs_(std::move(access_logs)), time_source_(context.timeSource()) {}
+        access_logs_(std::move(access_logs)),
+        time_source_(context.serverFactoryContext().timeSource()) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {

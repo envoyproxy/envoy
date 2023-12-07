@@ -9,16 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "access_log_config_interface",
-    hdrs = ["access_log_config.h"],
-    deps = [
-        ":filter_config_interface",
-        "//envoy/access_log:access_log_interface",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "admin_interface",
     hdrs = ["admin.h"],
     deps = [

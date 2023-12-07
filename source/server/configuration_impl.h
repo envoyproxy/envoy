@@ -198,7 +198,7 @@ public:
    * Initialize admin access log.
    */
   void initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                          Instance& server);
+                          FactoryContext& factory_context);
 
 private:
   struct AdminImpl : public Admin {

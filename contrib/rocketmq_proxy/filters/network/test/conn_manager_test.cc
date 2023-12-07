@@ -450,7 +450,7 @@ route_config:
   NiceMock<Network::MockIp> ip;
   std::shared_ptr<const Network::MockResolvedAddress> instance =
       std::make_shared<Network::MockResolvedAddress>("logical", "physical");
-  EXPECT_CALL(factory_context_, getServerFactoryContext())
+  EXPECT_CALL(factory_context_, serverFactoryContext())
       .WillRepeatedly(ReturnRef(server_factory_context));
   EXPECT_CALL(server_factory_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
   EXPECT_CALL(local_info, address()).WillRepeatedly(Return(instance));

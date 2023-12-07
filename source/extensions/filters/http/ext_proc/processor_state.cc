@@ -251,7 +251,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           if (absl::SimpleAtoi(headers_->getContentLengthValue(), &content_length) &&
               content_length != common_response.body_mutation().body().size()) {
             return absl::InternalError(
-                "mismatch between content length and the lenght of mutated body");
+                "mismatch between content length and the length of the mutated body");
           }
         }
         ENVOY_LOG(debug, "Applying body response to buffered data. State = {}",
