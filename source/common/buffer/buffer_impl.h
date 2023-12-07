@@ -30,7 +30,7 @@ namespace Buffer {
  * +-----------------+----------------+----------------------+
  * ^                 ^                ^                      ^
  * |                 |                |                      |
- * base_             data()           base_ + reservable_    base_ + capacity_
+ * base_             base_ + data_    base_ + reservable_    base_ + capacity_
  */
 class Slice {
 public:
