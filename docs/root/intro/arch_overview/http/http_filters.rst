@@ -208,12 +208,19 @@ for a specific route, we can set per filter config map in the route configuratio
 .. code-block:: yaml
 
   typed_per_filter_config:
-    buffer:
-      "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
     lua:
       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       name: my_lua_script
+    buffer:
+      # This configuration is meaningless but legal. No route per filter config is loaded from it but
+      # will be treated as enable flag for the filter 'buffer'.
+      # This is useful for the case that we want to enable the filter for a specific route but don't
+      # want to load any route specific configuration for it.
+      "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+        is_optional: true
 
 
-Both valid route-specific configurations for filters (like the above ``lua`` filter) and empty FilterConfig
-(like the above ``buffer`` filter) are valid ways to enable the filter for the route.
+Both route-specific configurations for filters (like the above ``lua`` filter) and meaningless but legal
+configurations (like the above ``buffer`` filter) are valid ways to enable the filter for the route.
