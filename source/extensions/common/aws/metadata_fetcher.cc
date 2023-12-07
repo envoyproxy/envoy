@@ -49,6 +49,7 @@ public:
   void fetch(Http::RequestMessage& message, Tracing::Span& parent_span,
              MetadataFetcher::MetadataReceiver& receiver) override {
     ASSERT(!request_);
+    ASSERT(!receiver_);
     complete_ = false;
     receiver_ = makeOptRef(receiver);
     const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster_name_);
@@ -115,7 +116,6 @@ public:
 
   // HTTP async receive method on success.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override {
-    ASSERT(receiver_);
     complete_ = true;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
     if (status_code == enumToInt(Http::Code::OK)) {
@@ -145,7 +145,6 @@ public:
   // HTTP async receive method on failure.
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override {
-    ASSERT(receiver_);
     ENVOY_LOG(debug, "{}: fetch AWS Metadata [cluster = {}]: network error {}", __func__,
               cluster_name_, enumToInt(reason));
     complete_ = true;
@@ -163,7 +162,10 @@ private:
   OptRef<MetadataFetcher::MetadataReceiver> receiver_;
   OptRef<Http::AsyncClient::Request> request_;
 
-  void reset() { request_.reset(); }
+  void reset() {
+    request_.reset();
+    receiver_.reset();
+  }
 };
 } // namespace
 
