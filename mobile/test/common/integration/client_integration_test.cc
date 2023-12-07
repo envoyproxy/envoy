@@ -71,7 +71,6 @@ public:
     builder_.enablePlatformCertificatesValidation(true);
     // Create a k-v store for DNS lookup which createEnvoy() will use to point
     // www.lyft.com -> fake H3 backend.
-    test_key_value_store_ = std::make_shared<TestKeyValueStore>();
     builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
     builder_.enableDnsCache(true, 1);
     upstream_tls_ = true;
@@ -345,6 +344,7 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
 }
 
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsHttp3) {
+  explicit_flow_control_ = true;
   initializeWithHttp3AndFakeDns();
 
   explicitFlowControlWithCancels();
@@ -534,7 +534,7 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   ASSERT_EQ(cc_.on_cancel_calls, 1);
 }
 
-TEST_P(ClientIntegrationTest, BasicCancelWithOpenStream) {
+TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStreamHttp3) {
   autonomous_upstream_ = false;
 
   initializeWithHttp3AndFakeDns();
