@@ -23,6 +23,7 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
       cache-docker: false
@@ -98,7 +99,7 @@ jobs:
             --config=mobile-remote-ci-macos
             //examples/swift/hello_world:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.4
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.5
               with:
                 app: //examples/swift/hello_world:app
                 status: 200
@@ -138,7 +139,7 @@ jobs:
             --config=mobile-remote-ci-macos
             //test/swift/apps/baseline:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.4
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.5
               with:
                 app: //test/swift/apps/baseline:app
                 status: 200
@@ -151,7 +152,7 @@ jobs:
             --define=admin_functionality=enabled
             //test/swift/apps/experimental:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.4
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.5
               with:
                 app: //test/swift/apps/experimental:app
                 args: >-
@@ -167,7 +168,7 @@ jobs:
             --config=mobile-remote-ci-macos
             //examples/swift/async_await:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.4
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.5
               with:
                 app: //examples/swift/async_await:app
           target: swift-async-await
@@ -177,7 +178,7 @@ jobs:
             --config=mobile-remote-ci-macos
             //examples/objective-c/hello_world:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.4
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.5
               with:
                 app: //examples/objective-c/hello_world:app
                 status: 301
@@ -191,7 +192,10 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    if: ${{ always() && fromJSON(needs.load.outputs.request).run.mobile-ios }}
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-ios }}
     needs:
     - load
     - build

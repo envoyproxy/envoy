@@ -498,6 +498,7 @@ case $CI_TARGET in
         ;;
 
     deps)
+        exit 23
         setup_clang_toolchain
         echo "dependency validate_test..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \

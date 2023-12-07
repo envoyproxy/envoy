@@ -17,7 +17,7 @@ jobs:
     name: Parse and run command
     runs-on: ubuntu-22.04
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/github/command@actions-v0.2.4
+    - uses: envoyproxy/toolshed/gh-actions/github/command@actions-v0.2.5
       name: Parse command from comment
       id: command
       with:
@@ -26,14 +26,14 @@ jobs:
           ^/(retest)
 
     # /retest
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.4
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.5
       if: ${{ steps.command.outputs.command == 'retest' }}
       id: appauth-retest
       name: Appauth (retest)
       with:
         key: ${{ secrets.ENVOY_CI_APP_KEY }}
         app_id: ${{ secrets.ENVOY_CI_APP_ID }}
-    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.2.4
+    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.2.5
       if: ${{ steps.command.outputs.command == 'retest' }}
       name: Retest
       with:

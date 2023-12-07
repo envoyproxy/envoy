@@ -27,6 +27,7 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
       check-name: mobile-asan
@@ -56,7 +57,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ always() && fromJSON(needs.load.outputs.request).run.mobile-asan }}
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-asan }}
     needs:
     - load
     - asan

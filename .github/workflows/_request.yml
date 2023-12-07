@@ -40,14 +40,14 @@ jobs:
       env: ${{ steps.data.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.4
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.5
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.4
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.5
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -60,7 +60,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/gh-actions/envoy/ci/request@actions-v0.2.4
+      uses: envoyproxy/toolshed/gh-actions/envoy/ci/request@actions-v0.2.5
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -71,7 +71,7 @@ jobs:
         vars: ${{ toJSON(vars) }}
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/gh-actions/github/env/summary@actions-v0.2.4
+      uses: envoyproxy/toolshed/gh-actions/github/env/summary@actions-v0.2.5
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -87,16 +87,22 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - name: Environment data
-      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.4
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.5
       id: data
       with:
-        input: ${{ steps.env.outputs.data }}
+        input: |
+          env: ${{ steps.env.outputs.data }}
+          title: ${{ steps.summary.outputs.title }}
+          link: ${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}
+          summary: ${{ steps.summary.outputs.summary }}
+        input-format: yaml
         filter: |
-          "${{ steps.summary.outputs.title }}" as $title
-          | .config.envoy.icon as $icon
-          | "${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}" as $link
+          .title as $title
+          | .env.config.envoy.icon as $icon
+          | .link as $link
           | "\($icon) Request ([\($title)](\($link)))" as $linkedTitle
-          | ${{ steps.summary.outputs.summary }} as $summary
+          |  .summary as $summary
+          | .env
           | .summary = {
               $summary,
               $title,

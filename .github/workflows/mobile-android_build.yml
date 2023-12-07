@@ -27,6 +27,7 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
       check-name: mobile-android
@@ -78,9 +79,9 @@ jobs:
       target: kotlin-hello-world
       runs-on: envoy-x64-small
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.4
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.5
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.4
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.5
           with:
             apk: bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
             app: io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
@@ -107,7 +108,7 @@ jobs:
       target: ${{ matrix.target }}
       runs-on: envoy-x64-small
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.4
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.5
       steps-post: ${{ matrix.steps-post }}
       timeout-minutes: 50
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
@@ -118,7 +119,7 @@ jobs:
         include:
         - name: java-hello-world
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.4
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.5
               with:
                 apk: bazel-bin/examples/java/hello_world/hello_envoy.apk
                 app: io.envoyproxy.envoymobile.helloenvoy/.MainActivity
@@ -141,7 +142,7 @@ jobs:
             --linkopt=-fuse-ld=lld
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.4
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.5
               with:
                 apk: bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
@@ -158,7 +159,7 @@ jobs:
             --linkopt=-fuse-ld=lld
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.4
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.5
               with:
                 apk: bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
@@ -173,7 +174,10 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    if: ${{ always() && fromJSON(needs.load.outputs.request).run.mobile-android }}
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-android }}
     needs:
     - load
     - build

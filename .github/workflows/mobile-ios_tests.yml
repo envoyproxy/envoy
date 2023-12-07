@@ -23,6 +23,7 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
       cache-docker: false
@@ -82,7 +83,10 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    if: ${{ always() && fromJSON(needs.load.outputs.request).run.mobile-ios-tests }}
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-ios-tests }}
     needs:
     - load
     - tests
