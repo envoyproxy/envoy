@@ -48,12 +48,8 @@ protected:
 class ClientIntegrationTest : public BaseClientIntegrationTest,
                               public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  static void SetUpTestCase() {
-    test_key_value_store_ = std::make_shared<TestKeyValueStore>();
-  }
-  static void TearDownTestCase() {
-    test_key_value_store_.reset();
-  }
+  static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
+  static void TearDownTestCase() { test_key_value_store_.reset(); }
 
   ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {
     // For H3 tests.
