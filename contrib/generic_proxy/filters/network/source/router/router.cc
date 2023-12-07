@@ -544,7 +544,8 @@ void RouterFilter::resetStream(StreamResetReason reason) {
 void RouterFilter::kickOffNewUpstreamRequest() {
   const auto& cluster_name = route_entry_->clusterName();
 
-  auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster_name);
+  auto thread_local_cluster =
+      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
     filter_complete_ = true;
     callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
