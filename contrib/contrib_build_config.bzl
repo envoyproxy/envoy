@@ -1,6 +1,12 @@
 # See bazel/README.md for details on how this system works.
 CONTRIB_EXTENSIONS = {
     #
+    # Compression
+    #
+
+    "envoy.compression.qatzip.compressor":                      "//contrib/qat/compression/qatzip/compressor/source:config",
+
+    #
     # HTTP filters
     #
     "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",

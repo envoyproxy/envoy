@@ -63,6 +63,7 @@ envoy_cc_test(
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//source/exe:main_common_lib",
+        "//source/extensions/filters/http/lua:config",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",

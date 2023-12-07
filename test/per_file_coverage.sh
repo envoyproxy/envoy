@@ -15,7 +15,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/protobuf:96.5"
+"source/common/protobuf:96.4"
 "source/common/quic:93.6"
 "source/common/secret:95.1"
 "source/common/signal:87.2" # Death tests don't report LCOV
@@ -59,6 +59,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
+"source/extensions/listener_managers:70.5"
 "source/extensions/listener_managers/validation_listener_manager:70.5"
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:91.0" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239

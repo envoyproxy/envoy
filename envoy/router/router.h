@@ -335,6 +335,11 @@ public:
   virtual std::vector<InternalRedirectPredicateSharedPtr> predicates() const PURE;
 
   /**
+   * @return a vector of response header names to preserve in the redirected request.
+   */
+  virtual const std::vector<Http::LowerCaseString>& responseHeadersToCopy() const PURE;
+
+  /**
    * @return the maximum number of allowed internal redirects on this route.
    */
   virtual uint32_t maxInternalRedirects() const PURE;
@@ -1383,7 +1388,7 @@ class GenericConnectionPoolCallbacks;
 class GenericUpstream;
 
 /**
- * An API for wrapping either an HTTP or a TCP connection pool.
+ * An API for wrapping either an HTTP, TCP, or UDP connection pool.
  *
  * The GenericConnPool exists to create a GenericUpstream handle via a call to
  * newStream resulting in an eventual call to onPoolReady
@@ -1393,7 +1398,8 @@ public:
   virtual ~GenericConnPool() = default;
 
   /**
-   * Called to create a new HTTP stream or TCP connection for "CONNECT streams".
+   * Called to create a new HTTP stream, TCP connection for CONNECT streams, or UDP socket for
+   * CONNECT-UDP streams.
    *
    * The implementation of the GenericConnPool will either call
    * GenericConnectionPoolCallbacks::onPoolReady
@@ -1443,7 +1449,7 @@ public:
 };
 
 /**
- * An API for wrapping callbacks from either an HTTP or a TCP connection pool.
+ * An API for wrapping callbacks from either an HTTP, TCP, or UDP connection pool.
  *
  * Just like the connection pool callbacks, the GenericConnectionPoolCallbacks
  * will either call onPoolReady when a GenericUpstream is ready, or
@@ -1489,7 +1495,7 @@ public:
 };
 
 /**
- * An API for sending information to either a TCP or HTTP upstream.
+ * An API for sending information to either a TCP, UDP, or HTTP upstream.
  *
  * It is similar logically to RequestEncoder, only without the getStream interface.
  */

@@ -39,7 +39,8 @@ class ProxyFilterConfig : public Upstream::ClusterUpdateCallbacks,
 public:
   ProxyFilterConfig(
       const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+      Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
+      Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
       Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory& cluster_store_factory,
       Server::Configuration::FactoryContext& context);
 

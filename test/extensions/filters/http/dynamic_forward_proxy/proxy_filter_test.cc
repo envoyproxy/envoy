@@ -62,8 +62,9 @@ public:
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
         factory_context_);
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cluster_store_factory,
-                                                         factory_context_);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        this->get(), cluster_store_factory, factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -530,8 +531,10 @@ public:
 
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
         factory_context_);
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cluster_store_factory,
-                                                         factory_context_);
+
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        this->get(), cluster_store_factory, factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);

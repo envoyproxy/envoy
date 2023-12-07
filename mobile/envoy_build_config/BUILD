@@ -4,7 +4,6 @@ load(
     "envoy_mobile_package",
     "envoy_select_enable_http3",
     "envoy_select_envoy_mobile_listener",
-    "envoy_select_envoy_mobile_request_compression",
     "envoy_select_envoy_mobile_xds",
 )
 
@@ -27,6 +26,7 @@ envoy_cc_library(
         "@envoy//source/common/upstream:default_local_address_selector_factory",
         "@envoy//source/common/watchdog:abort_action_config",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
+        "@envoy//source/extensions/compression/brotli/compressor:config",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
         "@envoy//source/extensions/filters/http/alternate_protocols_cache:config",
@@ -57,14 +57,6 @@ envoy_cc_library(
     ] + envoy_select_enable_http3(
         [
             "@envoy//source/common/quic:quic_transport_socket_factory_lib",
-        ],
-        "@envoy",
-    ) + envoy_select_envoy_mobile_request_compression(
-        [
-            "@envoy//source/extensions/compression/brotli/compressor:config",
-            "@envoy//source/extensions/compression/gzip/compressor:config",
-            "@envoy//source/extensions/filters/http/compressor:config",
-            "@envoy//source/extensions/filters/http/composite:config",
         ],
         "@envoy",
     ) + envoy_select_envoy_mobile_listener(

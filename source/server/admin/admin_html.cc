@@ -15,7 +15,7 @@ Http::Code AdminImpl::handlerAdminHome(Http::ResponseHeaderMap& response_headers
   AdminHtmlUtil::renderTableBegin(response);
 
   // Prefix order is used during searching, but for printing do them in alpha order.
-  OptRef<const Http::Utility::QueryParams> no_query_params;
+  OptRef<const Http::Utility::QueryParamsMulti> no_query_params;
   uint32_t index = 0;
   for (const UrlHandler* handler : sortedHandlers()) {
     AdminHtmlUtil::renderEndpointTableRow(response, *handler, no_query_params, ++index, false,

@@ -45,7 +45,7 @@ public:
   AccessLog::InstanceBaseSharedPtr<Context>
   createAccessLogInstance(const Protobuf::Message& config,
                           AccessLog::FilterBasePtr<Context>&& filter,
-                          Server::Configuration::CommonFactoryContext& context) override {
+                          Server::Configuration::FactoryContext& context) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
         config, context.messageValidationVisitor());
@@ -93,15 +93,8 @@ public:
 
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, typed_config.path()};
     return std::make_shared<FileAccessLogBase<Context>>(
-        file_info, std::move(filter), std::move(formatter), context.accessLogManager());
-  }
-
-  AccessLog::InstanceBaseSharedPtr<Context> createAccessLogInstance(
-      const Protobuf::Message& config, AccessLog::FilterBasePtr<Context>&& filter,
-      Server::Configuration::ListenerAccessLogFactoryContext& context) override {
-    return createAccessLogInstance(
-        config, std::move(filter),
-        static_cast<Server::Configuration::CommonFactoryContext&>(context));
+        file_info, std::move(filter), std::move(formatter),
+        context.serverFactoryContext().accessLogManager());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
