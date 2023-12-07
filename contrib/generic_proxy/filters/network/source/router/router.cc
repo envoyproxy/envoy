@@ -271,7 +271,7 @@ void OwnedGenericUpstream::onDecodingFailure() {
 
 UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr generic_upstream)
     : parent_(parent), generic_upstream_(std::move(generic_upstream)),
-      stream_info_(parent.context_.mainThreadDispatcher().timeSource(), nullptr) {
+      stream_info_(parent.context_.serverFactoryContext().timeSource(), nullptr) {
 
   // Set the upstream info for the stream info.
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -289,7 +289,7 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr 
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         tracing_config_.value().get(),
         absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
-        parent.context_.mainThreadDispatcher().timeSource().systemTime());
+        parent.context_.serverFactoryContext().timeSource().systemTime());
   }
 }
 
