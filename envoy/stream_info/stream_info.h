@@ -703,9 +703,9 @@ public:
   virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
-   * @return the time that the access log was emitted.
+   * @return returns the time source.
    */
-  virtual SystemTime emitLogTime() const PURE;
+  virtual TimeSource& timeSource() const PURE;
 
   /**
    * Sets the upstream information for this stream.

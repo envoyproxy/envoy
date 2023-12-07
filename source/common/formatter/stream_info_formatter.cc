@@ -1371,7 +1371,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   format,
                   std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                       [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                        return stream_info.emitLogTime();
+                        return stream_info.timeSource().systemTime();
                       }));
             }}},
           {"DYNAMIC_METADATA",

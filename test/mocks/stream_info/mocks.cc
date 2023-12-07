@@ -10,7 +10,6 @@
 using testing::_;
 using testing::Const;
 using testing::Invoke;
-using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -101,7 +100,7 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
-  ON_CALL(*this, emitLogTime()).WillByDefault(Return(ts_.systemTime()));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnPointee(&ts_));
   ON_CALL(*this, currentDuration()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
