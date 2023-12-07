@@ -89,11 +89,9 @@ public:
     }
     std::stringstream stack_stream;
     printTrace(stack_stream);
-    ENVOY_LOG(
-        critical,
-        absl::StrCat(
-            "Backtrace (use tools/stack_decode.py to get line numbers):\nEnvoy version: {}\n{}",
-            VersionInfo::version(), stack_stream.str()));
+    ENVOY_LOG(critical,
+              "Backtrace (use tools/stack_decode.py to get line numbers):\nEnvoy version: {}\n{}",
+              VersionInfo::version(), stack_stream.str());
   }
 
   void logFault(const char* signame, const void* addr) {
