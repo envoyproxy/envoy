@@ -19,6 +19,7 @@ envoy_cc_extension(
     ],
     extra_visibility = [
         "//source/server:__subpackages__",
+        "//source/common/listener_manager:__subpackages__",
     ],
     tags = ["nofips"],
     deps = [

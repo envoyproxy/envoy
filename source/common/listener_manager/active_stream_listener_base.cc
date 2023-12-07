@@ -1,4 +1,4 @@
-#include "source/extensions/listener_managers/listener_manager/active_stream_listener_base.h"
+#include "source/common/listener_manager/active_stream_listener_base.h"
 
 #include "envoy/network/filter.h"
 

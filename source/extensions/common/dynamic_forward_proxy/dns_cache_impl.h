@@ -138,14 +138,17 @@ private:
     void setAddresses(Network::Address::InstanceConstSharedPtr address,
                       std::vector<Network::Address::InstanceConstSharedPtr>&& list) {
       absl::WriterMutexLock lock{&resolve_lock_};
-      first_resolve_complete_ = true;
+      if (!(Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.dns_cache_set_first_resolve_complete"))) {
+        first_resolve_complete_ = true;
+      }
       address_ = address;
       address_list_ = std::move(list);
     }
 
     std::chrono::steady_clock::duration lastUsedTime() const { return last_used_time_.load(); }
 
-    bool firstResolveComplete() const {
+    bool firstResolveComplete() const override {
       absl::ReaderMutexLock lock{&resolve_lock_};
       return first_resolve_complete_;
     }

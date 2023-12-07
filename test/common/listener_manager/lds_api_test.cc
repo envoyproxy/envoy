@@ -4,8 +4,8 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/listener_manager/lds_api.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/listener_managers/listener_manager/lds_api.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
