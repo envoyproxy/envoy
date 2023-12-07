@@ -1,5 +1,4 @@
 #include "source/extensions/common/aws/sigv4a_signer_impl.h"
-#include "source/extensions/common/aws/sigv4a_key_derivation.h"
 
 #include <openssl/ssl.h>
 
@@ -12,6 +11,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/headers.h"
+#include "source/extensions/common/aws/sigv4a_key_derivation.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
@@ -131,7 +131,7 @@ std::string SigV4ASignerImpl::createSignature(absl::string_view access_key_id,
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
-  EC_KEY* ec_key = SigV4AKeyDerivation::derivePrivateKey(access_key_id,secret_access_key);
+  EC_KEY* ec_key = SigV4AKeyDerivation::derivePrivateKey(access_key_id, secret_access_key);
   if (!ec_key) {
     ENVOY_LOG(debug, "SigV4A key derivation failed");
     return BlankStr;
@@ -168,7 +168,8 @@ std::string SigV4ASignerImpl::createSignature(absl::string_view access_key_id,
   //   fixed_input.insert(fixed_input.end(), external_counter);
   //   fixed_input.insert(fixed_input.end(), {0x00, 0x00, 0x01, 0x00});
 
-  //   auto k0 = crypto_util.getSha256Hmac(std::vector<uint8_t>(secret_key.begin(), secret_key.end()),
+  //   auto k0 = crypto_util.getSha256Hmac(std::vector<uint8_t>(secret_key.begin(),
+  //   secret_key.end()),
   //                                       fixed_input);
 
   //   // ECDSA q - 2
@@ -234,10 +235,12 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
 }
 
 // // adapted from
-// // https://github.com/awslabs/aws-c-auth/blob/baeffa791d9d1cf61460662a6d9ac2186aaf05df/source/key_derivation.c#L152
+// //
+// https://github.com/awslabs/aws-c-auth/blob/baeffa791d9d1cf61460662a6d9ac2186aaf05df/source/key_derivation.c#L152
 
 // bool SigV4ASignerImpl::constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
-//                                                      std::vector<uint8_t> rhs_raw_be_bigint) const {
+//                                                      std::vector<uint8_t> rhs_raw_be_bigint)
+//                                                      const {
 
 //   volatile uint8_t gt = 0;
 //   volatile uint8_t eq = 1;

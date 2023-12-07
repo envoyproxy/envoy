@@ -1,10 +1,10 @@
-#include "source/extensions/common/aws/sigv4a_signer_impl.h"
 #include "source/extensions/common/aws/sigv4a_key_derivation.h"
 
-#include "source/common/crypto/utility.h"
-#include "source/common/common/logger.h"
-
 #include <openssl/ssl.h>
+
+#include "source/common/common/logger.h"
+#include "source/common/crypto/utility.h"
+#include "source/extensions/common/aws/sigv4a_signer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,8 +12,7 @@ namespace Common {
 namespace Aws {
 
 EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
-                                            absl::string_view secret_access_key)
-{
+                                              absl::string_view secret_access_key) {
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
@@ -89,29 +88,26 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
   }
 
   return ec_key;
-
 }
 
-bool SigV4AKeyDerivation::derivePublicKey(EC_KEY* ec_key)
-{
+bool SigV4AKeyDerivation::derivePublicKey(EC_KEY* ec_key) {
 
-    const BIGNUM *priv_key_num = EC_KEY_get0_private_key(ec_key);
-    const EC_GROUP *group = EC_KEY_get0_group(ec_key);
-    EC_POINT *point = EC_POINT_new(group);
+  const BIGNUM* priv_key_num = EC_KEY_get0_private_key(ec_key);
+  const EC_GROUP* group = EC_KEY_get0_group(ec_key);
+  EC_POINT* point = EC_POINT_new(group);
 
-    EC_POINT_mul(group, point, priv_key_num, nullptr, nullptr, nullptr);
+  EC_POINT_mul(group, point, priv_key_num, nullptr, nullptr, nullptr);
 
-    EC_KEY_set_public_key(ec_key, point);
-    EC_POINT_free(point);
-    return true;
-
+  EC_KEY_set_public_key(ec_key, point);
+  EC_POINT_free(point);
+  return true;
 }
 
 // adapted from
 // https://github.com/awslabs/aws-c-auth/blob/baeffa791d9d1cf61460662a6d9ac2186aaf05df/source/key_derivation.c#L152
 
 bool SigV4AKeyDerivation::constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
-                                                     std::vector<uint8_t> rhs_raw_be_bigint) {
+                                                        std::vector<uint8_t> rhs_raw_be_bigint) {
 
   volatile uint8_t gt = 0;
   volatile uint8_t eq = 1;

@@ -42,8 +42,8 @@ envoy_cc_library(
     deps = [
         ":credentials_provider_interface",
         ":signer_interface",
-        ":utility_lib",
         ":sigv4a_key_derivation_lib",
+        ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
@@ -57,7 +57,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "sigv4a_key_derivation_lib",
     srcs = ["sigv4a_key_derivation.cc"],
-    hdrs = ["sigv4a_key_derivation.h","sigv4a_signer_impl.h"],
+    hdrs = [
+        "sigv4a_key_derivation.h",
+        "sigv4a_signer_impl.h",
+    ],
     deps = [
         ":credentials_provider_interface",
         ":signer_interface",
