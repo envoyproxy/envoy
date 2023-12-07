@@ -110,10 +110,10 @@ private:
     return matcher_ptrs;
   }
 
-  bool constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
-                                     std::vector<uint8_t> rhs_raw_be_bigint) const;
+  // bool constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
+  //                                    std::vector<uint8_t> rhs_raw_be_bigint) const;
 
-  void constantTimeAddOne(std::vector<uint8_t>* raw_be_bigint) const;
+  // void constantTimeAddOne(std::vector<uint8_t>* raw_be_bigint) const;
 
   const std::string service_name_;
   const std::string region_;
