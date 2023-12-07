@@ -171,6 +171,10 @@ new_features:
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
     These claims will be serialized as JSON and encoded as Base64.
+- area: jwt
+  change: |
+    The JWT authentication filter supports changing the routes when either the headers or the
+    dynamic metadata are modified.
 - area: tcp_proxy
   change: |
     added support to TCP Proxy for recording the latency in ``UpstreamTiming`` from when the first
