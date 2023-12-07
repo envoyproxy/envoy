@@ -48,6 +48,9 @@ protected:
 class ClientIntegrationTest : public BaseClientIntegrationTest,
                               public testing::TestWithParam<Network::Address::IpVersion> {
 public:
+  static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
+  static void TearDownTestCase() { test_key_value_store_.reset(); }
+
   ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {
     // For H3 tests.
     Network::forceRegisterUdpDefaultWriterFactoryFactory();
@@ -76,7 +79,6 @@ public:
       // www.lyft.com being recognized as QUIC ready.
       builder_.addQuicCanonicalSuffix(".lyft.com");
       builder_.addQuicHint("foo.lyft.com", upstream_port);
-      ASSERT(test_key_value_store_);
 
       // Force www.lyft.com to resolve to the fake upstream. It's the only domain
       // name the certs work for so we want that in the request, but we need to
@@ -100,8 +102,10 @@ public:
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
-  std::shared_ptr<TestKeyValueStore> test_key_value_store_;
+  static std::shared_ptr<TestKeyValueStore> test_key_value_store_;
 };
+
+std::shared_ptr<TestKeyValueStore> ClientIntegrationTest::test_key_value_store_{};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -258,10 +262,6 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
 
 // Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
 TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
-  if (version_ != Network::Address::IpVersion::v4) {
-    // Loopback resolves to a v4 address.
-    return;
-  }
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
   EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
@@ -270,7 +270,6 @@ TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
   builder_.enablePlatformCertificatesValidation(true);
   // Create a k-v store for DNS lookup which createEnvoy() will use to point
   // www.lyft.com -> fake H3 backend.
-  test_key_value_store_ = std::make_shared<TestKeyValueStore>();
   builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
   builder_.enableDnsCache(true, 1);
   upstream_tls_ = true;
