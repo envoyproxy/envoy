@@ -364,6 +364,12 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config);
     predicate_factories_.emplace_back(&factory, std::move(config));
   }
+  for (const auto& header : policy_config.response_headers_to_copy()) {
+    if (!Http::HeaderUtility::isModifiableHeader(header)) {
+      throwEnvoyExceptionOrPanic(":-prefixed headers or Hosts may not be specified here.");
+    }
+    response_headers_to_copy_.emplace_back(header);
+  }
 }
 
 std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::predicates() const {
@@ -374,6 +380,11 @@ std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::pred
         *predicate_factory.second, current_route_name_));
   }
   return predicates;
+}
+
+const std::vector<Http::LowerCaseString>&
+InternalRedirectPolicyImpl::responseHeadersToCopy() const {
+  return response_headers_to_copy_;
 }
 
 absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectResponseCodes(

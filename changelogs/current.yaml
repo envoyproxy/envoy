@@ -245,6 +245,11 @@ new_features:
     <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log_options>`
     to allow recording an access log entry periodically for the UDP session, and allow recording an access
     log entry on the connection tunnel created successfully to upstream when UDP tunneling is configured.
+- area: internal_redirects
+  change: |
+    Added support to copy headers from the redirect response to the
+    triggered request. See
+    :ref:`response_headers_to_copy<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_copy>`.
 - area: zookeeper
   change: |
     Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
