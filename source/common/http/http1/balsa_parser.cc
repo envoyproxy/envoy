@@ -273,7 +273,6 @@ void BalsaParser::OnBodyChunkInput(absl::string_view input) {
 
 void BalsaParser::OnHeaderInput(absl::string_view /*input*/) {}
 void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
-void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*/) {}
 
 void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
   validateAndProcessHeadersOrTrailersImpl(headers, /* trailers = */ false);
