@@ -4179,6 +4179,10 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
 
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
 
@@ -4228,6 +4232,9 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
   EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
   ON_CALL(*mock_predicate, name()).WillByDefault(Return("mock_predicate"));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
   EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
@@ -4250,6 +4257,10 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4276,6 +4287,9 @@ TEST_F(RouterTest, HttpInternalRedirectMatchedToDirectResponseSucceeded) {
             .WillRepeatedly(Return(&direct_response));
       }));
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4299,6 +4313,10 @@ TEST_F(RouterTest, InternalRedirectStripsFragment) {
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
       {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+
   response_decoder_->decodeHeaders(std::move(redirect_headers), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4319,6 +4337,9 @@ TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
 
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
   Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
       {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
   response_decoder_->decodeHeaders(std::move(redirect_headers), false);
@@ -4343,6 +4364,9 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4366,6 +4390,9 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
       .WillOnce(Return(true));
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4373,6 +4400,35 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
 
   // In production, the HCM recreateStream would have called this.
   router_->onDestroy();
+}
+
+TEST_F(RouterTest, ResponseHeadersTCopyCopiesHeadersOrClears) {
+  enableRedirects();
+  default_request_headers_.setCopy(Http::LowerCaseString("x-to-clear"), "value");
+
+  sendRequest();
+
+  redirect_headers_->setCopy(Http::LowerCaseString("x-to-copy"), "bar");
+
+  std::vector<Http::LowerCaseString> toCopy;
+  toCopy.emplace_back("x-to-clear");
+  toCopy.emplace_back("x-to-copy");
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_->onDestroy();
+  EXPECT_TRUE(default_request_headers_.get(Http::LowerCaseString("x-to-clear")).empty());
+  auto copyResult = default_request_headers_.get(Http::LowerCaseString("x-to-copy"));
+  EXPECT_FALSE(copyResult.empty());
+  EXPECT_EQ(1, copyResult.size());
+  EXPECT_EQ("bar", copyResult[0]->value().getStringView());
 }
 
 namespace {
@@ -6403,10 +6459,11 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
   // called to get address of upstream host that should be selected first.
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+      .WillOnce(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
+          std::make_pair("1.2.3.4", false))));
 
   auto override_host = router_->overrideHostToSelect();
-  EXPECT_EQ("1.2.3.4", override_host.value());
+  EXPECT_EQ("1.2.3.4", override_host.value().first);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);

@@ -49,6 +49,9 @@ protected:
 class ClientIntegrationTest : public BaseClientIntegrationTest,
                               public testing::TestWithParam<Network::Address::IpVersion> {
 public:
+  static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
+  static void TearDownTestCase() { test_key_value_store_.reset(); }
+
   ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {
     // For H3 tests.
     Network::forceRegisterUdpDefaultWriterFactoryFactory();
@@ -89,7 +92,8 @@ public:
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
     EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _)).Times(AnyNumber());
-    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation()).Times(AnyNumber());
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation())
+        .Times(AnyNumber());
   }
 
   void createEnvoy() override {
@@ -102,7 +106,6 @@ public:
       // www.lyft.com being recognized as QUIC ready.
       builder_.addQuicCanonicalSuffix(".lyft.com");
       builder_.addQuicHint("foo.lyft.com", upstream_port);
-      ASSERT(test_key_value_store_);
 
       // Force www.lyft.com to resolve to the fake upstream. It's the only domain
       // name the certs work for so we want that in the request, but we need to
@@ -127,8 +130,10 @@ public:
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
-  std::shared_ptr<TestKeyValueStore> test_key_value_store_;
+  static std::shared_ptr<TestKeyValueStore> test_key_value_store_;
 };
+
+std::shared_ptr<TestKeyValueStore> ClientIntegrationTest::test_key_value_store_{};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -252,8 +257,7 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
       absl::MutexLock l(&engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
-    Platform::StreamSharedPtr stream =
-        (*stream_prototype).start(explicit_flow_control_, min_delivery_size_);
+    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_);
     stream_prototype->setOnComplete(
         [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
           cc_.on_complete_calls++;
@@ -292,8 +296,7 @@ void ClientIntegrationTest::explicitFlowControlWithCancels() {
       absl::MutexLock l(&engine_lock_);
       stream_prototype = engine_->streamClient()->newStreamPrototype();
     }
-    Platform::StreamSharedPtr stream =
-        (*stream_prototype).start(explicit_flow_control_, min_delivery_size_);
+    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_);
     stream_prototype->setOnComplete(
         [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
           cc_.on_complete_calls++;
@@ -336,14 +339,12 @@ void ClientIntegrationTest::explicitFlowControlWithCancels() {
 }
 
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
-  min_delivery_size_ = 0;
   explicit_flow_control_ = true;
   initialize();
   explicitFlowControlWithCancels();
 }
 
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsHttp3) {
-  min_delivery_size_ = 0;
   initializeWithHttp3AndFakeDns();
 
   explicitFlowControlWithCancels();
@@ -399,6 +400,7 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
 // Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
 TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
   initializeWithHttp3AndFakeDns();
+
   basicTest();
 
   {
@@ -562,7 +564,7 @@ TEST_P(ClientIntegrationTest, BasicCancelWithOpenStream) {
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_complete_calls, 1);
 
-  // Now cancel.  As on_complete has been called cancel is a no-op but is
+  // Now cancel. As on_complete has been called cancel is a no-op but is
   // non-problematic.
   stream_->cancel();
   memset(&cc_.final_intel, 0, sizeof(cc_.final_intel));
