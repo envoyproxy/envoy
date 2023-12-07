@@ -160,7 +160,7 @@ There is support for having different filter chains for different routes. There 
 * Overriding a filter in the filter chain that is disabled by default and enabling it for specific
   routes.
 
-By default, the filter chain is the same for all routes and all filters are enabled. However, they
+By default, the filter chain is the same for all routes and all filters are enabled. However, a filter
 can be disabled for specific routes by using the :ref:`FilterConfig <envoy_v3_api_msg_config.route.v3.FilterConfig>`
 and setting the :ref:`disabled field <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>` in the
 per filter config map in the route configuration. See the
