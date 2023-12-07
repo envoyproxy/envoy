@@ -9,7 +9,7 @@ FactoryContextImplBase::FactoryContextImplBase(
     ListenerInfoConstSharedPtr listener_info)
     : server_(server), validation_visitor_(validation_visitor), scope_(std::move(scope)),
       listener_scope_(std::move(listener_scope)), listener_info_(std::move(listener_info)) {
-  if (listener_info == nullptr) {
+  if (listener_info_ == nullptr) {
     listener_info_ = std::make_shared<ListenerInfoImpl>();
   }
 }
