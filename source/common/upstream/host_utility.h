@@ -35,6 +35,8 @@ public:
   forEachHostMetric(const ClusterManager& cluster_manager,
                     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
                     const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb);
+
+  static bool allowLBChooseHost(LoadBalancerContext* context);
 };
 
 } // namespace Upstream
