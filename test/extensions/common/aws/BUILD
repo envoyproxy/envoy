@@ -43,6 +43,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
         "//source/extensions/common/aws:sigv4a_signer_impl_lib",
+        "//source/extensions/common/aws:sigv4a_key_derivation_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",

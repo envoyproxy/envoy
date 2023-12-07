@@ -69,10 +69,10 @@ match_excluded_headers:
 
   AwsRequestSigningProtoConfig expected_config;
   expected_config.set_service_name("s3");
-  expected_config.set_region("'*'");
+  expected_config.set_region("*");
   expected_config.set_host_rewrite("new-host");
   expected_config.set_signing_algorithm(envoy::extensions::filters::http::aws_request_signing::v3::
-                                            AwsRequestSigning_SigningAlgorithm_SigV4);
+                                            AwsRequestSigning_SigningAlgorithm_AWS_SigV4A);
   expected_config.add_match_excluded_headers()->set_prefix("x-envoy");
   expected_config.add_match_excluded_headers()->set_exact("foo");
   expected_config.add_match_excluded_headers()->set_exact("bar");
