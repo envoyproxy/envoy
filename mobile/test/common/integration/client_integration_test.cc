@@ -72,7 +72,7 @@ public:
     // Create a k-v store for DNS lookup which createEnvoy() will use to point
     // www.lyft.com -> fake H3 backend.
     builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
-    builder_.enableDnsCache(true, 1);
+    builder_.enableDnsCache(true, /* save_interval_seconds */ 1);
     upstream_tls_ = true;
     add_quic_hints_ = true;
 
@@ -567,7 +567,6 @@ TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStreamHttp3) {
   // Now cancel. As on_complete has been called cancel is a no-op but is
   // non-problematic.
   stream_->cancel();
-  memset(&cc_.final_intel, 0, sizeof(cc_.final_intel));
 }
 
 TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
