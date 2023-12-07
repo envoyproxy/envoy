@@ -570,7 +570,7 @@ match_config {
         patterns {
           string_match: "match_me"
         }
-      } 
+      }
     }
     rules {
       http_response_trailers_match {

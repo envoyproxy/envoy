@@ -370,6 +370,17 @@ absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
   return absl::OkStatus();
 }
 
+std::string MessageUtil::convertToStringForLogs(const Protobuf::Message& message, bool pretty_print,
+                                                bool always_print_primitive_fields) {
+#ifdef ENVOY_ENABLE_YAML
+  return getJsonStringFromMessageOrError(message, pretty_print, always_print_primitive_fields);
+#else
+  UNREFERENCED_PARAMETER(pretty_print);
+  UNREFERENCED_PARAMETER(always_print_primitive_fields);
+  return message.DebugString();
+#endif
+}
+
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
   ProtobufWkt::Struct struct_obj;
   ProtobufWkt::Value val;
