@@ -91,8 +91,10 @@ enum ResponseFlag {
   OverloadManager = 0x2000000,
   // DNS resolution failed.
   DnsResolutionFailed = 0x4000000,
+  // Drop certain percentage of overloaded traffic.
+  DropOverLoad = 0x8000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DnsResolutionFailed,
+  LastFlag = DropOverLoad,
 };
 
 /**
@@ -156,6 +158,8 @@ struct ResponseCodeDetailValues {
   const std::string ClusterNotFound = "cluster_not_found";
   // The request was rejected by the router filter because the cluster was in maintenance mode.
   const std::string MaintenanceMode = "maintenance_mode";
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
+  const std::string DropOverload = "drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
   // The request was forwarded upstream but the response timed out.

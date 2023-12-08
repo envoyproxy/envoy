@@ -163,6 +163,10 @@ new_features:
     instead of using :ref:`choice_count
     <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     to select the hosts.
+- area: upstream
+  change: |
+    Implmented API :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`
+    which can be used to drop certain percentage of traffic from Envoy.
 - area: stats
   change: |
     added :ref:`per_endpoint_stats <envoy_v3_api_field_config.cluster.v3.TrackClusterStats.per_endpoint_stats>` to get some metrics
