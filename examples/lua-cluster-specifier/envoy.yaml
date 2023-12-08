@@ -20,7 +20,7 @@ static_resources:
               - "*"
               routes:
               - match:
-                  prefix: "/anything"
+                  prefix: "/"
                 route:
                   inline_cluster_specifier_plugin:
                     extension:
@@ -54,5 +54,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: httpbin.org
-                port_value: 80
+                address: web_service
+                port_value: 8080
