@@ -19,7 +19,7 @@ namespace Common {
 namespace Aws {
 namespace {
 
-class SigV4ASignerImplTest : public testing::Test, public Logger::Loggable<Logger::Id::aws>  {
+class SigV4ASignerImplTest : public testing::Test, public Logger::Loggable<Logger::Id::aws> {
 public:
   SigV4ASignerImplTest()
       : credentials_provider_(new NiceMock<MockCredentialsProvider>()),
