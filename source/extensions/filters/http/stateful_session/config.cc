@@ -15,9 +15,7 @@ Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProto
     const ProtoConfig& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
 
-  Server::GenericFactoryContextImpl generic_context(context);
-
-  auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, generic_context));
+  auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new StatefulSession(filter_config)});
   };

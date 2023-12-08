@@ -188,8 +188,9 @@ public:
         .WillOnce(
             Invoke([this](ServerCodecCallbacks& callback) { decoder_callback_ = &callback; }));
 
-    filter_ = std::make_shared<Filter>(filter_config_, factory_context_.time_system_,
-                                       factory_context_.runtime_loader_);
+    filter_ = std::make_shared<Filter>(filter_config_,
+                                       factory_context_.server_factory_context_.time_system_,
+                                       factory_context_.server_factory_context_.runtime_loader_);
 
     EXPECT_EQ(filter_.get(), decoder_callback_);
 

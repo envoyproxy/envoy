@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -76,6 +77,11 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    copts = envoy_select_boringssl(
+        [
+            "-DENVOY_SSL_FIPS",
+        ],
+    ),
     external_deps = ["curl"],
     deps = [
         "//envoy/http:message_interface",

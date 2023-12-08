@@ -989,7 +989,7 @@ session_ticket_keys:
 )EOF";
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  factory_context_.secretManager().addStaticSecret(secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
@@ -1478,7 +1478,7 @@ tls_certificate:
       ->Add()
       ->set_name("abc.com");
 
-  factory_context_.secretManager().addStaticSecret(secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   const std::string cert_pem =
@@ -1514,7 +1514,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
       ->Add()
       ->set_name("abc.com");
 
-  factory_context_.secretManager().addStaticSecret(secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   const std::string cert_pem =
@@ -1554,7 +1554,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  factory_context_.secretManager().addStaticSecret(secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   const std::string cert_p12 =
@@ -1588,7 +1588,7 @@ TEST_F(ClientContextConfigImplTest, PasswordWrongPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  factory_context_.secretManager().addStaticSecret(secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1616,7 +1616,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  factory_context_.secretManager().addStaticSecret(secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1647,7 +1647,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
       ->Add()
       ->set_name("abc.com");
 
-  factory_context_.secretManager().addStaticSecret(secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
   ClientContextConfigImpl client_context_config(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1670,7 +1670,7 @@ TEST_F(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  factory_context_.secretManager().addStaticSecret(tls_certificate_secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(tls_certificate_secret_config).ok());
   envoy::extensions::transport_sockets::tls::v3::Secret
       certificate_validation_context_secret_config;
   const std::string certificate_validation_context_yaml = R"EOF(
@@ -1681,7 +1681,9 @@ TEST_F(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  factory_context_.secretManager().addStaticSecret(certificate_validation_context_secret_config);
+  EXPECT_TRUE(factory_context_.secretManager()
+                  .addStaticSecret(certificate_validation_context_secret_config)
+                  .ok());
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -1715,7 +1717,7 @@ tls_certificate:
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
-  factory_context_.secretManager().addStaticSecret(secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -1742,7 +1744,7 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  factory_context_.secretManager().addStaticSecret(tls_certificate_secret_config);
+  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(tls_certificate_secret_config).ok());
   envoy::extensions::transport_sockets::tls::v3::Secret
       certificate_validation_context_secret_config;
   const std::string certificate_validation_context_yaml = R"EOF(
@@ -1753,7 +1755,9 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  factory_context_.secretManager().addStaticSecret(certificate_validation_context_secret_config);
+  EXPECT_TRUE(factory_context_.secretManager()
+                  .addStaticSecret(certificate_validation_context_secret_config)
+                  .ok());
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()

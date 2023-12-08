@@ -94,7 +94,8 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
               // left. It would be nice to unify the logic but that can be cleaned up later.
               auto host_sessions_it = host_to_sessions_.find(host.get());
               if (host_sessions_it != host_to_sessions_.end()) {
-                for (const auto& session : host_sessions_it->second) {
+                for (auto& session : host_sessions_it->second) {
+                  session->onSessionComplete();
                   ASSERT(sessions_.count(session) == 1);
                   sessions_.erase(session);
                 }
@@ -112,7 +113,7 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
   ASSERT(host_to_sessions_.empty());
 }
 
-void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
+void UdpProxyFilter::ClusterInfo::removeSession(ActiveSession* session) {
   if (session->host().has_value()) {
     // First remove from the host to sessions map, in case the host was resolved.
     ASSERT(host_to_sessions_[&session->host().value().get()].count(session) == 1);
@@ -122,6 +123,8 @@ void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
       host_to_sessions_.erase(host_sessions_it);
     }
   }
+
+  session->onSessionComplete();
 
   // Now remove it from the primary map.
   ASSERT(sessions_.count(session) == 1);
@@ -178,6 +181,7 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOpt
     return new_session_ptr;
   }
 
+  new_session->onSessionComplete();
   return nullptr;
 }
 
@@ -299,6 +303,10 @@ UdpProxyFilter::UdpActiveSession::UdpActiveSession(
       use_original_src_ip_(cluster.filter_.config_->usingOriginalSrcIp()) {}
 
 UdpProxyFilter::ActiveSession::~ActiveSession() {
+  ENVOY_BUG(on_session_complete_called_, "onSessionComplete() not called");
+}
+
+void UdpProxyFilter::ActiveSession::onSessionComplete() {
   ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
@@ -311,6 +319,14 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
 
   disableAccessLogFlushTimer();
 
+  for (auto& active_read_filter : read_filters_) {
+    active_read_filter->read_filter_->onSessionComplete();
+  }
+
+  for (auto& active_write_filter : write_filters_) {
+    active_write_filter->write_filter_->onSessionComplete();
+  }
+
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     const Formatter::HttpFormatterContext log_context{
@@ -319,6 +335,8 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
       access_log->log(log_context, udp_session_info_);
     }
   }
+
+  on_session_complete_called_ = true;
 }
 
 void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {

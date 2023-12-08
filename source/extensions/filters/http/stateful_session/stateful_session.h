@@ -33,8 +33,11 @@ public:
     return factory_->create(headers);
   }
 
+  bool isStrict() const { return strict_; }
+
 private:
   Http::SessionStateFactorySharedPtr factory_;
+  bool strict_{false};
 };
 using StatefulSessionConfigSharedPtr = std::shared_ptr<StatefulSessionConfig>;
 

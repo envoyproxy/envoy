@@ -52,11 +52,12 @@ using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCa
 
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+    Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory& cluster_store_factory,
     Server::Configuration::FactoryContext& context)
-    : cluster_store_(cluster_store_factory.get()), dns_cache_manager_(cache_manager_factory.get()),
-      dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
+    : cluster_store_(cluster_store_factory.get()), dns_cache_manager_(std::move(cache_manager)),
+      dns_cache_(std::move(cache)),
       cluster_manager_(context.serverFactoryContext().clusterManager()),
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       tls_slot_(context.serverFactoryContext().threadLocal()),
