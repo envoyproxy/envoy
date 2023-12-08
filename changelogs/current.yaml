@@ -26,6 +26,11 @@ behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
     requests and responses. This behavior can be reverted by setting the feature to false.
+- area: http2
+  change: |
+    Discard the ``Host`` header if the ``:authority`` header was received to bring Envoy into compliance with
+    https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1 This behavioral change can be reverted by setting runtime flag
+    ``envoy.reloadable_features.http2_discard_host_header`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
