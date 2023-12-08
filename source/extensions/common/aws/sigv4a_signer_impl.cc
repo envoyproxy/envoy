@@ -53,14 +53,17 @@ void SigV4ASignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& 
     // This behavior matches what the AWS SDK would do.
     return;
   }
+
   const auto* method_header = headers.Method();
   if (method_header == nullptr) {
     throw EnvoyException("Message is missing :method header");
   }
+
   const auto* path_header = headers.Path();
   if (path_header == nullptr) {
     throw EnvoyException("Message is missing :path header");
   }
+
   if (credentials.sessionToken()) {
     headers.addCopy(SigV4ASignatureHeaders::get().SecurityToken,
                     credentials.sessionToken().value());
@@ -70,6 +73,7 @@ void SigV4ASignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& 
   headers.addCopy(SigV4ASignatureHeaders::get().Date, long_date);
   headers.addCopy(SigV4ASignatureHeaders::get().RegionSet,
                   override_region.empty() ? region_ : override_region);
+    ENVOY_LOG(debug,"ahere4");
 
   // Phase 1: Create a canonical request
   const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
