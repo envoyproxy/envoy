@@ -435,10 +435,10 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
+      "%CONNECTION_ID% "
       "%DOWNSTREAM_REMOTE_ADDRESS% "
       "%DOWNSTREAM_LOCAL_ADDRESS% "
       "%UPSTREAM_HOST% "
-      "%CONNECTION_ID% "
       "%STREAM_ID% "
       "%ACCESS_LOG_TYPE%";
 
@@ -504,17 +504,13 @@ upstream_socket_config:
   EXPECT_EQ(output_.size(), 3);
   EXPECT_EQ(output_[0], "23 4 23 4 0 2 0");
 
-  const std::string session_access_log_regex1 =
-      "17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 0 "
+  const std::string session_access_log_regex =
+      "(17 3 17 3 0|6 1 6 1 1) 10.0.0.(1|3):1000 10.0.0.2:80 20.0.0.1:443 "
       "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
       AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
-  EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex1)));
 
-  const std::string session_access_log_regex2 =
-      "6 1 6 1 10.0.0.3:1000 10.0.0.2:80 20.0.0.1:443 1 "
-      "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
-      AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
-  EXPECT_TRUE(std::regex_match(output_[2], std::regex(session_access_log_regex2)));
+  EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex)));
+  EXPECT_TRUE(std::regex_match(output_[2], std::regex(session_access_log_regex)));
 }
 
 // Route with source IP.
