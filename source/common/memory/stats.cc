@@ -58,7 +58,7 @@ Allocator::~Allocator() {
 }
 
 void Allocator::configureBackgroundMemoryRelease() {
-  ASSERT(!tcmalloc_thread_);
+  RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc thread has not beein initialised");
   if (background_release_rate_ > 0) {
     tcmalloc::MallocExtension::SetBackgroundReleaseRate(
         tcmalloc::MallocExtension::BytesPerSecond{background_release_rate_});
@@ -142,8 +142,6 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", buffer.get());
 }
 
-}
-
 Allocator::~Allocator() {
   MallocExtension::instance()->SetBackgroundProcessActionsEnabled(false);
   if (tcmalloc_thread_) {
@@ -152,7 +150,7 @@ Allocator::~Allocator() {
 }
 
 void Allocator::configureBackgroundMemoryRelease() {
-  RELEASE_ASSERT(!tcmalloc_thread_);
+  RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc thread has not beein initialised");
   if (background_release_rate_ > 0) {
     MallocExtension::instance()->SetBackgroundReleaseRate(
         MallocExtension::instance()->BytesPerSecond{background_release_rate_});
@@ -161,7 +159,7 @@ void Allocator::configureBackgroundMemoryRelease() {
     // `ProcessBackgroundActions` routine needs to be invoked for background memory release to be
     // operative. https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h#L635
     tcmalloc_thread_ = thread_factory_.createThread(
-        []() -> void { tcmallocProcessBackgroundActionsThreadRoutine(); },
+        [this]() -> void { tcmallocProcessBackgroundActionsThreadRoutine(); },
         Thread::Options{"TcmallocProcessBackgroundActions"});
   }
 }
