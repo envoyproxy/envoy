@@ -295,6 +295,8 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
 }
 
 TEST(HttpCacheTest, StableHashKey) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "true"}});
   Key key;
   key.set_host("example.com");
   ASSERT_EQ(stableHashKey(key), 6153940628716543519u);
@@ -302,8 +304,8 @@ TEST(HttpCacheTest, StableHashKey) {
 
 TEST(HttpCacheTest, StableHashKeyWithSlowHash) {
   // TODO(ravenblack): This test should be removed when the runtime guard is removed.
-  TestScopedRuntime runtime_;
-  runtime_.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "false"}});
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "false"}});
   Key key;
   key.set_host("example.com");
   ASSERT_EQ(stableHashKey(key), 9582653837550152292u);

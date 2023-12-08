@@ -54,8 +54,8 @@ static std::unique_ptr<Protobuf::Message> testProtoWithRepeatedFields() {
 }
 
 static void bmHashByTextFormat(benchmark::State& state, std::unique_ptr<Protobuf::Message> msg) {
-  TestScopedRuntime runtime_;
-  runtime_.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "false"}});
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "false"}});
   uint64_t hash = 0;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
@@ -66,6 +66,8 @@ static void bmHashByTextFormat(benchmark::State& state, std::unique_ptr<Protobuf
 
 static void bmHashByDeterministicHash(benchmark::State& state,
                                       std::unique_ptr<Protobuf::Message> msg) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "true"}});
   uint64_t hash = 0;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
