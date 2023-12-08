@@ -22,7 +22,6 @@ ProxyFilterConfig::ProxyFilterConfig(
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     Server::Configuration::FactoryContext& context)
     : dns_cache_manager_(cache_manager_factory.get()),
-      dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       stats_scope_(context.scope().createScope(
           absl::StrCat("udp.session.dynamic_forward_proxy.", config.stat_prefix(), "."))),
       filter_stats_(generateStats(*stats_scope_)), buffer_enabled_(config.has_buffer_options()),
@@ -35,7 +34,11 @@ ProxyFilterConfig::ProxyFilterConfig(
                               ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.buffer_options(),
                                                                 max_buffered_bytes,
                                                                 DefaultMaxBufferedBytes)
-                              : DefaultMaxBufferedBytes) {}
+                              : DefaultMaxBufferedBytes) {
+  auto cache_or_error = dns_cache_manager_->getCache(config.dns_cache_config());
+  THROW_IF_STATUS_NOT_OK(cache_or_error, throw);
+  dns_cache_ = std::move(cache_or_error.value());
+}
 
 ReadFilterStatus ProxyFilter::onNewSession() {
   absl::string_view host;

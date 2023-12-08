@@ -27,8 +27,8 @@ GeoipProviderConfig::GeoipProviderConfig(
                                                  : absl::nullopt),
       anon_db_path_(!config.anon_db_path().empty() ? absl::make_optional(config.anon_db_path())
                                                    : absl::nullopt),
-      scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Maxmind")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "maxmind")) {
+      stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
+      stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
   auto geo_headers_to_add = config.common_provider_config().geo_headers_to_add();
   country_header_ = !geo_headers_to_add.country().empty()
                         ? absl::make_optional(geo_headers_to_add.country())
@@ -81,8 +81,7 @@ bool GeoipProviderConfig::isLookupEnabledForHeader(const absl::optional<std::str
 }
 
 void GeoipProviderConfig::incCounter(Stats::StatName name) {
-  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  stats_scope_->counterFromStatName(name).inc();
 }
 
 GeoipProvider::~GeoipProvider() {

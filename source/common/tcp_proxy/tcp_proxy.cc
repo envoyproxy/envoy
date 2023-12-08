@@ -139,9 +139,9 @@ Config::SharedConfig::SharedConfig(
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
                Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
-      upstream_drain_manager_slot_(context.getServerFactoryContext().threadLocal().allocateSlot()),
+      upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
-      random_generator_(context.getServerFactoryContext().api().randomGenerator()) {
+      random_generator_(context.serverFactoryContext().api().randomGenerator()) {
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();

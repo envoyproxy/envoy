@@ -16,10 +16,11 @@ Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryF
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocol_cache_manager_factory(
-      server_context.singletonManager(), server_context.threadLocal(), {context});
+      server_context.singletonManager(), server_context.threadLocal(),
+      {context.serverFactoryContext(), context.messageValidationVisitor()});
   FilterConfigSharedPtr filter_config(
       std::make_shared<FilterConfig>(proto_config, alternate_protocol_cache_manager_factory,
                                      server_context.mainThreadDispatcher().timeSource()));

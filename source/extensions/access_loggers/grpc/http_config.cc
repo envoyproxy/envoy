@@ -29,8 +29,8 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
       config, context.messageValidationVisitor());
 
   return std::make_shared<HttpGrpcAccessLog>(
-      std::move(filter), proto_config, context.getServerFactoryContext().threadLocal(),
-      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.getServerFactoryContext()));
+      std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
+      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {

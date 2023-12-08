@@ -24,7 +24,8 @@ public:
 } // namespace
 
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
-                                             Server::Configuration::CommonFactoryContext& context) {
+                                             Server::Configuration::GenericFactoryContext& context)
+    : strict_(config.strict()) {
   if (!config.has_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
     return;
@@ -41,7 +42,7 @@ StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
 }
 
 PerRouteStatefulSession::PerRouteStatefulSession(
-    const PerRouteProtoConfig& config, Server::Configuration::CommonFactoryContext& context) {
+    const PerRouteProtoConfig& config, Server::Configuration::GenericFactoryContext& context) {
   if (config.override_case() == PerRouteProtoConfig::kDisabled) {
     disabled_ = true;
     return;
@@ -66,7 +67,8 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
   }
 
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
-    decoder_callbacks_->setUpstreamOverrideHost(upstream_address.value());
+    decoder_callbacks_->setUpstreamOverrideHost(
+        std::make_pair(upstream_address.value(), config->isStrict()));
   }
   return Http::FilterHeadersStatus::Continue;
 }

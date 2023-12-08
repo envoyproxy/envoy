@@ -96,7 +96,7 @@ public:
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
-  using OverrideHost = absl::string_view;
+  using OverrideHost = std::pair<absl::string_view, bool>;
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and
    * the host can be selected directly, the load balancer can bypass the load balancing algorithm

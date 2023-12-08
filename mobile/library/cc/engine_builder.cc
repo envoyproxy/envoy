@@ -835,16 +835,20 @@ EngineSharedPtr EngineBuilder::build() {
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
-    auto* api = new envoy_kv_store();
-    *api = store->asEnvoyKeyValueStore();
-    register_platform_api(name.c_str(), api);
+    if (!Api::External::retrieveApi(name, true)) {
+      auto* api = new envoy_kv_store();
+      *api = store->asEnvoyKeyValueStore();
+      register_platform_api(name.c_str(), api);
+    }
   }
 
   for (const auto& [name, accessor] : string_accessors_) {
     // TODO(RyanTheOptimist): This leaks, but it's tied to the life of the engine.
-    auto* api = new envoy_string_accessor();
-    *api = StringAccessor::asEnvoyStringAccessor(accessor);
-    register_platform_api(name.c_str(), api);
+    if (!Api::External::retrieveApi(name, true)) {
+      auto* api = new envoy_string_accessor();
+      *api = StringAccessor::asEnvoyStringAccessor(accessor);
+      register_platform_api(name.c_str(), api);
+    }
   }
 
   Engine* engine = new Engine(envoy_engine);

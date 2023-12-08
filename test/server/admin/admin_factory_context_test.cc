@@ -13,38 +13,17 @@ TEST(AdminFactoryContextTest, AdminFactoryContextTest) {
 
   AdminFactoryContext context(server);
 
-  context.getServerFactoryContext();
+  context.serverFactoryContext();
   context.getTransportSocketFactoryContext();
   context.scope();
   context.listenerScope();
-  context.isQuicListener();
-  context.listenerMetadata();
-  context.listenerTypedMetadata();
-  context.direction();
+  context.listenerInfo().isQuic();
+  context.listenerInfo().metadata();
+  context.listenerInfo().typedMetadata();
+  context.listenerInfo().direction();
   context.messageValidationVisitor();
   context.initManager();
   context.drainDecision();
-
-  context.accessLogManager();
-  context.clusterManager();
-  context.mainThreadDispatcher();
-  context.options();
-  context.grpcContext();
-  context.healthCheckFailed();
-  context.httpContext();
-  context.routerContext();
-  context.localInfo();
-  context.runtime();
-  context.serverScope();
-  context.messageValidationContext();
-  context.singletonManager();
-  context.overloadManager();
-  context.threadLocal();
-  context.admin();
-  context.timeSource();
-  context.api();
-  context.lifecycleNotifier();
-  context.processContext();
 }
 
 } // namespace
