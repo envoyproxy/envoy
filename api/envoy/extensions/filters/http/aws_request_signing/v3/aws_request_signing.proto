@@ -44,8 +44,8 @@ message AwsRequestSigning {
   //
   // Example: us-west-2
   //
-  // When using aws_sigv4a, the region specifier is now used as a region set. A region set is a comma 
-  // seperated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
+  // When using aws_sigv4a, the region specifier is now used as a region set. A region set is a comma seperated list of
+  // AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
   string region = 2 [(validate.rules).string = {min_len: 1}];
 
   // Indicates that before signing headers, the host header will be swapped with
@@ -76,8 +76,8 @@ message AwsRequestSigning {
   repeated type.matcher.v3.StringMatcher match_excluded_headers = 5;
 
   // Optional Signing algorithm specifier, either aws_sigv4 or aws_sigv4a, defaulting to aws_sigv4.
-  // When using aws_sigv4a, the region specifier is now used as a region set. A region set is a comma 
-  // seperated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
+  // When using aws_sigv4a, the region specifier is now used as a region set. A region set is a comma seperated list of
+  // AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
   SigningAlgorithm signing_algorithm = 6;
 }
 
