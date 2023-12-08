@@ -36,6 +36,25 @@ class DownstreamFilterManager;
 
 struct ActiveStreamFilterBase;
 
+constexpr absl::string_view LocalReplyFilterStateKey =
+    "envoy.filters.network.http_connection_manager.local_reply_owner";
+class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
+public:
+  LocalReplyOwnerObject(const std::string& filter_config_name)
+      : filter_config_name_(filter_config_name) {}
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    message->set_value(filter_config_name_);
+    return message;
+  }
+
+  absl::optional<std::string> serializeAsString() const override { return filter_config_name_; }
+
+private:
+  const std::string filter_config_name_;
+};
+
 /**
  * Base class wrapper for both stream encoder and decoder filters.
  *
@@ -106,6 +125,11 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
   absl::string_view filterConfigName() const override { return filter_context_.config_name; }
+  RequestHeaderMapOptRef requestHeaders() override;
+  RequestTrailerMapOptRef requestTrailers() override;
+  ResponseHeaderMapOptRef informationalHeaders() override;
+  ResponseHeaderMapOptRef responseHeaders() override;
+  ResponseTrailerMapOptRef responseTrailers() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -131,6 +155,11 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   }
 
   Router::RouteConstSharedPtr getRoute() const;
+
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
@@ -218,13 +247,10 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override;
-  ResponseHeaderMapOptRef informationalHeaders() const override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
-  ResponseHeaderMapOptRef responseHeaders() const override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
-  ResponseTrailerMapOptRef responseTrailers() const override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
   void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -239,8 +265,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
   Buffer::BufferMemoryAccountSharedPtr account() const override;
-  void setUpstreamOverrideHost(absl::string_view host) override;
-  absl::optional<absl::string_view> upstreamOverrideHost() const override;
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -495,7 +521,7 @@ public:
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 
   /**
-   * Returns the UpstreamStreamFilterCallbacks for upstream filters.
+   * Returns the UpstreamStreamFilterCallbacks for upstream HTTP filters.
    */
   virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() { return {}; }
 
@@ -516,7 +542,7 @@ public:
   virtual const ScopeTrackedObject& scope() PURE;
 
   /**
-   * Returns a handle to the downstream callbacks, if available.
+   * Returns the DownstreamStreamFilterCallbacks for downstream HTTP filters.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
 };
@@ -662,22 +688,15 @@ public:
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
   void log(AccessLog::AccessLogType access_log_type) {
-    RequestHeaderMap* request_headers = nullptr;
-    if (filter_manager_callbacks_.requestHeaders()) {
-      request_headers = filter_manager_callbacks_.requestHeaders().ptr();
-    }
-    ResponseHeaderMap* response_headers = nullptr;
-    if (filter_manager_callbacks_.responseHeaders()) {
-      response_headers = filter_manager_callbacks_.responseHeaders().ptr();
-    }
-    ResponseTrailerMap* response_trailers = nullptr;
-    if (filter_manager_callbacks_.responseTrailers()) {
-      response_trailers = filter_manager_callbacks_.responseTrailers().ptr();
-    }
+    const Formatter::HttpFormatterContext log_context{
+        filter_manager_callbacks_.requestHeaders().ptr(),
+        filter_manager_callbacks_.responseHeaders().ptr(),
+        filter_manager_callbacks_.responseTrailers().ptr(),
+        {},
+        access_log_type};
 
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers, response_headers, response_trailers, streamInfo(),
-                       access_log_type);
+      log_handler->log(log_context, streamInfo());
     }
   }
 
@@ -918,8 +937,8 @@ private:
   public:
     FilterChainOptionsImpl(Router::RouteConstSharedPtr route) : route_(std::move(route)) {}
 
-    bool filterDisabled(absl::string_view config_name) const override {
-      return route_ != nullptr && route_->filterDisabled(config_name);
+    absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
+      return route_ != nullptr ? route_->filterDisabled(config_name) : absl::nullopt;
     }
 
   private:
@@ -1010,7 +1029,7 @@ private:
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
-  absl::optional<absl::string_view> upstream_override_host_;
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
 
   const FilterChainFactory& filter_chain_factory_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,

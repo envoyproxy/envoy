@@ -14,105 +14,78 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 /**
- * Decoder of request.
+ * Server codec that used to decode downstream request and encode upstream response.
+ * This codec is used by downstream connection.
  */
-class RequestDecoder {
+class ServerCodec {
 public:
-  virtual ~RequestDecoder() = default;
+  virtual ~ServerCodec() = default;
 
-  // The decode() method may be called multiple times for single request or response.
-  // So an independent setDecoderCallback() is used to set decoding callback.
-  virtual void setDecoderCallback(RequestDecoderCallback& callback) PURE;
-  virtual void decode(Buffer::Instance& buffer) PURE;
+  /**
+   * Set callbacks of server codec.
+   * @param callbacks callbacks of server codec. This callback will have same lifetime
+   * as the server codec.
+   */
+  virtual void setCodecCallbacks(ServerCodecCallbacks& callbacks) PURE;
+
+  /**
+   * Decode request frame from downstream connection.
+   * @param buffer data to decode.
+   * @param end_stream whether this is the last data of the downstream connection.
+   */
+  virtual void decode(Buffer::Instance& buffer, bool end_stream) PURE;
+
+  /**
+   * Encode response frame.
+   * @param frame response frame to encode.
+   * @param callbacks callbacks of encoding. This callback should be used to notify the
+   * generic proxy filter that the response is encoded and should be called only once.
+   */
+  virtual void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) PURE;
+
+  /**
+   * Create a response frame with specified status and flags.
+   * @param status status of the response.
+   * @param short_response_flags short flags of the response.
+   * @param request origin request that the response is created for.
+   */
+  virtual ResponsePtr respond(Status status, absl::string_view short_response_flags,
+                              const Request& request) PURE;
 };
 
 /**
- * Decoder of response.
+ * Client codec that used to decode upstream response and encode downstream request.
+ * This codec is used by upstream connection.
  */
-class ResponseDecoder {
+class ClientCodec {
 public:
-  virtual ~ResponseDecoder() = default;
-
-  // The decode() method may be called multiple times for single request or response.
-  // So an independent setDecoderCallback() is used to set decoding callback.
-  virtual void setDecoderCallback(ResponseDecoderCallback& callback) PURE;
-  virtual void decode(Buffer::Instance& buffer) PURE;
-};
-
-/*
- * Encoder of request.
- */
-class RequestEncoder {
-public:
-  virtual ~RequestEncoder() = default;
-
-  virtual void encode(const Request&, RequestEncoderCallback& callback) PURE;
-};
-
-/*
- * Encoder of response.
- */
-class ResponseEncoder {
-public:
-  virtual ~ResponseEncoder() = default;
-
-  virtual void encode(const Response&, ResponseEncoderCallback& callback) PURE;
-};
-
-class MessageCreator {
-public:
-  virtual ~MessageCreator() = default;
+  virtual ~ClientCodec() = default;
 
   /**
-   * Create local response message for local reply.
+   * Set callbacks of client codec.
+   * @param callbacks callbacks of client codec. This callback will have same lifetime
+   * as the client codec.
    */
-  virtual ResponsePtr response(Status status, const Request& origin_request) PURE;
-};
-
-using RequestDecoderPtr = std::unique_ptr<RequestDecoder>;
-using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
-using RequestEncoderPtr = std::unique_ptr<RequestEncoder>;
-using ResponseEncoderPtr = std::unique_ptr<ResponseEncoder>;
-using MessageCreatorPtr = std::unique_ptr<MessageCreator>;
-
-/**
- * Protocol specific options to control the behavior of the connection manager (generic proxy).
- */
-class ProtocolOptions {
-public:
-  ProtocolOptions(bool bind_upstream_connection)
-      : bind_upstream_connection_(bind_upstream_connection) {}
-  ProtocolOptions() = default;
+  virtual void setCodecCallbacks(ClientCodecCallbacks& callbacks) PURE;
 
   /**
-   * @return true if the upstream connection should be bound to the downstream connection, false
-   * otherwise.
-   *
-   * By default, one random upstream connection will be selected from the upstream connection pool
-   * and used for every request. And after the request is finished, the upstream connection will be
-   * released back to the upstream connection pool.
-   *
-   * If this option is true, the upstream connection will be bound to the downstream connection and
-   * have same lifetime as the downstream connection. The same upstream connection will be used for
-   * all requests from the same downstream connection.
-   *
-   * And if this options is true, one of the following requirements must be met:
-   * 1. The request must be handled one by one. That is, the next request can not be sent to the
-   *    upstream until the previous request is finished.
-   * 2. Unique request id must be provided for each request and response. The request id must be
-   *    unique for each request and response pair in same connection pair. And the request id must
-   *    be the same for the corresponding request and response.
-   * TODO(wbpcode): add pipeline support in the future.
-   *
-   * This could be useful for some protocols that require the same upstream connection to be used
-   * for all requests from the same downstream connection. For example, the protocol using stateful
-   * connection.
+   * Decode response frame from upstream connection.
+   * @param buffer data to decode.
+   * @param end_stream whether this is the last data of the upstream connection.
    */
-  bool bindUpstreamConnection() const { return bind_upstream_connection_; }
+  virtual void decode(Buffer::Instance& buffer, bool end_stream) PURE;
 
-private:
-  bool bind_upstream_connection_{false};
+  /**
+   * Encode request frame.
+   * @param frame request frame to encode.
+   * @param callbacks callbacks of encoding. This callbacks should be used to notify the
+   * generic proxy filter that the request is encoded and should be called only once.
+   */
+  virtual void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) PURE;
 };
+
+using ServerCodecPtr = std::unique_ptr<ServerCodec>;
+using ClientCodecPtr = std::unique_ptr<ClientCodec>;
 
 /**
  * Factory used to create generic stream encoder and decoder. If the developer wants to add
@@ -123,35 +96,15 @@ class CodecFactory {
 public:
   virtual ~CodecFactory() = default;
 
-  /*
-   * Create request decoder.
+  /**
+   * Create a server codec instance.
    */
-  virtual RequestDecoderPtr requestDecoder() const PURE;
-
-  /*
-   * Create response decoder.
-   */
-  virtual ResponseDecoderPtr responseDecoder() const PURE;
-
-  /*
-   * Create request encoder.
-   */
-  virtual RequestEncoderPtr requestEncoder() const PURE;
-
-  /*
-   * Create response encoder.
-   */
-  virtual ResponseEncoderPtr responseEncoder() const PURE;
+  virtual ServerCodecPtr createServerCodec() const PURE;
 
   /**
-   * Create message creator.
+   * Create a client codec instance.
    */
-  virtual MessageCreatorPtr messageCreator() const PURE;
-
-  /**
-   * @return the options to control the behavior of generic proxy filter.
-   */
-  virtual ProtocolOptions protocolOptions() const PURE;
+  virtual ClientCodecPtr createClientCodec() const PURE;
 };
 
 using CodecFactoryPtr = std::unique_ptr<CodecFactory>;

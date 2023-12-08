@@ -32,7 +32,7 @@ public:
   }
   Api::IoCallUint64Result flush() override {
     return {/*rc=*/0,
-            /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
+            /*err=*/Api::IoError::none()};
   }
 
 private:

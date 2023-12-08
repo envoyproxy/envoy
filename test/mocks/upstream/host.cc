@@ -50,6 +50,9 @@ MockHostDescription::MockHostDescription()
 
 MockHostDescription::~MockHostDescription() = default;
 
+MockHostLight::MockHostLight() = default;
+MockHostLight::~MockHostLight() = default;
+
 MockHost::MockHost() : socket_factory_(new testing::NiceMock<Network::MockTransportSocketFactory>) {
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/aws_lambda/config.h"
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
@@ -36,6 +37,7 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.serverFactoryContext();
 
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {
@@ -45,11 +47,12 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), Extensions::Common::Aws::Utility::fetchMetadata);
+          server_context.api(), makeOptRef(server_context), region,
+          Extensions::Common::Aws::Utility::fetchMetadata);
 
   auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
       service_name, region, std::move(credentials_provider),
-      context.mainThreadDispatcher().timeSource(),
+      server_context.mainThreadDispatcher().timeSource(),
       // TODO: extend API to allow specifying header exclusion. ref:
       // https://github.com/envoyproxy/envoy/pull/18998
       Extensions::Common::Aws::AwsSigV4HeaderExclusionVector{});

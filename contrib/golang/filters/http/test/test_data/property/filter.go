@@ -54,7 +54,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.assertProperty("request.useragent", "ua")
 	f.assertProperty("request.id", "xri")
 
-	f.assertProperty("request.duration", "value not found") // available only when the request is finished
+	f.assertProperty("request.duration", api.ErrValueNotFound.Error()) // available only when the request is finished
 
 	f.assertProperty("source.address", f.callbacks.StreamInfo().DownstreamRemoteAddress())
 	f.assertProperty("destination.address", f.callbacks.StreamInfo().DownstreamLocalAddress())
@@ -63,7 +63,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.assertProperty("xds.route_name", "test-route-name")
 
 	// non-existed attribute
-	f.assertProperty("request.user_agent", "value not found")
+	f.assertProperty("request.user_agent", api.ErrValueNotFound.Error())
 
 	// access response attribute in the decode phase
 	f.assertProperty("response.total_size", "0")
@@ -74,7 +74,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		".",
 		".total_size",
 	} {
-		f.assertProperty(attr, "value not found")
+		f.assertProperty(attr, api.ErrValueNotFound.Error())
 	}
 	// unsupported value type
 	for _, attr := range []string{
@@ -84,7 +84,14 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		"request",
 		"request.",
 	} {
-		f.assertProperty(attr, "serialization failure")
+		f.assertProperty(attr, api.ErrSerializationFailure.Error())
+	}
+
+	// error handling
+	_, err := f.callbacks.GetProperty(".not_found")
+	if err != api.ErrValueNotFound {
+		f.callbacks.Log(api.Critical, "unexpected error "+err.Error())
+		f.failed = true
 	}
 	return api.Continue
 }
@@ -94,9 +101,8 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	f.assertProperty("xds.cluster_name", "cluster_0")
 	f.assertProperty("xds.cluster_metadata", "")
 
-	// response.code is available only after the response has started to send
 	code, _ := f.callbacks.StreamInfo().ResponseCode()
-	exp := "value not found"
+	exp := ""
 	if code != 0 {
 		exp = strconv.Itoa(int(code))
 	}

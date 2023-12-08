@@ -102,6 +102,14 @@ public:
   virtual bool bufferEnabled() const PURE;
   virtual uint32_t maxBufferedDatagrams() const PURE;
   virtual uint64_t maxBufferedBytes() const PURE;
+
+  virtual void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
+
+  virtual void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
 };
 
 using UdpTunnelingConfigPtr = std::unique_ptr<const UdpTunnelingConfig>;
@@ -126,6 +134,9 @@ public:
   virtual const FilterChainFactory& sessionFilterFactory() const PURE;
   virtual bool hasSessionFilters() const PURE;
   virtual const UdpTunnelingConfigPtr& tunnelingConfig() const PURE;
+  virtual bool flushAccessLogOnTunnelConnected() const PURE;
+  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const PURE;
+  virtual Random::RandomGenerator& randomGenerator() const PURE;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -136,16 +147,20 @@ using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig
 class UdpLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   UdpLoadBalancerContext(const Udp::HashPolicy* hash_policy,
-                         const Network::Address::InstanceConstSharedPtr& peer_address) {
+                         const Network::Address::InstanceConstSharedPtr& peer_address,
+                         const StreamInfo::StreamInfo* stream_info)
+      : stream_info_(stream_info) {
     if (hash_policy) {
       hash_ = hash_policy->generateHash(*peer_address);
     }
   }
 
   absl::optional<uint64_t> computeHashKey() override { return hash_; }
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_; }
 
 private:
   absl::optional<uint64_t> hash_;
+  const StreamInfo::StreamInfo* stream_info_;
 };
 
 /**
@@ -309,6 +324,9 @@ private:
         is_valid_response = Http::HeaderUtility::isConnectUdpResponse(*headers);
       }
 
+      parent_.tunnel_config_.propagateResponseHeaders(std::move(headers),
+                                                      parent_.downstream_info_.filterState());
+
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.tunnel_creation_callbacks_.has_value()) {
@@ -324,7 +342,9 @@ private:
       }
     }
 
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
+      parent_.tunnel_config_.propagateResponseTrailers(std::move(trailers),
+                                                       parent_.downstream_info_.filterState());
       parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
     }
 
@@ -369,7 +389,9 @@ public:
                               Upstream::LoadBalancerContext* context,
                               const UdpTunnelingConfig& tunnel_config,
                               UpstreamTunnelCallbacks& upstream_callbacks,
-                              StreamInfo::StreamInfo& downstream_info);
+                              StreamInfo::StreamInfo& downstream_info,
+                              bool flush_access_log_on_tunnel_connected,
+                              const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs);
   ~TunnelingConnectionPoolImpl() override = default;
 
   bool valid() const { return conn_pool_data_.has_value(); }
@@ -404,6 +426,8 @@ private:
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   const UdpTunnelingConfig& tunnel_config_;
   StreamInfo::StreamInfo& downstream_info_;
+  const bool flush_access_log_on_tunnel_connected_;
+  const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   StreamInfo::StreamInfo* upstream_info_;
@@ -416,16 +440,20 @@ public:
    *
    * @param thread_local_cluster the thread local cluster to use for conn pool creation.
    * @param context the load balancing context for this connection.
-   * @param config the tunneling config.
+   * @param tunnel_config the tunneling config.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
    * @param stream_info is the downstream session stream info.
+   * @param flush_access_log_on_tunnel_connected indicates whether to flush access log on tunnel
+   * connected.
+   * @param session_access_logs is the list of access logs for the session.
    * @return may be null if pool creation failed.
    */
-  TunnelingConnectionPoolPtr createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                                            Upstream::LoadBalancerContext* context,
-                                            const UdpTunnelingConfig& tunnel_config,
-                                            UpstreamTunnelCallbacks& upstream_callbacks,
-                                            StreamInfo::StreamInfo& stream_info) const;
+  TunnelingConnectionPoolPtr
+  createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                 Upstream::LoadBalancerContext* context, const UdpTunnelingConfig& tunnel_config,
+                 UpstreamTunnelCallbacks& upstream_callbacks, StreamInfo::StreamInfo& stream_info,
+                 bool flush_access_log_on_tunnel_connected,
+                 const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const;
 };
 
 using TunnelingConnectionPoolFactoryPtr = std::unique_ptr<TunnelingConnectionPoolFactory>;
@@ -453,7 +481,7 @@ private:
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
-    void continueFilterChain() override { parent_.onContinueFilterChain(this); }
+    bool continueFilterChain() override { return parent_.onContinueFilterChain(this); }
     void injectDatagramToFilterChain(Network::UdpRecvData& data) override {
       parent_.onInjectReadDatagramToFilterChain(this, data);
     }
@@ -505,13 +533,13 @@ private:
       return absl::nullopt;
     }
 
-    void onNewSession();
+    bool onNewSession();
     void onData(Network::UdpRecvData& data);
     void processUpstreamDatagram(Network::UdpRecvData& data);
     void writeDownstream(Network::UdpRecvData& data);
     void resetIdleTimer();
 
-    virtual void createUpstream() PURE;
+    virtual bool createUpstream() PURE;
     virtual void writeUpstream(Network::UdpRecvData& data) PURE;
     virtual void onIdleTimer() PURE;
 
@@ -521,9 +549,10 @@ private:
 
     uint64_t sessionId() const { return session_id_; };
     StreamInfo::StreamInfo& streamInfo() { return udp_session_info_; };
-    void onContinueFilterChain(ActiveReadFilter* filter);
+    bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
+    void onSessionComplete();
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {
@@ -574,12 +603,20 @@ private:
     // idle timeouts work so we should consider unifying the implementation if we move to a time
     // stamp and scan approach.
     const Event::TimerPtr idle_timer_;
+    Event::TimerPtr access_log_flush_timer_;
 
     UdpProxySessionStats session_stats_{};
     StreamInfo::StreamInfoImpl udp_session_info_;
     uint64_t session_id_;
     std::list<ActiveReadFilterPtr> read_filters_;
     std::list<ActiveWriteFilterPtr> write_filters_;
+
+  private:
+    void onAccessLogFlushInterval();
+    void rearmAccessLogFlushTimer();
+    void disableAccessLogFlushTimer();
+
+    bool on_session_complete_called_{false};
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
@@ -591,7 +628,7 @@ private:
     ~UdpActiveSession() override = default;
 
     // ActiveSession
-    void createUpstream() override;
+    bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
 
@@ -640,7 +677,7 @@ private:
     ~TunnelingActiveSession() override = default;
 
     // ActiveSession
-    void createUpstream() override;
+    bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
 
@@ -662,7 +699,7 @@ private:
   private:
     using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
 
-    void establishUpstreamConnection();
+    bool establishUpstreamConnection();
     bool createConnectionPool();
     void maybeBufferDatagram(Network::UdpRecvData& data);
     void flushBuffer();
@@ -755,13 +792,14 @@ private:
                 SessionStorageType&& sessions);
     virtual ~ClusterInfo();
     virtual Network::FilterStatus onData(Network::UdpRecvData& data) PURE;
-    void removeSession(const ActiveSession* session);
-    void addSession(const Upstream::Host* host, const ActiveSession* session) {
+    void removeSession(ActiveSession* session);
+    void addSession(const Upstream::Host* host, ActiveSession* session) {
       host_to_sessions_[host].emplace(session);
     }
 
     Upstream::HostConstSharedPtr
-    chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address) const;
+    chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address,
+               const StreamInfo::StreamInfo* stream_info) const;
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;
@@ -785,7 +823,7 @@ private:
                                   const Upstream::HostConstSharedPtr& host);
 
     Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
-    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
+    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<ActiveSession*>>
         host_to_sessions_;
   };
 

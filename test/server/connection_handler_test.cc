@@ -13,6 +13,8 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/listener_manager/active_raw_udp_listener_config.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -20,8 +22,6 @@
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/listener_managers/listener_manager/active_raw_udp_listener_config.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -50,12 +50,22 @@ namespace Envoy {
 namespace Server {
 namespace {
 
+class MockConnectionHandlerImpl : public ConnectionHandlerImpl {
+public:
+  using ConnectionHandlerImpl::ConnectionHandlerImpl;
+  MOCK_METHOD(Network::ListenerPtr, createListener,
+              (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
+               Runtime::Loader& runtime, Random::RandomGenerator& random,
+               const Network::ListenerConfig& listener_config,
+               Server::ThreadLocalOverloadStateOptRef overload_state));
+};
+
 class ConnectionHandlerTest : public testing::Test,
                               protected Logger::Loggable<Logger::Id::main>,
                               public Event::TestUsingSimulatedTime {
 public:
   ConnectionHandlerTest()
-      : handler_(new ConnectionHandlerImpl(dispatcher_, 0)),
+      : handler_(new MockConnectionHandlerImpl(dispatcher_, 0)),
         filter_chain_(std::make_shared<NiceMock<Network::MockFilterChain>>()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()),
         access_log_(std::make_shared<AccessLog::MockInstance>()) {
@@ -95,6 +105,7 @@ public:
       udp_listener_config_->listener_factory_ =
           std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
       udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
+      ON_CALL(listener_info_, direction()).WillByDefault(Return(direction_));
     }
 
     struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
@@ -149,7 +160,7 @@ public:
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-    envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
+    const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
     }
@@ -186,6 +197,7 @@ public:
     const bool ignore_global_conn_limit_;
     envoy::config::core::v3::TrafficDirection direction_;
     absl::flat_hash_map<std::string, Network::UdpListenerCallbacks*> udp_listener_callback_map_{};
+    NiceMock<Network::MockListenerInfo> listener_info_;
   };
 
   class TestListener : public TestListenerBase {
@@ -321,16 +333,17 @@ public:
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
         .WillOnce(Return(listeners_.back()->sockets_[0]));
     if (socket_type == Network::Socket::Type::Stream) {
-      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-          .WillOnce(Invoke([listener, listener_callbacks](
-                               Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
-                               Runtime::Loader&, const Network::ListenerConfig&,
-                               Server::ThreadLocalOverloadStateOptRef) -> Network::Listener* {
-            if (listener_callbacks != nullptr) {
-              *listener_callbacks = &cb;
-            }
-            return listener;
-          }));
+      EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
+          .WillOnce(
+              Invoke([listener, listener_callbacks](
+                         Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
+                         Runtime::Loader&, Random::RandomGenerator&, const Network::ListenerConfig&,
+                         Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+                if (listener_callbacks != nullptr) {
+                  *listener_callbacks = &cb;
+                }
+                return std::unique_ptr<Network::Listener>(listener);
+              }));
     } else {
       delete listener;
       if (address == nullptr) {
@@ -382,18 +395,18 @@ public:
       test_listener_raw_ptr->sockets_[i]->connection_info_provider_->setLocalAddress(addresses[i]);
 
       if (socket_type == Network::Socket::Type::Stream) {
-        EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-            .WillOnce(
-                Invoke([i, &mock_listeners, &listener_callbacks_map](
-                           Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                           Runtime::Loader&, const Network::ListenerConfig&,
-                           Server::ThreadLocalOverloadStateOptRef) -> Network::Listener* {
-                  auto listener_callbacks_iter = listener_callbacks_map.find(
-                      socket->connectionInfoProvider().localAddress()->asString());
-                  EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
-                  *listener_callbacks_iter->second = &cb;
-                  return mock_listeners[i];
-                }))
+        EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
+            .WillOnce(Invoke([i, &mock_listeners, &listener_callbacks_map](
+                                 Network::SocketSharedPtr&& socket,
+                                 Network::TcpListenerCallbacks& cb, Runtime::Loader&,
+                                 Random::RandomGenerator&, const Network::ListenerConfig&,
+                                 Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+              auto listener_callbacks_iter = listener_callbacks_map.find(
+                  socket->connectionInfoProvider().localAddress()->asString());
+              EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
+              *listener_callbacks_iter->second = &cb;
+              return std::unique_ptr<Network::Listener>(mock_listeners[i]);
+            }))
             .RetiresOnSaturation();
       } else {
         listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
@@ -420,7 +433,7 @@ public:
         *Network::Utility::getIpv4AnyAddress(), normal_address->ip()->port());
     EXPECT_CALL(test_listener->socketFactory(), localAddress())
         .WillRepeatedly(ReturnRef(any_address));
-    handler_->addListener(absl::nullopt, *test_listener, runtime_);
+    handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
     Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
     Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
@@ -445,7 +458,7 @@ public:
     EXPECT_EQ(1UL, handler_->numConnections());
 
     EXPECT_CALL(*listener, onDestroy());
-    EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+    EXPECT_CALL(*access_log_, log(_, _));
   }
 
   Stats::TestUtil::TestStore stats_store_;
@@ -453,7 +466,7 @@ public:
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
   std::list<TestListenerPtr> listeners_;
-  std::unique_ptr<ConnectionHandlerImpl> handler_;
+  std::unique_ptr<MockConnectionHandlerImpl> handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
   NiceMock<Network::MockFilterChainFactory> factory_;
   const std::shared_ptr<Network::MockFilterChain> filter_chain_;
@@ -465,6 +478,7 @@ public:
   std::shared_ptr<AccessLog::MockInstance> access_log_;
   TestScopedRuntime scoped_runtime_;
   Runtime::Loader& runtime_{scoped_runtime_.loader()};
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 // Verify that if a listener is removed while a rebalanced connection is in flight, we correctly
@@ -484,7 +498,7 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, nullptr,
                   connection_balancer, &current_handler);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   // Fake a balancer posting a connection to us.
   Event::PostCb post_cb;
@@ -494,7 +508,7 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
   current_handler->incNumConnections();
 #ifndef NDEBUG
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 #endif
   current_handler->post(Network::ConnectionSocketPtr{connection});
 
@@ -527,7 +541,7 @@ TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
                                              &listener_callbacks1, normal_address);
   // Only allow a single connection on this listener.
   test_listener1->setMaxConnections(1);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   auto listener2 = new NiceMock<Network::MockListener>();
   Network::TcpListenerCallbacks* listener_callbacks2;
@@ -537,7 +551,7 @@ TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
       addListener(2, false, false, "test_listener2", listener2, &listener_callbacks2, alt_address);
   // Do not allow any connections on this listener.
   test_listener2->setMaxConnections(0);
-  handler_->addListener(absl::nullopt, *test_listener2, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener2, runtime_, random_);
 
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillRepeatedly(Return(filter_chain_.get()));
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillRepeatedly(Return(true));
@@ -557,7 +571,7 @@ TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
 
   // We expect that listener 2 accepts the connection, so there will be a call to
   // createServerConnection and active cx should increase, while cx overflow remains the same.
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks2->onAccept(
       Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
   EXPECT_EQ(0, handler_->numConnections());
@@ -606,10 +620,10 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 
@@ -652,10 +666,10 @@ TEST_F(ConnectionHandlerTest, RemoveListenerWithMultiAddrs) {
   TestMultiAddressesListener* test_listener =
       addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
                             connection_balancers, listener_callbacks_map);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks1->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 
@@ -682,7 +696,7 @@ TEST_F(ConnectionHandlerTest, DisableListener) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   EXPECT_CALL(*listener, disable());
   EXPECT_CALL(*listener, onDestroy());
@@ -712,7 +726,7 @@ TEST_F(ConnectionHandlerTest, DisableListenerWithMultiAddrs) {
   TestMultiAddressesListener* test_listener =
       addMultiAddrsListener(1, false, false, "test_listener", mock_listeners, addresses,
                             connection_balancers, listener_callbacks_map);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   EXPECT_CALL(*listener1, disable());
   EXPECT_CALL(*listener2, disable());
@@ -759,13 +773,13 @@ TEST_F(ConnectionHandlerTest, RebalanceWithMultiAddressListener) {
   TestMultiAddressesListener* test_listener =
       addMultiAddrsListener(1, false, false, "test_listener", mock_listeners, addresses,
                             connection_balancers, listener_callbacks_map);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   // Send connection to the first listener, expect mock_connection_balancer1 will be called.
   // then mock_connection_balancer1 will balance the connection to the same listener.
   EXPECT_CALL(*mock_connection_balancer1, pickTargetHandler(_))
       .WillOnce(ReturnRef(*current_handler1));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
   current_handler1->incNumConnections();
@@ -775,7 +789,7 @@ TEST_F(ConnectionHandlerTest, RebalanceWithMultiAddressListener) {
   // then mock_connection_balancer2 will balance the connection to the same listener.
   EXPECT_CALL(*mock_connection_balancer2, pickTargetHandler(_))
       .WillOnce(ReturnRef(*current_handler2));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
   current_handler2->incNumConnections();
@@ -795,7 +809,7 @@ TEST_F(ConnectionHandlerTest, StopAndDisableStoppedListener) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   EXPECT_CALL(*listener, onDestroy());
   handler_->stopListeners(1, {});
@@ -818,7 +832,7 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
   EXPECT_CALL(*listener, onDestroy());
 
   handler_->disableListeners();
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 }
 
 TEST_F(ConnectionHandlerTest, AddDisabledListenerWithMultiAddrs) {
@@ -847,7 +861,7 @@ TEST_F(ConnectionHandlerTest, AddDisabledListenerWithMultiAddrs) {
   EXPECT_CALL(*listener2, onDestroy());
 
   handler_->disableListeners();
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 }
 
 TEST_F(ConnectionHandlerTest, SetListenerRejectFraction) {
@@ -857,7 +871,7 @@ TEST_F(ConnectionHandlerTest, SetListenerRejectFraction) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   EXPECT_CALL(*listener, setRejectFraction(UnitFloat(0.1234f)));
   EXPECT_CALL(*listener, onDestroy());
@@ -876,7 +890,7 @@ TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
   EXPECT_CALL(*listener, onDestroy());
 
   handler_->setListenerRejectFraction(UnitFloat(0.12345f));
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 }
 
 TEST_F(ConnectionHandlerTest, SetsTransportSocketConnectTimeout) {
@@ -887,7 +901,7 @@ TEST_F(ConnectionHandlerTest, SetsTransportSocketConnectTimeout) {
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
 
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   auto server_connection = new NiceMock<Network::MockServerConnection>();
 
@@ -897,7 +911,7 @@ TEST_F(ConnectionHandlerTest, SetsTransportSocketConnectTimeout) {
       .WillOnce(Return(std::chrono::seconds(5)));
   EXPECT_CALL(*server_connection,
               setTransportSocketConnectTimeout(std::chrono::milliseconds(5 * 1000), _));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 
   listener_callbacks->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());
 
@@ -911,10 +925,10 @@ TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 
@@ -930,7 +944,7 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   auto* connection = new NiceMock<Network::MockServerConnection>();
@@ -938,7 +952,7 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(*connection, state()).WillOnce(Return(Network::Connection::State::Closed));
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(0);
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_EQ(0UL, handler_->numConnections());
@@ -953,7 +967,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   auto* connection = new NiceMock<Network::MockServerConnection>();
@@ -961,7 +975,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(false));
   EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(0);
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_EQ(0UL, handler_->numConnections());
@@ -976,7 +990,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   Network::TcpListenerCallbacks* listener_callbacks2;
   auto listener2 = new NiceMock<Network::MockListener>();
@@ -984,7 +998,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
       new Network::Address::Ipv4Instance("127.0.0.2", 20002));
   TestListener* test_listener2 =
       addListener(2, false, false, "test_listener2", listener2, &listener_callbacks2, alt_address);
-  handler_->addListener(absl::nullopt, *test_listener2, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener2, runtime_, random_);
 
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1017,12 +1031,11 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
   EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                           const Http::ResponseTrailerMap*,
-                           const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
-        EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
-      }));
+  EXPECT_CALL(*access_log_, log(_, _))
+      .WillOnce(Invoke(
+          [&](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
+          }));
   connection->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
@@ -1054,7 +1067,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirectWithMultiAddrs) {
   TestMultiAddressesListener* test_listener1 =
       addMultiAddrsListener(1, true, true, "test_listener1", mock_listeners, addresses,
                             connection_balancers, listener_callbacks_map);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1087,12 +1100,11 @@ TEST_F(ConnectionHandlerTest, NormalRedirectWithMultiAddrs) {
   EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
   EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                           const Http::ResponseTrailerMap*,
-                           const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
-        EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
-      }));
+  EXPECT_CALL(*access_log_, log(_, _))
+      .WillOnce(Invoke(
+          [&](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_EQ(alt_address, stream_info.downstreamAddressProvider().localAddress());
+          }));
   connection->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
@@ -1112,7 +1124,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   // Listener2 will be replaced by Listener3.
   auto listener2_overridden_filter_chain_manager =
@@ -1124,7 +1136,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
       addListener(2, false, false, "test_listener2", listener2, nullptr, listener2_address, nullptr,
                   nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
                   listener2_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *test_listener2, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener2, runtime_, random_);
 
   // Listener3 will replace the listener2.
   auto listener3_overridden_filter_chain_manager =
@@ -1141,7 +1153,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   // add the new listener.
   EXPECT_CALL(*listener2, onDestroy());
   handler_->stopListeners(2, {});
-  handler_->addListener(absl::nullopt, *test_listener3, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener3, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1180,7 +1192,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
 
   EXPECT_CALL(*listener3, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
@@ -1189,7 +1201,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   auto listener2_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
@@ -1200,7 +1212,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
       addListener(2, false, false, "test_listener2", listener2, nullptr, listener2_address, nullptr,
                   nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
                   listener2_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *test_listener2, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener2, runtime_, random_);
 
   // Stop the listener2.
   EXPECT_CALL(*listener2, onDestroy());
@@ -1240,7 +1252,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
   EXPECT_EQ(1UL, handler_->numConnections());
 
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
@@ -1249,7 +1261,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   auto listener2_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
@@ -1260,7 +1272,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
       addListener(2, false, false, "test_listener2", listener2, nullptr, listener2_address, nullptr,
                   nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
                   listener2_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *test_listener2, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener2, runtime_, random_);
 
   // Stop the listener2.
   EXPECT_CALL(*listener2, onDestroy());
@@ -1300,7 +1312,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
   EXPECT_EQ(1UL, handler_->numConnections());
 
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
@@ -1310,14 +1322,14 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   Network::TcpListenerCallbacks* listener_callbacks2;
   auto listener2 = new NiceMock<Network::MockListener>();
   Network::Address::InstanceConstSharedPtr any_address = Network::Utility::getIpv4AnyAddress();
   TestListener* test_listener2 =
       addListener(2, false, false, "test_listener2", listener2, &listener_callbacks2, any_address);
-  handler_->addListener(absl::nullopt, *test_listener2, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener2, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1350,7 +1362,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
 
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
@@ -1360,7 +1372,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   auto ipv4_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
@@ -1372,7 +1384,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
       2, false, false, "ipv4_any_test_listener", listener2, &ipv4_any_listener_callbacks,
       any_address, nullptr, nullptr, Network::Socket::Type::Stream,
       std::chrono::milliseconds(15000), false, ipv4_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv4_any_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv4_any_listener, runtime_, random_);
 
   auto ipv6_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
@@ -1384,7 +1396,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
       3, false, false, "ipv6_any_test_listener", listener3, &ipv6_any_listener_callbacks,
       any_address_ipv6, nullptr, nullptr, Network::Socket::Type::Stream,
       std::chrono::milliseconds(15000), false, ipv6_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv6_any_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv6_any_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1421,7 +1433,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
   EXPECT_CALL(*listener3, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 // This tests the ConnectionHandler's `getBalancedHandlerByAddress` will match
@@ -1436,7 +1448,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListenerWithAnyAddressAndIpv4Comp
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   auto ipv6_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
@@ -1449,7 +1461,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListenerWithAnyAddressAndIpv4Comp
       2, false, false, "ipv6_any_test_listener", listener2, &ipv6_any_listener_callbacks,
       any_address_ipv6, nullptr, nullptr, Network::Socket::Type::Stream,
       std::chrono::milliseconds(15000), false, ipv6_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv6_any_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv6_any_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1486,7 +1498,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListenerWithAnyAddressAndIpv4Comp
 
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 // This tests the ConnectionHandler's `getBalancedHandlerByAddress` will match
@@ -1501,7 +1513,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4CompatiableIPv6ListenerWithIpv4CompatFla
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   auto ipv6_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
@@ -1514,7 +1526,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4CompatiableIPv6ListenerWithIpv4CompatFla
       addListener(2, false, false, "ipv6_test_listener", listener2, &ipv6_listener_callbacks,
                   ipv4_mapped_ipv6_address, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, ipv6_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv6_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv6_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1551,7 +1563,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4CompatiableIPv6ListenerWithIpv4CompatFla
 
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 // This tests the ConnectionHandler's `getBalancedHandlerByAddress` won't match
@@ -1566,7 +1578,7 @@ TEST_F(ConnectionHandlerTest, NotMatchIPv6WildcardListenerWithoutIpv4CompatFlag)
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   auto ipv6_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
@@ -1579,7 +1591,7 @@ TEST_F(ConnectionHandlerTest, NotMatchIPv6WildcardListenerWithoutIpv4CompatFlag)
       2, false, false, "ipv6_any_test_listener", listener2, &ipv6_any_listener_callbacks,
       any_address_ipv6, nullptr, nullptr, Network::Socket::Type::Stream,
       std::chrono::milliseconds(15000), false, ipv6_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv6_any_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv6_any_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1615,7 +1627,7 @@ TEST_F(ConnectionHandlerTest, NotMatchIPv6WildcardListenerWithoutIpv4CompatFlag)
 
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 // This tests the case both "0.0.0.0" and "::" with ipv4_compat are added. The
@@ -1628,7 +1640,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   // Listener2 is listening on an ipv4-mapped ipv6 address.
   auto ipv6_overridden_filter_chain_manager =
@@ -1642,7 +1654,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
       addListener(2, false, false, "ipv6_test_listener", listener2, &ipv6_any_listener_callbacks,
                   ipv6_any_address, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, ipv6_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv6_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv6_listener, runtime_, random_);
 
   // Listener3 is listening on an ipv4 address.
   auto ipv4_overridden_filter_chain_manager =
@@ -1655,7 +1667,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
       addListener(3, false, false, "ipv4_test_listener", listener3, &ipv4_listener_callbacks,
                   ipv4_address, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, ipv4_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv4_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv4_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1695,7 +1707,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag) {
   EXPECT_CALL(*listener3, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 // This test is same as above except the Ipv4 listener is added first, then Ipv6
@@ -1708,7 +1720,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   // Listener3 is listening on an ipv4 address.
   auto ipv4_overridden_filter_chain_manager =
@@ -1721,7 +1733,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
       addListener(3, false, false, "ipv4_test_listener", listener3, &ipv4_listener_callbacks,
                   ipv4_address, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, ipv4_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv4_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv4_listener, runtime_, random_);
 
   // Listener2 is listening on an ipv4-mapped ipv6 address.
   auto ipv6_overridden_filter_chain_manager =
@@ -1735,7 +1747,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
       addListener(2, false, false, "ipv6_test_listener", listener2, &ipv6_any_listener_callbacks,
                   ipv4_mapped_ipv6_address, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, ipv6_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *ipv6_listener, runtime_);
+  handler_->addListener(absl::nullopt, *ipv6_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1775,7 +1787,7 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
   EXPECT_CALL(*listener3, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 // This test the case of an update for listener which listening
@@ -1788,7 +1800,7 @@ TEST_F(ConnectionHandlerTest, UpdateIpv4MappedListener) {
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, normal_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   // Listener2 is listening on an Ipv4-mapped Ipv6 address.
   auto listener2_overridden_filter_chain_manager =
@@ -1802,7 +1814,7 @@ TEST_F(ConnectionHandlerTest, UpdateIpv4MappedListener) {
       2, false, false, "ipv4_mapped_test_listener", listener2, &listener2_listener_callbacks,
       ipv4_mapped_ipv6_address, nullptr, nullptr, Network::Socket::Type::Stream,
       std::chrono::milliseconds(15000), false, listener2_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *origin_ipv4_mapped_listener, runtime_);
+  handler_->addListener(absl::nullopt, *origin_ipv4_mapped_listener, runtime_, random_);
 
   // Listener3 is an update of listener2.
   auto listener3_overridden_filter_chain_manager =
@@ -1813,7 +1825,7 @@ TEST_F(ConnectionHandlerTest, UpdateIpv4MappedListener) {
       3, false, false, "ipv4_mapped_test_listener", listener3, &listener3_any_listener_callbacks,
       ipv4_mapped_ipv6_address, nullptr, nullptr, Network::Socket::Type::Stream,
       std::chrono::milliseconds(15000), false, listener3_overridden_filter_chain_manager);
-  handler_->addListener(absl::nullopt, *updated_ipv4_mapped_listener, runtime_);
+  handler_->addListener(absl::nullopt, *updated_ipv4_mapped_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1855,7 +1867,7 @@ TEST_F(ConnectionHandlerTest, UpdateIpv4MappedListener) {
   EXPECT_CALL(*listener3, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDstInbound) {
@@ -1885,7 +1897,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
       *Network::Utility::getIpv4AnyAddress(), normal_address->ip()->port());
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1, any_address);
-  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1905,7 +1917,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
   EXPECT_EQ(1UL, handler_->numConnections());
 
   EXPECT_CALL(*listener1, onDestroy());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 }
 
 TEST_F(ConnectionHandlerTest, TransportProtocolDefault) {
@@ -1913,14 +1925,14 @@ TEST_F(ConnectionHandlerTest, TransportProtocolDefault) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   EXPECT_CALL(*accepted_socket, detectedTransportProtocol())
       .WillOnce(Return(absl::string_view("")));
   EXPECT_CALL(*accepted_socket, setDetectedTransportProtocol(absl::string_view("raw_buffer")));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(*listener, onDestroy());
@@ -1931,7 +1943,7 @@ TEST_F(ConnectionHandlerTest, TransportProtocolCustom) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1950,7 +1962,7 @@ TEST_F(ConnectionHandlerTest, TransportProtocolCustom) {
   EXPECT_CALL(*accepted_socket, setDetectedTransportProtocol(dummy));
   EXPECT_CALL(*accepted_socket, detectedTransportProtocol()).WillOnce(Return(dummy));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(*listener, onDestroy());
@@ -1964,7 +1976,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter(512);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
@@ -1993,7 +2005,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   EXPECT_EQ(1UL, downstream_pre_cx_active.value());
 
   EXPECT_CALL(*timeout, disableTimer());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   timeout->invokeCallback();
   EXPECT_CALL(*test_filter, destroy_());
   dispatcher_.clearDeferredDeleteList();
@@ -2016,7 +2028,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, nullptr, nullptr,
                   nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000), true);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new NiceMock<Network::MockListenerFilter>(128);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
@@ -2046,7 +2058,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   EXPECT_CALL(*test_filter, destroy_());
   // Barrier: test_filter must be destructed before findFilterChain
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(*timeout, disableTimer());
   timeout->invokeCallback();
   dispatcher_.clearDeferredDeleteList();
@@ -2076,7 +2088,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
   size_t max_size = 10;
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter(max_size);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
@@ -2106,8 +2118,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(io_handle, recv(_, _, _))
-      .WillOnce(Return(ByMove(
-          Api::IoCallUint64Result(max_size, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(max_size, Api::IoError::none()))));
   EXPECT_CALL(*test_filter, onData(_))
       .WillOnce(Invoke([](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
         return Network::FilterStatus::Continue;
@@ -2115,7 +2126,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   EXPECT_CALL(io_handle, resetFileEvents());
   EXPECT_CALL(*test_filter, destroy_());
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(*timeout, disableTimer());
 
   file_event_callback(Event::FileReadyType::Read);
@@ -2139,7 +2150,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, nullptr, nullptr,
                   nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds());
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter(512);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
@@ -2175,7 +2186,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockListenerFilter* first_filter = new Network::MockListenerFilter();
   Network::MockListenerFilter* last_filter = new Network::MockListenerFilter();
@@ -2191,7 +2202,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
         cb.socket().close();
         return Network::FilterStatus::StopIteration;
       }));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   // The last filter won't be invoked
   EXPECT_CALL(*last_filter, onAccept(_)).Times(0);
   EXPECT_CALL(*first_filter, destroy_());
@@ -2231,7 +2242,7 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilter) {
         callbacks = &cb;
       }));
 
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   // Make sure these calls don't crash.
   Network::UdpRecvData data;
@@ -2270,7 +2281,7 @@ TEST_F(ConnectionHandlerTest, UdpListenerWorkerRouterWithMultipleAddresses) {
   EXPECT_CALL(*udp_listener_worker_router1, registerWorkerForListener(_));
   EXPECT_CALL(*udp_listener_worker_router2, registerWorkerForListener(_));
 
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   EXPECT_CALL(*udp_listener_worker_router1, unregisterWorkerForListener(_));
   EXPECT_CALL(*udp_listener_worker_router2, unregisterWorkerForListener(_));
@@ -2293,7 +2304,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
   TestListener* old_test_listener =
       addListener(old_listener_tag, true, false, "test_listener", old_listener,
                   &old_listener_callbacks, nullptr, mock_connection_balancer, &current_handler);
-  handler_->addListener(absl::nullopt, *old_test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *old_test_listener, runtime_, random_);
   ASSERT_NE(old_test_listener, nullptr);
 
   Network::TcpListenerCallbacks* new_listener_callbacks = nullptr;
@@ -2305,7 +2316,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
                   &new_listener_callbacks, nullptr, mock_connection_balancer, nullptr,
                   Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
                   overridden_filter_chain_manager);
-  handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
+  handler_->addListener(old_listener_tag, *new_test_listener, runtime_, random_);
   ASSERT_EQ(new_listener_callbacks, nullptr)
       << "new listener should be inplace added and callback should not change";
 
@@ -2316,7 +2327,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
       .WillOnce(ReturnRef(*current_handler));
   EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
   EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(*mock_connection_balancer, unregisterHandler(_));
   old_listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
@@ -2330,14 +2341,14 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   auto* server_connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(server_connection));
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
 
@@ -2377,7 +2388,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
@@ -2397,7 +2408,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   handler_->stopListeners(listener_tag, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
 
   {
     // Filter chain removal in the same poll cycle but earlier.
@@ -2438,10 +2449,10 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveListener) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 
@@ -2470,10 +2481,10 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv6AnyAddressWithIpv4CompatListe
       new Network::Address::Ipv6Instance("::", 80, nullptr, false));
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, any_address_ipv6);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 
@@ -2499,10 +2510,10 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv4CompatAddressListener) {
       new Network::Address::Ipv6Instance("::FFFF:192.168.0.1", 80, nullptr, false));
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, address_ipv6);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 
@@ -2528,7 +2539,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
       new Network::Address::Ipv6Instance("::", 80, nullptr, false));
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, address_ipv6);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   Network::TcpListenerCallbacks* listener_callbacks2;
   auto listener2 = new NiceMock<Network::MockListener>();
@@ -2536,15 +2547,15 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
       new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
   TestListener* test_listener2 =
       addListener(2, true, false, "test_listener2", listener2, &listener_callbacks2, address_ipv4);
-  handler_->addListener(absl::nullopt, *test_listener2, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener2, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 
   Network::MockConnectionSocket* connection2 = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks2->onAccept(Network::ConnectionSocketPtr{connection2});
   EXPECT_EQ(0UL, handler_->numConnections());
 
@@ -2574,7 +2585,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerGlobalCxLimitReject) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   listener_callbacks->onReject(Network::TcpListenerCallbacks::RejectCause::GlobalCxLimit);
 
@@ -2588,7 +2599,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerOverloadActionReject) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   listener_callbacks->onReject(Network::TcpListenerCallbacks::RejectCause::OverloadAction);
 
@@ -2603,7 +2614,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
 
   auto all_matcher = std::make_shared<Network::MockListenerFilterMatcher>();
   auto* disabled_listener_filter = new Network::MockListenerFilter();
@@ -2625,7 +2636,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
   EXPECT_CALL(*disabled_listener_filter, destroy_());
   EXPECT_CALL(*enabled_filter, destroy_());
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_, log(_, _));
   listener_callbacks->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());
   EXPECT_CALL(*listener, onDestroy());
 }
@@ -2651,7 +2662,7 @@ TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
       .WillRepeatedly(ReturnRef(local_address_));
   EXPECT_CALL(dummy_callbacks.udp_listener_, onDestroy());
 
-  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+  handler_->addListener(absl::nullopt, *test_listener, runtime_, random_);
   handler_->stopListeners();
 }
 

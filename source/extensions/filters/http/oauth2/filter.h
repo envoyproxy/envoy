@@ -147,7 +147,7 @@ public:
     return oauth_token_endpoint_;
   }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
-  const Http::Utility::QueryParams& authorizationQueryParams() const {
+  const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
   }
   const std::string& redirectUri() const { return redirect_uri_; }
@@ -168,7 +168,7 @@ private:
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
-  const Http::Utility::QueryParams authorization_query_params_;
+  const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
   const Matchers::PathMatcher redirect_matcher_;

@@ -100,7 +100,7 @@ envoy_cc_extension(
     hdrs = ["http_config.h"],
     deps = [
         ":config_utils",
-        "//envoy/server:access_log_config_interface",
+        "//envoy/access_log:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
@@ -116,7 +116,7 @@ envoy_cc_extension(
     hdrs = ["tcp_config.h"],
     deps = [
         ":config_utils",
-        "//envoy/server:access_log_config_interface",
+        "//envoy/access_log:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",

@@ -50,6 +50,7 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   // See setters below for verbose descriptions.
   private final Context mApplicationContext;
   private final Map<String, Integer> mQuicHints = new HashMap<>();
+  private final List<String> mQuicCanonicalSuffixes = new LinkedList<>();
   private final List<Pkp> mPkps = new LinkedList<>();
   private boolean mPublicKeyPinningBypassForLocalTrustAnchorsEnabled;
   private String mUserAgent;
@@ -226,6 +227,13 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   }
 
   Map<String, Integer> quicHints() { return mQuicHints; }
+
+  public CronvoyEngineBuilderImpl addQuicCanonicalSuffix(String suffix) {
+    mQuicCanonicalSuffixes.add(suffix);
+    return this;
+  }
+
+  List<String> quicCanonicalSuffixes() { return mQuicCanonicalSuffixes; }
 
   @Override
   public CronvoyEngineBuilderImpl addPublicKeyPins(String hostName, Set<byte[]> pinsSha256,

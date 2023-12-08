@@ -99,7 +99,7 @@ public:
    *   from cluster config. If the bind config from the cluster manager, the param
    *   is empty.
    */
-  virtual UpstreamLocalAddressSelectorConstSharedPtr
+  virtual absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
   createLocalAddressSelector(std::vector<UpstreamLocalAddress> upstream_local_addresses,
                              absl::optional<std::string> cluster_name) const PURE;
 
@@ -771,11 +771,14 @@ public:
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
- * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
- * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * stats sink. See envoy.config.endpoint.v3.ClusterStats for the definition of
+ * total_dropped_requests and dropped_requests, which correspond to the upstream_rq_dropped and
+ * upstream_rq_drop_overload counter here. These are latched by LoadStatsReporter, independent of
+ * the normal stats sink flushing.
  */
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
-  COUNTER(upstream_rq_dropped)
+  COUNTER(upstream_rq_dropped)                                                                     \
+  COUNTER(upstream_rq_drop_overload)
 
 /**
  * Cluster circuit breakers gauges. Note that we do not generate a stats
@@ -1018,6 +1021,9 @@ public:
   /**
    * @return the load balancer factory for this cluster if the load balancing type is
    * LOAD_BALANCING_POLICY_CONFIG.
+   * TODO(wbpcode): change the return type to return a reference after
+   * 'envoy_reloadable_features_convert_legacy_lb_config' is removed. The factory should never be
+   * nullptr when the load balancing type is LOAD_BALANCING_POLICY_CONFIG.
    */
   virtual TypedLoadBalancerFactory* loadBalancerFactory() const PURE;
 
@@ -1168,6 +1174,11 @@ public:
    * budgets for this cluster.
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
+
+  /**
+   * @return true if this cluster should produce per-endpoint stats.
+   */
+  virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
@@ -1331,6 +1342,16 @@ public:
    * @return the const PrioritySet for the cluster.
    */
   virtual const PrioritySet& prioritySet() const PURE;
+
+  /**
+   * @return the cluster drop_overload configuration.
+   */
+  virtual UnitFloat dropOverload() const PURE;
+
+  /**
+   * Set up the drop_overload value for the cluster.
+   */
+  virtual void setDropOverload(UnitFloat drop_overload) PURE;
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;

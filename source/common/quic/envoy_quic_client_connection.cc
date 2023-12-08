@@ -106,6 +106,7 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
       connection_socket->connectionInfoProvider().remoteAddress()->ip());
 
   // The old socket is not closed in this call, because it could still receive useful packets.
+  num_socket_switches_++;
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket(*connectionSocket(), delegate_);
   MigratePath(self_address, peer_address, writer.release(), true);
@@ -117,7 +118,8 @@ void EnvoyQuicClientConnection::OnPathDegradingDetected() {
 }
 
 void EnvoyQuicClientConnection::maybeMigratePort() {
-  if (!IsHandshakeConfirmed() || HasPendingPathValidation() || !migrate_port_on_path_degrading_) {
+  if (!IsHandshakeConfirmed() || HasPendingPathValidation() || !migrate_port_on_path_degrading_ ||
+      num_socket_switches_ >= kMaxNumSocketSwitches) {
     return;
   }
 
@@ -172,6 +174,7 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
       peer_address() == envoy_context->peer_address()) {
     // probing_socket will be set as the new default socket. But old sockets are still able to
     // receive packets.
+    num_socket_switches_++;
     setConnectionSocket(std::move(probing_socket));
     return;
   }

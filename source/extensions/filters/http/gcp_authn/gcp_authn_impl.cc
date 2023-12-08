@@ -36,7 +36,8 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
 
   const std::string cluster = config_.http_uri().cluster();
   const std::string uri = config_.http_uri().uri();
-  const auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster);
+  const auto thread_local_cluster =
+      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(cluster);
 
   // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {

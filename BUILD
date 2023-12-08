@@ -1,5 +1,5 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_py_namespace")
+load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 
@@ -15,6 +15,7 @@ exports_files([
     ".coveragerc",
     "CODEOWNERS",
     "OWNERS.md",
+    ".github/workflows/_env.yml",
 ])
 
 alias(

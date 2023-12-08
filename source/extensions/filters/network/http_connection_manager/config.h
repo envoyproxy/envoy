@@ -27,6 +27,7 @@
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/date_provider_impl.h"
 #include "source/common/http/dependency_manager.h"
+#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
@@ -139,8 +140,7 @@ public:
   bool createFilterChain(
       Http::FilterChainManager& manager, bool = false,
       const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override;
-  using FilterFactoriesList =
-      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
+  using FilterFactoriesList = Envoy::Http::FilterChainUtility::FilterFactoriesList;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;

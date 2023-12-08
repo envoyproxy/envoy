@@ -8,8 +8,8 @@ HTTP/3 overview
   While HTTP/3 **downstream support is deemed ready for production use**, improvements are ongoing,
   tracked in the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
 
-  HTTP/3 **upstream support is fine for locally controlled networks**, but is not ready for
-  general internet use, and is missing some key latency features. See details below.
+  HTTP/3 **upstream support is fine for locally controlled networks**, but is alpha for
+  general internet use - key features are implemented but have not been tested at scale.
 
 .. _arch_overview_http3_downstream:
 

@@ -70,19 +70,23 @@ absl::flat_hash_map<int32_t, MonotonicTime>& KafkaMetricsFacadeImpl::getRequestA
 }
 
 KafkaBrokerFilter::KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_source,
-                                     const std::string& stat_prefix)
-    : KafkaBrokerFilter{
-          std::make_shared<KafkaMetricsFacadeImpl>(scope, time_source, stat_prefix)} {};
+                                     const BrokerFilterConfig& filter_config)
+    : KafkaBrokerFilter{filter_config, std::make_shared<KafkaMetricsFacadeImpl>(
+                                           scope, time_source, filter_config.stat_prefix())} {};
 
-KafkaBrokerFilter::KafkaBrokerFilter(const KafkaMetricsFacadeSharedPtr& metrics)
-    : metrics_{metrics}, response_decoder_{new ResponseDecoder({metrics})},
+KafkaBrokerFilter::KafkaBrokerFilter(const BrokerFilterConfig& filter_config,
+                                     const KafkaMetricsFacadeSharedPtr& metrics)
+    : metrics_{metrics}, response_rewriter_{createRewriter(filter_config)},
+      response_decoder_{new ResponseDecoder({metrics, response_rewriter_})},
       request_decoder_{
           new RequestDecoder({std::make_shared<Forwarder>(*response_decoder_), metrics})} {};
 
 KafkaBrokerFilter::KafkaBrokerFilter(KafkaMetricsFacadeSharedPtr metrics,
+                                     ResponseRewriterSharedPtr response_rewriter,
                                      ResponseDecoderSharedPtr response_decoder,
                                      RequestDecoderSharedPtr request_decoder)
-    : metrics_{metrics}, response_decoder_{response_decoder}, request_decoder_{request_decoder} {};
+    : metrics_{metrics}, response_rewriter_{response_rewriter}, response_decoder_{response_decoder},
+      request_decoder_{request_decoder} {};
 
 Network::FilterStatus KafkaBrokerFilter::onNewConnection() {
   return Network::FilterStatus::Continue;
@@ -107,6 +111,7 @@ Network::FilterStatus KafkaBrokerFilter::onWrite(Buffer::Instance& data, bool) {
   ENVOY_LOG(trace, "data from Kafka broker [{} response bytes]", data.length());
   try {
     response_decoder_->onData(data);
+    response_rewriter_->process(data);
     return Network::FilterStatus::Continue;
   } catch (const EnvoyException& e) {
     ENVOY_LOG(debug, "could not process data from Kafka broker: {}", e.what());

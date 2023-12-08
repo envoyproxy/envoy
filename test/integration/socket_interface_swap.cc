@@ -2,8 +2,6 @@
 
 namespace Envoy {
 
-void preserveIoError(Api::IoError*) {}
-
 SocketInterfaceSwap::SocketInterfaceSwap(Network::Socket::Type socket_type)
     : write_matcher_(std::make_shared<IoHandleMatcher>(socket_type)) {
   Envoy::Network::SocketInterfaceSingleton::clear();
@@ -15,15 +13,14 @@ SocketInterfaceSwap::SocketInterfaceSwap(Network::Socket::Type socket_type)
             // TODO(yanavlasov): refactor into separate method after CVE is public.
             if (slices == nullptr && size == 0) {
               // This is connect override check
-              Network::IoSocketError* error_override =
-                  write_matcher->returnConnectOverride(io_handle);
+              Api::IoErrorPtr error_override = write_matcher->returnConnectOverride(io_handle);
               if (error_override) {
-                return Api::IoCallUint64Result(0, Api::IoErrorPtr(error_override, preserveIoError));
+                return Api::IoCallUint64Result(0, std::move(error_override));
               }
             } else {
-              Network::IoSocketError* error_override = write_matcher->returnOverride(io_handle);
+              Api::IoErrorPtr error_override = write_matcher->returnOverride(io_handle);
               if (error_override) {
-                return Api::IoCallUint64Result(0, Api::IoErrorPtr(error_override, preserveIoError));
+                return Api::IoCallUint64Result(0, std::move(error_override));
               }
             }
             return absl::nullopt;

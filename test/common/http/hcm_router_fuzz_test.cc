@@ -359,6 +359,16 @@ public:
     return nullptr;
   }
 
+  FuzzCluster*
+  selectClusterByThreadLocalCluster(Upstream::ThreadLocalCluster& thread_local_cluster) {
+    for (auto& cluster : clusters_) {
+      if (&cluster->tlc_ == &thread_local_cluster) {
+        return cluster.get();
+      }
+    }
+    return nullptr;
+  }
+
   void reset() {
     for (auto& cluster : clusters_) {
       cluster->reset();
@@ -395,15 +405,14 @@ public:
   std::string name() const override { return "envoy.filters.connection_pools.http.generic"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster&,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        const Router::RouteEntry& route_entry,
-                        absl::optional<Envoy::Http::Protocol> protocol,
+                        Upstream::ResourcePriority, absl::optional<Envoy::Http::Protocol> protocol,
                         Upstream::LoadBalancerContext*) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       return nullptr;
     }
-    FuzzCluster* cluster = cluster_manager_.selectClusterByName(route_entry.clusterName());
+    FuzzCluster* cluster = cluster_manager_.selectClusterByThreadLocalCluster(thread_local_cluster);
     if (cluster == nullptr) {
       return nullptr;
     }

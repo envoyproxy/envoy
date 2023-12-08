@@ -30,7 +30,7 @@ void DFPClusterStore::remove(const std::string cluster_name) {
 }
 
 DFPClusterStoreSharedPtr DFPClusterStoreFactory::get() {
-  return context_.singletonManager().getTyped<DFPClusterStore>(
+  return singleton_manager_.getTyped<DFPClusterStore>(
       SINGLETON_MANAGER_REGISTERED_NAME(dynamic_forward_proxy_cluster_store),
       []() { return std::make_shared<DFPClusterStore>(); });
 }

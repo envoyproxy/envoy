@@ -46,7 +46,7 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo&, const std::string&,
-                                   const Tracing::Decision decision) {
+                                   Tracing::Decision decision) {
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   TracingContextPtr tracing_context;
   // TODO(shikugawa): support extension span header.

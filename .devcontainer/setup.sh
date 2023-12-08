@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
-. ci/setup_cache.sh
-trap - EXIT # Don't remove the key file written into a temporary file
-
 BAZELRC_FILE=~/.bazelrc bazel/setup_clang.sh /opt/llvm
 
+# TODO(phlax): use user.bazelrc
 # Use generated toolchain config because we know the base container is the one we're using in RBE.
 # Not using libc++ here because clangd will raise some tidy issue in libc++ header as of version 9.
 echo "build --config=rbe-toolchain-clang" >> ~/.bazelrc

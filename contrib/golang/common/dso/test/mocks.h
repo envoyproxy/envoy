@@ -16,7 +16,7 @@ public:
   MOCK_METHOD(GoUint64, envoyGoFilterNewHttpPluginConfig, (httpConfig * p0));
   MOCK_METHOD(GoUint64, envoyGoFilterMergeHttpPluginConfig,
               (GoUint64 p0, GoUint64 p1, GoUint64 p2, GoUint64 p3));
-  MOCK_METHOD(void, envoyGoFilterDestroyHttpPluginConfig, (GoUint64 p0));
+  MOCK_METHOD(void, envoyGoFilterDestroyHttpPluginConfig, (GoUint64 p0, GoInt p1));
   MOCK_METHOD(GoUint64, envoyGoFilterOnHttpHeader,
               (httpRequest * p0, GoUint64 p1, GoUint64 p2, GoUint64 p3));
   MOCK_METHOD(GoUint64, envoyGoFilterOnHttpData,

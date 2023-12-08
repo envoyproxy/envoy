@@ -8,8 +8,6 @@ set -e
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
-# shellcheck source=ci/setup_cache.sh
-. "$(dirname "$0")"/setup_cache.sh
 # shellcheck source=ci/build_setup.sh
 . "$(dirname "$0")"/build_setup.sh
 
@@ -165,7 +163,7 @@ function bazel_binary_build() {
     # The COMPILE_TYPE variable is redundant in this case and is only here for
     # readability. It is already set in the .bazelrc config for sizeopt.
     COMPILE_TYPE="opt"
-    CONFIG_ARGS="--config=sizeopt"
+    CONFIG_ARGS=("--config=sizeopt")
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
     COMPILE_TYPE="fastbuild"
   fi
@@ -183,7 +181,7 @@ function bazel_binary_build() {
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" "${CONFIG_ARGS[@]}"
   collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the built envoy binary somewhere that we can access outside of the
@@ -193,14 +191,14 @@ function bazel_binary_build() {
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     # Generate dwp file for debugging since we used split DWARF to reduce binary
     # size
-    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" "${CONFIG_ARGS[@]}"
     # Copy the debug information
     cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
   # Validation tools for the tools image.
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
+    //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" external:su-exec
@@ -280,9 +278,7 @@ case $CI_TARGET in
         ;&
 
     api.go)
-        if [[ -z "$NO_BUILD_SETUP" ]]; then
-            setup_clang_toolchain
-        fi
+        setup_clang_toolchain
         GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
         GO_TARGETS=(@envoy_api//...)
         read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
@@ -518,6 +514,7 @@ case $CI_TARGET in
         TODAY_DATE=$(date -u -I"date")
         export TODAY_DATE
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
+              --//tools/dependency:preload_cve_data \
               --action_env=TODAY_DATE \
               -- -v warn \
                  -c cves release_dates releases
@@ -525,6 +522,11 @@ case $CI_TARGET in
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
+        # Disable this pending resolution to https://github.com/envoyproxy/envoy/issues/30286
+        # Run pip requirements tests
+        # echo "Check pip requirements ..."
+        # bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       //tools/base:requirements_test
         ;;
 
     dev)
@@ -623,7 +625,7 @@ case $CI_TARGET in
         fi
         PLATFORMS="$(IFS=, ; echo "${_PLATFORMS[*]}")"
         export DOCKER_PLATFORM="$PLATFORMS"
-        if [[ -z "${DOCKERHUB_PASSWORD}" && "${#_PLATFORMS[@]}" -eq 1 ]]; then
+        if [[ -z "${DOCKERHUB_PASSWORD}" && "${#_PLATFORMS[@]}" -eq 1 && -z $ENVOY_DOCKER_SAVE_IMAGE ]]; then
             # if you are not pushing the images and there is only one platform
             # then load to Docker (ie local build)
             export DOCKER_LOAD_IMAGES=1
@@ -786,16 +788,20 @@ case $CI_TARGET in
     publish)
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
         PUBLISH_ARGS=(
-            --publish-commitish="$BUILD_SHA"
+            --publish-commitish="$ENVOY_COMMIT"
+            --publish-commit-message
             --publish-assets=/build/release.signed/release.signed.tar.zst)
         if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
             PUBLISH_ARGS+=(--dry-run)
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               @envoy_repo//:publish \
-              -- "${PUBLISH_ARGS[@]}"
+              -- --repo="$ENVOY_REPO" \
+                 "${PUBLISH_ARGS[@]}"
         ;;
 
     release|release.server_only)
@@ -856,12 +862,15 @@ case $CI_TARGET in
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 
+    release.server_only.binary)
+        setup_clang_toolchain
+        echo "bazel release build..."
+        bazel_envoy_binary_build release
+        ;;
+
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
-        # The default config expects these files
-        mkdir -p distribution/custom
-        cp -a /build/*/*64 distribution/custom/
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release

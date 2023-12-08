@@ -93,6 +93,7 @@ public:
                               const Envoy::Http::RequestHeaderMap& headers,
                               Protobuf::Map<std::string, std::string>&& context_extensions,
                               envoy::config::core::v3::Metadata&& metadata_context,
+                              envoy::config::core::v3::Metadata&& route_metadata_context,
                               envoy::service::auth::v3::CheckRequest& request,
                               uint64_t max_request_bytes, bool pack_as_bytes,
                               bool include_peer_certificate, bool include_tls_session,

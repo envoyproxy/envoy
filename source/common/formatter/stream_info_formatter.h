@@ -274,7 +274,7 @@ public:
     auto it = formatters.find(command);
 
     if (it == formatters.end()) {
-      throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", command));
+      throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
     }
 
     // Check flags for the command.

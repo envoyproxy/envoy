@@ -43,8 +43,9 @@ public:
   /**
    * If a read filter stopped filter iteration, continueFilterChain() can be called to continue the
    * filter chain. It will have onNewSession() called if it was not previously called.
+   * @return false if the session is removed and no longer valid, otherwise returns true.
    */
-  virtual void continueFilterChain() PURE;
+  virtual bool continueFilterChain() PURE;
 };
 
 class WriteFilterCallbacks : public FilterCallbacks {};
@@ -59,10 +60,35 @@ enum class ReadFilterStatus {
   StopIteration,
 };
 
+class FilterBase {
+public:
+  virtual ~FilterBase() = default;
+
+  /**
+   * This routine is called before the access log handlers' final log() is called. Filters can use
+   * this callback to enrich the data passed in to the log handlers.
+   */
+  void onSessionComplete() {
+    if (!on_session_complete_already_called_) {
+      onSessionCompleteInternal();
+      on_session_complete_already_called_ = true;
+    }
+  }
+
+protected:
+  /**
+   * This routine is called by onSessionComplete to enrich the data passed in to the log handlers.
+   */
+  virtual void onSessionCompleteInternal() { ASSERT(!on_session_complete_already_called_); }
+
+private:
+  bool on_session_complete_already_called_{false};
+};
+
 /**
  * Session read filter interface.
  */
-class ReadFilter {
+class ReadFilter : public FilterBase {
 public:
   virtual ~ReadFilter() = default;
 
@@ -108,7 +134,7 @@ enum class WriteFilterStatus {
 /**
  * Session write filter interface.
  */
-class WriteFilter {
+class WriteFilter : public FilterBase {
 public:
   virtual ~WriteFilter() = default;
 

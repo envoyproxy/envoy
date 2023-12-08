@@ -96,14 +96,18 @@ paths:
     - envoy/common/exception.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
+    - source/common/listener_manager/listener_impl.cc
+    - source/common/listener_manager/listener_manager_impl.cc
+    - source/common/listener_manager/filter_chain_manager_impl.cc
     - source/common/upstream/thread_aware_lb_impl.cc
+    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/load_balancer_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/outlier_detection_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
-    - source/common/network/io_socket_handle_impl.cc
+    - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
     - source/common/network/cidr_range.cc
     - source/common/network/utility.cc
@@ -272,6 +276,7 @@ paths:
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
+    - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/version/version.cc
@@ -404,3 +409,7 @@ visibility_excludes:
 - source/extensions/config_subscription/grpc/BUILD
 - source/extensions/load_balancing_policies/subset/BUILD
 - source/extensions/load_balancing_policies/ring_hash/BUILD
+- source/extensions/load_balancing_policies/round_robin/
+- source/extensions/load_balancing_policies/least_request/
+- source/extensions/load_balancing_policies/random/
+- source/extensions/load_balancing_policies/cluster_provided/

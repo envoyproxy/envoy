@@ -9,6 +9,7 @@
 
 #include "test/benchmark/main.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -18,6 +19,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+// Override the one method used by this test so that using a mock doesn't affect performance.
+class FastMockClusterManager : public testing::StrictMock<Upstream::MockClusterManager> {
+public:
+  ClusterInfoMaps clusters() const override { return ClusterInfoMaps{}; }
+};
 
 class TestSinkPredicates : public Stats::SinkPredicates {
 public:
@@ -76,7 +83,7 @@ public:
       UNREFERENCED_PARAMETER(_);
       std::list<Stats::SinkPtr> sinks;
       sinks.emplace_back(new testing::NiceMock<Stats::MockSink>());
-      Server::InstanceUtil::flushMetricsToSinks(sinks, stats_store_, time_system_);
+      Server::InstanceUtil::flushMetricsToSinks(sinks, stats_store_, cm_, time_system_);
     }
   }
 
@@ -86,6 +93,7 @@ private:
   Stats::AllocatorImpl stats_allocator_;
   Stats::ThreadLocalStoreImpl stats_store_;
   Event::SimulatedTimeSystem time_system_;
+  FastMockClusterManager cm_;
 };
 
 static void bmFlushToSinks(::benchmark::State& state) {

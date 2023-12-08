@@ -132,8 +132,11 @@ message Compressor {
 }
 
 // Per-route overrides of ``ResponseDirectionConfig``. Anything added here should be optional,
-// to allow overriding arbitrary subsets of configuration. Omitted fields must have no affect.
+// to allow overriding arbitrary subsets of configuration. Omitted fields must have no effect.
 message ResponseDirectionOverrides {
+  // If set, overrides the filter-level
+  // :ref:`remove_accept_encoding_header<envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.remove_accept_encoding_header>`.
+  google.protobuf.BoolValue remove_accept_encoding_header = 1;
 }
 
 // Per-route overrides. As per-route overrides are needed, they should be

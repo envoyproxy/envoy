@@ -360,6 +360,7 @@ public:
 
   void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override{};
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override{};
+  const Stats::TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(Stats::TagVector); }
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
@@ -461,6 +462,16 @@ public:
 
   void waitForCounterExists(const std::string& name) override {
     notifyingStatsAllocator().waitForCounterExists(name);
+  }
+
+  void waitForCounterNonexistent(const std::string& name,
+                                 std::chrono::milliseconds timeout) override {
+    Event::TestTimeSystem::RealTimeBound bound(timeout);
+    while (TestUtility::findCounter(statStore(), name) != nullptr) {
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+      ASSERT_FALSE(!bound.withinBound())
+          << "timed out waiting for counter " << name << " to not exist.";
+    }
   }
 
   void waitForProactiveOverloadResourceUsageEq(

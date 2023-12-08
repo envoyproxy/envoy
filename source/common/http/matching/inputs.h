@@ -161,15 +161,15 @@ public:
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
-    Utility::QueryParams params =
-        Http::Utility::parseAndDecodeQueryString(ret->value().getStringView());
+    auto params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(ret->value().getStringView());
 
-    auto ItParam = params.find(query_param_);
-    if (ItParam == params.end()) {
+    auto ItParam = params.getFirstValue(query_param_);
+    if (!ItParam.has_value()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::move(ItParam->second)};
+            std::move(ItParam.value())};
   }
 
 private:

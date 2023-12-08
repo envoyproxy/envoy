@@ -14,7 +14,6 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/server/overload/overload_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -36,6 +35,7 @@
 #include "source/common/router/scoped_config_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/server/admin/admin_factory_context.h"
 #include "source/server/admin/admin_filter.h"
 #include "source/server/admin/clusters_handler.h"
 #include "source/server/admin/config_dump_handler.h"
@@ -48,6 +48,7 @@
 #include "source/server/admin/server_cmd_handler.h"
 #include "source/server/admin/server_info_handler.h"
 #include "source/server/admin/stats_handler.h"
+#include "source/server/null_overload_manager.h"
 
 #include "absl/strings/string_view.h"
 
@@ -76,6 +77,8 @@ public:
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutableSocket() { return *socket_; }
 
+  Configuration::FactoryContext& factoryContext() { return factory_context_; }
+
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
   // Wins would be no manual removeHandler() and code reuse.
@@ -90,11 +93,9 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
-  void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
-                         const std::string& address_out_path,
+  void startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
                          Network::Address::InstanceConstSharedPtr address,
-                         const Network::Socket::OptionsSharedPtr& socket_options,
-                         Stats::ScopeSharedPtr&& listener_scope) override;
+                         Network::Socket::OptionsSharedPtr socket_options) override;
   uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
@@ -330,50 +331,6 @@ private:
     Router::ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const override { return nullptr; };
   };
 
-  /**
-   * Implementation of OverloadManager that is never overloaded. Using this instead of the real
-   * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
-   */
-  struct NullOverloadManager : public OverloadManager {
-    struct OverloadState : public ThreadLocalOverloadState {
-      OverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-      const OverloadActionState& getState(const std::string&) override { return inactive_; }
-      bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
-      bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
-      bool isResourceMonitorEnabled(OverloadProactiveResourceName) override { return false; }
-      ProactiveResourceMonitorOptRef
-      getProactiveResourceMonitorForTest(OverloadProactiveResourceName) override {
-        return makeOptRefFromPtr<ProactiveResourceMonitor>(nullptr);
-      }
-      Event::Dispatcher& dispatcher_;
-      const OverloadActionState inactive_ = OverloadActionState::inactive();
-    };
-
-    NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
-        : tls_(slot_allocator.allocateSlot()) {}
-
-    void start() override {
-      tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<OverloadState>(dispatcher);
-      });
-    }
-
-    ThreadLocalOverloadState& getThreadLocalOverloadState() override {
-      return tls_->getTyped<OverloadState>();
-    }
-    LoadShedPoint* getLoadShedPoint(absl::string_view) override { return nullptr; }
-
-    Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
-
-    bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
-      // This method shouldn't be called by the admin listener
-      IS_ENVOY_BUG("Unexpected function call");
-      return false;
-    }
-
-    ThreadLocal::SlotPtr tls_;
-  };
-
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
 
@@ -413,9 +370,9 @@ private:
 
   class AdminListener : public Network::ListenerConfig {
   public:
-    AdminListener(AdminImpl& parent, Stats::ScopeSharedPtr&& listener_scope)
-        : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
-          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
+    AdminListener(AdminImpl& parent, Stats::Scope& listener_scope)
+        : parent_(parent), name_("admin"), scope_(listener_scope),
+          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", scope_)),
           init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
 
     // Network::ListenerConfig
@@ -429,14 +386,14 @@ private:
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
-    Stats::Scope& listenerScope() override { return *scope_; }
+    Stats::Scope& listenerScope() override { return scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    const Network::ListenerInfo& listenerInfo() const override {
+      return parent_.factoryContext().listenerInfo();
+    }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-    envoy::config::core::v3::TrafficDirection direction() const override {
-      return envoy::config::core::v3::UNSPECIFIED;
-    }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return connection_balancer_;
     }
@@ -453,7 +410,7 @@ private:
 
     AdminImpl& parent_;
     const std::string name_;
-    Stats::ScopeSharedPtr scope_;
+    Stats::Scope& scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl open_connections_;
@@ -492,6 +449,7 @@ private:
   };
 
   Server::Instance& server_;
+  AdminFactoryContext factory_context_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const bool flush_access_log_on_new_request_ = false;

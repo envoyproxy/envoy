@@ -442,12 +442,12 @@ ConnectivityManagerImpl::enumerateInterfaces([[maybe_unused]] unsigned short fam
 }
 
 ConnectivityManagerSharedPtr ConnectivityManagerFactory::get() {
-  return context_.singletonManager().getTyped<ConnectivityManagerImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager), [&] {
-        Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory{
-            context_};
-        return std::make_shared<ConnectivityManagerImpl>(context_.clusterManager(),
-                                                         cache_manager_factory.get());
+  return context_.serverFactoryContext().singletonManager().getTyped<ConnectivityManagerImpl>(
+      SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager), [this] {
+        Envoy::Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl
+            cache_manager_factory{context_};
+        return std::make_shared<ConnectivityManagerImpl>(
+            context_.serverFactoryContext().clusterManager(), cache_manager_factory.get());
       });
 }
 

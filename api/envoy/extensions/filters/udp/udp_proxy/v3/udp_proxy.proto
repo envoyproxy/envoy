@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -66,7 +66,7 @@ message UdpProxyConfig {
 
   // Configuration for tunneling UDP over other transports or application layers.
   // Tunneling is currently supported over HTTP/2.
-  // [#next-free-field: 10]
+  // [#next-free-field: 12]
   message UdpTunnelingConfig {
     // Configuration for UDP datagrams buffering.
     message BufferOptions {
@@ -160,6 +160,28 @@ message UdpProxyConfig {
     // while the upstream is not ready will be dropped. In case this field is set but the options
     // are not configured, the default values will be applied as described in the ``BufferOptions``.
     BufferOptions buffer_options = 9;
+
+    // Save the response headers to the downstream info filter state for consumption
+    // by the session filters. The filter state key is ``envoy.udp_proxy.propagate_response_headers``.
+    bool propagate_response_headers = 10;
+
+    // Save the response trailers to the downstream info filter state for consumption
+    // by the session filters. The filter state key is ``envoy.udp_proxy.propagate_response_trailers``.
+    bool propagate_response_trailers = 11;
+  }
+
+  message UdpAccessLogOptions {
+    // The interval to flush access log. The UDP proxy will flush only one access log when the session
+    // is ended by default. If this field is set, the UDP proxy will flush access log periodically with
+    // the specified interval.
+    // This field does not require on-tunnel-connected access logging enabled, and the other way around.
+    // The interval must be at least 1ms.
+    google.protobuf.Duration access_log_flush_interval = 1
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // If set to true and UDP tunneling is configured, access log will be flushed when the UDP proxy has successfully
+    // established a connection tunnel with the upstream. If the connection failed, the access log will not be flushed.
+    bool flush_access_log_on_tunnel_connected = 2;
   }
 
   // The stat prefix used when emitting UDP proxy filter stats.
@@ -233,4 +255,7 @@ message UdpProxyConfig {
   // If set, this configures UDP tunneling. See `Proxying UDP in HTTP <https://www.rfc-editor.org/rfc/rfc9298.html>`_.
   // More information can be found in the UDP Proxy and HTTP upgrade documentation.
   UdpTunnelingConfig tunneling_config = 12;
+
+  // Additional access log options for UDP Proxy.
+  UdpAccessLogOptions access_log_options = 13;
 }

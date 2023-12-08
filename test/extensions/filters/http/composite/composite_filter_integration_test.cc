@@ -33,6 +33,7 @@ using envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute;
 using envoy::extensions::filters::http::composite::v3::ExecuteFilterAction;
 using envoy::type::matcher::v3::HttpRequestHeaderMatchInput;
 using test::integration::filters::SetResponseCodeFilterConfig;
+using test::integration::filters::SetResponseCodePerRouteFilterConfig;
 using xds::type::matcher::v3::Matcher_OnMatch;
 
 class CompositeFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -85,6 +86,25 @@ public:
           route->mutable_route()->set_cluster("cluster_0");
           (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route_config);
         });
+  }
+
+  void addResponseCodeFilterPerRouteConfig(const std::string& filter_name,
+                                           const std::string& route_prefix, const int& code,
+                                           bool response_prefix = false) {
+    SetResponseCodePerRouteFilterConfig set_response_code_per_route_config;
+    set_response_code_per_route_config.set_code(code);
+    if (response_prefix) {
+      set_response_code_per_route_config.set_prefix("skipLocalReplyAndContinue");
+    }
+    config_helper_.addConfigModifier([set_response_code_per_route_config, filter_name,
+                                      route_prefix](ConfigHelper::HttpConnectionManager& cm) {
+      auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
+      auto* route = vh->mutable_routes()->Mutable(0);
+      route->mutable_match()->set_prefix(route_prefix);
+      route->mutable_route()->set_cluster("cluster_0");
+      (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(
+          set_response_code_per_route_config);
+    });
   }
 
   void prependCompositeFilter(const std::string& name = "composite") {
@@ -164,6 +184,23 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
   auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("401"));
+}
+
+// Verifies set_response_code filter's per-route config overrides the filter config.
+TEST_P(CompositeFilterIntegrationTest, TestPerRouteResponseCodeConfig) {
+  std::string top_level_filter_name = "match_delegate_filter";
+  prependCompositeFilter(top_level_filter_name);
+
+  addResponseCodeFilterPerRouteConfig(/*filter_name=*/top_level_filter_name,
+                                      /*route_prefix=*/"/somepath",
+                                      /*code=*/406);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  // Verifies that 406 from per route config is used, rather than 403 from filter config.
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("406"));
 }
 
 // Test an empty match tree resolving with a per route config.

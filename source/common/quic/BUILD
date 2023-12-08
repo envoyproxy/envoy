@@ -143,16 +143,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_server_push_utils_for_envoy_lib",
-    srcs = ["spdy_server_push_utils_for_envoy.cc"],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "@com_github_google_quiche//:quic_core_http_spdy_server_push_utils_header",
-    ],
-)
-
-envoy_cc_library(
     name = "envoy_quic_stream_lib",
     hdrs = ["envoy_quic_stream.h"],
     tags = ["nofips"],
@@ -542,8 +532,10 @@ envoy_cc_library(
         "//source/common/network:io_socket_error_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib",
-    ],
+    ] + select({
+        "//bazel:linux": ["@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
@@ -552,6 +544,7 @@ envoy_cc_library(
     hdrs = ["send_buffer_monitor.h"],
     tags = ["nofips"],
     deps = [
+        "//source/common/common:assert_lib",
         "@com_github_google_quiche//:quic_core_session_lib",
     ],
 )
@@ -561,7 +554,9 @@ envoy_cc_library(
     hdrs = ["envoy_quic_client_crypto_stream_factory.h"],
     tags = ["nofips"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/config:typed_config_interface",
+        "//envoy/network:transport_socket_interface",
         "@com_github_google_quiche//:quic_client_session_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
     ],
@@ -617,6 +612,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         "//envoy/access_log:access_log_interface",
+        "//envoy/http:codec_interface",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
     ],
@@ -628,6 +624,7 @@ envoy_cc_library(
     hdrs = ["http_datagram_handler.h"],
     deps = [
         "//envoy/http:codec_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",

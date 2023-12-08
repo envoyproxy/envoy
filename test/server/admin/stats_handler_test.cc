@@ -12,6 +12,7 @@
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/real_threads_test_helper.h"
+#include "test/test_common/stats_utility.h"
 #include "test/test_common/utility.h"
 
 using testing::Combine;
@@ -78,11 +79,12 @@ public:
    * @return the Http Code and the response body as a string.
    */
   CodeResponse handlerStats(absl::string_view url) {
-    MockInstance instance;
+    NiceMock<MockInstance> instance;
     EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
     EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
     EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-    EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
+    ON_CALL(instance, stats()).WillByDefault(ReturnRef(*store_));
+    ON_CALL(instance, clusterManager()).WillByDefault(ReturnRef(endpoints_helper_.cm_));
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
@@ -121,6 +123,7 @@ public:
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
+  Upstream::PerEndpointMetricsTestHelper endpoints_helper_;
   Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
@@ -153,6 +156,8 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
   Stats::TextReadout& t = store_->textReadoutFromString("t");
   t.set("hello world");
 
+  endpoints_helper_.makeCluster("mycluster", 1);
+
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
 
@@ -169,6 +174,11 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
   constexpr char expected[] = "t: \"hello world\"\n"
                               "c1: 10\n"
                               "c2: 20\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.c1: 11\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.c2: 12\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.g1: 13\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.g2: 14\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.healthy: 1\n"
                               "h1: P0(200,200) P25(202.5,202.5) P50(205,205) P75(207.5,207.5) "
                               "P90(209,209) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
                               "P99.9(209.99,209.99) P100(210,210)\n"
@@ -581,6 +591,8 @@ TEST_F(AdminStatsTest, HandlerStatsJson) {
   c1.add(10);
   c2.add(20);
 
+  endpoints_helper_.makeCluster("mycluster", 1);
+
   Stats::TextReadout& t = store_->textReadoutFromString("t");
   t.set("hello world");
 
@@ -602,11 +614,31 @@ TEST_F(AdminStatsTest, HandlerStatsJson) {
         },
         {
             "name":"c1",
-            "value":10,
+            "value":10
         },
         {
             "name":"c2",
             "value":20
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.c1",
+           "value":11
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.c2",
+           "value":12
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.g1",
+           "value":13
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.g2",
+           "value":14
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.healthy",
+           "value":1
         },
         {
             "histograms": {
@@ -1227,7 +1259,7 @@ protected:
   }
 
   void statsEndpoint() {
-    StatsRequest request(*store_, StatsParams());
+    StatsRequest request(*store_, StatsParams(), cm_);
     Http::TestResponseHeaderMapImpl response_headers;
     request.start(response_headers);
     Buffer::OwnedImpl data;
@@ -1246,6 +1278,7 @@ protected:
   Stats::StatNamePool pool_;
   Stats::AllocatorImpl alloc_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   std::vector<Stats::ScopeSharedPtr> scopes_{NumScopes};
   absl::Mutex scope_mutexes_[NumScopes];
   std::atomic<uint64_t> total_lines_{0};

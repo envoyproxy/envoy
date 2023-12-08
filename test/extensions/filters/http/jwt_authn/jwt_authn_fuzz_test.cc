@@ -88,10 +88,12 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
   // The jwt token in the corpus files expired at 2001001001 (at year 2033).
   if (input.force_jwt_expired()) {
     // 20 years == 615168000 seconds.
-    mock_factory_ctx.time_system_.advanceTimeWait(Envoy::Seconds(615168000));
+    mock_factory_ctx.server_factory_context_.time_system_.advanceTimeWait(
+        Envoy::Seconds(615168000));
   }
 
-  MockJwksUpstream mock_jwks(mock_factory_ctx.cluster_manager_, input.remote_jwks());
+  MockJwksUpstream mock_jwks(mock_factory_ctx.server_factory_context_.cluster_manager_,
+                             input.remote_jwks());
 
   // Mock per route config.
   std::unique_ptr<MockPerRouteConfig> mock_per_route;

@@ -1,25 +1,88 @@
+#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
+#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/udp_packet_writer/default/config.h"
 
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/integration/autonomous_upstream.h"
 
+#include "extension_registry.h"
 #include "library/common/data/utility.h"
 #include "library/common/main_interface.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
 namespace {
 
+// The only thing this TestKeyValueStore does is return value_ when asked for
+// initial loaded contents.
+// In this case the TestKeyValueStore will be used for DNS and value will map
+// www.lyft.com -> fake test upstream.
+class TestKeyValueStore : public Envoy::Platform::KeyValueStore {
+public:
+  absl::optional<std::string> read(const std::string&) override {
+    ASSERT(!value_.empty());
+    return value_;
+  }
+  void save(std::string, std::string) override {}
+  void remove(const std::string&) override {}
+  void addOrUpdate(absl::string_view, absl::string_view, absl::optional<std::chrono::seconds>) {}
+  absl::optional<absl::string_view> get(absl::string_view) { return {}; }
+  void flush() {}
+  void iterate(::Envoy::KeyValueStore::ConstIterateCb) const {}
+  void setValue(std::string value) { value_ = value; }
+
+protected:
+  std::string value_;
+};
+
 class ClientIntegrationTest : public BaseClientIntegrationTest,
                               public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {}
+  static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
+  static void TearDownTestCase() { test_key_value_store_.reset(); }
+
+  ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {
+    // For H3 tests.
+    Network::forceRegisterUdpDefaultWriterFactoryFactory();
+    Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
+    Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
+    Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+    Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
+    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+  }
+
+  void initializeWithHttp3AndFakeDns() {
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+
+    setUpstreamProtocol(Http::CodecType::HTTP3);
+    builder_.enablePlatformCertificatesValidation(true);
+    // Create a k-v store for DNS lookup which createEnvoy() will use to point
+    // www.lyft.com -> fake H3 backend.
+    builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
+    builder_.enableDnsCache(true, /* save_interval_seconds */ 1);
+    upstream_tls_ = true;
+    add_quic_hints_ = true;
+
+    initialize();
+
+    auto address = fake_upstreams_[0]->localAddress();
+    auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
+    default_request_headers_.setHost(fmt::format("www.lyft.com:{}", upstream_port));
+    default_request_headers_.setScheme("https");
+  }
 
   void SetUp() override {
     setUpstreamCount(config_helper_.bootstrap().static_resources().clusters_size());
@@ -27,27 +90,49 @@ public:
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
+    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _)).Times(AnyNumber());
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation())
+        .Times(AnyNumber());
   }
 
   void createEnvoy() override {
-    BaseClientIntegrationTest::createEnvoy();
     // Allow last minute addition of QUIC hints. This is done lazily as it must be done after
     // upstreams are created.
     if (add_quic_hints_) {
       auto address = fake_upstreams_[0]->localAddress();
-      builder_.addQuicHint(address->ip()->addressAsString(), address->ip()->port());
+      auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
+      // With canonical suffix, having a quic hint of foo.lyft.com will make
+      // www.lyft.com being recognized as QUIC ready.
+      builder_.addQuicCanonicalSuffix(".lyft.com");
+      builder_.addQuicHint("foo.lyft.com", upstream_port);
+
+      // Force www.lyft.com to resolve to the fake upstream. It's the only domain
+      // name the certs work for so we want that in the request, but we need to
+      // fake resolution to not result in a request to the real www.lyft.com
+      std::string host = fmt::format("www.lyft.com:{}", upstream_port);
+      std::string cache_file_value_contents =
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
+                       fake_upstreams_[0]->localAddress()->ip()->port(), "|1000000|0");
+      test_key_value_store_->setValue(absl::StrCat(host.length(), "\n", host,
+                                                   cache_file_value_contents.length(), "\n",
+                                                   cache_file_value_contents));
     }
+    BaseClientIntegrationTest::createEnvoy();
   }
 
   void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
   void basicTest();
   void trickleTest();
+  void explicitFlowControlWithCancels();
 
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
+  static std::shared_ptr<TestKeyValueStore> test_key_value_store_;
 };
+
+std::shared_ptr<TestKeyValueStore> ClientIntegrationTest::test_key_value_store_{};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -80,7 +165,7 @@ void ClientIntegrationTest::basicTest() {
 
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 2);
+  ASSERT_GE(cc_.on_data_calls, 1);
   ASSERT_EQ(cc_.on_complete_calls, 1);
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
@@ -144,28 +229,125 @@ void ClientIntegrationTest::trickleTest() {
   terminal_callback_.waitReady();
 }
 
-TEST_P(ClientIntegrationTest, TrickleNoMinDelivery) {
-  min_delivery_size_ = 0;
+TEST_P(ClientIntegrationTest, Trickle) {
   trickleTest();
   ASSERT_LE(cc_.on_data_calls, 11);
 }
 
-TEST_P(ClientIntegrationTest, TrickleNoNoMinDeliveryExplicitFlowControl) {
-  min_delivery_size_ = 0;
+TEST_P(ClientIntegrationTest, TrickleExplicitFlowControl) {
   explicit_flow_control_ = true;
   trickleTest();
   ASSERT_LE(cc_.on_data_calls, 11);
 }
 
-TEST_P(ClientIntegrationTest, TrickleMinDelivery) {
-  trickleTest();
-  ASSERT_EQ(cc_.on_data_calls, 2);
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
+  explicit_flow_control_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1000));
+
+  uint32_t num_requests = 100;
+  std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
+  std::vector<Platform::StreamSharedPtr> streams;
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    Platform::StreamPrototypeSharedPtr stream_prototype;
+    {
+      absl::MutexLock l(&engine_lock_);
+      stream_prototype = engine_->streamClient()->newStreamPrototype();
+    }
+    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_);
+    stream_prototype->setOnComplete(
+        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
+          cc_.on_complete_calls++;
+          if (cc_.on_complete_calls == num_requests) {
+            cc_.terminal_callback->setReady();
+          }
+        });
+
+    stream_prototype->setOnData([stream](envoy_data c_data, bool) {
+      // Allow reading up to 10 bytes.
+      stream->readData(100);
+      release_envoy_data(c_data);
+    });
+    stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    stream->readData(100);
+    prototype_streams.push_back(stream_prototype);
+    streams.push_back(stream);
+  }
+  ASSERT(streams.size() == num_requests);
+  ASSERT(prototype_streams.size() == num_requests);
+
+  terminal_callback_.waitReady();
+  ASSERT_EQ(num_requests, cc_.on_complete_calls);
 }
 
-TEST_P(ClientIntegrationTest, TrickleNoMinDeliveryExplicitFlowControl) {
+void ClientIntegrationTest::explicitFlowControlWithCancels() {
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1000));
+
+  uint32_t num_requests = 100;
+  std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
+  std::vector<Platform::StreamSharedPtr> streams;
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    Platform::StreamPrototypeSharedPtr stream_prototype;
+    {
+      absl::MutexLock l(&engine_lock_);
+      stream_prototype = engine_->streamClient()->newStreamPrototype();
+    }
+    Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_);
+    stream_prototype->setOnComplete(
+        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
+          cc_.on_complete_calls++;
+          if (cc_.on_complete_calls + cc_.on_cancel_calls == num_requests) {
+            cc_.terminal_callback->setReady();
+          }
+        });
+    stream_prototype->setOnCancel(
+        [this, &num_requests](envoy_stream_intel, envoy_final_stream_intel) {
+          cc_.on_cancel_calls++;
+          if (cc_.on_complete_calls + cc_.on_cancel_calls == num_requests) {
+            cc_.terminal_callback->setReady();
+          }
+        });
+    stream_prototype->setOnData([stream](envoy_data c_data, bool) {
+      // Allow reading up to 10 bytes.
+      stream->readData(100);
+      release_envoy_data(c_data);
+    });
+    stream_prototype_->setOnError(
+        [](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
+          RELEASE_ASSERT(0, "unexpected");
+        });
+
+    stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    prototype_streams.push_back(stream_prototype);
+    streams.push_back(stream);
+    if (i % 2 == 0) {
+      stream->cancel();
+    } else {
+      stream->readData(100);
+    }
+  }
+  ASSERT(streams.size() == num_requests);
+  ASSERT(prototype_streams.size() == num_requests);
+
+  terminal_callback_.waitReady();
+  ASSERT_EQ(num_requests / 2, cc_.on_complete_calls);
+  ASSERT_EQ(num_requests / 2, cc_.on_cancel_calls);
+}
+
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
   explicit_flow_control_ = true;
-  trickleTest();
-  ASSERT_EQ(cc_.on_data_calls, 2);
+  initialize();
+  explicitFlowControlWithCancels();
+}
+
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsHttp3) {
+  explicit_flow_control_ = true;
+  initializeWithHttp3AndFakeDns();
+
+  explicitFlowControlWithCancels();
 }
 
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
@@ -216,20 +398,19 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
 }
 
 // Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
-TEST_P(ClientIntegrationTest, DISABLED_Http3WithQuicHints) {
-  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
+  initializeWithHttp3AndFakeDns();
 
-  setUpstreamProtocol(Http::CodecType::HTTP3);
-  builder_.enablePlatformCertificatesValidation(true);
-  upstream_tls_ = true;
-  add_quic_hints_ = true;
-
-  initialize();
-  default_request_headers_.setScheme("https");
   basicTest();
-  // HTTP/3
+
+  {
+    // This verifies the H3 attempt was made due to the quic hints
+    absl::MutexLock l(&engine_lock_);
+    std::string stats = engine_->dumpStats();
+    EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
+  }
+
+  // Make sure the client reported protocol was also HTTP/3.
   ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
 }
 
@@ -351,6 +532,41 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   ASSERT_EQ(cc_.on_data_calls, 0);
   ASSERT_EQ(cc_.on_complete_calls, 0);
   ASSERT_EQ(cc_.on_cancel_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStreamHttp3) {
+  autonomous_upstream_ = false;
+
+  initializeWithHttp3AndFakeDns();
+  ConditionalInitializer headers_callback;
+
+  stream_prototype_->setOnHeaders(
+      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
+                                envoy_stream_intel) {
+        cc_.status = absl::StrCat(headers->httpStatus());
+        cc_.on_headers_calls++;
+        headers_callback.setReady();
+        return nullptr;
+      });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+
+  FakeHttpConnectionPtr upstream_connection;
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection));
+  ASSERT_TRUE(
+      upstream_connection->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request));
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+
+  // Now cancel. As on_complete has been called cancel is a no-op but is
+  // non-problematic.
+  stream_->cancel();
 }
 
 TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
@@ -521,10 +737,6 @@ TEST_P(ClientIntegrationTest, Proxying) {
 
 TEST_P(ClientIntegrationTest, DirectResponse) {
   initialize();
-  if (version_ == Network::Address::IpVersion::v6) {
-    // Localhost only resolves to an ipv4 address - alas no kernel happy eyeballs.
-    return;
-  }
 
   // Override to not validate stream intel.
   stream_prototype_->setOnComplete(
@@ -561,8 +773,11 @@ TEST_P(ClientIntegrationTest, TestRuntimeSet) {
 TEST_P(ClientIntegrationTest, TestStats) {
   initialize();
 
-  std::string stats = engine_->dumpStats();
-  EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
+  {
+    absl::MutexLock l(&engine_lock_);
+    std::string stats = engine_->dumpStats();
+    EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
+  }
 }
 
 } // namespace

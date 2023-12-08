@@ -12,33 +12,26 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const { return error_cod
 
 std::string IoSocketError::getErrorDetails() const { return errorDetails(errno_); }
 
-IoSocketError* IoSocketError::getIoSocketInvalidAddressInstance() {
-  static auto* instance =
-      new IoSocketError(SOCKET_ERROR_NOT_SUP, Api::IoError::IoErrorCode::NoSupport);
-  return instance;
+Api::IoErrorPtr IoSocketError::getIoSocketInvalidAddressError() {
+  return Api::IoError::wrap(
+      new IoSocketError(SOCKET_ERROR_NOT_SUP, Api::IoError::IoErrorCode::NoSupport));
 }
 
-IoSocketError* IoSocketError::getIoSocketEbadfInstance() {
-  static auto* instance =
-      new IoSocketError(SOCKET_ERROR_BADF, Api::IoError::IoErrorCode::NoSupport);
-  return instance;
+Api::IoErrorPtr IoSocketError::create(int sys_errno) {
+  return Api::IoError::wrap(new IoSocketError(sys_errno));
 }
 
-IoSocketError* IoSocketError::getIoSocketEagainInstance() {
+Api::IoErrorPtr IoSocketError::getIoSocketEbadfError() {
+  return Api::IoError::wrap(new IoSocketError(SOCKET_ERROR_BADF, Api::IoError::IoErrorCode::BadFd));
+}
+
+Api::IoErrorPtr IoSocketError::getIoSocketEagainError() {
   static auto* instance = new IoSocketError(SOCKET_ERROR_AGAIN, Api::IoError::IoErrorCode::Again);
-  return instance;
-}
-
-void IoSocketError::deleteIoError(Api::IoError* err) {
-  ASSERT(err != nullptr);
-  ASSERT(err != getIoSocketInvalidAddressInstance());
-  if (err != getIoSocketEagainInstance()) {
-    delete err;
-  }
+  return Api::IoError::reusedStatic(instance);
 }
 
 Api::IoCallUint64Result IoSocketError::ioResultSocketInvalidAddress() {
-  return {0, Api::IoErrorPtr(getIoSocketInvalidAddressInstance(), [](IoError*) {})};
+  return {0, getIoSocketInvalidAddressError()};
 }
 
 Api::IoError::IoErrorCode IoSocketError::errorCodeFromErrno(int sys_errno) {

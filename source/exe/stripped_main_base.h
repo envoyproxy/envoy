@@ -12,7 +12,6 @@
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/exe/process_wide.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
 #include "source/server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -36,6 +35,15 @@ public:
 // separate for legacy reasons.
 class StrippedMainBase {
 public:
+  using CreateInstanceFunction = std::function<std::unique_ptr<Server::Instance>(
+      Init::Manager& init_manager, const Server::Options& options, Event::TimeSystem& time_system,
+      ListenerHooks& hooks, Server::HotRestart& restarter, Stats::StoreRoot& store,
+      Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
+      Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
+      Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+      std::unique_ptr<ProcessContext> process_context,
+      Buffer::WatermarkFactorySharedPtr watermark_factory)>;
+
   static std::string hotRestartVersion(bool hot_restart_enabled);
 
   // Consumer must guarantee that all passed references are alive until this object is
@@ -44,7 +52,8 @@ public:
                    ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                    std::unique_ptr<Server::Platform> platform_impl,
                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                   std::unique_ptr<ProcessContext> process_context);
+                   std::unique_ptr<ProcessContext> process_context,
+                   CreateInstanceFunction createInstance);
 
   void runServer() {
     ASSERT(options_.mode() == Server::Mode::Serve);
@@ -71,7 +80,10 @@ protected:
   Stats::ThreadLocalStoreImplPtr stats_store_;
   std::unique_ptr<Logger::Context> logging_context_;
   std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
-  std::unique_ptr<Server::InstanceImpl> server_;
+  std::unique_ptr<Server::Instance> server_;
+
+  // Only used for validation mode
+  std::unique_ptr<ProcessContext> process_context_;
 
 private:
   void configureComponentLogLevels();

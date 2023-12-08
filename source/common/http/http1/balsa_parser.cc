@@ -5,9 +5,9 @@
 #include <cstdint>
 
 #include "source/common/common/assert.h"
-#include "source/common/common/regex.h"
 #include "source/common/http/headers.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -22,6 +22,7 @@ using ::quiche::BalsaHeaders;
 constexpr absl::string_view kColonSlashSlash = "://";
 // Response must start with "HTTP".
 constexpr char kResponseFirstByte = 'H';
+constexpr absl::string_view kHttpVersionPrefix = "HTTP/";
 
 // Allowed characters for field names according to Section 5.1
 // and for methods according to Section 9.1 of RFC 9110:
@@ -120,19 +121,21 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
          std::all_of(path_query.begin(), path_query.end(), is_valid_path_query_char);
 }
 
+// Returns true if `version_input` is a valid HTTP version string as defined at
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3, or empty (for HTTP/0.9).
 bool isVersionValid(absl::string_view version_input) {
-  // HTTP-version is defined at
-  // https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3. HTTP/0.9 requests
-  // have no http-version, so empty `version_input` is also accepted.
+  if (version_input.empty()) {
+    return true;
+  }
 
-  static const auto regex = [] {
-    envoy::type::matcher::v3::RegexMatcher matcher;
-    *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
-    matcher.set_regex("|HTTP/[0-9]\\.[0-9]");
-    return Regex::Utility::parseRegex(matcher);
-  }();
+  if (!absl::StartsWith(version_input, kHttpVersionPrefix)) {
+    return false;
+  }
+  version_input.remove_prefix(kHttpVersionPrefix.size());
 
-  return regex->match(version_input);
+  // Version number is in the form of "[0-9].[0-9]".
+  return version_input.size() == 3 && absl::ascii_isdigit(version_input[0]) &&
+         version_input[1] == '.' && absl::ascii_isdigit(version_input[2]);
 }
 
 bool isHeaderNameValid(absl::string_view name) {
@@ -150,7 +153,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
-  http_validation_policy.disallow_header_continuation_lines = true;
+  http_validation_policy.disallow_header_continuation_lines = false;
   http_validation_policy.require_header_colon = true;
   http_validation_policy.disallow_multiple_content_length = true;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
@@ -160,10 +163,10 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
-  framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
   framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
+  framer_.EnableTrailers();
 
   switch (message_type_) {
   case MessageType::Request:
@@ -270,13 +273,12 @@ void BalsaParser::OnBodyChunkInput(absl::string_view input) {
 
 void BalsaParser::OnHeaderInput(absl::string_view /*input*/) {}
 void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
-void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*/) {}
 
 void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
   validateAndProcessHeadersOrTrailersImpl(headers, /* trailers = */ false);
 }
-void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
-  validateAndProcessHeadersOrTrailersImpl(trailer, /* trailers = */ true);
+void BalsaParser::OnTrailers(std::unique_ptr<quiche::BalsaHeaders> trailers) {
+  validateAndProcessHeadersOrTrailersImpl(*trailers, /* trailers = */ true);
 }
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
@@ -393,12 +395,11 @@ void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
 
 void BalsaParser::validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers,
                                                           bool trailers) {
-  for (const std::pair<absl::string_view, absl::string_view>& key_value : headers.lines()) {
+  for (const auto& [key, value] : headers.lines()) {
     if (status_ == ParserStatus::Error) {
       return;
     }
 
-    absl::string_view key = key_value.first;
     if (!isHeaderNameValid(key)) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_HEADER_TOKEN";
@@ -414,8 +415,22 @@ void BalsaParser::validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHea
       return;
     }
 
-    absl::string_view value = key_value.second;
-    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
+    // Remove CR and LF characters to match http-parser behavior.
+    auto is_cr_or_lf = [](char c) { return c == '\r' || c == '\n'; };
+    if (std::any_of(value.begin(), value.end(), is_cr_or_lf)) {
+      std::string value_without_cr_or_lf;
+      value_without_cr_or_lf.reserve(value.size());
+      for (char c : value) {
+        if (!is_cr_or_lf(c)) {
+          value_without_cr_or_lf.push_back(c);
+        }
+      }
+      status_ = convertResult(connection_->onHeaderValue(value_without_cr_or_lf.data(),
+                                                         value_without_cr_or_lf.length()));
+    } else {
+      // No need to copy if header value does not contain CR or LF.
+      status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
+    }
   }
 }
 
