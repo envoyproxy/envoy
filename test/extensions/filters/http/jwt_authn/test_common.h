@@ -136,6 +136,33 @@ rules:
 bypass_cors_preflight: true
 )";
 
+// Config with payload_in_metadata and clear_route_cache.
+const char PayloadClearRouteCacheConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    audiences:
+    - example_service
+    - http://example_service1
+    - https://example_service2/
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+      cache_duration:
+        seconds: 600
+    payload_in_metadata: test_payload
+    clear_route_cache: true
+rules:
+- match:
+    path: "/"
+  requires:
+    provider_name: "example_provider"
+bypass_cors_preflight: true
+)";
+
 const char ExampleConfigWithRegEx[] = R"(
 providers:
   example_provider:

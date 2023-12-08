@@ -69,19 +69,18 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config)
     : FilterConfig(
-          stat_prefix, context.getServerFactoryContext().localInfo(), context.scope(),
-          context.getServerFactoryContext().clusterManager(),
-          context.getServerFactoryContext().runtime(),
-          context.getServerFactoryContext().api().randomGenerator(), std::move(shadow_writer),
+          stat_prefix, context.serverFactoryContext().localInfo(), context.scope(),
+          context.serverFactoryContext().clusterManager(), context.serverFactoryContext().runtime(),
+          context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
           config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
           config.suppress_grpc_request_failure_code_stats(),
           config.has_upstream_log_options()
               ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
               : false,
-          config.strict_check_headers(), context.getServerFactoryContext().api().timeSource(),
-          context.getServerFactoryContext().httpContext(),
-          context.getServerFactoryContext().routerContext()) {
+          config.strict_check_headers(), context.serverFactoryContext().api().timeSource(),
+          context.serverFactoryContext().httpContext(),
+          context.serverFactoryContext().routerContext()) {
   for (const auto& upstream_log : config.upstream_log()) {
     upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
   }
@@ -93,7 +92,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
   }
 
   if (config.upstream_http_filters_size() > 0) {
-    auto& server_factory_ctx = context.getServerFactoryContext();
+    auto& server_factory_ctx = context.serverFactoryContext();
     const Http::FilterChainUtility::FiltersList& upstream_http_filters =
         config.upstream_http_filters();
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
@@ -105,7 +104,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, server_factory_ctx,
-               context.getServerFactoryContext().clusterManager(), *upstream_ctx_, prefix);
+               context.serverFactoryContext().clusterManager(), *upstream_ctx_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
                                           "router upstream http", upstream_http_filter_factories_));
   }
@@ -1762,7 +1761,8 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   // Redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ && (!request_buffer_overflowed_ || !callbacks_->decodingBuffer()) &&
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code) &&
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, headers, *location,
+                                               status_code) &&
       callbacks_->recreateStream(&headers)) {
     ENVOY_STREAM_LOG(debug, "Internal redirect succeeded", *callbacks_);
     cluster_->trafficStats()->upstream_internal_redirect_succeeded_total_.inc();
@@ -1782,9 +1782,9 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   return false;
 }
 
-bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                                      const Http::HeaderEntry& internal_redirect,
-                                                      uint64_t status_code) {
+bool Filter::convertRequestHeadersForInternalRedirect(
+    Http::RequestHeaderMap& downstream_headers, const Http::ResponseHeaderMap& upstream_headers,
+    const Http::HeaderEntry& internal_redirect, uint64_t status_code) {
   if (!downstream_headers.Path()) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: no path in downstream_headers", *callbacks_);
     return false;
@@ -1838,17 +1838,41 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     return false;
   }
   // Copy the old values, so they can be restored if the redirect fails.
-  const std::string original_host(downstream_headers.getHostValue());
-  const std::string original_path(downstream_headers.getPathValue());
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
+
+  std::unique_ptr<Http::RequestHeaderMapImpl> saved_headers = Http::RequestHeaderMapImpl::create();
+  Http::RequestHeaderMapImpl::copyFrom(*saved_headers, downstream_headers);
+
+  for (const Http::LowerCaseString& header :
+       route_entry_->internalRedirectPolicy().responseHeadersToCopy()) {
+    Http::HeaderMap::GetResult result = upstream_headers.get(header);
+    Http::HeaderMap::GetResult downstream_result = downstream_headers.get(header);
+    if (result.empty()) {
+      // Clear headers if present, else do nothing:
+      if (downstream_result.empty()) {
+        continue;
+      }
+      downstream_headers.remove(header);
+    } else {
+      // The header exists in the response, copy into the downstream headers
+      if (!downstream_result.empty()) {
+        downstream_headers.remove(header);
+      }
+      for (size_t idx = 0; idx < result.size(); idx++) {
+        downstream_headers.addCopy(header, result[idx]->value().getStringView());
+      }
+    }
+  }
+
   Cleanup restore_original_headers(
-      [&downstream_headers, original_host, original_path, scheme_is_set, scheme_is_http]() {
-        downstream_headers.setHost(original_host);
-        downstream_headers.setPath(original_path);
+      [&downstream_headers, scheme_is_set, scheme_is_http, &saved_headers]() {
+        downstream_headers.clear();
         if (scheme_is_set) {
           downstream_headers.setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
                                                       : Http::Headers::get().SchemeValues.Https);
         }
+
+        Http::RequestHeaderMapImpl::copyFrom(downstream_headers, *saved_headers);
       });
 
   // Replace the original host, scheme and path.
@@ -1903,10 +1927,10 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   num_internal_redirect->increment();
   restore_original_headers.cancel();
   // Preserve the original request URL for the second pass.
-  downstream_headers.setEnvoyOriginalUrl(absl::StrCat(scheme_is_http
-                                                          ? Http::Headers::get().SchemeValues.Http
-                                                          : Http::Headers::get().SchemeValues.Https,
-                                                      "://", original_host, original_path));
+  downstream_headers.setEnvoyOriginalUrl(
+      absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
+                                  : Http::Headers::get().SchemeValues.Https,
+                   "://", saved_headers->getHostValue(), saved_headers->getPathValue()));
   return true;
 }
 

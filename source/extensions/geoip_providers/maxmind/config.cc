@@ -59,7 +59,7 @@ DriverSharedPtr MaxmindProviderFactory::createGeoipProviderDriverTyped(
     const ConfigProto& proto_config, const std::string& stat_prefix,
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<DriverSingleton> drivers =
-      context.getServerFactoryContext().singletonManager().getTyped<DriverSingleton>(
+      context.serverFactoryContext().singletonManager().getTyped<DriverSingleton>(
           SINGLETON_MANAGER_REGISTERED_NAME(maxmind_geolocation_provider_singleton),
           [] { return std::make_shared<DriverSingleton>(); });
   return drivers->get(drivers, proto_config, stat_prefix, context);

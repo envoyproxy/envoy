@@ -46,6 +46,11 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
+   * Returns whether the first DNS resolving attempt is completed or not.
+   */
+  virtual bool firstResolveComplete() const PURE;
+
+  /**
    * Returns the host's currently resolved address. These addresses may change periodically due to
    * async re-resolution.
    */
@@ -264,7 +269,7 @@ public:
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
    */
-  virtual DnsCacheSharedPtr
+  virtual absl::StatusOr<DnsCacheSharedPtr>
   getCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
 
   /**
