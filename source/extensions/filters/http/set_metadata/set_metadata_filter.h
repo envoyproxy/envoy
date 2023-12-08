@@ -23,11 +23,20 @@ public:
   Config(const envoy::extensions::filters::http::set_metadata::v3::Config& config);
 
   absl::string_view metadataNamespace() const { return namespace_; }
-  const absl::variant<const ProtobufWkt::Struct, const ProtobufWkt::Any>& value() { return value_; }
+  bool hasUntypedValue() const { return has_untyped_value_; }
+  const ProtobufWkt::Struct& untypedValue() { return untyped_value_; }
+  bool hasTypedValue() const { return has_typed_value_; }
+  const ProtobufWkt::Any& typedValue() { return typed_value_; }
+  bool allowOverwrite() const { return allow_overwrite_; }
 
 private:
-  const std::string namespace_;
-  const absl::variant<const ProtobufWkt::Struct, const ProtobufWkt::Any> value_;
+  absl::string_view namespace_;
+  bool has_untyped_value_{true};
+  ProtobufWkt::Struct untyped_value_;
+  bool has_typed_value_{};
+  ProtobufWkt::Any typed_value_;
+  // default to true until deprecated ``value`` field is removed
+  bool allow_overwrite_{true};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

@@ -8,13 +8,19 @@ Set Metadata
 
 This filters adds or updates dynamic metadata with static data.
 
-Dynamic metadata values are updated with the following scheme. If a key
-does not exists, it's just copied into the current metadata. If the key exists
-but has a different type, it is replaced by the new value. Otherwise:
+Typed dynamic metadata will overwrite existing values at the configured namespace if and only if ``allow_overwrite`` is
+set to true, otherwise nothing is done. If the namespace does not exist in the typed dynamic
+metadata, it is inserted with the configured value.
 
- * for scalar values (null, string, number, boolean) are replaced with the new value
- * for lists: new values are added to the current list
- * for structures: recursively apply this scheme
+If ``allow_overwrite`` is set to false or omitted, untyped dynamic metadata will only be updated if
+there are no existing values at that namespace. If ``allow_overwrite`` is set to true, or if using deprecated ``value``
+field, untyped dynamic metadata values are updated with the following scheme:
+- If a key does not exist, the configured value is copied into the metadata namespace.
+- If the key exists but has a different type, the value is replaced outright by the configured value.
+- Otherwise:
+ * scalar values (null, string, number, boolean): the existing value is replaced.
+ * lists: new values are appended to the current list.
+ * structures: recursively apply this scheme.
 
 For instance, if the namespace already contains this structure:
 
@@ -26,7 +32,7 @@ For instance, if the namespace already contains this structure:
    mytags:
      tag0: 1
 
-and the value to set is:
+and the untyped_metadata.value to set is:
 
 .. code-block:: yaml
 
