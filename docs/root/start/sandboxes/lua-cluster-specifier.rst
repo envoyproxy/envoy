@@ -1,7 +1,7 @@
 .. _install_sandboxes_lua_cluster_specifier:
 
 Lua Cluster Specifier
-==========
+=====================
 
 .. sidebar:: Requirements
 
