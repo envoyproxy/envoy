@@ -260,6 +260,9 @@ public:
     ASSERT(size() >= HeaderSize);
     setPayloadSize(size() - HeaderSize);
   }
+  // Headers are directly encoded
+  void appendStaticHeader(StaticHeaderIndex index);
+  void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
 
 private:
   void buildHeader(Type type, uint32_t payload_size = 0, uint8_t flags = 0, uint32_t stream_id = 0);
@@ -277,9 +280,6 @@ private:
     std::copy(data.begin(), data.end(), data_.begin() + 9);
   }
 
-  // Headers are directly encoded
-  void appendStaticHeader(StaticHeaderIndex index);
-  void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
   void appendEmptyHeader();
 
   DataContainer data_;
