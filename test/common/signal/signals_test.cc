@@ -189,7 +189,7 @@ TEST(SignalsDeathTest, ShouldJustExitIfFatalActionsRaiseAnotherSignal) {
   FatalErrorHandler::registerFatalActions(std::move(safe_actions), std::move(unsafe_actions),
                                           Thread::threadFactoryForTest());
 
-  EXPECT_DEATH([]() -> void { raise(SIGABRT); }(), "Our FatalActions triggered a fatal signal.");
+  EXPECT_DEATH([]() -> void { raise(SIGABRT); }(), "XOur FatalActions triggered a fatal signal.");
   FatalErrorHandler::removeFatalErrorHandler(handler);
   FatalErrorHandler::resetFatalActionStateForTest();
 }
