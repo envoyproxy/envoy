@@ -279,6 +279,10 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+
+  std::string response(18 * 1024, 'a');
+  Buffer::OwnedImpl buffer(response);
+  quic_stream_->encodeData(buffer, false);
   quic_stream_->encodeTrailers(response_trailers_);
 }
 
