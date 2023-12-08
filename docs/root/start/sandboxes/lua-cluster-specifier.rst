@@ -39,7 +39,7 @@ Change to the ``examples/lua-cluster-specifier`` directory.
   lua-cluster-specifier-web_service-1   /bin/echo-server               Up      0.0.0.0:8080->8080/tcp
 
 Step 2: Send a request to the normal service
-*************************************
+********************************************
 
 The output from the ``curl`` command below should return 200, since the lua code select the normal service.
 
@@ -51,7 +51,7 @@ Terminal 1
    HTTP/1.1 200 OK
 
 Step 3: Send a request to the fake service
-*********************************************************
+******************************************
 
 The output from the ``curl`` command below should return 503, since the lua code select the fake service.
 

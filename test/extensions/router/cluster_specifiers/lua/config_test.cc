@@ -33,7 +33,7 @@ TEST(LuaClusterSpecifierPluginConfigTest, NormalConfig) {
 
   LuaClusterSpecifierConfigProto proto_config{};
   TestUtility::loadFromYaml(normal_lua_config_yaml, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   LuaClusterSpecifierPluginFactoryConfig factory;
   Envoy::Router::ClusterSpecifierPluginSharedPtr plugin =
       factory.createClusterSpecifierPlugin(proto_config, context);
