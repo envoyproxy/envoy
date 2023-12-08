@@ -91,9 +91,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   std::string traceparent_header_value =
       absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
   // Set the traceparent in the trace_context.
-  traceParentHeader().setReferenceKey(trace_context, traceparent_header_value);
+  traceParentHeader().setRefKey(trace_context, traceparent_header_value);
   // Also set the tracestate.
-  traceStateHeader().setReferenceKey(trace_context, span_.trace_state());
+  traceStateHeader().setRefKey(trace_context, span_.trace_state());
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {

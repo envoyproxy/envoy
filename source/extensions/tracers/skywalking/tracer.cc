@@ -54,7 +54,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   auto sw8_header =
       tracing_context_->createSW8HeaderValue({remote_address.data(), remote_address.size()});
   if (sw8_header.has_value()) {
-    skywalkingPropagationHeaderKey().setReferenceKey(trace_context, sw8_header.value());
+    skywalkingPropagationHeaderKey().setRefKey(trace_context, sw8_header.value());
 
     // Rewrite operation name with latest upstream request path for the EXIT span.
     absl::string_view upstream_request_path = trace_context.path();

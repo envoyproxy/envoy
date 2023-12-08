@@ -83,24 +83,6 @@ public:
   virtual void setByKey(absl::string_view key, absl::string_view val) PURE;
 
   /**
-   * Set new tracing context key/value pair. The key MUST point to data that will live beyond
-   * the lifetime of any traceable stream that using the string.
-   *
-   * @param key The context key of string view type.
-   * @param val The context value of string view type.
-   */
-  virtual void setByReferenceKey(absl::string_view key, absl::string_view val) PURE;
-
-  /**
-   * Set new tracing context key/value pair. Both key and val MUST point to data that will live
-   * beyond the lifetime of any traceable stream that using the string.
-   *
-   * @param key The context key of string view type.
-   * @param val The context value of string view type.
-   */
-  virtual void setByReference(absl::string_view key, absl::string_view val) PURE;
-
-  /**
    * Removes the following key and its associated values from the tracing
    * context.
    *

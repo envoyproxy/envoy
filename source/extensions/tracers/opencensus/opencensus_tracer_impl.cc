@@ -210,25 +210,25 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
     case OpenCensusConfig::TRACE_CONTEXT:
-      Constants::get().TRACEPARENT.setReferenceKey(
+      Constants::get().TRACEPARENT.setRefKey(
           trace_context, ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
       break;
     case OpenCensusConfig::GRPC_TRACE_BIN: {
       std::string val = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(ctx);
       val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
-      Constants::get().GRPC_TRACE_BIN.setReferenceKey(trace_context, val);
+      Constants::get().GRPC_TRACE_BIN.setRefKey(trace_context, val);
       break;
     }
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT:
-      Constants::get().X_CLOUD_TRACE_CONTEXT.setReferenceKey(
+      Constants::get().X_CLOUD_TRACE_CONTEXT.setRefKey(
           trace_context, ::opencensus::trace::propagation::ToCloudTraceContextHeader(ctx));
       break;
     case OpenCensusConfig::B3:
-      Constants::get().X_B3_TRACEID.setReferenceKey(
+      Constants::get().X_B3_TRACEID.setRefKey(
           trace_context, ::opencensus::trace::propagation::ToB3TraceIdHeader(ctx));
-      Constants::get().X_B3_SPANID.setReferenceKey(
+      Constants::get().X_B3_SPANID.setRefKey(
           trace_context, ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
-      Constants::get().X_B3_SAMPLED.setReferenceKey(
+      Constants::get().X_B3_SAMPLED.setRefKey(
           trace_context, ::opencensus::trace::propagation::ToB3SampledHeader(ctx));
       // OpenCensus's trace context propagation doesn't produce the
       // "X-B3-Flags:" header.

@@ -1110,28 +1110,6 @@ TEST(HeaderMapImplTest, HttpTraceContextTest) {
     EXPECT_EQ(13, request_headers.byteSize());
     EXPECT_TRUE(request_headers.get(Http::LowerCaseString("bar")).empty());
   }
-
-  {
-    TestRequestHeaderMapImpl request_headers{{"host", "foo"}};
-    EXPECT_EQ(request_headers.getByKey("host").value(), "foo");
-
-    request_headers.setByKey("trace_key", "trace_value");
-    EXPECT_EQ(request_headers.getByKey("trace_key").value(), "trace_value");
-
-    std::string trace_ref_key = "trace_ref_key";
-    request_headers.setByReferenceKey(trace_ref_key, "trace_value");
-    auto* header_entry = request_headers.get(Http::LowerCaseString(trace_ref_key))[0];
-    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_key.data()),
-              reinterpret_cast<intptr_t>(header_entry->key().getStringView().data()));
-
-    std::string trace_ref_value = "trace_ref_key";
-    request_headers.setByReference(trace_ref_key, trace_ref_value);
-    header_entry = request_headers.get(Http::LowerCaseString(trace_ref_key))[0];
-    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_key.data()),
-              reinterpret_cast<intptr_t>(header_entry->key().getStringView().data()));
-    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_value.data()),
-              reinterpret_cast<intptr_t>(header_entry->value().getStringView().data()));
-  }
 }
 
 // Test the header map max limits are setup correctly.

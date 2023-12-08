@@ -16,12 +16,6 @@ absl::optional<absl::string_view> TraceContextBridge::getByKey(absl::string_view
 void TraceContextBridge::setByKey(absl::string_view key, absl::string_view val) {
   request_.set(key, val);
 }
-void TraceContextBridge::setByReferenceKey(absl::string_view key, absl::string_view val) {
-  request_.set(key, val);
-}
-void TraceContextBridge::setByReference(absl::string_view key, absl::string_view val) {
-  request_.set(key, val);
-}
 void TraceContextBridge::removeByKey(absl::string_view key) { request_.erase(key); }
 
 } // namespace GenericProxy

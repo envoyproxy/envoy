@@ -125,7 +125,7 @@ void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context,
       return;
     }
     const std::string current_span_context = oss.str();
-    otSpanContextHeader().setReferenceKey(
+    otSpanContextHeader().setRefKey(
         trace_context, Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
     // Inject the context using the tracer's standard header format.

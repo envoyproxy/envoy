@@ -570,23 +570,6 @@ void RequestHeaderMapImpl::setByKey(absl::string_view key, absl::string_view val
   HeaderMapImpl::insertByKey(std::move(new_key), std::move(new_val));
 }
 
-void RequestHeaderMapImpl::setByReferenceKey(absl::string_view key, absl::string_view val) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
-
-  HeaderString new_val;
-  new_val.setCopy(val);
-
-  HeaderMapImpl::insertByKey(HeaderString(key), std::move(new_val));
-}
-
-void RequestHeaderMapImpl::setByReference(absl::string_view key, absl::string_view val) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
-
-  HeaderMapImpl::insertByKey(HeaderString(key), HeaderString(val));
-}
-
 void RequestHeaderMapImpl::removeByKey(absl::string_view key) {
   ASSERT(validatedLowerCaseString(key));
   HeaderMapImpl::removeExisting(key);

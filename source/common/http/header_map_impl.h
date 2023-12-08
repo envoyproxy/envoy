@@ -499,8 +499,6 @@ public:
   void forEach(Tracing::TraceContext::IterateCallback callback) const override;
   absl::optional<absl::string_view> getByKey(absl::string_view key) const override;
   void setByKey(absl::string_view key, absl::string_view val) override;
-  void setByReferenceKey(absl::string_view key, absl::string_view val) override;
-  void setByReference(absl::string_view key, absl::string_view val) override;
   void removeByKey(absl::string_view key) override;
   OptRef<RequestHeaderMap> requestHeaders() override {
     return makeOptRefFromPtr<RequestHeaderMap>(this);
