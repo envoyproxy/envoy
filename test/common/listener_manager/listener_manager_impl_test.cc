@@ -5768,29 +5768,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   ASSERT_TRUE(listener_factory_context != nullptr);
   ListenerFactoryContextBaseImpl& parent_context =
       static_cast<PerListenerFactoryContextImpl*>(listener_factory_context)->parentFactoryContext();
-  EXPECT_EQ(&listener_factory_context->timeSource(), &listener_factory_context->api().timeSource());
   EXPECT_EQ(&listener_factory_context->initManager(), &listener.initManager());
-  EXPECT_EQ(&listener_factory_context->lifecycleNotifier(), &server_.lifecycleNotifier());
-  EXPECT_EQ(&listener_factory_context->messageValidationContext(),
-            &listener_factory_context->serverFactoryContext().messageValidationContext());
-  EXPECT_EQ(&listener_factory_context->mainThreadDispatcher(),
-            &parent_context.mainThreadDispatcher());
-  EXPECT_EQ(&listener_factory_context->options(), &parent_context.options());
-  EXPECT_EQ(&listener_factory_context->grpcContext(), &parent_context.grpcContext());
-  EXPECT_EQ(listener_factory_context->healthCheckFailed(), parent_context.healthCheckFailed());
-  EXPECT_EQ(&listener_factory_context->httpContext(), &parent_context.httpContext());
-  EXPECT_EQ(&listener_factory_context->routerContext(), &parent_context.routerContext());
-  EXPECT_EQ(&listener_factory_context->overloadManager(), &parent_context.overloadManager());
-  EXPECT_EQ(listener_factory_context->admin().has_value(), parent_context.admin().has_value());
-  EXPECT_EQ(listener_factory_context->processContext().has_value(),
-            parent_context.processContext().has_value());
   EXPECT_EQ(&listener_factory_context->getTransportSocketFactoryContext(),
             &parent_context.getTransportSocketFactoryContext());
-
-  // Unit test ListenerFactoryContextBaseImpl for coverage.
-  EXPECT_EQ(&parent_context.timeSource(), &listener_factory_context->api().timeSource());
-  EXPECT_EQ(&parent_context.messageValidationContext(), &server_.messageValidationContext());
-  EXPECT_EQ(&parent_context.lifecycleNotifier(), &server_.lifecycleNotifier());
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;

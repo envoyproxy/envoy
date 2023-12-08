@@ -121,14 +121,16 @@ public:
       : stats_(DubboFilterStats::generateStats("test.", *store_.rootScope())),
         engine_(std::make_unique<Regex::GoogleReEngine>()) {
 
-    route_config_provider_manager_ =
-        std::make_unique<Router::RouteConfigProviderManagerImpl>(factory_context_.admin_);
+    route_config_provider_manager_ = std::make_unique<Router::RouteConfigProviderManagerImpl>(
+        factory_context_.server_factory_context_.admin_);
   }
   ~ConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  TimeSource& timeSystem() { return factory_context_.mainThreadDispatcher().timeSource(); }
+  TimeSource& timeSystem() {
+    return factory_context_.server_factory_context_.mainThreadDispatcher().timeSource();
+  }
 
   void initializeFilter() { initializeFilter(""); }
 

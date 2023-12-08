@@ -56,10 +56,12 @@ public:
     }
     config_ = std::make_unique<TestConfigImpl>(proto_config_, factory_context_, stats_);
     conn_manager_ = std::make_unique<ConnectionManager>(
-        *config_, factory_context_.mainThreadDispatcher().timeSource());
+        *config_, factory_context_.server_factory_context_.mainThreadDispatcher().timeSource());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
     conn_manager_->onNewConnection();
-    current_ = factory_context_.mainThreadDispatcher().timeSource().monotonicTime();
+    current_ = factory_context_.server_factory_context_.mainThreadDispatcher()
+                   .timeSource()
+                   .monotonicTime();
   }
 
   void initializeCluster() {
@@ -70,8 +72,10 @@ public:
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
-    ON_CALL(factory_context_.cluster_manager_.thread_local_cluster_, prioritySet())
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+            prioritySet())
         .WillByDefault(ReturnRef(priority_set_));
   }
 
@@ -421,7 +425,7 @@ route_config:
 )EOF";
   initializeFilter(yaml);
 
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillRepeatedly(Return(nullptr));
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::GetRouteInfoByTopic);
