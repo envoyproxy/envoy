@@ -268,5 +268,20 @@ new_features:
 - area: redis
   change: |
     Added support for the watch command (aborts multi transactions if watched keys change).
+- area: set_metadata
+  change: |
+    Added support for injecting typed and untyped dynamic metadata with this filter, also adds the ability
+    to add multiple namespaces with one filter and config to overwrite existing metadata is opt-in.
+    :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.untyped_metadata>`
+    and :ref:`typed_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.typed_metadata>`
+    may now be used to configure the ``set_metadata`` filter.
 
 deprecated:
+- area: set_metadata
+  change: |
+    :ref:`metadata_namespace <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata_namespace>`
+    and :ref:`value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.value>`
+    are deprecated. Please use the new fields
+    :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.untyped_metadata>`
+    and :ref:`typed_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.typed_metadata>`
+    to configure static metadata to inject.

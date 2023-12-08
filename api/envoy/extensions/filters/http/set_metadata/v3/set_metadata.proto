@@ -23,21 +23,36 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message Config {
   message UntypedMetadata {
-    google.protobuf.Struct value = 1;
+    // The metadata namespace.
+    string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
 
-    // Allow the filter to overwrite an existing value in the namespace.
-    bool allow_overwrite = 2;
+    // The value to place at the namespace. If ``allow_overwrite``, this will
+    // overwrite or merge with any existing values in that namespace.
+    google.protobuf.Struct value = 2;
+
+    // Allow the filter to overwrite or merge with an existing value in the namespace.
+    bool allow_overwrite = 3;
   }
 
   message TypedMetadata {
-    google.protobuf.Any value = 1;
+    // The metadata namespace.
+    string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The value to place at the namespace. If ``allow_overwrite``, this will
+    // overwrite any existing values in that namespace. See
+    // :ref:`the filter documentation <config_http_filters_set_metadata>` for
+    // more information on how this value is merged with potentially existing
+    // ones if ``allow_overwrite`` is configured.
+    google.protobuf.Any value = 2;
 
     // Allow the filter to overwrite an existing value in the namespace.
-    bool allow_overwrite = 2;
+    bool allow_overwrite = 3;
   }
 
   // The metadata namespace.
-  string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+  // metadata_namespace is deprecated; use untyped_metadata or typed_metadata
+  string metadata_namespace = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The untyped value to update the dynamic metadata namespace with. See
   // :ref:`the filter documentation <config_http_filters_set_metadata>` for
@@ -49,16 +64,9 @@ message Config {
   google.protobuf.Struct value = 2
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  oneof metadata {
-    // The untyped protobuf Struct to update the dynamic metadata namespace. See
-    // :ref:`the filter documentation <config_http_filters_set_metadata>` for
-    // more information on how this value is merged with potentially existing
-    // ones if ``allow_overwrite`` is configured.
-    UntypedMetadata untyped_metadata = 3;
+  // Defines changes to be made to untyped dynamic metadata.
+  repeated UntypedMetadata untyped_metadata = 3;
 
-    // The typed protobuf Any to put in the dynamic metadata metadata namespace.
-    // If ``allow_overwrite``, this will overwrite any existing values in that
-    // namespace.
-    TypedMetadata typed_metadata = 4;
-  }
+  // Defines changes to be made to typed dynamic metadata.
+  repeated TypedMetadata typed_metadata = 4;
 }

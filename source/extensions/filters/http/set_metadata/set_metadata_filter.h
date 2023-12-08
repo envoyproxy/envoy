@@ -17,26 +17,30 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SetMetadataFilter {
 
+using envoy::extensions::filters::http::set_metadata::v3::Config_TypedMetadata;
+using envoy::extensions::filters::http::set_metadata::v3::Config_UntypedMetadata;
+
+struct UntypedMetadataEntry {
+  bool allow_overwrite{};
+  std::string metadata_namespace;
+  ProtobufWkt::Struct value;
+};
+struct TypedMetadataEntry {
+  bool allow_overwrite{};
+  std::string metadata_namespace;
+  ProtobufWkt::Any value;
+};
 class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
                public Logger::Loggable<Logger::Id::config> {
 public:
   Config(const envoy::extensions::filters::http::set_metadata::v3::Config& config);
 
-  absl::string_view metadataNamespace() const { return namespace_; }
-  bool hasUntypedValue() const { return has_untyped_value_; }
-  const ProtobufWkt::Struct& untypedValue() { return untyped_value_; }
-  bool hasTypedValue() const { return has_typed_value_; }
-  const ProtobufWkt::Any& typedValue() { return typed_value_; }
-  bool allowOverwrite() const { return allow_overwrite_; }
+  const std::vector<UntypedMetadataEntry>& untyped() { return untyped_; }
+  const std::vector<TypedMetadataEntry>& typed() { return typed_; }
 
 private:
-  absl::string_view namespace_;
-  bool has_untyped_value_{true};
-  ProtobufWkt::Struct untyped_value_;
-  bool has_typed_value_{};
-  ProtobufWkt::Any typed_value_;
-  // default to true until deprecated ``value`` field is removed
-  bool allow_overwrite_{true};
+  std::vector<UntypedMetadataEntry> untyped_;
+  std::vector<TypedMetadataEntry> typed_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

@@ -9,7 +9,7 @@ Set Metadata
 This filters adds or updates dynamic metadata with static data.
 
 Typed dynamic metadata will overwrite existing values at the configured namespace if and only if ``allow_overwrite`` is
-set to true, otherwise nothing is done. If the namespace does not exist in the typed dynamic
+set to true, otherwise nothing is done. If the namespace does not already exist in the typed dynamic
 metadata, it is inserted with the configured value.
 
 If ``allow_overwrite`` is set to false or omitted, untyped dynamic metadata will only be updated if

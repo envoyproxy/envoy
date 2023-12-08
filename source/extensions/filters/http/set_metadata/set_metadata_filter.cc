@@ -14,17 +14,21 @@ namespace HttpFilters {
 namespace SetMetadataFilter {
 
 Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config) {
-  namespace_ = proto_config.metadata_namespace();
-  untyped_value_ = proto_config.value();
+  if (proto_config.has_value() && !proto_config.metadata_namespace().empty()) {
+    UntypedMetadataEntry deprecated_api_val{true, proto_config.metadata_namespace(),
+                                            proto_config.value()};
+    untyped_.emplace_back(deprecated_api_val);
+  }
 
-  if (proto_config.has_untyped_metadata()) {
-    allow_overwrite_ = proto_config.untyped_metadata().allow_overwrite();
-    untyped_value_ = proto_config.untyped_metadata().value();
-  } else if (proto_config.has_typed_metadata()) {
-    has_untyped_value_ = false;
-    has_typed_value_ = true;
-    allow_overwrite_ = proto_config.typed_metadata().allow_overwrite();
-    typed_value_ = proto_config.typed_metadata().value();
+  for (const auto& untyped : proto_config.untyped_metadata()) {
+    UntypedMetadataEntry untyped_entry{untyped.allow_overwrite(), untyped.metadata_namespace(),
+                                       untyped.value()};
+    untyped_.emplace_back(untyped_entry);
+  }
+  for (const auto& typed : proto_config.typed_metadata()) {
+    TypedMetadataEntry typed_entry{typed.allow_overwrite(), typed.metadata_namespace(),
+                                   typed.value()};
+    typed_.emplace_back(typed_entry);
   }
 }
 
@@ -33,28 +37,37 @@ SetMetadataFilter::SetMetadataFilter(const ConfigSharedPtr config) : config_(con
 SetMetadataFilter::~SetMetadataFilter() = default;
 
 Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  const absl::string_view metadata_namespace = config_->metadataNamespace();
 
-  if (config_->hasUntypedValue()) {
-    auto& metadata = *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata();
+  // add configured untyped metadata
+  if (config_->untyped().size() > 0) {
+    auto& mut_untyped_metadata =
+        *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata();
 
-    if (!metadata.contains(metadata_namespace)) {
-      metadata[metadata_namespace] = config_->untypedValue();
-    } else if (config_->allowOverwrite()) {
-      // get the existing metadata at this key for merging
-      ProtobufWkt::Struct& orig_fields = metadata[metadata_namespace];
-      const auto& to_merge = config_->untypedValue();
+    for (const auto& entry : config_->untyped()) {
+      if (!mut_untyped_metadata.contains(entry.metadata_namespace)) {
+        mut_untyped_metadata[entry.metadata_namespace] = entry.value;
+      } else if (entry.allow_overwrite) {
+        // get the existing metadata at this key for merging
+        ProtobufWkt::Struct& orig_fields = mut_untyped_metadata[entry.metadata_namespace];
+        const auto& to_merge = entry.value;
 
-      // merge the new metadata into the existing metadata
-      StructUtil::update(orig_fields, to_merge);
+        // merge the new metadata into the existing metadata
+        StructUtil::update(orig_fields, to_merge);
+      }
     }
-  } else if (config_->hasTypedValue()) {
-    auto& metadata =
+  }
+
+  // add configured typed metadata
+  if (config_->typed().size() > 0) {
+    auto& mut_typed_metadata =
         *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_typed_filter_metadata();
-    // overwrite the existing typed metadata at this key
-    metadata[metadata_namespace] = config_->typedValue();
-  } else {
-    ENVOY_LOG(error, "no configured metadata found");
+
+    for (const auto& entry : config_->typed()) {
+      if (!mut_typed_metadata.contains(entry.metadata_namespace) || entry.allow_overwrite) {
+        // overwrite the existing typed metadata at this key
+        mut_typed_metadata[entry.metadata_namespace] = entry.value;
+      }
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;

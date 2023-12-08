@@ -138,8 +138,8 @@ TEST_F(SetMetadataFilterTest, DeprecatedWithMerge) {
 
 TEST_F(SetMetadataFilterTest, UntypedSimple) {
   const std::string yaml_config = R"EOF(
-    metadata_namespace: thenamespace
     untyped_metadata:
+    - metadata_namespace: thenamespace
       value:
         tags:
           mytag0: 1
@@ -162,8 +162,8 @@ TEST_F(SetMetadataFilterTest, UntypedSimple) {
 
 TEST_F(SetMetadataFilterTest, TypedSimple) {
   const std::string yaml_config = R"EOF(
-    metadata_namespace: thenamespace
     typed_metadata:
+    - metadata_namespace: thenamespace
       value:
         '@type': type.googleapis.com/helloworld.HelloRequest
         name: typed_metadata
@@ -186,33 +186,24 @@ TEST_F(SetMetadataFilterTest, TypedSimple) {
 TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
   envoy::config::core::v3::Metadata metadata;
 
-  {
-    const std::string yaml_config = R"EOF(
-      metadata_namespace: thenamespace
-      untyped_metadata:
-        value:
-          mynumber: 10
-          mylist: ["a"]
-          tags:
-            mytag0: 1
-    )EOF";
+  const std::string yaml_config = R"EOF(
+    untyped_metadata:
+    - metadata_namespace: thenamespace
+      value:
+        mynumber: 10
+        mylist: ["a"]
+        tags:
+          mytag0: 1
+    - metadata_namespace: thenamespace
+      value:
+        mynumber: 20
+        mylist: ["b"]
+        tags:
+          mytag1: 1
+      allow_overwrite: true
+  )EOF";
 
-    runFilter(metadata, yaml_config);
-  }
-  {
-    const std::string yaml_config = R"EOF(
-      metadata_namespace: thenamespace
-      untyped_metadata:
-        value:
-          mynumber: 20
-          mylist: ["b"]
-          tags:
-            mytag1: 1
-        allow_overwrite: true
-    )EOF";
-
-    runFilter(metadata, yaml_config);
-  }
+  runFilter(metadata, yaml_config);
 
   // Verify that `metadata` contains:
   // ``{"thenamespace": {number: 20, mylist: ["a","b"], "tags": {"mytag0": 1, "mytag1": 1}}}``
@@ -248,32 +239,23 @@ TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
 TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   envoy::config::core::v3::Metadata metadata;
 
-  {
-    const std::string yaml_config = R"EOF(
-      metadata_namespace: thenamespace
-      untyped_metadata:
-        value:
-          mynumber: 10
-          mylist: ["a"]
-          tags:
-            mytag0: 1
-    )EOF";
+  const std::string yaml_config = R"EOF(
+    untyped_metadata:
+    - metadata_namespace: thenamespace
+      value:
+        mynumber: 10
+        mylist: ["a"]
+        tags:
+          mytag0: 1
+    - metadata_namespace: thenamespace
+      value:
+        mynumber: 20
+        mylist: ["b"]
+        tags:
+          mytag1: 1
+  )EOF";
 
-    runFilter(metadata, yaml_config);
-  }
-  {
-    const std::string yaml_config = R"EOF(
-      metadata_namespace: thenamespace
-      untyped_metadata:
-        value:
-          mynumber: 20
-          mylist: ["b"]
-          tags:
-            mytag1: 1
-    )EOF";
-
-    runFilter(metadata, yaml_config);
-  }
+  runFilter(metadata, yaml_config);
 
   // Verify that `metadata` contains:
   // ``{"thenamespace": {number: 10, mylist: ["a"], "tags": {"mytag0": 1}}}``
@@ -303,16 +285,18 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   checkKeyInt(tags_struct, "mytag0", 1);
 }
 
-TEST_F(SetMetadataFilterTest, UntypedSupersedesDeprecated) {
+TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
   const std::string yaml_config = R"EOF(
     metadata_namespace: thenamespace
     value:
       tags:
         mytag0: 0
     untyped_metadata:
+    - metadata_namespace: thenamespace
       value:
         tags:
           mytag0: 1
+      allow_overwrite: true
   )EOF";
 
   envoy::config::core::v3::Metadata metadata;
@@ -330,13 +314,14 @@ TEST_F(SetMetadataFilterTest, UntypedSupersedesDeprecated) {
   checkKeyInt(tags.struct_value(), "mytag0", 1);
 }
 
-TEST_F(SetMetadataFilterTest, TypedSupersedesDeprecated) {
+TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
   const std::string yaml_config = R"EOF(
     metadata_namespace: thenamespace
     value:
       tags:
         mytag0: 0
     typed_metadata:
+    - metadata_namespace: thenamespace
       value:
         '@type': type.googleapis.com/helloworld.HelloRequest
         name: typed_metadata
@@ -345,10 +330,16 @@ TEST_F(SetMetadataFilterTest, TypedSupersedesDeprecated) {
   envoy::config::core::v3::Metadata metadata;
   runFilter(metadata, yaml_config);
 
-  // Verify that `metadata` contains no untyped metadata
+  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 0}}}`
   const auto& untyped_metadata = metadata.filter_metadata();
   const auto it_namespace = untyped_metadata.find("thenamespace");
-  ASSERT_EQ(untyped_metadata.end(), it_namespace);
+  ASSERT_NE(untyped_metadata.end(), it_namespace);
+  const auto& fields = it_namespace->second.fields();
+  const auto it_tags = fields.find("tags");
+  ASSERT_NE(it_tags, fields.end());
+  const auto& tags = it_tags->second;
+  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  checkKeyInt(tags.struct_value(), "mytag0", 0);
 
   // Verify that `metadata` contains our typed HelloRequest
   const auto& typed_metadata = metadata.typed_filter_metadata();

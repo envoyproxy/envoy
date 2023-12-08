@@ -21,7 +21,7 @@ namespace SetMetadataFilter {
 
 using SetMetadataProtoConfig = envoy::extensions::filters::http::set_metadata::v3::Config;
 
-TEST(SetMetadataFilterConfigTest, SimpleConfigUntyped) {
+TEST(SetMetadataFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
 metadata_namespace: thenamespace
 value:
@@ -30,36 +30,15 @@ value:
   tags:
     mytag1: 1
 untyped_metadata:
+- metadata_namespace: thenamespace
   value:
     mynumber: 20
     mylist: ["b"]
     tags:
       mytag1: 1
   allow_overwrite: true
-  )EOF";
-
-  SetMetadataProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  SetMetadataConfig factory;
-
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
-  Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
-  cb(filter_callbacks);
-}
-
-TEST(SetMetadataFilterConfigTest, SimpleConfigTyped) {
-  const std::string yaml = R"EOF(
-metadata_namespace: thenamespace
-value:
-  mynumber: 20
-  mylist: ["b"]
-  tags:
-    mytag1: 1
 typed_metadata:
+- metadata_namespace: thenamespace
   value:
     '@type': type.googleapis.com/helloworld.HelloRequest
     name: typed_metadata
@@ -79,7 +58,7 @@ typed_metadata:
   cb(filter_callbacks);
 }
 
-TEST(SetMetadataFilterConfigTest, SimpleConfigServerContextUntyped) {
+TEST(SetMetadataFilterConfigTest, SimpleConfigServerContext) {
   const std::string yaml = R"EOF(
 metadata_namespace: thenamespace
 value:
@@ -88,36 +67,15 @@ value:
   tags:
     mytag1: 1
 untyped_metadata:
+- metadata_namespace: thenamespace
   value:
     mynumber: 20
     mylist: ["b"]
     tags:
       mytag1: 1
   allow_overwrite: true
-  )EOF";
-
-  SetMetadataProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  SetMetadataConfig factory;
-
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
-  cb(filter_callbacks);
-}
-
-TEST(SetMetadataFilterConfigTest, SimpleConfigServerContextTyped) {
-  const std::string yaml = R"EOF(
-metadata_namespace: thenamespace
-value:
-  mynumber: 20
-  mylist: ["b"]
-  tags:
-    mytag1: 1
 typed_metadata:
+- metadata_namespace: thenamespace
   value:
     '@type': type.googleapis.com/helloworld.HelloRequest
     name: typed_metadata
