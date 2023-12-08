@@ -325,7 +325,8 @@ message JwtProvider {
   //
   // 1. The field is set to ``true``.
   //
-  // 2. At least one ``claim_to_headers`` header is added to the request.
+  // 2. At least one ``claim_to_headers`` header is added to the request OR
+  //    if ``payload_in_metadata`` is set.
   //
   bool clear_route_cache = 17;
 }

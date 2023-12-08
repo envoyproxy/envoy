@@ -23,6 +23,7 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/server/factory_context_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -122,42 +123,17 @@ private:
  * The common functionality shared by PerListenerFilterFactoryContexts and
  * PerFilterChainFactoryFactoryContexts.
  */
-class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContext,
+class ListenerFactoryContextBaseImpl final : public Server::FactoryContextImplBase,
                                              public Network::DrainDecision {
 public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 const std::shared_ptr<const ListenerInfoImpl>& listener_info,
+                                 ListenerInfoConstSharedPtr listener_info,
                                  const envoy::config::listener::v3::Listener& config,
                                  Server::DrainManagerPtr drain_manager);
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Server::Options& options() override;
-  Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  bool healthCheckFailed() override;
-  Http::Context& httpContext() override;
-  Router::Context& routerContext() override;
+
   Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& serverScope() override { return *server_.stats().rootScope(); }
-  Stats::Scope& scope() override;
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::Instance& threadLocal() override;
-  OptRef<Admin> admin() override;
-  const Network::ListenerInfo& listenerInfo() const override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  ProcessContextOptRef processContext() override;
-  Configuration::ServerFactoryContext& serverFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
-  Stats::Scope& listenerScope() override;
+  Network::DrainDecision& drainDecision() override;
 
   // DrainDecision
   bool drainClose() const override {
@@ -170,11 +146,6 @@ public:
   Server::DrainManager& drainManager();
 
 private:
-  Envoy::Server::Instance& server_;
-  const std::shared_ptr<const ListenerInfoImpl> listener_info_;
-  Stats::ScopeSharedPtr global_scope_;
-  Stats::ScopeSharedPtr listener_scope_; // Stats with listener named scope.
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
 };
 
@@ -188,7 +159,7 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                const std::shared_ptr<const ListenerInfoImpl>& listener_info,
+                                ListenerInfoConstSharedPtr listener_info,
                                 ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
 
   PerListenerFactoryContextImpl(
@@ -198,31 +169,11 @@ public:
         listener_impl_(listener_impl) {}
 
   // FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Options& options() override;
   Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  bool healthCheckFailed() override;
-  Http::Context& httpContext() override;
-  Router::Context& routerContext() override;
   Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
-  Stats::Scope& serverScope() override { return listener_factory_context_base_->serverScope(); }
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::Instance& threadLocal() override;
-  OptRef<Admin> admin() override;
   const Network::ListenerInfo& listenerInfo() const override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  ProcessContextOptRef processContext() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
@@ -511,8 +462,8 @@ private:
 
   // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
   // listener initialization is complete.
-  // Important: local_init_watcher_ must be the last field in the class to avoid unexpected watcher
-  // callback during the destroy of ListenerImpl.
+  // Important: local_init_watcher_ must be the last field in the class to avoid unexpected
+  // watcher callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
   std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context_;

@@ -4,7 +4,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
-#include "source/server/factory_context_base_impl.h"
 #include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -16,8 +15,7 @@ namespace DynamicForwardProxy {
 
 class DnsCacheManagerImpl : public DnsCacheManager, public Singleton::Instance {
 public:
-  DnsCacheManagerImpl(const Server::Configuration::GenericFactoryContext& context)
-      : context_(context) {}
+  DnsCacheManagerImpl(Server::Configuration::GenericFactoryContext& context) : context_(context) {}
 
   // DnsCacheManager
   absl::StatusOr<DnsCacheSharedPtr> getCache(
@@ -43,7 +41,8 @@ public:
   DnsCacheManagerFactoryImpl(Server::Configuration::ServerFactoryContext& server_context,
                              ProtobufMessage::ValidationVisitor& validation_visitor)
       : context_(server_context, validation_visitor) {}
-  DnsCacheManagerFactoryImpl(Server::GenericFactoryContextImpl context) : context_(context) {}
+  DnsCacheManagerFactoryImpl(Server::Configuration::GenericFactoryContext& context)
+      : context_(context) {}
 
   DnsCacheManagerSharedPtr get() override;
 

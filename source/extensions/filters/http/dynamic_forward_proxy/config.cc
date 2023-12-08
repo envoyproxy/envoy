@@ -17,7 +17,8 @@ DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
     const std::string&, Server::Configuration::FactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
-  Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(context);
+  Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+      context.serverFactoryContext().singletonManager());
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
       cache_manager_factory.get();
   auto cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());

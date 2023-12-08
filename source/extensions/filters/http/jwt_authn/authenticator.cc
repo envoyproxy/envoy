@@ -377,7 +377,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     header_added |=
         addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
   }
-  if (provider.clear_route_cache() && header_added) {
+  if (provider.clear_route_cache() && (header_added || !provider.payload_in_metadata().empty())) {
     clear_route_cache_ = true;
   }
 
