@@ -18,9 +18,9 @@ field, untyped dynamic metadata values are updated with the following scheme:
 - If a key does not exist, the configured value is copied into the metadata namespace.
 - If the key exists but has a different type, the value is replaced outright by the configured value.
 - Otherwise:
- * scalar values (null, string, number, boolean): the existing value is replaced.
- * lists: new values are appended to the current list.
- * structures: recursively apply this scheme.
+ - scalar values (null, string, number, boolean): the existing value is replaced.
+ - lists: new values are appended to the current list.
+ - structures: recursively apply this scheme.
 
 For instance, if the namespace already contains this structure:
 

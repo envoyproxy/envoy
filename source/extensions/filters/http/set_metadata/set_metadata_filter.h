@@ -17,9 +17,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SetMetadataFilter {
 
-using envoy::extensions::filters::http::set_metadata::v3::Config_TypedMetadata;
-using envoy::extensions::filters::http::set_metadata::v3::Config_UntypedMetadata;
-
 struct UntypedMetadataEntry {
   bool allow_overwrite{};
   std::string metadata_namespace;
