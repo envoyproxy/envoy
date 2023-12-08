@@ -110,6 +110,10 @@ bug_fixes:
     Fixed a race condition that when multiple requests with the same authority header are sent to Envoy, sometimes some requests
     may receive 503 response with no_healthy_upstream from Envoy. The fix is guarded by runtime guard
     ``envoy.reloadable_features.dns_cache_set_first_resolve_complete``, which defaults to true.
+- area: upstream
+  change: |
+    Fixed a bug that the subset load balancer will always be used even if the subset load balancer config does not
+    contain any subset selector.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
