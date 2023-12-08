@@ -617,10 +617,11 @@ envoy_cmake(
 )
 
 envoy_cc_library(
-    name = "maxmind_linux",
+    name = "maxmind_linux_apple",
     srcs = [],
     deps = select({
         "//bazel:linux": [":maxmind"],
+        "//bazel:apple": [":maxmind"],
         "//conditions:default": [],
     }),
 )
