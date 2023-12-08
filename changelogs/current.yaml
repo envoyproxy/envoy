@@ -2,6 +2,35 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: http
+  change: |
+    Remove the hop by hop TE header from downstream request headers. This change can be temporarily reverted
+    by setting ``envoy.reloadable_features.sanitize_te`` to false.
+- area: http
+  change: |
+    Flip runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to true. Name downgrading in the
+    per filter config searching will be disabled by default. This behavior can be temporarily reverted by setting
+    the flag to false explicitly.
+    See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
+    issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
+- area: listener
+  change: |
+    undeprecated runtime key ``overload.global_downstream_max_connections`` until :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
+- area: stats dns_filter
+  change: |
+    Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
+    is properly extracted. This changes the Prometheus name from
+    dns_filter_myprefix_local_a_record_answers{} to dns_filter_local_a_record_answers{envoy.dns_filter_prefix="myprefix"}.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
+    requests and responses. This behavior can be reverted by setting the feature to false.
+- area: http2
+  change: |
+    Discard the ``Host`` header if the ``:authority`` header was received to bring Envoy into compliance with
+    https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1 This behavioral change can be reverted by setting runtime flag
+    ``envoy.reloadable_features.http2_discard_host_header`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
