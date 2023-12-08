@@ -466,6 +466,10 @@ upstream_socket_config:
                         session_access_log_format, proxy_access_log_format),
         true, false);
 
+  // Allow for two sessions.
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->resetResourceManager(2, 0, 0, 0, 0);
+
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -487,28 +491,27 @@ upstream_socket_config:
   test_sessions_[0].recvDataFromUpstream("world3");
   checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
 
-  test_sessions_[0].idle_timer_->invokeCallback();
   expectSessionCreate(upstream_address_);
   test_sessions_[1].expectWriteToUpstream("hello4", 0, nullptr, true);
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello4");
+  recvDataFromDownstream("10.0.0.3:1000", "10.0.0.2:80", "hello4");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
   checkTransferStats(23 /*rx_bytes*/, 4 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
   test_sessions_[1].recvDataFromUpstream("world4");
   checkTransferStats(23 /*rx_bytes*/, 4 /*rx_datagrams*/, 23 /*tx_bytes*/, 4 /*tx_datagrams*/);
 
   filter_.reset();
   EXPECT_EQ(output_.size(), 3);
-  EXPECT_EQ(output_[1], "23 4 23 4 0 2 1");
+  EXPECT_EQ(output_[0], "23 4 23 4 0 2 0");
 
   const std::string session_access_log_regex1 =
       "17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 0 "
       "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
       AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
-  EXPECT_TRUE(std::regex_match(output_[0], std::regex(session_access_log_regex1)));
+  EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex1)));
 
   const std::string session_access_log_regex2 =
-      "6 1 6 1 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 1 "
+      "6 1 6 1 10.0.0.3:1000 10.0.0.2:80 20.0.0.1:443 1 "
       "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
       AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
   EXPECT_TRUE(std::regex_match(output_[2], std::regex(session_access_log_regex2)));

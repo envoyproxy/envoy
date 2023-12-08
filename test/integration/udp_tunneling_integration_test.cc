@@ -6,6 +6,8 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/upstreams/http/udp/v3/udp_connection_pool.pb.h"
 
+#include "source/common/stream_info/utility.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 
@@ -607,7 +609,8 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeout) {
   ASSERT_TRUE(upstream_request_->waitForReset());
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 
-  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("SI"));
+  EXPECT_THAT(waitForAccessLog(access_log_filename),
+              testing::HasSubstr(StreamInfo::ResponseFlagUtils::STREAM_IDLE_TIMEOUT));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {
@@ -735,7 +738,10 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 
-  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("1 UF,URX"));
+  const std::string expected_log =
+      "1 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE) + "," +
+      std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_RETRY_LIMIT_EXCEEDED);
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
@@ -791,7 +797,9 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   sendCapsuleDownstream("response", true);
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 
-  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("2 UF"));
+  const std::string expected_log =
+      "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
 }
 
 TEST_P(UdpTunnelingIntegrationTest, PropagateValidResponseHeaders) {
