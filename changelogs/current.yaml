@@ -213,5 +213,10 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace resource detector for the OpenTelemetry tracer.
+- area: aws_request_signing
+  change: |
+    added support for sigv4a signing in :ref:`signing_algorithm <
+    :ref:`request_attributes <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.signing_algorithm>`
+    config API.
 
 deprecated:
