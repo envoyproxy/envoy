@@ -1,4 +1,4 @@
-#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
 
 #include <algorithm>
 
@@ -33,7 +33,7 @@
 #include "source/server/api_listener_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
-#include "source/extensions/listener_managers/listener_manager/filter_chain_manager_impl.h"
+#include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -94,7 +94,8 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
       ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
           proto_config.config_discovery(), proto_config.name(),
           filter_chain_factory_context.serverFactoryContext(), filter_chain_factory_context,
-          filter_chain_factory_context.clusterManager(), is_terminal, "network", nullptr));
+          filter_chain_factory_context.serverFactoryContext().clusterManager(), is_terminal,
+          "network", nullptr));
       continue;
     }
 
@@ -157,8 +158,9 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         }
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.serverFactoryContext(), context, context.clusterManager(),
-          false, "tcp-listener", createListenerFilterMatcher(proto_config));
+          config_discovery, name, context.serverFactoryContext(), context,
+          context.serverFactoryContext().clusterManager(), false, "tcp-listener",
+          createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",
@@ -244,8 +246,9 @@ ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
         }
       }
       ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.serverFactoryContext(), context, context.clusterManager(),
-          false, "quic-listener", createListenerFilterMatcher(proto_config)));
+          config_discovery, name, context.serverFactoryContext(), context,
+          context.serverFactoryContext().clusterManager(), false, "quic-listener",
+          createListenerFilterMatcher(proto_config)));
     } else {
       ENVOY_LOG(debug, "  config: {}",
                 MessageUtil::getJsonStringFromMessageOrError(
@@ -990,7 +993,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
   stop_listeners_type_ = stop_listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     if (stop_listeners_type != StopListenersType::InboundOnly ||
-        listener.direction() == envoy::config::core::v3::INBOUND) {
+        listener.listenerInfo().direction() == envoy::config::core::v3::INBOUND) {
       ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
       auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
       // Destroy a warming listener directly.

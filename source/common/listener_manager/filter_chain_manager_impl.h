@@ -18,9 +18,9 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
+#include "source/common/listener_manager/filter_chain_factory_context_callback.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
-#include "source/extensions/listener_managers/listener_manager/filter_chain_factory_context_callback.h"
 #include "source/server/factory_context_impl.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -58,37 +58,14 @@ public:
   }
 
   // Configuration::FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  Router::Context& routerContext() override;
-  bool healthCheckFailed() override;
-  Http::Context& httpContext() override;
   Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
-  Stats::Scope& serverScope() override { return parent_context_.serverScope(); }
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::SlotAllocator& threadLocal() override;
-  OptRef<Admin> admin() override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  ProcessContextOptRef processContext() override;
+  const Network::ListenerInfo& listenerInfo() const override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
-  bool isQuicListener() const override;
 
   void startDraining() override { is_draining_.store(true); }
 

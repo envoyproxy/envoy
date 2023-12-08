@@ -1,16 +1,15 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_extension_package",
+    "envoy_package",
     "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_extension_package()
+envoy_package()
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "listener_manager_lib",
     srcs = [
         "listener_impl.cc",
@@ -19,13 +18,6 @@ envoy_cc_extension(
     hdrs = [
         "listener_impl.h",
         "listener_manager_impl.h",
-    ],
-    # any changes to this should be reviewed by mobile maintainers
-    # to ensure that listener code doesn't leak back into Envoy Mobile.
-    extra_visibility = [
-        "//source/server/admin:__subpackages__",
-        "//source/server/config_validation:__subpackages__",
-        "//test:__subpackages__",
     ],
     deps = [
         ":active_raw_udp_listener_config",
@@ -44,7 +36,6 @@ envoy_cc_extension(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:basic_resource_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
@@ -66,6 +57,7 @@ envoy_cc_extension(
         "//source/server:api_listener_lib",
         "//source/server:configuration_lib",
         "//source/server:drain_manager_lib",
+        "//source/server:factory_context_lib",
         "//source/server:listener_manager_factory_lib",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -82,15 +74,13 @@ envoy_cc_extension(
         "//source/common/quic:udp_gso_batch_writer_lib",
         "//source/extensions/udp_packet_writer/gso:config",
     ]),
+    alwayslink = True,
 )
 
 envoy_cc_library(
     name = "active_raw_udp_listener_config",
     srcs = ["active_raw_udp_listener_config.cc"],
     hdrs = ["active_raw_udp_listener_config.h"],
-    visibility = [
-        "//test:__subpackages__",
-    ],
     deps = [
         ":connection_handler_lib",
         "//envoy/registry",
@@ -155,15 +145,11 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "connection_handler_lib",
     srcs = ["connection_handler_impl.cc"],
     hdrs = [
         "connection_handler_impl.h",
-    ],
-    # core code.
-    extra_visibility = [
-        "//test:__subpackages__",
     ],
     deps = [
         "active_tcp_listener",
@@ -241,6 +227,19 @@ envoy_cc_library(
         "//source/common/network:generic_listener_filter_impl_base_lib",
         "//source/common/stats:timespan_lib",
         "//source/server:active_listener_base",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_info_lib",
+    srcs = ["listener_info_impl.cc"],
+    hdrs = [
+        "listener_info_impl.h",
+    ],
+    deps = [
+        "//envoy/network:listener_interface",
+        "//source/common/config:metadata_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

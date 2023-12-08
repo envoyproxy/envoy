@@ -559,8 +559,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_tracing()) {
     tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
-    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
-                                                                             config.tracing());
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
+        context.listenerInfo().direction(), config.tracing());
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -628,7 +628,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
-    if (!context_.isQuicListener()) {
+    if (!context_.listenerInfo().isQuic()) {
       throwEnvoyExceptionOrPanic("HTTP/3 codec configured on non-QUIC listener.");
     }
 #else
@@ -636,7 +636,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
     break;
   }
-  if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
+  if (codec_type_ != CodecType::HTTP3 && context_.listenerInfo().isQuic()) {
     throwEnvoyExceptionOrPanic("Non-HTTP/3 codec configured on QUIC listener.");
   }
 

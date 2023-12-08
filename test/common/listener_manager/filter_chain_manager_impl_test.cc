@@ -11,14 +11,14 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/config/metadata.h"
+#include "source/common/listener_manager/filter_chain_manager_impl.h"
+#include "source/common/listener_manager/listener_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/listener_managers/listener_manager/filter_chain_manager_impl.h"
-#include "source/extensions/listener_managers/listener_manager/listener_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 #include "source/server/configuration_impl.h"
 
@@ -43,22 +43,6 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
-
-// Meaningless case to improve coverage rate.
-TEST(PerFilterChainFactoryContextImplTest, NopTest) {
-  NiceMock<Configuration::MockFactoryContext> parent_context;
-
-  PerFilterChainFactoryContextImpl context(parent_context, parent_context.init_manager_);
-
-  context.messageValidationContext();
-  context.grpcContext();
-  context.healthCheckFailed();
-  context.httpContext();
-  context.routerContext();
-  context.overloadManager();
-  context.timeSource();
-  context.lifecycleNotifier();
-}
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:

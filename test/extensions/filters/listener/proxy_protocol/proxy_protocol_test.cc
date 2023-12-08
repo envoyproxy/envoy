@@ -10,6 +10,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
@@ -17,7 +18,6 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -101,9 +101,7 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
-  }
+  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -227,6 +225,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  NiceMock<Network::MockListenerInfo> listener_info_;
 };
 
 // Parameterize the listener socket address version.
@@ -2015,9 +2014,7 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
-  }
+  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -2101,6 +2098,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  NiceMock<Network::MockListenerInfo> listener_info_;
 };
 
 // Parameterize the listener socket address version.

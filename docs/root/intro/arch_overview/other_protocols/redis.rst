@@ -208,6 +208,7 @@ For details on each command's usage see the official
   SRANDMEMBER, Set
   SREM, Set
   SSCAN, Set
+  WATCH, String
   ZADD, Sorted Set
   ZCARD, Sorted Set
   ZCOUNT, Sorted Set

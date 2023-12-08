@@ -105,6 +105,11 @@ bug_fixes:
     used for retrieval. This caused cache misses on initial use, even though the host DNS entry
     was pre-resolved. The fix is guarded by runtime guard ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns``,
     which defaults to true.
+- area: DNS
+  change: |
+    Fixed a race condition that when multiple requests with the same authority header are sent to Envoy, sometimes some requests
+    may receive 503 response with no_healthy_upstream from Envoy. The fix is guarded by runtime guard
+    ``envoy.reloadable_features.dns_cache_set_first_resolve_complete``, which defaults to true.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -143,6 +148,14 @@ new_features:
   change: |
     added :ref:`ExtensionConfiguration discovery service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>` support for
     :ref:`composite filter <config_http_filters_composite>`.
+- area: aws
+  change: |
+    Added support for AWS common utility to fetch metadata credentials from AWS STS by using ``WebIdentityToken``. To enable
+    you need to set ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to ``true`` so that web identity
+    credentials provider can use http async client to fetch credentials. Web identity credentials provider cannot use current
+    default libcurl credentials fetcher which is under deprecation and will soon be removed. Web identity credentials provider
+    is not compatible with :ref:`Grpc Credentials AWS IAM <envoy_v3_api_file_envoy/config/grpc_credential/v3/aws_iam.proto>`
+    plugin which can only support deprecated libcurl credentials fetcher, see https://github.com/envoyproxy/envoy/pull/30626.
 - area: filters
   change: |
     Added :ref:`the Basic Auth filter <envoy_v3_api_msg_extensions.filters.http.basic_auth.v3.BasicAuth>`, which can be used to
@@ -162,6 +175,10 @@ new_features:
   change: |
     The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
     These claims will be serialized as JSON and encoded as Base64.
+- area: jwt
+  change: |
+    The JWT authentication filter supports changing the routes when either the headers or the
+    dynamic metadata are modified.
 - area: tcp_proxy
   change: |
     added support to TCP Proxy for recording the latency in ``UpstreamTiming`` from when the first
@@ -236,12 +253,28 @@ new_features:
     <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log_options>`
     to allow recording an access log entry periodically for the UDP session, and allow recording an access
     log entry on the connection tunnel created successfully to upstream when UDP tunneling is configured.
+- area: internal_redirects
+  change: |
+    Added support to copy headers from the redirect response to the
+    triggered request. See
+    :ref:`response_headers_to_copy<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_copy>`.
 - area: zookeeper
   change: |
     Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
     <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
+- area: stateful_session
+  change: |
+    Added :ref:`strict mode <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.strict>`
+    to cookie and header based stateful session. If a destination encoded in :ref:`cookie
+    <envoy_v3_api_msg_extensions.http.stateful_session.cookie.v3.CookieBasedSessionState>`
+    or in :ref:`specified header
+    <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.name>` respectively
+    is not available, Envoy will return ``503`` instead of selecting another destination from the cluster.
 - area: stream info
   change: |
     Added time spent reading request headers to ``DownstreamTiming``.
+- area: redis
+  change: |
+    Added support for the watch command (aborts multi transactions if watched keys change).
 
 deprecated:

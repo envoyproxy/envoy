@@ -42,6 +42,57 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 }
 
+TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10) {
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http10));
+  setup(false, "envoy-server-test");
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  startRequest();
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_NE(nullptr, headers.Server());
+        EXPECT_EQ("envoy-server-test", headers.getServerValue());
+      }));
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  // When framing by connection close, by default Envoy will FlushWrite, no delay.
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+}
+
+TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10NoOptimize) {
+  EXPECT_CALL(runtime_.snapshot_, getBoolean(_, _)).WillRepeatedly(Return(false));
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http10));
+  setup(false, "envoy-server-test");
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  startRequest();
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_NE(nullptr, headers.Server());
+        EXPECT_EQ("envoy-server-test", headers.getServerValue());
+      }));
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  // When framing by connection close, by default Envoy will FlushWrite, no delay but with a runtime
+  // override, it will still flush close.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+}
+
 TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
   setup(false, "envoy-server-test");
 

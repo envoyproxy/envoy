@@ -41,7 +41,6 @@
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/server/factory_context_base_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -62,7 +61,8 @@ public:
       : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
         dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls, {context}),
+        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls,
+                                                   {context, context.messageValidationVisitor()}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
         server_(server) {}
 
