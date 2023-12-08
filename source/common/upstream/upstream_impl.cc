@@ -1286,7 +1286,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
+        helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
                                           http_filter_factories_));
@@ -1523,6 +1523,11 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         info_->endpointStats().membership_degraded_.set(degraded_hosts);
         info_->endpointStats().membership_excluded_.set(excluded_hosts);
       });
+  // Drop overload configuration parsing.
+  absl::Status status = parseDropOverloadConfig(cluster.load_assignment());
+  if (!status.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(status.message()));
+  }
 }
 
 namespace {
@@ -1640,6 +1645,45 @@ void ClusterImplBase::finishInitialization() {
   if (snapped_callback != nullptr) {
     snapped_callback();
   }
+}
+
+absl::Status ClusterImplBase::parseDropOverloadConfig(
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+  // Default drop_overload_ to zero.
+  drop_overload_ = UnitFloat(0);
+
+  if (!cluster_load_assignment.has_policy()) {
+    return absl::OkStatus();
+  }
+  auto policy = cluster_load_assignment.policy();
+  if (policy.drop_overloads().size() == 0) {
+    return absl::OkStatus();
+  }
+  if (policy.drop_overloads().size() > kDropOverloadSize) {
+    return absl::InvalidArgumentError(
+        fmt::format("Cluster drop_overloads config has {} categories. Envoy only support one.",
+                    policy.drop_overloads().size()));
+  }
+
+  const auto drop_percentage = policy.drop_overloads(0).drop_percentage();
+  float denominator = 100;
+  switch (drop_percentage.denominator()) {
+  case envoy::type::v3::FractionalPercent::HUNDRED:
+    denominator = 100;
+    break;
+  case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
+    denominator = 10000;
+    break;
+  case envoy::type::v3::FractionalPercent::MILLION:
+    denominator = 1000000;
+    break;
+  default:
+    return absl::InvalidArgumentError(fmt::format(
+        "Cluster drop_overloads config denominator setting is invalid : {}. Valid range 0~2.",
+        drop_percentage.denominator()));
+  }
+  drop_overload_ = UnitFloat(float(drop_percentage.numerator()) / (denominator));
+  return absl::OkStatus();
 }
 
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {

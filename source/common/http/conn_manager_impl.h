@@ -126,6 +126,7 @@ public:
   // prematurely closed.
   static const absl::string_view PrematureResetMinStreamLifetimeSecondsKey;
   static const absl::string_view MaxRequestsPerIoCycle;
+  static const absl::string_view OptionallyDelayClose;
 
 private:
   struct ActiveStream;

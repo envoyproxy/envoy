@@ -34,10 +34,8 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::set_filter_state::v3::Config& proto_config,
       Server::Configuration::FactoryContext& context) override {
-    Server::GenericFactoryContextImpl generic_context(context);
     auto filter_config(std::make_shared<Filters::Common::SetFilterState::Config>(
-        proto_config.on_new_connection(), StreamInfo::FilterState::LifeSpan::Connection,
-        generic_context));
+        proto_config.on_new_connection(), StreamInfo::FilterState::LifeSpan::Connection, context));
     return [filter_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<SetFilterState>(filter_config));
     };

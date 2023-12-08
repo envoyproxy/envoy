@@ -752,7 +752,9 @@ public:
     filter_->initializeReadFilterCallbacks(filter_callbacks);
   }
 
-  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::TestTimeSystem& timeSystem() {
+    return factory_context_.server_factory_context_.timeSystem();
+  }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;

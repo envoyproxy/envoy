@@ -32,6 +32,14 @@ public:
         stop_iteration_on_first_read_(stop_iteration_on_first_read),
         continue_filter_chain_(continue_filter_chain) {}
 
+  void onSessionCompleteInternal() override {
+    read_callbacks_->streamInfo().filterState()->setData(
+        "test.udp_session.drainer.on_session_complete",
+        std::make_shared<Envoy::Router::StringAccessorImpl>("session_complete"),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  }
+
   ReadFilterStatus onNewSession() override {
     if (stop_iteration_on_new_session_) {
       // We can count how many times onNewSession was called on a filter chain

@@ -540,8 +540,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
                                  mCurrentUrl, mRequestContext.getBuilder().quicEnabled());
     mCronvoyCallbacks = new CronvoyHttpCallbacks();
     mStream.set(mRequestContext.getEnvoyEngine().startStream(mCronvoyCallbacks,
-                                                             /* explicitFlowCrontrol */ true,
-                                                             /* minDeliverySize */ 0));
+                                                             /* explicitFlowCrontrol= */ true));
     mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null);
     if (mUploadDataStream != null && mUrlChain.size() == 1) {
       mUploadDataStream.initializeWithRequest();
@@ -995,7 +994,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
         return;
       }
 
-      mUploadDataStream.readDataReady(); // Have the next request body delivery to be sent.
+      mUploadDataStream.readDataReady(); // Have the next request body chunk to be sent.
     }
 
     @Override

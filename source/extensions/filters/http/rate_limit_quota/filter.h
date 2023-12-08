@@ -53,8 +53,7 @@ public:
                        Grpc::GrpcServiceConfigWithHashKey config_with_hash_key)
       : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
         factory_context_(factory_context), quota_buckets_(quota_buckets), client_(client),
-        time_source_(
-            factory_context.getServerFactoryContext().mainThreadDispatcher().timeSource()) {
+        time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
     createMatcher();
   }
 
