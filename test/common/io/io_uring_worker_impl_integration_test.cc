@@ -17,7 +17,9 @@ namespace {
 
 class IoUringSocketTestImpl : public IoUringSocketEntry {
 public:
-  IoUringSocketTestImpl(os_fd_t fd, IoUringWorkerImpl& parent) : IoUringSocketEntry(fd, parent) {}
+  IoUringSocketTestImpl(os_fd_t fd, IoUringWorkerImpl& parent)
+      : IoUringSocketEntry(
+            fd, parent, [](uint32_t) {}, false) {}
 
   void onAccept(Request* req, int32_t result, bool injected) override {
     IoUringSocketEntry::onAccept(req, result, injected);
@@ -64,6 +66,10 @@ public:
 
   void cleanupForTest() { cleanup(); }
 
+  void write(Buffer::Instance&) override {}
+  uint64_t write(const Buffer::RawSlice*, uint64_t) override { return 0; }
+  void shutdown(int) override {}
+
   int32_t accept_result_{-1};
   bool is_accept_injected_completion_{false};
   int32_t connect_result_{-1};
@@ -84,7 +90,7 @@ public:
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
-      : IoUringWorkerImpl(std::move(io_uring_instance), dispatcher) {}
+      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, dispatcher) {}
 
   IoUringSocket& addTestSocket(os_fd_t fd) {
     return addSocket(std::make_unique<IoUringSocketTestImpl>(fd, *this));
@@ -266,6 +272,609 @@ TEST_F(IoUringWorkerIntegrationTest, MergeInjection) {
   EXPECT_EQ(socket.nr_completion_, 1);
 
   socket.cleanupForTest();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        result = socket->getReadParam()->result_;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Write data through client socket.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(result.value(), write_data.length());
+
+  socket->close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
+  initialize();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      -1,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        result = socket->getReadParam()->result_;
+        socket->close(false);
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(result.value(), -EBADF);
+
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        result = socket->getReadParam()->result_;
+        socket->close(false);
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Close the client socket to trigger an error.
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(result.value(), 0);
+
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+// Verify that enables a socket will continue reading its remaining data.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  bool drained = false;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&socket, &result, &drained](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        result = socket->getReadParam()->result_;
+        if (!drained) {
+          socket->getReadParam()->buf_.drain(5);
+          drained = true;
+        }
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Write data through client socket.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(result.value(), write_data.length());
+
+  // Emulate enable behavior.
+  result.reset();
+  socket->disableRead();
+  socket->enableRead();
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(result.value(), write_data.length() - 5);
+
+  socket->close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) {}, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the server socket sending the data.
+  std::string write_data = "hello world";
+  struct Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+  socket.write(&slice, 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Read data from client socket.
+  struct iovec read_iov;
+  auto read_buf = std::make_unique<uint8_t[]>(20);
+  read_iov.iov_base = read_buf.get();
+  read_iov.iov_len = 20;
+  auto size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(write_data.size(), size);
+
+  // Test another write interface.
+  Buffer::OwnedImpl buffer;
+  buffer.add(write_data);
+  socket.write(buffer);
+  EXPECT_EQ(buffer.length(), 0);
+
+  size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(write_data.size(), size);
+
+  socket.close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteError) {
+  initialize();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      -1,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Write);
+        EXPECT_NE(absl::nullopt, socket->getWriteParam());
+        result = socket->getWriteParam()->result_;
+        socket->close(false);
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  socket->disableRead();
+  // Waiting for the server socket sending the data.
+  std::string write_data = "hello world";
+  struct Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+  socket->write(&slice, 1);
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_EQ(result.value(), -EBADF);
+
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteTimeout) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) {}, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Fill peer socket receive buffer.
+  std::string write_data(10000000, 'a');
+  struct Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+  // The following line may partially complete since write buffer is full.
+  socket.write(&slice, 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // The following will block in iouring.
+  socket.write(&slice, 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Continuously sending the data in server socket until timeout.
+  socket.close(false);
+  runToClose(server_socket_);
+
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) {}, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the server socket sending the data.
+  std::string write_data = "hello world";
+  struct Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+  socket.write(&slice, 1);
+  socket.shutdown(SHUT_WR);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Read data from client socket.
+  struct iovec read_iov;
+  auto read_buf = std::make_unique<uint8_t[]>(20);
+  read_iov.iov_base = read_buf.get();
+  read_iov.iov_len = 20;
+  auto size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(write_data.size(), size);
+
+  socket.close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdown) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) {}, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  socket.shutdown(SHUT_WR);
+
+  socket.close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) {}, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the server socket sending the data.
+  std::string write_data = "hello world";
+  struct Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+  socket.write(&slice, 1);
+  socket.shutdown(SHUT_WR);
+  socket.close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+
+  // Read data from client socket.
+  struct iovec read_iov;
+  auto read_buf = std::make_unique<uint8_t[]>(20);
+  read_iov.iov_base = read_buf.get();
+  read_iov.iov_len = 20;
+  auto size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(write_data.size(), size);
+
+  size = Api::OsSysCallsSingleton::get().readv(client_socket_, &read_iov, 1).return_value_;
+  EXPECT_EQ(0, size);
+
+  cleanup();
+}
+
+// This tests the case when the socket disabled, then a remote close happened.
+// In this case, we should deliver this close event if the enable_close_event is true.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableCloseEvent) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  bool is_closed = false;
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&is_closed](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Closed);
+        is_closed = true;
+      },
+      false);
+  socket.enableCloseEvent(true);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  // Waiting for the server socket sending the data.
+  socket.disableRead();
+
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  while (!is_closed) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  cleanup();
+}
+
+// This tests the case when the socket disabled, then a remote close happened.
+// Different from the previous cast, in the test the client socket will first write and then
+// close.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadAndCloseAfterDisabledWithEnableCloseEvent) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  bool is_closed = false;
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&is_closed](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Closed);
+        is_closed = true;
+      },
+      true);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  // Waiting for the server socket sending the data.
+  socket.disableRead();
+
+  // Write data through client socket.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  while (!is_closed) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  cleanup();
+}
+
+// This tests the case when the socket disabled, then a remote close happened.
+// In this case, we should deliver this remote close by read event if enable_close_event
+// is false.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithoutEnableCloseEvent) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  bool is_closed = false;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&socket, &is_closed](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(socket->getReadParam(), absl::nullopt);
+        EXPECT_EQ(socket->getReadParam()->result_, 0);
+        is_closed = true;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  while (!is_closed) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  cleanup();
+}
+
+// This tests the case the socket is disabled, and the close event isn't listened. Then
+// a remote close happened, then deliver the remote close by write event.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithoutEnableCloseEvent) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  bool is_closed = false;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&socket, &is_closed](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Write);
+        EXPECT_NE(socket->getWriteParam(), absl::nullopt);
+        EXPECT_EQ(socket->getWriteParam()->result_, 0);
+        is_closed = true;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+  socket->disableRead();
+
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  while (!is_closed) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) {}, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Disable the socket, then it won't submit any new request.
+  socket.disableRead();
+  // Write data through client socket, then it will consume the existing request.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+
+  // Running the event loop, to let the iouring worker process the read request.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Close the socket now, it expected the socket will be close directly without cancel.
+  socket.close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+// This test ensures that a write after the client reset the connection
+// will trigger a closed event.
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteWithClientRST) {
+  initialize();
+  createServerListenerAndClientSocket();
+  bool expected_read = false;
+  bool expected_closed = false;
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&expected_read, &expected_closed](uint32_t events) {
+        if (expected_read) {
+          EXPECT_TRUE(events | Event::FileReadyType::Read);
+          expected_read = false;
+          return;
+        }
+        if (expected_closed) {
+          EXPECT_TRUE(events | Event::FileReadyType::Closed);
+          expected_closed = false;
+          return;
+        }
+        // It shouldn't reach here.
+        EXPECT_TRUE(false);
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  Api::OsSysCallsSingleton::get().shutdown(client_socket_, SHUT_WR);
+  expected_read = true;
+  // Running the event loop, to let the iouring worker process the read request.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(expected_read);
+
+  struct linger sl;
+  sl.l_onoff = 1;  /* non-zero value enables linger option in kernel */
+  sl.l_linger = 0; /* timeout interval in seconds */
+  setsockopt(client_socket_, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
+  Api::OsSysCallsSingleton::get().close(client_socket_);
+
+  expected_closed = true;
+  std::string write_data = "hello";
+  Buffer::OwnedImpl buffer;
+  buffer.add(write_data);
+  socket.write(buffer);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(expected_closed);
+
+  // Close the socket now, it expected the socket will be close directly without cancel.
+  socket.close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, AddServerSocketWithBuffer) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  std::string data = "hello";
+  Buffer::OwnedImpl buffer;
+  buffer.add(data);
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_, buffer,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        EXPECT_NE(absl::nullopt, socket->getReadParam());
+        result = socket->getReadParam()->result_;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(result.value(), data.length());
+
+  socket->close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFDOpen) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) {}, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  socket->close(true);
+  while (io_uring_worker_->getSockets().size() != 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Ensure the server socket is still open.
+  std::string write_data = "hello world";
+  auto rc =
+      Api::OsSysCallsSingleton::get().write(server_socket_, write_data.data(), write_data.size());
+  EXPECT_EQ(rc.return_value_, write_data.length());
+
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketUpdateFileEventCb) {
+  initialize();
+  createServerListenerAndClientSocket();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) { EXPECT_TRUE(false); }, false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  socket->setFileReadyCb([&socket, &result](uint32_t events) {
+    ASSERT(events == Event::FileReadyType::Read);
+    EXPECT_NE(absl::nullopt, socket->getReadParam());
+    result = socket->getReadParam()->result_;
+  });
+  // Write data through client socket.
+  std::string write_data = "hello world";
+  Api::OsSysCallsSingleton::get().write(client_socket_, write_data.data(), write_data.size());
+
+  // Waiting for the server socket receive the data.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(result.value(), write_data.length());
+
+  socket->close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
 }
 
 } // namespace

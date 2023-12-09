@@ -31,15 +31,15 @@ protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
   CacheFilterSharedPtr makeFilter(std::shared_ptr<HttpCache> cache, bool auto_destroy = true) {
-    std::shared_ptr<CacheFilter> filter(new CacheFilter(config_, /*stats_prefix=*/"",
-                                                        context_.scope(), context_.timeSource(),
-                                                        cache),
-                                        [auto_destroy](CacheFilter* f) {
-                                          if (auto_destroy) {
-                                            f->onDestroy();
-                                          }
-                                          delete f;
-                                        });
+    std::shared_ptr<CacheFilter> filter(
+        new CacheFilter(config_, /*stats_prefix=*/"", context_.scope(),
+                        context_.server_factory_context_.timeSource(), cache),
+        [auto_destroy](CacheFilter* f) {
+          if (auto_destroy) {
+            f->onDestroy();
+          }
+          delete f;
+        });
     filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
         StreamInfo::FilterState::LifeSpan::FilterChain);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1150,21 +1150,18 @@ TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
 }
 
 TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndInitialIsBug) {
-  GTEST_SKIP(); // TODO(issue #29217): Remove skip.
   EXPECT_ENVOY_BUG(
       CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation, FilterState::Initial),
       "Unexpected filter state in requestCacheStatus");
 }
 
 TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDecodeServingFromCacheIsBug) {
-  GTEST_SKIP(); // TODO(issue #29217): Remove skip.
   EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
                                                     FilterState::DecodeServingFromCache),
                    "Unexpected filter state in requestCacheStatus");
 }
 
 TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDestroyedIsBug) {
-  GTEST_SKIP(); // TODO(issue #29217): Remove skip.
   EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
                                                     FilterState::Destroyed),
                    "Unexpected filter state in requestCacheStatus");

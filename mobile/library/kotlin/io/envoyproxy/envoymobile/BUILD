@@ -1,10 +1,12 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_select_envoy_mobile_request_compression")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:android_artifacts.bzl", "android_artifacts")
 load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 load("@rules_detekt//detekt:defs.bzl", "detekt")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 android_artifacts(
     name = "envoy_aar",
@@ -101,13 +103,7 @@ envoy_mobile_kt_library(
         "grpc/*.kt",
         "mocks/*.kt",
         "stats/*.kt",
-    ]) + envoy_select_envoy_mobile_request_compression(
-        [
-            "CompressionAlgorithm.kt",
-            "RequestHeadersBuilderCompressionUtil.kt",
-        ],
-        "@envoy",
-    ),
+    ]),
     visibility = ["//visibility:public"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",

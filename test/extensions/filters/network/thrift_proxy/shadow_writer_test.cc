@@ -39,9 +39,10 @@ struct MockNullResponseDecoder : public NullResponseDecoder {
 class ShadowWriterTest : public testing::Test {
 public:
   ShadowWriterTest() {
-    stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
-    shadow_writer_ =
-        std::make_shared<ShadowWriterImpl>(cm_, *stats_, dispatcher_, context_.threadLocal());
+    stats_ = std::make_shared<const RouterStats>("test", context_.scope(),
+                                                 context_.server_factory_context_.localInfo());
+    shadow_writer_ = std::make_shared<ShadowWriterImpl>(
+        cm_, *stats_, dispatcher_, context_.server_factory_context_.threadLocal());
     metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName("ping");
     metadata_->setMessageType(MessageType::Call);

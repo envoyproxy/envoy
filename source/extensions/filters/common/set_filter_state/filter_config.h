@@ -31,14 +31,14 @@ struct Value {
 class Config : public Logger::Loggable<Logger::Id::config> {
 public:
   Config(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values, LifeSpan life_span,
-         Server::Configuration::CommonFactoryContext& context)
+         Server::Configuration::GenericFactoryContext& context)
       : life_span_(life_span), values_(parse(proto_values, context)) {}
   void updateFilterState(const Formatter::HttpFormatterContext& context,
                          StreamInfo::StreamInfo& info) const;
 
 private:
   std::vector<Value> parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
-                           Server::Configuration::CommonFactoryContext& context) const;
+                           Server::Configuration::GenericFactoryContext& context) const;
   const LifeSpan life_span_;
   const std::vector<Value> values_;
 };

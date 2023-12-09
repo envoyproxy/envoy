@@ -23,20 +23,24 @@ SINGLETON_MANAGER_REGISTRATION(dubbo_route_config_provider_manager);
 Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
+
+  auto& server_context = context.serverFactoryContext();
+
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
-      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(dubbo_route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+      server_context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(dubbo_route_config_provider_manager),
+          [&server_context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(server_context.admin());
           });
 
   std::shared_ptr<Config> filter_config(
       std::make_shared<ConfigImpl>(proto_config, context, *route_config_provider_manager));
 
   return [route_config_provider_manager, filter_config,
-          &context](Network::FilterManager& filter_manager) -> void {
+          &server_context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
-                                            context.mainThreadDispatcher().timeSource()));
+        std::make_shared<ConnectionManager>(*filter_config, server_context.api().randomGenerator(),
+                                            server_context.mainThreadDispatcher().timeSource()));
   };
 }
 
@@ -109,20 +113,20 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
       }
     }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
-        config.drds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
+        config.drds(), context_.serverFactoryContext(), stats_prefix_, context_.initManager());
   } else if (config.has_multiple_route_config()) {
     if (config.route_config_size() > 0) {
       throw EnvoyException("both mutiple_route_config and route_config is present in DubboProxy");
     }
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.multiple_route_config(), context_.getServerFactoryContext());
+        config.multiple_route_config(), context_.serverFactoryContext());
   } else {
     envoy::extensions::filters::network::dubbo_proxy::v3::MultipleRouteConfiguration
         multiple_route_config;
 
     *multiple_route_config.mutable_route_config() = config.route_config();
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        multiple_route_config, context_.getServerFactoryContext());
+        multiple_route_config, context_.serverFactoryContext());
   }
 
   if (config.dubbo_filters().empty()) {

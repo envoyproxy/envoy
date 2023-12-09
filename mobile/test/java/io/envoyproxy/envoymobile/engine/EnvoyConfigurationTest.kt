@@ -66,7 +66,6 @@ class TestEnvoyHTTPFilterFactory(name : String) : EnvoyHTTPFilterFactory {
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
-    grpcStatsDomain: String = "stats.example.com",
     connectTimeoutSeconds: Int = 123,
     dnsRefreshSeconds: Int = 234,
     dnsFailureRefreshSecondsBase: Int = 345,
@@ -89,7 +88,6 @@ class EnvoyConfigurationTest {
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
     maxConnectionsPerHost: Int = 543,
-    statsFlushSeconds: Int = 567,
     streamIdleTimeoutSeconds: Int = 678,
     perTryIdleTimeoutSeconds: Int = 910,
     appVersion: String = "v1.2.3",
@@ -98,7 +96,6 @@ class EnvoyConfigurationTest {
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
-    statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false,
     rtdsResourceName: String = "",
     rtdsTimeoutSeconds: Int = 0,
@@ -106,7 +103,6 @@ class EnvoyConfigurationTest {
     xdsPort: Int = 0,
     xdsGrpcInitialMetadata: Map<String, String> = emptyMap(),
     xdsSslRootCerts: String = "",
-    xdsSni: String = "",
     nodeId: String = "",
     nodeRegion: String = "",
     nodeZone: String = "",
@@ -118,7 +114,6 @@ class EnvoyConfigurationTest {
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
-      grpcStatsDomain,
       connectTimeoutSeconds,
       dnsRefreshSeconds,
       dnsFailureRefreshSecondsBase,
@@ -141,7 +136,6 @@ class EnvoyConfigurationTest {
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
       maxConnectionsPerHost,
-      statsFlushSeconds,
       streamIdleTimeoutSeconds,
       perTryIdleTimeoutSeconds,
       appVersion,
@@ -151,7 +145,6 @@ class EnvoyConfigurationTest {
       platformFilterFactories,
       emptyMap(),
       emptyMap(),
-      statSinks,
       runtimeGuards,
       enablePlatformCertificatesValidation,
       rtdsResourceName,
@@ -160,7 +153,6 @@ class EnvoyConfigurationTest {
       xdsPort,
       xdsGrpcInitialMetadata,
       xdsSslRootCerts,
-      xdsSni,
       nodeId,
       nodeRegion,
       nodeZone,
@@ -172,8 +164,8 @@ class EnvoyConfigurationTest {
     )
   }
 
-  fun isGoogleGrpcDisabled(): Boolean {
-    return System.getProperty("envoy_jni_google_grpc_disabled") != null;
+  fun isEnvoyMobileXdsDisabled(): Boolean {
+    return System.getProperty("envoy_jni_envoy_mobile_xds_disabled") != null;
   }
 
   @Test
@@ -214,12 +206,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("connection_options: 5RTO");
     assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
 
-    // Gzip
-    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
-
-    // Brotli
-    assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
-
     // Per Host Limits
     assertThat(resolvedTemplate).contains("max_connections: 543")
 
@@ -227,10 +213,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("os: Android")
     assertThat(resolvedTemplate).contains("app_version: v1.2.3")
     assertThat(resolvedTemplate).contains("app_id: com.example.myapp")
-
-    // Stats
-    assertThat(resolvedTemplate).contains("stats_flush_interval: 567s")
-    assertThat(resolvedTemplate).contains("stats.example.com");
 
     // Idle timeouts
     assertThat(resolvedTemplate).contains("stream_idle_timeout: 678s")
@@ -259,7 +241,6 @@ class EnvoyConfigurationTest {
   fun `configuration resolves with alternate values`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      grpcStatsDomain = "",
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
       dnsCacheSaveIntervalSeconds = 101,
@@ -272,7 +253,6 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames = mutableListOf(),
       filterChain = mutableListOf(),
       runtimeGuards = mapOf("test_feature_false" to true),
-      statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
     )
 
@@ -295,21 +275,14 @@ class EnvoyConfigurationTest {
     // enableGzipDecompression = false
     assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
 
-    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip");
-
     // enableBrotliDecompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
-
-    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli");
 
     // enableInterfaceBinding = true
     assertThat(resolvedTemplate).contains("enable_interface_binding: true")
 
     // enablePlatformCertificatesValidation = true
     assertThat(resolvedTemplate).doesNotContain("trusted_ca:")
-
-    // statsSinks
-    assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
 
     // ADS and RTDS not included by default
     assertThat(resolvedTemplate).doesNotContain("rtds_layer:");
@@ -332,7 +305,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -349,7 +322,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS and CDS`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -380,7 +353,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test enableCds with default string`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -397,7 +370,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test RTDS default timeout`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -410,22 +383,6 @@ class EnvoyConfigurationTest {
 
     assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s")
   }
-
-  @Test
-  fun `test YAML loads with stats sinks and stats domain`() {
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      grpcStatsDomain = "stats.example.com",
-      statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
-      trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
-    )
-
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
-    // statsSinks
-    assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
-    assertThat(resolvedTemplate).contains("stats.example.com");
- }
 
   @Test
   fun `test node metadata`() {

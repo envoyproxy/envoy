@@ -65,6 +65,9 @@ const absl::string_view ConnectionManagerImpl::PrematureResetMinStreamLifetimeSe
 // I/O cycle. Requests over this limit are deferred until the next I/O cycle.
 const absl::string_view ConnectionManagerImpl::MaxRequestsPerIoCycle =
     "http.max_requests_per_io_cycle";
+// Don't attempt to intelligently delay close: https://github.com/envoyproxy/envoy/issues/30010
+const absl::string_view ConnectionManagerImpl::OptionallyDelayClose =
+    "http1.optionally_delay_close";
 
 bool requestWasConnect(const RequestHeaderMapSharedPtr& headers, Protocol protocol) {
   if (!headers) {
@@ -213,7 +216,8 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
   Network::ConnectionCloseType close = Network::ConnectionCloseType::FlushWriteAndDelay;
-  if (skip_delay_close) {
+  if (runtime_.snapshot().getBoolean(ConnectionManagerImpl::OptionallyDelayClose, true) &&
+      skip_delay_close) {
     close = Network::ConnectionCloseType::FlushWrite;
   }
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
@@ -1186,6 +1190,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
                                                         bool end_stream) {
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *headers);
+  // We only want to record this when reading the headers the first time, not when recreating
+  // a stream.
+  if (!filter_manager_.remoteDecodeComplete()) {
+    filter_manager_.streamInfo().downstreamTiming().onLastDownstreamHeaderRxByteReceived(
+        connection_manager_.dispatcher_->timeSource());
+  }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);

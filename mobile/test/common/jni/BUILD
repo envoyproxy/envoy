@@ -1,9 +1,9 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 # Library which contains all the JNI related targets and test extensions
 cc_library(
@@ -64,7 +64,7 @@ cc_library(
     deps = [
         ":server_envoy_jni_lib",
         "//library/common/jni:envoy_jni_lib",
-        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "@envoy//source/common/listener_manager:listener_manager_lib",
     ],
 )
 

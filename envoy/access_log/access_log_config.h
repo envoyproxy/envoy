@@ -25,12 +25,12 @@ public:
    * implementation is unable to produce a filter with the provided parameters, it should throw an
    * EnvoyException. The returned pointer should never be nullptr.
    * @param config supplies the custom configuration for this filter type.
-   * @param context supplies the server factory context.
+   * @param context supplies the factory context.
    * @return an instance of extension filter implementation from a config proto.
    */
   virtual FilterBasePtr<Context>
   createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-               Server::Configuration::CommonFactoryContext& context) PURE;
+               Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return category_; }
 
@@ -74,21 +74,7 @@ public:
   virtual AccessLog::InstanceBaseSharedPtr<Context>
   createAccessLogInstance(const Protobuf::Message& config,
                           AccessLog::FilterBasePtr<Context>&& filter,
-                          Server::Configuration::ListenerAccessLogFactoryContext& context) PURE;
-
-  /**
-   * Create a particular AccessLog::Instance implementation from a config proto. If the
-   * implementation is unable to produce a factory with the provided parameters, it should throw an
-   * EnvoyException. The returned pointer should never be nullptr.
-   * @param config the custom configuration for this access log type.
-   * @param filter filter to determine whether a particular request should be logged. If no filter
-   * was specified in the configuration, argument will be nullptr.
-   * @param context general filter context through which persistent resources can be accessed.
-   */
-  virtual AccessLog::InstanceBaseSharedPtr<Context>
-  createAccessLogInstance(const Protobuf::Message& config,
-                          AccessLog::FilterBasePtr<Context>&& filter,
-                          Server::Configuration::CommonFactoryContext& context) PURE;
+                          Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return category_; }
 

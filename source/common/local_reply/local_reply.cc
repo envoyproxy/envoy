@@ -23,7 +23,7 @@ public:
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
-                Server::Configuration::CommonFactoryContext& context)
+                Server::Configuration::GenericFactoryContext& context)
       : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context)),
         content_type_(
             !config.content_type().empty() ? config.content_type()
@@ -61,7 +61,7 @@ public:
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
     if (config.has_body()) {
-      body_ = Config::DataSource::read(config.body(), true, context.api());
+      body_ = Config::DataSource::read(config.body(), true, context.serverFactoryContext().api());
     }
 
     if (config.has_body_format_override()) {

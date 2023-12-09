@@ -137,11 +137,14 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
 
   addHostInfo(*host, hostname, "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
               "tcp://1.2.3.5:90", 5, 6);
+  // Adding drop_overload config.
+  ON_CALL(cluster, dropOverload()).WillByDefault(Return(UnitFloat(0.00035)));
 
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));
   std::string output = response.toString();
+
   const std::string expected_json = R"EOF({
  "configs": [
   {
@@ -178,6 +181,15 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
        }
       ],
       "policy": {
+       "drop_overloads": [
+        {
+         "category": "drop_overload",
+         "drop_percentage": {
+          "numerator": 350,
+          "denominator": "MILLION"
+         }
+        }
+       ],
        "overprovisioning_factor": 140
       }
      }

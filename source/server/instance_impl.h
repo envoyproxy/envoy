@@ -13,6 +13,8 @@ public:
 
 protected:
   void maybeCreateHeapShrinker() override;
+  std::unique_ptr<OverloadManager> createOverloadManager() override;
+  std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) override;
 
 private:
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
