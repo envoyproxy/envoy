@@ -44,7 +44,7 @@ checks:
     on-run:
     - mobile-asan
   mobile-cc:
-    name: Mobile/cc
+    name: Mobile/CC
     required: true
     on-run:
     - mobile-cc
@@ -72,7 +72,7 @@ checks:
     on-run:
     - mobile-format
   mobile-ios:
-    name: Mobile/ios
+    name: Mobile/iOS
     required: true
     cache:
     on-run:
