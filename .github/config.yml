@@ -159,6 +159,15 @@ run:
   build-windows:
   build-macos:
   mobile-android:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-android-all:
     paths:
     - mobile/**/*
@@ -169,14 +178,87 @@ run:
     - .github/workflows/_env.yml
     - tools/code_format/check_format.py
     - bazel/external/quiche.BUILD
+    push: never
   mobile-android-tests:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-asan:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-cc:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-compile-time-options:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-coverage:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-core:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-format:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-ios:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-ios-all:
     paths:
     - mobile/**/*
@@ -187,10 +269,47 @@ run:
     - .github/workflows/_env.yml
     - tools/code_format/check_format.py
     - bazel/external/quiche.BUILD
+    push: never
   mobile-ios-tests:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-perf:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-release-validation:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   mobile-tsan:
+    paths:
+    - mobile/**/*
+    - bazel/repository_locations.bzl
+    - .bazelrc
+    - .bazelversion
+    - .github/workflows/mobile-*
+    - .github/workflows/_env.yml
+    - tools/code_format/check_format.py
+    - bazel/external/quiche.BUILD
   precheck-deps:
     paths:
     - ".github/**/*"
