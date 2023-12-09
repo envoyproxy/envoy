@@ -31,6 +31,8 @@ on:
 
           \($request.summary.title)
 
+          \($request.summary.summary | @base64d | @base64d)
+
 env:
   CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
 

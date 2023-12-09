@@ -139,6 +139,8 @@ jobs:
         input: ${{ steps.data.outputs.data }}
         filter: |
           .data
+          | .summary.summary |= (@base64 | @base64)
+          | del(.request.message)
         print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
 
   cache:
