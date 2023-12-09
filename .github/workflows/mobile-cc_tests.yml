@@ -1,4 +1,4 @@
-name: Mobile/CC tests
+name: Mobile/CC
 
 permissions:
   contents: read
