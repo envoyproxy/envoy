@@ -69,5 +69,19 @@ TraceContextHandler::get(const TraceContext& trace_context) const {
   }
 }
 
+void TraceContextHandler::remove(TraceContext& trace_context) const {
+  auto header_map = trace_context.requestHeaders();
+  if (!header_map.has_value()) {
+    trace_context.removeByKey(key_);
+    return;
+  }
+
+  if (handle_.has_value()) {
+    header_map->removeInline(handle_.value());
+  } else {
+    header_map->remove(key_);
+  }
+}
+
 } // namespace Tracing
 } // namespace Envoy

@@ -38,7 +38,7 @@ envoy_cc_library(
         "http_tracer_impl.h",
     ],
     deps = [
-        ":tracer_context_lib",
+        ":trace_context_lib",
         ":tracer_lib",
         "//envoy/tracing:tracer_interface",
         "//source/common/formatter:substitution_formatter_lib",
@@ -102,7 +102,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "tracer_context_lib",
+    name = "trace_context_lib",
     srcs = [
         "trace_context_impl.cc",
     ],
@@ -124,7 +124,7 @@ envoy_cc_library(
         "custom_tag_impl.h",
     ],
     deps = [
-        ":tracer_context_lib",
+        ":trace_context_lib",
         "//envoy/router:router_interface",
         "//envoy/tracing:custom_tag_interface",
         "//source/common/config:metadata_lib",

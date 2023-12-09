@@ -4,6 +4,7 @@
 
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -161,9 +162,10 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   const std::vector<std::string> v = {version, trace_id_hex, Hex::uint64ToHex(parent_span_id),
                                       trace_flags};
   const std::string parent_trace_header = absl::StrJoin(v, "-");
-  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT, parent_trace_header);
+  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT.key(),
+                                  parent_trace_header);
   // Also add tracestate.
-  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_STATE, "test=foo");
+  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_STATE.key(), "test=foo");
 
   // Mock the random call for generating span ID so we can check it later.
   const uint64_t new_span_id = 3;
@@ -177,17 +179,18 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   EXPECT_EQ(span->getTraceIdAsHex(), trace_id_hex);
 
   // Remove headers, then inject context into header from the span.
-  request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT);
-  request_headers.remove(OpenTelemetryConstants::get().TRACE_STATE);
+  request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT.key());
+  request_headers.remove(OpenTelemetryConstants::get().TRACE_STATE.key());
   span->injectContext(request_headers, nullptr);
 
-  auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT);
+  auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT.key());
   EXPECT_EQ(sampled_entry.size(), 1);
   EXPECT_EQ(
       sampled_entry[0]->value().getStringView(),
       absl::StrJoin({version, trace_id_hex, Hex::uint64ToHex(new_span_id), trace_flags}, "-"));
 
-  auto sampled_tracestate_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_STATE);
+  auto sampled_tracestate_entry =
+      request_headers.get(OpenTelemetryConstants::get().TRACE_STATE.key());
   EXPECT_EQ(sampled_tracestate_entry.size(), 1);
   EXPECT_EQ(sampled_tracestate_entry[0]->value().getStringView(), "test=foo");
   constexpr absl::string_view request_yaml = R"(
@@ -260,10 +263,10 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
   // Remove headers, then inject context into header from the span.
-  request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT);
+  request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT.key());
   span->injectContext(request_headers, nullptr);
 
-  auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT);
+  auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT.key());
 
   // Ends in 01 because span should be sampled. See
   // https://w3c.github.io/trace-context/#trace-flags.
@@ -278,7 +281,7 @@ TEST_F(OpenTelemetryDriverTest, NullSpanWithPropagationHeaderError) {
   // Add an invalid OTLP header to the request headers.
   Http::TestRequestHeaderMapImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
-  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT,
+  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT.key(),
                                   "invalid00-0000000000000003-01");
 
   Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,

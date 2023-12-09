@@ -14,14 +14,6 @@ namespace Tracers {
 namespace OpenTelemetry {
 namespace {
 
-const Tracing::TraceContextHandler& openTelemetryPropagationHeader() {
-  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "traceparent");
-}
-
-const Tracing::TraceContextHandler& openTelemetryTraceStateHeader() {
-  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "tracestate");
-}
-
 // See https://www.w3.org/TR/trace-context/#traceparent-header
 constexpr int kTraceparentHeaderSize = 55; // 2 + 1 + 32 + 1 + 16 + 1 + 2
 constexpr int kVersionHexSize = 2;
@@ -46,12 +38,12 @@ SpanContextExtractor::SpanContextExtractor(Tracing::TraceContext& trace_context)
 SpanContextExtractor::~SpanContextExtractor() = default;
 
 bool SpanContextExtractor::propagationHeaderPresent() {
-  auto propagation_header = openTelemetryPropagationHeader().get(trace_context_);
+  auto propagation_header = OpenTelemetryConstants::get().TRACE_PARENT.get(trace_context_);
   return propagation_header.has_value();
 }
 
 absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
-  auto propagation_header = openTelemetryPropagationHeader().get(trace_context_);
+  auto propagation_header = OpenTelemetryConstants::get().TRACE_PARENT.get(trace_context_);
   if (!propagation_header.has_value()) {
     // We should have already caught this, but just in case.
     return absl::InvalidArgumentError("No propagation header found");
@@ -97,7 +89,7 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   // it is invalid and MUST be discarded. Because we're already checking for the
   // traceparent header above, we don't need to check here.
   // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
-  absl::string_view tracestate_key = openTelemetryTraceStateHeader().key();
+  absl::string_view tracestate_key = OpenTelemetryConstants::get().TRACE_STATE.key();
   std::vector<std::string> tracestate_values;
   // Multiple tracestate header fields MUST be handled as specified by RFC7230 Section 3.2.2 Field
   // Order.
