@@ -31,7 +31,6 @@ jobs:
     with:
       bazel-extra: '--config=rbe-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      # catch-errors: true
       request: ${{ inputs.request }}
       error-match: |
         ERROR
