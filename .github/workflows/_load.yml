@@ -126,7 +126,7 @@ jobs:
         key: ${{ secrets.app-key }}
     - uses: envoyproxy/toolshed/gh-actions/github/check/update@actions-v0.2.10
       name: Update check
-      if: ${{ fromJSON(steps.data.outputs.data).data.check.check-id }}
+      if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
         data: ${{ toJSON(fromJSON(steps.data.outputs.data).check) }}
         id: ${{ fromJSON(steps.data.outputs.data).data.check.check-id }}
