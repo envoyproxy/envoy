@@ -202,7 +202,7 @@ For example, given following http filter config:
     typed_config: { ... }
     disabled: true
 
-Both the ``buffer`` and ``lua`` filters are disabled by default. If we want to enable these two filters
+Both the ``buffer`` and ``lua`` filters are disabled by default. If we want to enable one of them
 for a specific route, we can set per filter config map in the route configuration:
 
 .. code-block:: yaml
@@ -211,16 +211,7 @@ for a specific route, we can set per filter config map in the route configuratio
     lua:
       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       name: my_lua_script
-    buffer:
-      # This configuration self is meaningless but legal. No route per filter config is loaded from
-      # it but will be treated as enable flag for the filter 'buffer'.
-      # This is useful for the case that we want to enable the filter for a specific route but don't
-      # want to load any route specific configuration for it.
-      "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
-        config:
-          "@type": type.googleapis.com/google.protobuf.Empty
-        is_optional: true
 
 
-Both route-specific configurations for filters (like the above ``lua`` filter) and meaningless but legal
-configurations (like the above ``buffer`` filter) are valid ways to enable the filter for the route.
+Legitimate route-specific configuration for filter (like the above ``lua`` filter) is valid way to
+enable the filter for the route.
