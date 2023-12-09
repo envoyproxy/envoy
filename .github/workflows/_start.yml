@@ -75,6 +75,7 @@ jobs:
           | .skipped.conclusion = "skipped"
           | .skipped.output.title = "${{ inputs.skipped-title }}"
           | .skipped.output.summary = "${{ inputs.skipped-summary }}"
+          | .skipped.output.text = ""
 
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.10
       name: Appauth
