@@ -25,14 +25,6 @@ on:
 
           # \($icon) \($run_link)
 
-          ### Check started by
-
-          ## \($linked_title)
-
-          \($request.summary.title)
-
-          \($request.summary.summary | @base64d | @base64d)
-
 env:
   CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
 
@@ -44,7 +36,7 @@ jobs:
       actions: read
       contents: read
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.10
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.11
       name: Incoming data
       id: needs
       with:
@@ -64,7 +56,6 @@ jobs:
           | $load["run-id"] as $workflow_id
           | (.load.request | fromjson) as $request
           | $request.config.envoy.icon as $icon
-          | $request.summary["linked-title"]  as $linked_title
           | .outcomes
           | if any(. == "failure") then
               {name: "failure", icon: ":x:"}
@@ -92,7 +83,7 @@ jobs:
                  summary: "Check has finished",
                  text: $text}}}
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.10
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.11
       name: Print summary
       with:
         input: ${{ steps.needs.outputs.value }}
@@ -100,17 +91,16 @@ jobs:
           "## \(.["summary-title"])"
         options: -r
         output-path: GITHUB_STEP_SUMMARY
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.10
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.11
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/gh-actions/github/check/update@actions-v0.2.10
+    - uses: envoyproxy/toolshed/gh-actions/github/check/update@actions-v0.2.11
       name: Update check
       with:
         data: ${{ toJSON(fromJSON(steps.needs.outputs.value).check) }}
-        id: ${{ fromJSON(steps.needs.outputs.value).check-id }}
         token: ${{ steps.appauth.outputs.token }}
 
     # This is necessary to ensure that any retests have their checks updated
