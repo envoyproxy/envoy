@@ -16,6 +16,13 @@ jobs:
   command:
     name: Parse and run command
     runs-on: ubuntu-22.04
+    if: >-
+      ${{
+         github.event.issue.pull_request
+         && github.repository == 'envoyproxy/envoy'
+         && github.actor != 'repokitteh-read-only[bot]'
+         && github.actor != 'dependabot[bot]'
+      }}
     steps:
     - uses: envoyproxy/toolshed/gh-actions/github/command@actions-v0.2.10
       name: Parse command from comment
