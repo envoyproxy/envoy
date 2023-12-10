@@ -1,0 +1,154 @@
+name: Request/load
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+        required: true
+      app-key:
+        required: true
+      lock-app-id:
+        required: true
+      lock-app-key:
+        required: true
+
+    inputs:
+      agent-ubuntu:
+        type: string
+        default: ubuntu-22.04
+      cache-docker:
+        type: boolean
+        default: true
+      check-name:
+        type: string
+        required: true
+      check-title:
+        type: string
+        default:
+      head-sha:
+        type: string
+        default:
+      run-id:
+        type: string
+        default: ${{ github.event.workflow_run.id }}
+      template-request-summary:
+        type: string
+        default: |
+          ## \($linkedTitle)
+
+          \($summary)
+
+          \($extra)
+
+    outputs:
+      build-image:
+        value: ${{ jobs.request.outputs.build-image }}
+      build-image-mobile:
+        value: ${{ jobs.request.outputs.build-image-mobile }}
+      check-id:
+        value: ${{ jobs.request.outputs.check-id }}
+      check-name:
+        value: ${{ inputs.check-name }}
+      request:
+        value: ${{ jobs.request.outputs.request }}
+      run-id:
+        value: ${{ inputs.run-id }}
+      trusted:
+        value: ${{ jobs.request.outputs.trusted }}
+
+concurrency:
+  group: |
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-env
+  cancel-in-progress: true
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
+
+
+jobs:
+  request:
+    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      build-image: ${{ toJSON(fromJSON(steps.request-output.outputs.value).request.build-image) }}
+      build-image-mobile: ${{ fromJSON(steps.request-output.outputs.value).request.build-image-mobile }}
+      check-id: ${{ fromJSON(steps.request-output.outputs.value).check.check-id }}
+      request: ${{ steps.request-output.outputs.value }}
+      trusted: ${{ fromJSON(steps.request-output.outputs.value).request.trusted }}
+      skip: ${{ fromJSON(steps.request-output.outputs.value).check.action != 'RUN' }}
+    steps:
+    # Load env data
+    # Handle any failure in triggering job
+    # Remove the `checks` object, and shift the one we care about to `check`
+    # Prepare a check request
+    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.2.11
+      name: Load env
+      id: data
+      with:
+        run-id: ${{ inputs.run-id }}
+        check-name: ${{ inputs.check-name }}
+        head-sha: ${{ inputs.head-sha }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    #  Update the check
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.11
+      name: Appauth
+      id: appauth
+      with:
+        app_id: ${{ secrets.app-id }}
+        key: ${{ secrets.app-key }}
+    - uses: envoyproxy/toolshed/gh-actions/github/check/update@actions-v0.2.11
+      name: Update check
+      if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
+      with:
+        data: ${{ toJSON(fromJSON(steps.data.outputs.data).check) }}
+        token: ${{ steps.appauth.outputs.token }}
+
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.11
+      name: Print request summary
+      with:
+        input: ${{ steps.data.outputs.data }}
+        output-path: GITHUB_STEP_SUMMARY
+        options: -r
+        filter: |
+          .data as $data
+          | if ($data.check.action != "RUN") then
+              "### ${{ github.workflow }} was skipped"
+            else "" end
+          | . as $extra
+          | $data.summary.summary as $summary
+          | $data.summary["linked-title"] as $linkedTitle
+          | "${{ inputs.template-request-summary }}"
+
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.11
+      id: request-output
+      name: Load request
+      with:
+        input: ${{ steps.data.outputs.data }}
+        output-path: ${{ steps.tmpfile.outputs.output }}
+        filter: |
+          .data
+          | del(.request.message, .summary.summary, .summary["linked-title"])
+        print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
+
+  cache:
+    secrets:
+      app-id: ${{ secrets.lock-app-id }}
+      app-key: ${{ secrets.lock-app-key }}
+    uses: ./.github/workflows/_cache.yml
+    needs: request
+    if: ${{ inputs.cache-docker && ! fromJSON(needs.request.outputs.skip) }}
+    with:
+      request: ${{ toJSON(needs.request.outputs) }}
+      image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}

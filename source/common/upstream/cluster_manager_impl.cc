@@ -1211,15 +1211,16 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 
   pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
 
+  const UnitFloat drop_overload = cm_cluster.cluster().dropOverload();
   // Populate the cluster initialization object based on this update.
   ClusterInitializationObjectConstSharedPtr cluster_initialization_object =
-      addOrUpdateClusterInitializationObjectIfSupported(params, cm_cluster.cluster().info(),
-                                                        load_balancer_factory, host_map);
+      addOrUpdateClusterInitializationObjectIfSupported(
+          params, cm_cluster.cluster().info(), load_balancer_factory, host_map, drop_overload);
 
   tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
                         add_or_update_cluster, load_balancer_factory, map = std::move(host_map),
-                        cluster_initialization_object = std::move(cluster_initialization_object)](
-                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+                        cluster_initialization_object = std::move(cluster_initialization_object),
+                        drop_overload](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     ASSERT(cluster_manager.has_value(),
            "Expected the ThreadLocalClusterManager to be set during ClusterManagerImpl creation.");
 
@@ -1275,6 +1276,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
             cluster_manager->thread_local_clusters_.size());
       }
 
+      if (cluster_manager->thread_local_clusters_[info->name()]) {
+        cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(drop_overload);
+      }
       for (const auto& per_priority : params.per_priority_update_params_) {
         cluster_manager->updateClusterMembership(
             info->name(), per_priority.priority_, per_priority.update_hosts_params_,
@@ -1309,7 +1313,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 ClusterManagerImpl::ClusterInitializationObjectConstSharedPtr
 ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map) {
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    UnitFloat drop_overload) {
   if (!deferralIsSupportedForCluster(cluster_info)) {
     return nullptr;
   }
@@ -1340,13 +1345,13 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
         entry->second->per_priority_state_, params, std::move(cluster_info),
         load_balancer_factory == nullptr ? entry->second->load_balancer_factory_
                                          : load_balancer_factory,
-        map);
+        map, drop_overload);
     cluster_initialization_map_[cluster_name] = new_initialization_object;
     return new_initialization_object;
   } else {
     // We need to create a fresh Cluster Initialization Object.
     auto new_initialization_object = std::make_shared<ClusterInitializationObject>(
-        params, std::move(cluster_info), load_balancer_factory, map);
+        params, std::move(cluster_info), load_balancer_factory, map, drop_overload);
     cluster_initialization_map_[cluster_name] = new_initialization_object;
     return new_initialization_object;
   }
@@ -1379,6 +1384,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
                             per_priority.overprovisioning_factor_,
                             initialization_object->cross_priority_host_map_);
   }
+  thread_local_clusters_[cluster]->setDropOverload(initialization_object->drop_overload_);
 
   // Remove the CIO as we've initialized the cluster.
   thread_local_deferred_clusters_.erase(entry);
@@ -1388,9 +1394,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
 
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map)
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    UnitFloat drop_overload)
     : cluster_info_(std::move(cluster_info)), load_balancer_factory_(load_balancer_factory),
-      cross_priority_host_map_(map) {
+      cross_priority_host_map_(map), drop_overload_(drop_overload) {
   // Copy the update since the map is empty.
   for (const auto& update : params.per_priority_update_params_) {
     per_priority_state_.emplace(update.priority_, update);
@@ -1400,9 +1407,11 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>& per_priority_state,
     const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map)
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    UnitFloat drop_overload)
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
-      load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map) {
+      load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map),
+      drop_overload_(drop_overload) {
 
   // Because EDS Clusters receive the entire ClusterLoadAssignment but only
   // provides the delta we must process the hosts_added and hosts_removed and

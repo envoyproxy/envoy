@@ -51,6 +51,7 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
+  ENVOY_DOCKER_SOURCE_DIR="${ENVOY_DOCKER_SOURCE_DIR:-${SOURCE_DIR_MOUNT_DEST}}"
   START_COMMAND=(
       "/bin/bash"
       "-lc"
@@ -59,7 +60,7 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
-          && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
+          && sudo -EHs -u envoybuild bash -c 'cd ${ENVOY_DOCKER_SOURCE_DIR} && $*'")
 fi
 
 if [[ -n "$ENVOY_DOCKER_PLATFORM" ]]; then

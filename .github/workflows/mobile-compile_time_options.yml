@@ -1,177 +1,174 @@
-name: mobile_compile_time_options
+name: Mobile/Compile time options
 
 permissions:
   contents: read
 
 on:
-  push:
-    branches:
-    - main
-  pull_request:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
+
 jobs:
-  env:
-    if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/_env.yml
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
     permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: mobile-compile-time-options
+
+  cc:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-compile-time-options }}
+    needs: load
+    with:
+      args: ${{ matrix.args }}
+      command: ./bazelw
+      entrypoint: ${{ matrix.entrypoint }}
+      request: ${{ needs.load.outputs.request }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Running C++ test with YAML disabled
+          target: cc-test-no-yaml
+          args: >-
+            build
+            --config=mobile-remote-ci
+            --define=envoy_yaml=disabled
+            --define=envoy_full_protos=disabled
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+            //test/common/integration:client_integration_test
+        - name: Running C++ build with exceptions disabled
+          target: cc-no-build-exceptions
+          args: >-
+            build
+            --config=mobile-remote-ci
+            --define envoy_exceptions=disabled
+            --define=envoy_yaml=disabled
+            --copt=-fno-unwind-tables
+            --copt=-fno-exceptions
+            --define=google_grpc=disabled
+            --define=envoy_mobile_xds=disabled
+            //test/performance:test_binary_size //library/cc/...
+        - name: Running C++ test
+          target: cc-test
+          args: >-
+            test
+            --test_output=all
+            --config=mobile-remote-ci
+            --define=signal_trace=disabled
+            --define=google_grpc=disabled
+            --define=envoy_mobile_xds=disabled
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+          entrypoint: |
+            #!/bin/bash -e
+            export PATH=/opt/llvm/bin:$PATH
+            cd /source/mobile
+            EXTRA_ARGS=$(bazel query //test/cc/... + //test/common/... except //test/common/integration:client_integration_test)
+            exec "$@" $EXTRA_ARGS
+
+  build:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-compile-time-options }}
+    needs: load
+    with:
+      args: ${{ matrix.args }}
+      command: ./bazelw
+      container-command:
+      request: ${{ needs.load.outputs.request }}
+      runs-on: macos-12
+      source: ${{ matrix.source }}
+      steps-pre: ${{ matrix.steps-pre }}
+      target: ${{ matrix.target || matrix.name }}
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      timeout-minutes: 120
+      working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: kotlin-build
+          args: >-
+            build
+            --config=mobile-remote-ci-macos
+            --fat_apk_cpu=x86_64
+            --define=signal_trace=disabled
+            --define=envoy_mobile_request_compression=disabled
+            --define=envoy_enable_http_datagrams=disabled
+            --define=google_grpc=disabled
+            --define=envoy_mobile_xds=disabled
+            --define=envoy_yaml=disabled
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+            //:android_dist
+          source: |
+            . ./ci/mac_ci_setup.sh --android
+            echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" >> $GITHUB_ENV
+            export ANDROID_NDK_HOME
+          steps-pre: |
+            - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
+              with:
+                java-version: '8'
+                java-package: jdk
+                architecture: x64
+                distribution: zulu
+        - name: swift-build
+          args: >-
+            build
+            --config=ios
+            --config=mobile-remote-ci-macos
+            --define=signal_trace=disabled
+            --define=envoy_mobile_request_compression=disabled
+            --define=envoy_mobile_stats_reporting=disabled
+            --define=envoy_mobile_swift_cxx_interop=disabled
+            --define=google_grpc=disabled
+            --define=envoy_mobile_xds=disabled
+            --@envoy//bazel:http3=False
+            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+            //library/swift:ios_framework
+          source: |
+            ./ci/mac_ci_setup.sh
+            ./bazelw shutdown
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
       contents: read
       pull-requests: read
-
-  cc_test_no_yaml:
-    needs: env
-    permissions:
-      contents: read
-      packages: read
-    name: cc_test_no_yaml
-    runs-on: ubuntu-20.04
-    timeout-minutes: 120
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Running C++ test with YAML disabled'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
-      run: |
-        cd mobile
-        ./bazelw test \
-            --config=mobile-remote-ci \
-            --define=envoy_yaml=disabled \
-            --define=envoy_full_protos=disabled \
-            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
-            //test/common/integration:client_integration_test
-  cc_build_no_exceptions:
-    needs: env
-    permissions:
-      contents: read
-      packages: read
-    name: cc_test_no_yaml
-    runs-on: ubuntu-20.04
-    timeout-minutes: 120
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Running C++ build with exceptions disabled'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Envoy Mobile build which verifies that the build configuration where YAML is disabled.
-      run: |
-        cd mobile
-        ./bazelw build \
-            --config=mobile-remote-ci \
-             --define envoy_exceptions=disabled \
-             --define=envoy_yaml=disabled \
-             --copt=-fno-unwind-tables \
-             --copt=-fno-exceptions \
-             --define=google_grpc=disabled \
-             --define=envoy_mobile_xds=disabled \
-             //test/performance:test_binary_size //library/cc/...
-
-  cc_test:
-    needs: env
-    permissions:
-      contents: read
-      packages: read
-    name: cc_test
-    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
-    timeout-minutes: 120
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Running C++ tests'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        cd mobile
-        TARGETS=$(bazel query --noshow_progress --noshow_loading_progress //test/cc/... + //test/common/... except //test/common/integration:client_integration_test)
-        ./bazelw test \
-            --test_output=all \
-            --config=mobile-remote-ci \
-            --define=signal_trace=disabled \
-            --define=google_grpc=disabled \
-            --define=envoy_mobile_xds=disabled \
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            $TARGETS
-
-  swift_build:
-    if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
-    needs: env
-    permissions:
-      contents: read
-      packages: read
-    name: swift_build
-    runs-on: macos-12
-    timeout-minutes: 120
-    steps:
-    - uses: actions/checkout@v4
-    - run: |
-        cd mobile
-        ./ci/mac_ci_setup.sh
-      name: 'Install dependencies'
-    - name: 'Build Swift library'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        cd mobile
-        ./bazelw shutdown
-        ./bazelw build \
-            --config=ios \
-            --config=mobile-remote-ci-macos \
-            --define=signal_trace=disabled \
-            --define=envoy_mobile_stats_reporting=disabled \
-            --define=envoy_mobile_swift_cxx_interop=disabled \
-            --define=google_grpc=disabled \
-            --define=envoy_mobile_xds=disabled \
-            --@envoy//bazel:http3=False \
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //library/swift:ios_framework
-
-  kotlin_build:
-    if: ${{ needs.env.outputs.mobile_compile_time_options == 'true' }}
-    needs: env
-    permissions:
-      contents: read
-      packages: read
-    name: kotlin_build
-    runs-on: macos-12
-    timeout-minutes: 120
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
-      with:
-        java-version: '8'
-        java-package: jdk
-        architecture: x64
-        distribution: zulu
-    - name: 'Install dependencies'
-      run: |
-        cd mobile
-        ./ci/mac_ci_setup.sh --android
-    - name: 'Build Kotlin library'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        cd mobile
-        ./bazelw build \
-            --config=mobile-remote-ci-macos \
-            --fat_apk_cpu=x86_64 \
-            --define=signal_trace=disabled \
-            --define=envoy_enable_http_datagrams=disabled \
-            --define=google_grpc=disabled \
-            --define=envoy_mobile_xds=disabled \
-            --define=envoy_yaml=disabled \
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor= \
-            //:android_dist
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-compile-time-options }}
+    needs:
+    - load
+    - cc
+    - build
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}
