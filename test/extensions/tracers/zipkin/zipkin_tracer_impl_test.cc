@@ -152,7 +152,7 @@ public:
   uint64_t generateRandom64() { return Util::generateRandom64(time_source_); }
 
   const std::string operation_name_{"test"};
-  Http::TestRequestHeaderMapImpl request_headers_{
+  Tracing::TestTraceContextImpl request_headers_{
       {":authority", "api.lyft.com"}, {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
@@ -496,9 +496,9 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
 TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
   setupValidDriver("HTTP_JSON");
 
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).empty());
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).empty());
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).empty());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).has_value());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).has_value());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).has_value());
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -510,9 +510,9 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
 TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
   setupValidDriver("HTTP_JSON");
 
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).empty());
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).empty());
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).empty());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).has_value());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).has_value());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).has_value());
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, false});
@@ -524,11 +524,11 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
   setupValidDriver("HTTP_JSON");
 
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).empty());
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).has_value());
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -540,11 +540,11 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
   setupValidDriver("HTTP_JSON");
 
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).empty());
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED).has_value());
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, false});
@@ -556,11 +556,11 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
 TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
   setupValidDriver("HTTP_JSON");
 
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).empty());
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).empty());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).has_value());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).has_value());
 
   // Only context header set is B3 sampled to indicate trace should not be sampled
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, NOT_SAMPLED);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED, NOT_SAMPLED);
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
@@ -571,19 +571,19 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
 
   // Check B3 sampled flag is set to not sample
-  EXPECT_EQ(NOT_SAMPLED, sampled_entry[0]->value().getStringView());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry.value());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
   setupValidDriver("HTTP_JSON");
 
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).empty());
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).empty());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).has_value());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).has_value());
 
   // Only context header set is B3 sampled to indicate trace should not be sampled (using legacy
   // 'false' value)
   const std::string sampled = "false";
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, sampled);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED, sampled);
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
@@ -593,19 +593,19 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to not sample
-  EXPECT_EQ(NOT_SAMPLED, sampled_entry[0]->value().getStringView());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry.value());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
   setupValidDriver("HTTP_JSON");
 
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).empty());
-  EXPECT_TRUE(request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).empty());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID).has_value());
+  EXPECT_TRUE(!request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID).has_value());
 
   // Only context header set is B3 sampled to indicate trace should be sampled (using legacy
   // 'true' value)
   const std::string sampled = "true";
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, sampled);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED, sampled);
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, false});
 
@@ -615,17 +615,17 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to sample
-  EXPECT_EQ(SAMPLED, sampled_entry[0]->value().getStringView());
+  EXPECT_EQ(SAMPLED, sampled_entry.value());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
   setupValidDriver("HTTP_JSON");
 
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, NOT_SAMPLED);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED, NOT_SAMPLED);
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -664,7 +664,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   const std::string parent_id = Hex::uint64ToHex(generateRandom64());
   const std::string context = trace_id + ";" + span_id + ";" + parent_id + ";" + CLIENT_SEND;
 
-  request_headers_.setCopy(Http::CustomHeaders::get().OtSpanContext, context);
+  request_headers_.set(Http::CustomHeaders::get().OtSpanContext, context);
 
   // New span will have an SR annotation
   Tracing::SpanPtr span2 = driver_->startSpan(config_, request_headers_, stream_info_,
@@ -735,9 +735,9 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   const std::string span_id = Hex::uint64ToHex(generateRandom64());
   const std::string parent_id = Hex::uint64ToHex(generateRandom64());
 
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, trace_id);
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_id);
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID, trace_id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_id);
 
   // New span will have an SR annotation - so its span and parent ids will be
   // the same as the supplied span context (i.e. shared context)
@@ -757,13 +757,13 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
 
   // Root span so have same trace and span id
   const std::string id = Hex::uint64ToHex(generateRandom64());
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, id);
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, id);
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, SAMPLED);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID, id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID, id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED, SAMPLED);
 
   // Set parent span id to empty string, to ensure it is ignored
   const std::string parent_span_id = "";
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_span_id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_span_id);
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -781,9 +781,9 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   const std::string span_id = Hex::uint64ToHex(generateRandom64());
   const std::string parent_id = Hex::uint64ToHex(generateRandom64());
 
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, trace_id);
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_id);
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID, trace_id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_id);
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_id);
 
   // New span will have an SR annotation - so its span and parent ids will be
   // the same as the supplied span context (i.e. shared context)
@@ -803,11 +803,11 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
   setupValidDriver("HTTP_JSON");
 
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, std::string("xyz"));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID, std::string("xyz"));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -817,11 +817,11 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
   setupValidDriver("HTTP_JSON");
 
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, std::string("xyz"));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID, std::string("xyz"));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -831,12 +831,11 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
   setupValidDriver("HTTP_JSON");
 
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                   std::string("xyz"));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, std::string("xyz"));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -857,7 +856,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to not sample
-  EXPECT_EQ(NOT_SAMPLED, sampled_entry[0]->value().getStringView());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry.value());
 }
 
 TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
@@ -874,17 +873,17 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to sample
-  EXPECT_EQ(SAMPLED, sampled_entry[0]->value().getStringView());
+  EXPECT_EQ(SAMPLED, sampled_entry.value());
 }
 
 TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   setupValidDriver("HTTP_JSON");
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                   Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
+                       Hex::uint64ToHex(generateRandom64()));
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, false});
 
@@ -900,11 +899,10 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
 
   span->setSampled(true);
   span->injectContext(request_headers_, nullptr);
-  request_headers_.iterate(
-      [&dup_callback](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        dup_callback(header.key().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      });
+  request_headers_.forEach([&dup_callback](absl::string_view key, absl::string_view) -> bool {
+    dup_callback(key);
+    return true;
+  });
 }
 
 } // namespace
