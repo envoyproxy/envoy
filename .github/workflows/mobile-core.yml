@@ -1,49 +1,70 @@
-name: mobile_core
+name: Mobile/Core
 
 permissions:
   contents: read
 
 on:
-  push:
-    branches:
-    - main
-  pull_request:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
-jobs:
-  env:
-    if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/_env.yml
-    permissions:
-      contents: read
-      pull-requests: read
 
-  unittests:
-    if: ${{ github.repository == 'envoyproxy/envoy' }}
-    needs: env
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: mobile-core
+
+  unit-tests:
     permissions:
       contents: read
       packages: read
-    name: unit_tests
-    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
-    timeout-minutes: 120
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
-    - name: 'Run tests'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        cd mobile
-        ./bazelw test \
-            --build_tests_only \
-            --action_env=LD_LIBRARY_PATH \
-            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
-            --config=mobile-remote-ci \
-            //test/common/...
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-core }}
+    needs: load
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    with:
+      args: >-
+        test
+        --build_tests_only
+        --action_env=LD_LIBRARY_PATH
+        --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+        --config=mobile-remote-ci
+        //test/common/...
+      request: ${{ needs.load.outputs.request }}
+      target: unit-tests
+      timeout-minutes: 120
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-core }}
+    needs:
+    - load
+    - unit-tests
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

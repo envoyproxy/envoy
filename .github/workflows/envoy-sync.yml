@@ -28,10 +28,14 @@ jobs:
         - data-plane-api
         - mobile-website
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.8
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.11
+      id: appauth
+      with:
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.11
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main
-        key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
+        token: ${{ steps.appauth.outputs.token }}
         workflow: envoy-sync.yaml
-        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}

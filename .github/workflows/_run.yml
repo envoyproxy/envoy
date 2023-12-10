@@ -1,0 +1,261 @@
+name: Envoy CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+      app-key:
+      rbe-key:
+      ssh-key:
+      ssh-key-extra:
+    inputs:
+      args:
+        type: string
+      bazel-extra:
+        type: string
+      bazel-rbe-jobs:
+        type: number
+        default: 75
+      cache-build-image:
+        type: string
+      catch-errors:
+        type: boolean
+        default: false
+      checkout-extra:
+        type: string
+      container-command:
+        type: string
+        default: ./ci/run_envoy_docker.sh
+      container-output:
+        type: string
+        default:
+      command:
+        type: string
+        default: ./ci/do_ci.sh
+      diskspace-hack:
+        type: boolean
+        default: false
+      diskspace-hack-paths:
+        type: string
+        default:
+      downloads:
+        type: string
+      entrypoint:
+        type: string
+        default:
+      error-match:
+        type: string
+        default: |
+          ERROR
+          error:
+          Error:
+      notice-match:
+        type: string
+        default: |
+          NOTICE
+          Streaming build results
+      rbe:
+        type: boolean
+        default: true
+      repo-fetch-depth:
+        type: number
+        default: 1
+      report-pre:
+        type: string
+        default: |
+          - run: |
+              echo "disk space at beginning of build:"
+              df -h
+            shell: bash
+      report-post:
+        type: string
+        default: |
+          - run: |
+              echo "disk space at end of build:"
+              df -h
+            shell: bash
+      request:
+        type: string
+        required: true
+      runs-on:
+        type: string
+        default:
+      skip:
+        type: boolean
+        default: false
+      source:
+        type: string
+      summary-post:
+        type: string
+        default: |
+          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.2.8
+            with:
+              context: %{{ inputs.context }}
+      steps-pre:
+        type: string
+      steps-pre-name:
+        type: string
+      steps-post:
+        type: string
+        default: |
+          - run: |
+              du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :
+            shell: bash
+      steps-post-name:
+        type: string
+      target:
+        type: string
+        required: true
+      temp-dir:
+        type: string
+      timeout-minutes:
+        type: number
+      trusted:
+        type: boolean
+        required: true
+      upload-name:
+        type: string
+      upload-path:
+        type: string
+      warning-match:
+        type: string
+        default: |
+          WARNING
+          warning:
+          Warning:
+      working-directory:
+        type: string
+        default: .
+
+concurrency:
+  group: >-
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-${{ inputs.target }}
+  cancel-in-progress: true
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG }}
+
+
+jobs:
+  ci:
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ ! inputs.skip }}
+    runs-on: ${{ inputs.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu }}
+    name: ${{ inputs.command }} ${{ inputs.target }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.11
+      id: started
+      name: Create timestamp
+      with:
+        options: -r
+        filter: |
+          now
+    # This controls which input vars are exposed to the run action (and related steps)
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.11
+      name: Context
+      id: context
+      with:
+        print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
+        input: ${{ inputs.request }}
+        filter: |
+          .
+          | .check as $check
+          | .config as $config
+          | if "${{ inputs.runs-on }}" != "" then
+              "${{ inputs.runs-on }}"
+            else .config.ci["agent-ubuntu"] end
+          | . as $runsOn
+          | {"target": "${{ inputs.target }}",
+             "catch-errors": ${{ inputs.catch-errors }},
+             "runs-on": $runsOn,
+             "job-started": ${{ steps.started.outputs.value }}}
+          | . * {$config, $check}
+    - if: ${{ inputs.cache-build-image }}
+      name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.2.11
+      with:
+        image_tag: ${{ inputs.cache-build-image }}
+
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.11
+      id: appauth
+      name: Appauth
+      if: ${{ inputs.trusted }}
+      with:
+        app_id: ${{ secrets.app-id }}
+        key: ${{ secrets.app-key }}
+        # You cant use a secret as a condition so this always runs even if the app id/key are empty
+        # - the workaround is to allow the token to be passed through.
+        token: ${{ github.token }}
+        token-ok: true
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.11
+      id: checkout
+      name: Checkout Envoy repository
+      with:
+        branch: ${{ fromJSON(inputs.request).request.target-branch }}
+        config: |
+          fetch-depth: ${{ inputs.repo-fetch-depth }}
+          # WARNING: This allows untrusted code to run!!!
+          #  If this is set to run untrusted code, then anything before or after in the job should be regarded as
+          #  compromisable.
+          ref: ${{ inputs.trusted && fromJSON(inputs.request).request.sha || fromJSON(inputs.request).request.ref }}
+        fetch-merge-commit: false
+        pr: ${{ fromJSON(inputs.request).request.pr }}
+        ssh-key: ${{ inputs.trusted && inputs.ssh-key || '' }}
+        token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
+
+    # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.11
+      id: checkout-extra
+      name: Checkout extra repository (for publishing)
+      if: ${{ inputs.checkout-extra }}
+      with:
+        config: ${{ inputs.checkout-extra }}
+        ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
+
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.11
+      name: Run CI ${{ inputs.command }} ${{ inputs.target }}
+      with:
+        args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
+        catch-errors: ${{ inputs.catch-errors }}
+        command: ${{ inputs.command }}
+        container-command: ${{ env.CONTAINER_COMMAND || inputs.container-command }}
+        container-output: ${{ inputs.container-output }}
+        context: ${{ steps.context.outputs.value }}
+        diskspace-hack: ${{ inputs.diskspace-hack }}
+        diskspace-hack-paths: ${{ inputs.diskspace-hack-paths }}
+        downloads: ${{ inputs.downloads }}
+        entrypoint: ${{ inputs.entrypoint }}
+        error-match: ${{ inputs.error-match }}
+        notice-match: ${{ inputs.notice-match }}
+        report-pre: ${{ inputs.report-pre }}
+        report-post: ${{ inputs.report-post }}
+        source: ${{ inputs.source }}
+        steps-pre: ${{ inputs.steps-pre }}
+        steps-pre-name: ${{ inputs.steps-pre-name }}
+        steps-post: ${{ inputs.steps-post }}
+        steps-post-name: ${{ inputs.steps-post-name }}
+        summary-post: ${{ inputs.summary-post }}
+        upload-name: ${{ inputs.upload-name }}
+        upload-path: ${{ inputs.upload-path }}
+        warning-match: ${{ inputs.warning-match }}
+        working-directory: ${{ inputs.working-directory }}
+      env:
+        GITHUB_TOKEN: ${{ steps.checkout.outputs.token && steps.checkout.outputs.token || secrets.GITHUB_TOKEN }}
+        ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
+        ENVOY_RBE: ${{ inputs.rbe != 'false' && 1 || '' }}
+        RBE_KEY: ${{ secrets.rbe-key }}
+        BAZEL_BUILD_EXTRA_OPTIONS: >-
+          --config=remote-ci
+          ${{ inputs.bazel-extra }}
+          ${{ inputs.rbe != 'false' && format('--jobs={0}', inputs.bazel-rbe-jobs) || '' }}
+        BAZEL_FAKE_SCM_REVISION: ${{ github.event_name == 'pull_request' && 'e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9' || '' }}
+        CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
