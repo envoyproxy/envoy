@@ -91,7 +91,7 @@ jobs:
     # Handle any failure in triggering job
     # Remove the `checks` object, and shift the one we care about to `check`
     # Prepare a check request
-    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.2.11
+    - uses: envoyproxy/toolshed/gh-actions/github/env/load@8bcde82323799942b86a3d928f100e2c969e0d50
       name: Load env
       id: data
       with:
@@ -102,20 +102,20 @@ jobs:
         GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.11
+    - uses: envoyproxy/toolshed/gh-actions/appauth@8bcde82323799942b86a3d928f100e2c969e0d50
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/gh-actions/github/check/update@actions-v0.2.11
+    - uses: envoyproxy/toolshed/gh-actions/github/check/update@8bcde82323799942b86a3d928f100e2c969e0d50
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
         data: ${{ toJSON(fromJSON(steps.data.outputs.data).check) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.11
+    - uses: envoyproxy/toolshed/gh-actions/jq@8bcde82323799942b86a3d928f100e2c969e0d50
       name: Print request summary
       with:
         input: ${{ steps.data.outputs.data }}
@@ -131,7 +131,7 @@ jobs:
           | $data.summary["linked-title"] as $linkedTitle
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.11
+    - uses: envoyproxy/toolshed/gh-actions/jq@8bcde82323799942b86a3d928f100e2c969e0d50
       id: request-output
       name: Load request
       with:

@@ -352,6 +352,7 @@ run:
     - examples/**/*
     - source/**/*
     - tools/**/*
+    push: paths
 
 tables:
   env:
