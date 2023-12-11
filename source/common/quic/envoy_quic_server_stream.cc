@@ -128,7 +128,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
         auto single_slice_buffer = std::make_unique<Buffer::OwnedImpl>();
         single_slice_buffer->move(data, slice.len_);
         quic_slices.emplace_back(
-            reinterpret_cast<char*>(single_slice_buffer->frontSlice().mem_), slice.len_,
+            reinterpret_cast<char*>(slice.mem_), slice.len_,
             [single_slice_buffer = std::move(single_slice_buffer)](const char*) mutable {
               // Free this memory explicitly when the callback is invoked.
               single_slice_buffer = nullptr;
