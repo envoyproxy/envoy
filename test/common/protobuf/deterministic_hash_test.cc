@@ -308,6 +308,24 @@ TEST(HashTest, RepeatedFloatDifferentOrderMismatch) {
   EXPECT_NE(hash(r1), hash(r2));
 }
 
+TEST(HashTest, RepeatedMessageMatch) {
+  deterministichashtest::RepeatedFields r1, r2;
+  r1.add_messages()->set_index(1);
+  r1.add_messages()->set_index(2);
+  r2.add_messages()->set_index(1);
+  r2.add_messages()->set_index(2);
+  EXPECT_EQ(hash(r1), hash(r2));
+}
+
+TEST(HashTest, RepeatedMessageOrderMisMatch) {
+  deterministichashtest::RepeatedFields r1, r2;
+  r1.add_messages()->set_index(1);
+  r1.add_messages()->set_index(2);
+  r2.add_messages()->set_index(2);
+  r2.add_messages()->set_index(1);
+  EXPECT_NE(hash(r1), hash(r2));
+}
+
 TEST(HashTest, SingleInt32Match) {
   deterministichashtest::SingleFields s1, s2;
   s1.set_int32(5);
@@ -446,6 +464,39 @@ TEST(HashTest, SingleEnumMismatch) {
   s1.set_e(deterministichashtest::FOO);
   s2.set_e(deterministichashtest::BAR);
   EXPECT_NE(hash(s1), hash(s2));
+}
+
+TEST(HashTest, AnyWithUnknownTypeMatch) {
+  deterministichashtest::AnyContainer a1, a2;
+  a1.mutable_any()->set_type_url("invalid_type");
+  a2.mutable_any()->set_type_url("invalid_type");
+  EXPECT_EQ(hash(a1), hash(a2));
+}
+
+TEST(HashTest, AnyWithUnknownTypeMismatch) {
+  deterministichashtest::AnyContainer a1, a2;
+  a1.mutable_any()->set_type_url("invalid_type");
+  a2.mutable_any()->set_type_url("different_invalid_type");
+  EXPECT_NE(hash(a1), hash(a2));
+}
+
+TEST(HashTest, AnyWithKnownTypeMatch) {
+  deterministichashtest::AnyContainer a1, a2;
+  deterministichashtest::Recursion value;
+  value.set_index(1);
+  a1.mutable_any()->PackFrom(value);
+  a2.mutable_any()->PackFrom(value);
+  EXPECT_EQ(hash(a1), hash(a2));
+}
+
+TEST(HashTest, AnyWithKnownTypeMismatch) {
+  deterministichashtest::AnyContainer a1, a2;
+  deterministichashtest::Recursion value;
+  value.set_index(1);
+  a1.mutable_any()->PackFrom(value);
+  value.set_index(2);
+  a2.mutable_any()->PackFrom(value);
+  EXPECT_NE(hash(a1), hash(a2));
 }
 
 } // namespace DeterministicProtoHash

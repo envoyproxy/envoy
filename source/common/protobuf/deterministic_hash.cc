@@ -206,7 +206,8 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
     std::unique_ptr<Protobuf::Message> submsg = unpackAnyForReflection(*any);
     if (submsg == nullptr) {
       // If we wanted to handle unknown types in Any, this is where we'd have to do it.
-      return seed;
+      // Since we don't know the type to introspect it, we hash just its type name.
+      return HashUtil::xxHash64(any->type_url(), seed);
     }
     return reflectionHashMessage(*submsg, seed);
   }

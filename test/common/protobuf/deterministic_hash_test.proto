@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package deterministichashtest;
 
+import "google/protobuf/any.proto";
+
 enum FooEnum {
   ZERO = 0;
   FOO = 1;
@@ -33,6 +35,7 @@ message RepeatedFields {
   repeated double doubles = 8;
   repeated float floats = 9;
   repeated FooEnum enums = 10;
+  repeated Recursion messages = 11;
 };
 
 message SingleFields {
@@ -46,4 +49,8 @@ message SingleFields {
   double db = 8;
   float f = 9;
   FooEnum e = 10;
+};
+
+message AnyContainer {
+  google.protobuf.Any any = 1;
 };
