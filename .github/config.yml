@@ -23,6 +23,11 @@ checks:
   #
   # For example if macos is marked as `required: true` but then has a path
   # selection that means its doesnt run the check will be `skipped` and pass
+  macos:
+    name: Envoy/macOS
+    required: true
+    on-run:
+    - build-macos
   prechecks:
     name: Envoy/Prechecks
     on-run:
@@ -75,8 +80,39 @@ checks:
     - publish
     - verify
     required: true
+  windows:
+    name: Envoy/Windows
+    required: true
+    on-run:
+    - build-windows
 
 run:
+  build-windows:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/**/*
+    - ci/**/*
+    - configs/**/*
+    - contrib/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+  build-macos:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/**/*
+    - ci/**/*
+    - configs/**/*
+    - contrib/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
   precheck-deps:
     paths:
     - .bazelrc
