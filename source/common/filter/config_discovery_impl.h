@@ -309,7 +309,7 @@ public:
       const std::string& filter_chain_type, absl::string_view stat_prefix,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
       : DynamicFilterConfigProviderImpl<FactoryCb>(
-            subscription, require_type_urls, factory_context.threadLocal(),
+            subscription, require_type_urls, factory_context.serverFactoryContext().threadLocal(),
             std::move(default_config), last_filter_in_filter_chain, filter_chain_type, stat_prefix,
             listener_filter_matcher),
         factory_context_(factory_context) {}

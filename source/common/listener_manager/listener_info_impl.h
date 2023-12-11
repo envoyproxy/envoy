@@ -13,7 +13,7 @@ public:
   explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener& config)
       : config_(config), typed_metadata_(config_.metadata()),
         is_quic_(config.udp_listener_config().has_quic_options()) {}
-  ListenerInfoImpl() : typed_metadata_(config_.metadata()), is_quic_(false) {}
+  ListenerInfoImpl() : typed_metadata_(config_.metadata()) {}
 
   // Allow access to the underlying protobuf as an internal detail.
   const envoy::config::listener::v3::Listener& config() const { return config_; }
@@ -29,7 +29,7 @@ private:
   const envoy::config::listener::v3::Listener config_;
   const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
       typed_metadata_;
-  const bool is_quic_;
+  const bool is_quic_{};
 };
 
 } // namespace Server

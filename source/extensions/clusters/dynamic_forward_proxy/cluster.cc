@@ -500,7 +500,7 @@ ClusterFactory::createClusterWithConfig(
                                            proto_config, context, std::move(cache_manager)));
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
-      context.serverFactoryContext());
+      context.serverFactoryContext().singletonManager());
   cluster_store_factory.get()->save(new_cluster->info()->name(), new_cluster);
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();

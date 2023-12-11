@@ -27,11 +27,8 @@ Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 
-  Server::GenericFactoryContextImpl generic_context(context);
-
   const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-      generic_context);
+      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});
