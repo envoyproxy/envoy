@@ -86,7 +86,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     // available.
     hostname = encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->sni();
   }
-  const uint32_t port = host->address()->ip()->port();
+  const uint32_t port = (host->address() ? host->address()->ip()->port() : 443);
   Http::HttpServerPropertiesCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,
                                                  port);
   cache->setAlternatives(origin, protocols);
