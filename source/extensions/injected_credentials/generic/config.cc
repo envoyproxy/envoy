@@ -13,7 +13,8 @@ Common::CredentialInjectorSharedPtr
 GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
     const Generic& config, Server::Configuration::FactoryContext& context) {
   const auto& credential_secret = config.credential();
-  auto& cluster_manager = context.clusterManager();
+  auto& server_context = context.serverFactoryContext();
+  auto& cluster_manager = server_context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
   auto secret_provider = Common::secretsProvider(credential_secret, secret_manager,
@@ -22,7 +23,8 @@ GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
     throw EnvoyException("invalid credential secret configuration");
   }
 
-  auto secret_reader = std::make_shared<Common::SDSSecretReader>(secret_provider, context.api());
+  auto secret_reader =
+      std::make_shared<Common::SDSSecretReader>(secret_provider, server_context.api());
   std::string header = config.header();
   if (header.empty()) {
     header = "Authorization";
