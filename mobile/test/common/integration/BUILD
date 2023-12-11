@@ -18,6 +18,7 @@ envoy_cc_test(
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
+    shard_count = 4,
     repository = "@envoy",
     deps = [
         ":base_client_integration_test_lib",
