@@ -17,6 +17,8 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -27,6 +29,34 @@ namespace ZooKeeperProxy {
  */
 #define ALL_ZOOKEEPER_PROXY_STATS(COUNTER)                                                         \
   COUNTER(decoder_error)                                                                           \
+  COUNTER(connect_decoder_error)                                                                   \
+  COUNTER(ping_decoder_error)                                                                      \
+  COUNTER(auth_decoder_error)                                                                      \
+  COUNTER(getdata_decoder_error)                                                                   \
+  COUNTER(create_decoder_error)                                                                    \
+  COUNTER(create2_decoder_error)                                                                   \
+  COUNTER(createcontainer_decoder_error)                                                           \
+  COUNTER(createttl_decoder_error)                                                                 \
+  COUNTER(setdata_decoder_error)                                                                   \
+  COUNTER(getchildren_decoder_error)                                                               \
+  COUNTER(getchildren2_decoder_error)                                                              \
+  COUNTER(getephemerals_decoder_error)                                                             \
+  COUNTER(getallchildrennumber_decoder_error)                                                      \
+  COUNTER(delete_decoder_error)                                                                    \
+  COUNTER(exists_decoder_error)                                                                    \
+  COUNTER(getacl_decoder_error)                                                                    \
+  COUNTER(setacl_decoder_error)                                                                    \
+  COUNTER(sync_decoder_error)                                                                      \
+  COUNTER(multi_decoder_error)                                                                     \
+  COUNTER(reconfig_decoder_error)                                                                  \
+  COUNTER(close_decoder_error)                                                                     \
+  COUNTER(setauth_decoder_error)                                                                   \
+  COUNTER(setwatches_decoder_error)                                                                \
+  COUNTER(setwatches2_decoder_error)                                                               \
+  COUNTER(addwatch_decoder_error)                                                                  \
+  COUNTER(checkwatches_decoder_error)                                                              \
+  COUNTER(removewatches_decoder_error)                                                             \
+  COUNTER(check_decoder_error)                                                                     \
   COUNTER(request_bytes)                                                                           \
   COUNTER(connect_rq_bytes)                                                                        \
   COUNTER(connect_readonly_rq_bytes)                                                               \
@@ -223,6 +253,7 @@ public:
   ZooKeeperFilterConfig(const std::string& stat_prefix, const uint32_t max_packet_bytes,
                         const bool enable_per_opcode_request_bytes_metrics,
                         const bool enable_per_opcode_response_bytes_metrics,
+                        const bool enable_per_opcode_decoder_error_metrics,
                         const bool enable_latency_threshold_metrics,
                         const std::chrono::milliseconds default_latency_threshold,
                         const LatencyThresholdOverrideList& latency_threshold_overrides,
@@ -245,6 +276,7 @@ public:
     Stats::Counter* resp_slow_counter_;
     Stats::Counter* rq_bytes_counter_;
     Stats::Counter* resp_bytes_counter_;
+    Stats::Counter* decoder_error_counter_;
     std::string opname_;
     Stats::StatName latency_name_;
   };
@@ -261,6 +293,7 @@ public:
   const Stats::StatName unknown_opcode_latency_;
   const bool enable_per_opcode_request_bytes_metrics_;
   const bool enable_per_opcode_response_bytes_metrics_;
+  const bool enable_per_opcode_decoder_error_metrics_;
 
   ErrorBudgetResponseType errorBudgetDecision(const OpCodes opcode,
                                               const std::chrono::milliseconds latency) const;
@@ -268,7 +301,8 @@ public:
 private:
   void initOpCode(OpCodes opcode, Stats::Counter& resp_counter, Stats::Counter& resp_fast_counter,
                   Stats::Counter& resp_slow_counter, Stats::Counter& rq_bytes_counter,
-                  Stats::Counter& resp_bytes_counter, absl::string_view name);
+                  Stats::Counter& resp_bytes_counter, Stats::Counter& decoder_error_counter,
+                  absl::string_view name);
 
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
@@ -334,20 +368,21 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // ZooKeeperProxy::DecoderCallback
-  void onDecodeError() override;
+  void onDecodeError(const absl::optional<OpCodes> opcode) override;
   void onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnect(bool readonly) override;
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
   void onGetDataRequest(const std::string& path, bool watch) override;
-  void onCreateRequest(const std::string& path, CreateFlags flags, OpCodes opcode) override;
+  absl::Status onCreateRequest(const std::string& path, CreateFlags flags, OpCodes opcode) override;
   void onSetRequest(const std::string& path) override;
   void onGetChildrenRequest(const std::string& path, bool watch, bool v2) override;
   void onDeleteRequest(const std::string& path, int32_t version) override;
   void onExistsRequest(const std::string& path, bool watch) override;
   void onGetAclRequest(const std::string& path) override;
   void onSetAclRequest(const std::string& path, int32_t version) override;
-  void onSyncRequest(const std::string& path) override;
+  absl::Status onSyncRequest(const absl::StatusOr<std::string>& path,
+                             const OpCodes opcode) override;
   void onCheckRequest(const std::string& path, int32_t version) override;
   void onMultiRequest() override;
   void onReconfigRequest() override;
@@ -356,8 +391,10 @@ public:
   void onAddWatchRequest(const std::string& path, const int32_t mode) override;
   void onCheckWatchesRequest(const std::string& path, int32_t type) override;
   void onRemoveWatchesRequest(const std::string& path, int32_t type) override;
-  void onGetEphemeralsRequest(const std::string& path) override;
-  void onGetAllChildrenNumberRequest(const std::string& path) override;
+  absl::Status onGetEphemeralsRequest(const absl::StatusOr<std::string>& path,
+                                      const OpCodes opcode) override;
+  absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path,
+                                             const OpCodes opcode) override;
   void onCloseRequest() override;
   void onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,

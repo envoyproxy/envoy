@@ -22,7 +22,7 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -685,7 +685,7 @@ void FakeUpstream::initializeServer() {
 
   dispatcher_->post([this]() -> void {
     socket_factories_[0]->doFinalPreWorkerInit();
-    handler_->addListener(absl::nullopt, listener_, runtime_);
+    handler_->addListener(absl::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
   });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });

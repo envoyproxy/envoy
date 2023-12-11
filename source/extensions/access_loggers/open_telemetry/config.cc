@@ -30,26 +30,19 @@ getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& conte
       });
 }
 
-::Envoy::AccessLog::InstanceSharedPtr AccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
 ::Envoy::AccessLog::InstanceSharedPtr
 AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                           ::Envoy::AccessLog::FilterPtr&& filter,
-                                          Server::Configuration::CommonFactoryContext& context) {
+                                          Server::Configuration::FactoryContext& context) {
   validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<AccessLog>(std::move(filter), proto_config, context.threadLocal(),
-                                     getAccessLoggerCacheSingleton(context));
+  return std::make_shared<AccessLog>(std::move(filter), proto_config,
+                                     context.serverFactoryContext().threadLocal(),
+                                     getAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {

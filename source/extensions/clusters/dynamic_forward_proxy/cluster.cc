@@ -53,12 +53,12 @@ REGISTER_FACTORY(DynamicPortObjectFactory, StreamInfo::FilterState::ObjectFactor
 
 Cluster::Cluster(
     const envoy::config::cluster::v3::Cluster& cluster,
+    Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Upstream::ClusterFactoryContext& context,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager)
     : Upstream::BaseDynamicClusterImpl(cluster, context),
-      dns_cache_manager_(cache_manager_factory.get()),
-      dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
+      dns_cache_manager_(std::move(cache_manager)), dns_cache_(std::move(cache)),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)),
       local_info_(context.serverFactoryContext().localInfo()),
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
@@ -478,18 +478,9 @@ ClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
 
-  auto& server_context = context.serverFactoryContext();
-
-  // The message validation visitor of Upstream::ClusterFactoryContext should be used for
-  // validating the cluster config.
-  Server::FactoryContextBaseImpl factory_context_base(
-      server_context.options(), server_context.mainThreadDispatcher(), server_context.api(),
-      server_context.localInfo(), server_context.admin(), server_context.runtime(),
-      server_context.singletonManager(), context.messageValidationVisitor(),
-      server_context.serverScope().store(), server_context.threadLocal());
-
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      factory_context_base);
+      context.serverFactoryContext(), context.messageValidationVisitor());
+
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {
     // This sets defaults which will only apply if using old style http config.
@@ -499,11 +490,17 @@ ClusterFactory::createClusterWithConfig(
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
 
-  auto new_cluster = std::shared_ptr<Cluster>(
-      new Cluster(cluster_config, proto_config, context, cache_manager_factory));
+  Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
+      cache_manager_factory.get();
+  auto dns_cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
+  RETURN_IF_STATUS_NOT_OK(dns_cache_or_error);
+
+  auto new_cluster =
+      std::shared_ptr<Cluster>(new Cluster(cluster_config, std::move(dns_cache_or_error.value()),
+                                           proto_config, context, std::move(cache_manager)));
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
-      factory_context_base);
+      context.serverFactoryContext().singletonManager());
   cluster_store_factory.get()->save(new_cluster->info()->name(), new_cluster);
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();

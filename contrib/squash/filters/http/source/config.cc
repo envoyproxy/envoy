@@ -17,13 +17,14 @@ namespace Squash {
 Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::squash::v3::Squash& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.serverFactoryContext();
 
   SquashFilterConfigSharedPtr config = std::make_shared<SquashFilterConfig>(
-      SquashFilterConfig(proto_config, context.clusterManager()));
+      SquashFilterConfig(proto_config, server_context.clusterManager()));
 
-  return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [&server_context, config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
-        std::make_shared<SquashFilter>(config, context.clusterManager()));
+        std::make_shared<SquashFilter>(config, server_context.clusterManager()));
   };
 }
 

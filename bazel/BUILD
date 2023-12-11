@@ -362,13 +362,8 @@ config_setting(
 )
 
 config_setting(
-    name = "disable_envoy_mobile_request_compression",
-    values = {"define": "envoy_mobile_request_compression=disabled"},
-)
-
-config_setting(
-    name = "disable_envoy_mobile_stats_reporting",
-    values = {"define": "envoy_mobile_stats_reporting=disabled"},
+    name = "disable_envoy_mobile_xds",
+    values = {"define": "envoy_mobile_xds=disabled"},
 )
 
 config_setting(
@@ -395,7 +390,7 @@ config_setting(
 
 config_setting(
     name = "disable_http_datagrams",
-    values = {"define": "enable_http_datagrams=disabled"},
+    values = {"define": "envoy_enable_http_datagrams=disabled"},
 )
 
 config_setting(

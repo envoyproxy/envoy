@@ -72,6 +72,7 @@ proto_library(
     name = "v3_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/compression/qatzip/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/checksum/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
@@ -366,9 +367,9 @@ proto_library(
     name = "xds_protos",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_cncf_udpa//xds/core/v3:pkg",
-        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
-        "@com_github_cncf_udpa//xds/type/v3:pkg",
+        "@com_github_cncf_xds//xds/core/v3:pkg",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg",
+        "@com_github_cncf_xds//xds/type/v3:pkg",
     ],
 )
 

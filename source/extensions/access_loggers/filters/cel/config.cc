@@ -16,7 +16,7 @@ namespace CEL {
 
 Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config,
-    Server::Configuration::CommonFactoryContext& context) {
+    Server::Configuration::FactoryContext& context) {
 
   auto factory_config =
       Config::Utility::translateToFactoryConfig(config, context.messageValidationVisitor(), *this);
@@ -33,7 +33,8 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
   }
 
   return std::make_unique<CELAccessLogExtensionFilter>(
-      Extensions::Filters::Common::Expr::getBuilder(context), parse_status.value().expr());
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
+      parse_status.value().expr());
 #else
   throw EnvoyException("CEL is not available for use in this environment.");
 #endif

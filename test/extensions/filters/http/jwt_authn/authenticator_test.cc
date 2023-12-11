@@ -189,6 +189,18 @@ TEST_F(AuthenticatorTest, TestClaimToHeaderWithClearRouteCache) {
   }
 }
 
+TEST_F(AuthenticatorTest, TestPayloadInMetadataWithClearRouteCache) {
+  TestUtility::loadFromYaml(PayloadClearRouteCacheConfig, proto_config_);
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(NestedGoodToken)}};
+  expectVerifyStatus(Status::Ok, headers, true);
+}
+
 // This test verifies when wrong claim is passed in claim_to_headers
 TEST_F(AuthenticatorTest, TestClaimToHeaderWithHeaderReplace) {
   createAuthenticator();
@@ -778,7 +790,9 @@ TEST_F(AuthenticatorTest, TestInvalidPrefix) {
 // This test verifies when a JWT is non-expiring without audience specified, JwtAudienceNotAllowed
 // is returned.
 TEST_F(AuthenticatorTest, TestNonExpiringJWT) {
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              httpAsyncClient())
+      .Times(0);
 
   Http::TestRequestHeaderMapImpl headers{
       {"Authorization", "Bearer " + std::string(NonExpiringToken)}};

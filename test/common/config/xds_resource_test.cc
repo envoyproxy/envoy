@@ -43,7 +43,7 @@ TEST(XdsResourceIdentifierTest, DecodeEncode) {
   XdsResourceIdentifier::EncodeOptions encode_options;
   encode_options.sort_context_params_ = true;
   for (const std::string& uri : uris) {
-    EXPECT_EQ(uri, XdsResourceIdentifier::encodeUrn(XdsResourceIdentifier::decodeUrn(uri),
+    EXPECT_EQ(uri, XdsResourceIdentifier::encodeUrn(XdsResourceIdentifier::decodeUrn(uri).value(),
                                                     encode_options));
     EXPECT_EQ(uri, XdsResourceIdentifier::encodeUrl(XdsResourceIdentifier::decodeUrl(uri),
                                                     encode_options));
@@ -53,7 +53,8 @@ TEST(XdsResourceIdentifierTest, DecodeEncode) {
 // Corner cases around path-identifier encoding/decoding.
 TEST(XdsResourceIdentifierTest, PathDividerEscape) {
   {
-    const auto resource_name = XdsResourceIdentifier::decodeUrn("xdstp:///type/foo%2Fbar/baz");
+    const auto resource_name =
+        XdsResourceIdentifier::decodeUrn("xdstp:///type/foo%2Fbar/baz").value();
     EXPECT_EQ("foo/bar/baz", resource_name.id());
     EXPECT_EQ("xdstp:///type/foo/bar/baz", XdsResourceIdentifier::encodeUrn(resource_name));
   }
@@ -66,7 +67,8 @@ TEST(XdsResourceIdentifierTest, PathDividerEscape) {
 
 // Validate that URN decoding behaves as expected component-wise.
 TEST(XdsResourceNameTest, DecodeSuccess) {
-  const auto resource_name = XdsResourceIdentifier::decodeUrn(EscapedUrnWithManyQueryParams);
+  const auto resource_name =
+      XdsResourceIdentifier::decodeUrn(EscapedUrnWithManyQueryParams).value();
   EXPECT_EQ("f123%/?#o", resource_name.authority());
   EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.resource_type());
   EXPECT_EQ(resource_name.id(), "b%:?#[]ar//baz");
@@ -98,7 +100,7 @@ TEST(XdsResourceLocatorTest, DecodeSuccess) {
 // Validate that the URN decoding behaves with a near-empty xDS resource name.
 TEST(XdsResourceLocatorTest, DecodeEmpty) {
   const auto resource_name =
-      XdsResourceIdentifier::decodeUrn("xdstp:///envoy.config.listener.v3.Listener");
+      XdsResourceIdentifier::decodeUrn("xdstp:///envoy.config.listener.v3.Listener").value();
   EXPECT_TRUE(resource_name.authority().empty());
   EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.resource_type());
   EXPECT_TRUE(resource_name.id().empty());
@@ -119,33 +121,28 @@ TEST(XdsResourceNameTest, DecodeEmpty) {
 // Negative tests for URN decoding.
 TEST(XdsResourceNameTest, DecodeFail) {
   {
-    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrn("foo://"),
-                              XdsResourceIdentifier::DecodeException,
-                              "foo:// does not have an xdstp: scheme");
+    EXPECT_EQ(XdsResourceIdentifier::decodeUrn("foo://").status().message(),
+              "foo:// does not have an xdstp: scheme");
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrn("xdstp://foo"),
-                              XdsResourceIdentifier::DecodeException,
-                              "Resource type missing from /");
+    EXPECT_EQ(XdsResourceIdentifier::decodeUrn("xdstp://foo").status().message(),
+              "Resource type missing from /");
   }
 }
 
 // Negative tests for URL decoding.
 TEST(XdsResourceLocatorTest, DecodeFail) {
   {
-    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("foo://"),
-                              XdsResourceIdentifier::DecodeException,
+    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("foo://"), EnvoyException,
                               "foo:// does not have a xdstp:, http: or file: scheme");
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("xdstp://foo"),
-                              XdsResourceIdentifier::DecodeException,
+    EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("xdstp://foo"), EnvoyException,
                               "Resource type missing from /");
   }
   {
     EXPECT_THROW_WITH_MESSAGE(XdsResourceIdentifier::decodeUrl("xdstp://foo/some-type#bar=baz"),
-                              XdsResourceIdentifier::DecodeException,
-                              "Unknown fragment component bar=baz");
+                              EnvoyException, "Unknown fragment component bar=baz");
   }
 }
 

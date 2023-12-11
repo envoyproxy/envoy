@@ -48,28 +48,6 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnknownHttpFilterInTypedPerFilterConf
                "'google.protobuf.Struct'");
 }
 
-TEST_F(HTTPTypedPerFilterConfigTest, HcmIgnoreUnknownOptionalHttpFilterInTypedPerFilterConfig) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false");
-
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) {
-        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
-        auto* config = virtual_host->mutable_typed_per_filter_config();
-        (*config)["filter.unknown"].PackFrom(Envoy::ProtobufWkt::Struct());
-
-        auto* filter = hcm.mutable_http_filters()->Add();
-        filter->set_name("filter.unknown");
-        filter->set_is_optional(true);
-        // keep router the last
-        auto size = hcm.http_filters_size();
-        hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
-      });
-  initialize();
-}
-
 TEST_F(HTTPTypedPerFilterConfigTest, IgnoreUnknownOptionalHttpFilterInTypedPerFilterConfig) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

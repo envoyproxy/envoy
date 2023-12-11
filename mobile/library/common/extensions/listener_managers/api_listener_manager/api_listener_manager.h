@@ -29,7 +29,7 @@ public:
   }
   uint64_t numConnections() const override { return 0; }
   bool removeListener(const std::string&) override { return true; }
-  void startWorkers(GuardDog&, std::function<void()> callback) override { callback(); }
+  void startWorkers(OptRef<GuardDog>, std::function<void()> callback) override { callback(); }
   void stopListeners(StopListenersType, const Network::ExtraShutdownListenerOptions&) override {}
   void stopWorkers() override {}
   void beginListenerUpdate() override {}

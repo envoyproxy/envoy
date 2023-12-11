@@ -16,7 +16,7 @@
 #include "source/server/drain_manager_impl.h"
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
+#include "source/server/options_impl_base.h"
 #include "source/server/server.h"
 
 #include "absl/debugging/symbolize.h"
@@ -52,7 +52,7 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
       component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
-  OptionsImpl::disableExtensions(options.disabledExtensions());
+  OptionsImplBase::disableExtensions(options.disabledExtensions());
 
   // Enable core dumps as early as possible.
   if (options_.coreDumpEnabled()) {
@@ -78,8 +78,8 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
 
     configureComponentLogLevels();
 
-    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a try/catch
-    // block or not.
+    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
+    // try/catch block or not.
     std::set_new_handler([]() { PANIC("out of memory"); });
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
@@ -136,7 +136,7 @@ void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_gen
       }
 
       if (restarter == nullptr) {
-        throwEnvoyExceptionOrPanic("unable to select a dynamic base id");
+        throw EnvoyException("unable to select a dynamic base id");
       }
 
       restarter_.swap(restarter);

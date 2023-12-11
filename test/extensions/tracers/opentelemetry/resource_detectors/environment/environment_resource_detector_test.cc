@@ -71,7 +71,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
   auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
   Resource resource = detector->detect();
 
-  EXPECT_EQ(resource.schemaUrl_, "");
+  EXPECT_EQ(resource.schema_url_, "");
   EXPECT_EQ(2, resource.attributes_.size());
 
   for (auto& actual : resource.attributes_) {

@@ -138,7 +138,7 @@ TEST_F(DlbConnectionBalanceFactoryTest, TooManyThreads) {
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   DlbConnectionBalanceFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  context.options_.concurrency_ = 33;
+  context.server_factory_context_.options_.concurrency_ = 33;
 
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
   makeDlbConnectionBalanceConfig(typed_config, dlb);

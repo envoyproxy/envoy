@@ -1,8 +1,5 @@
 #include "library/common/jni/android_jni_utility.h"
 
-#include <stdlib.h>
-#include <string.h>
-
 #include "source/common/common/assert.h"
 
 #if defined(__ANDROID_API__)
@@ -12,16 +9,16 @@
 #include "library/common/jni/jni_utility.h"
 #endif
 
-// NOLINT(namespace-envoy)
+namespace Envoy {
+namespace JNI {
 
-bool is_cleartext_permitted(absl::string_view hostname) {
+bool isCleartextPermitted(absl::string_view hostname) {
 #if defined(__ANDROID_API__)
   envoy_data host = Envoy::Data::Utility::copyToBridgeData(hostname);
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
-  Envoy::JNI::LocalRefUniquePtr<jstring> java_host =
-      Envoy::JNI::native_data_to_string(jni_helper, host);
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
-      Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
+  JniHelper jni_helper(getEnv());
+  LocalRefUniquePtr<jstring> java_host = envoyDataToJavaString(jni_helper, host);
+  LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
+      findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_isCleartextTrafficPermitted = jni_helper.getStaticMethodId(
       jcls_AndroidNetworkLibrary.get(), "isCleartextTrafficPermitted", "(Ljava/lang/String;)Z");
   jboolean result = jni_helper.callStaticBooleanMethod(
@@ -34,11 +31,11 @@ bool is_cleartext_permitted(absl::string_view hostname) {
 #endif
 }
 
-void tag_socket(int ifd, int uid, int tag) {
+void tagSocket(int ifd, int uid, int tag) {
 #if defined(__ANDROID_API__)
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::get_env());
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
-      Envoy::JNI::find_class("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
+  JniHelper jni_helper(getEnv());
+  LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
+      findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_tagSocket =
       jni_helper.getStaticMethodId(jcls_AndroidNetworkLibrary.get(), "tagSocket", "(III)V");
   jni_helper.callStaticVoidMethod(jcls_AndroidNetworkLibrary.get(), jmid_tagSocket, ifd, uid, tag);
@@ -48,3 +45,6 @@ void tag_socket(int ifd, int uid, int tag) {
   UNREFERENCED_PARAMETER(tag);
 #endif
 }
+
+} // namespace JNI
+} // namespace Envoy

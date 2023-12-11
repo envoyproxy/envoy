@@ -398,6 +398,41 @@ TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
       cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something"));
 }
 
+// The region is simply interpolated into sts.{}.amazonaws.com for most regions
+// https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetNormalAndFipsSTSEndpoints) {
+  EXPECT_EQ("sts.ap-south-1.amazonaws.com", Utility::getSTSEndpoint("ap-south-1"));
+  EXPECT_EQ("sts.some-new-region.amazonaws.com", Utility::getSTSEndpoint("some-new-region"));
+#ifdef ENVOY_SSL_FIPS
+  // Under FIPS mode the Envoy should fetch the credentials from FIPS the dedicated endpoints.
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+  EXPECT_EQ("sts-fips.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
+  EXPECT_EQ("sts-fips.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
+  EXPECT_EQ("sts-fips.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+  // Even if FIPS mode is enabled ca-central-1 doesn't have a dedicated fips endpoint yet.
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
+#else
+  EXPECT_EQ("sts.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+  EXPECT_EQ("sts.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
+  EXPECT_EQ("sts.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
+  EXPECT_EQ("sts.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
+#endif
+}
+
+// China regions: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetChinaSTSEndpoints) {
+  EXPECT_EQ("sts.cn-north-1.amazonaws.com.cn", Utility::getSTSEndpoint("cn-north-1"));
+  EXPECT_EQ("sts.cn-northwest-1.amazonaws.com.cn", Utility::getSTSEndpoint("cn-northwest-1"));
+}
+
+// GovCloud regions: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetGovCloudSTSEndpoints) {
+  // No difference between fips vs non-fips endpoints in GovCloud.
+  EXPECT_EQ("sts.us-gov-east-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-east-1"));
+  EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

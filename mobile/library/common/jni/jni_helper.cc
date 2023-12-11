@@ -43,7 +43,6 @@ LocalRefUniquePtr<jthrowable> JniHelper::exceptionOccurred() {
 
 GlobalRefUniquePtr<jobject> JniHelper::newGlobalRef(jobject object) {
   GlobalRefUniquePtr<jobject> result(env_->NewGlobalRef(object), GlobalRefDeleter(env_));
-  RELEASE_ASSERT(result != nullptr, "Failed calling NewGlobalRef.");
   return result;
 }
 
@@ -118,14 +117,6 @@ DEFINE_GET_ARRAY_ELEMENTS(Boolean, jbooleanArray, jboolean)
 void JniHelper::setObjectArrayElement(jobjectArray array, jsize index, jobject value) {
   env_->SetObjectArrayElement(array, index, value);
   rethrowException();
-}
-
-PrimitiveArrayCriticalUniquePtr JniHelper::getPrimitiveArrayCritical(jarray array,
-                                                                     jboolean* is_copy) {
-  PrimitiveArrayCriticalUniquePtr result(env_->GetPrimitiveArrayCritical(array, is_copy),
-                                         PrimitiveArrayCriticalDeleter(env_, array));
-  rethrowException();
-  return result;
 }
 
 #define DEFINE_SET_ARRAY_REGION(JAVA_TYPE, JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE)                       \
