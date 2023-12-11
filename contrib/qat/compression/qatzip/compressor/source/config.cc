@@ -60,7 +60,7 @@ QatzipCompressorFactory::QatzipCompressorFactory(
     const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip& qatzip,
     Server::Configuration::FactoryContext& context)
     : chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(qatzip, chunk_size, DefaultChunkSize)),
-      tls_slot_(context.threadLocal().allocateSlot()) {
+      tls_slot_(context.serverFactoryContext().threadLocal().allocateSlot()) {
   QzSessionParams_T params;
 
   int status = qzGetDefaults(&params);

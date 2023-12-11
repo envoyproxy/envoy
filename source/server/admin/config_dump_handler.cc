@@ -301,6 +301,16 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     }
     auto& policy = *cluster_load_assignment.mutable_policy();
 
+    // Using MILLION as denominator in config dump.
+    float value = cluster.dropOverload().value() * 1000000;
+    if (value > 0) {
+      auto* drop_overload = policy.add_drop_overloads();
+      drop_overload->set_category("drop_overload");
+      auto* percent = drop_overload->mutable_drop_percentage();
+      percent->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
+      percent->set_numerator(uint32_t(value));
+    }
+
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       policy.mutable_overprovisioning_factor()->set_value(host_set->overprovisioningFactor());
 

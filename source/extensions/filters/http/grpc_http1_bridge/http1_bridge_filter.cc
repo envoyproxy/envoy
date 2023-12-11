@@ -19,6 +19,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
+// Some client requests' URLs may contain query params. gRPC upstream servers can not
+// handle these requests, and may return error such as "unknown method". So we remove
+// query params here.
+void Http1BridgeFilter::ignoreQueryParams(Http::RequestHeaderMap& headers) {
+  absl::string_view path = headers.getPathValue();
+  size_t pos = path.find("?");
+  if (pos != absl::string_view::npos) {
+    absl::string_view new_path = path.substr(0, pos);
+    headers.setPath(new_path);
+  }
+}
+
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const bool protobuf_request = Grpc::Common::isProtobufRequestHeaders(headers);
   if (upgrade_protobuf_ && protobuf_request) {
@@ -30,13 +42,15 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
   }
 
   const bool grpc_request = Grpc::Common::isGrpcRequestHeaders(headers);
-
   const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
   ASSERT(protocol);
   if (protocol.value() < Http::Protocol::Http2 && grpc_request) {
     do_bridging_ = true;
   }
 
+  if (do_bridging_ && ignore_query_parameters_) {
+    ignoreQueryParams(headers);
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 

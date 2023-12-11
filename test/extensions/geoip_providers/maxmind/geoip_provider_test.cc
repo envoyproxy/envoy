@@ -24,6 +24,14 @@ namespace Extensions {
 namespace GeoipProviders {
 namespace Maxmind {
 
+class GeoipProviderPeer {
+public:
+  static Stats::Scope& providerScope(const DriverSharedPtr& driver) {
+    auto provider = std::static_pointer_cast<GeoipProvider>(driver);
+    return provider->config_->getStatsScopeForTest();
+  }
+};
+
 class GeoipProviderTest : public testing::Test {
 public:
   GeoipProviderTest() {
@@ -34,23 +42,24 @@ public:
   }
 
   void initializeProvider(const std::string& yaml) {
-    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(scope_));
+    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
   }
 
-  void expectStats(const std::string& db_type, const uint32_t total_times = 1,
-                   const uint32_t hit_times = 1, const uint32_t error_times = 0) {
-    EXPECT_CALL(stats_, counter(absl::StrCat("prefix.maxmind.", db_type, ".total")))
-        .Times(total_times);
-    EXPECT_CALL(stats_, counter(absl::StrCat("prefix.maxmind.", db_type, ".hit"))).Times(hit_times);
-    EXPECT_CALL(stats_, counter(absl::StrCat("prefix.maxmind.", db_type, ".lookup_error")))
-        .Times(error_times);
+  void expectStats(const std::string& db_type, const uint32_t total_count = 1,
+                   const uint32_t hit_count = 1, const uint32_t error_count = 0) {
+    auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
+    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".total")).value(),
+              total_count);
+    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".hit")).value(), hit_count);
+    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".lookup_error")).value(),
+              error_count);
   }
 
-  NiceMock<Stats::MockStore> stats_;
-  Stats::MockScope& scope_{stats_.mockScope()};
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   DriverSharedPtr provider_;
   MaxmindProviderFactory* provider_factory_;
@@ -75,8 +84,6 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  expectStats("city_db");
-  expectStats("isp_db");
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
   EXPECT_EQ(4, captured_lookup_response_.size());
   const auto& city_it = captured_lookup_response_.find("x-geo-city");
@@ -87,6 +94,8 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   EXPECT_EQ("GB", country_it->second);
   const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
   EXPECT_EQ("15169", asn_it->second);
+  expectStats("city_db");
+  expectStats("isp_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
@@ -104,8 +113,8 @@ TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  expectStats("city_db", 1, 0, 1);
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  expectStats("city_db", 1, 0, 1);
   EXPECT_EQ(0, captured_lookup_response_.size());
 }
 
@@ -126,13 +135,13 @@ TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  expectStats("anon_db");
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
   EXPECT_EQ(2, captured_lookup_response_.size());
   const auto& anon_it = captured_lookup_response_.find("x-geo-anon");
   EXPECT_EQ("true", anon_it->second);
   const auto& anon_vpn_it = captured_lookup_response_.find("x-geo-anon-vpn");
   EXPECT_EQ("true", anon_vpn_it->second);
+  expectStats("anon_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
@@ -150,13 +159,13 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  expectStats("anon_db");
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
   EXPECT_EQ(2, captured_lookup_response_.size());
   const auto& anon_it = captured_lookup_response_.find("x-geo-anon");
   EXPECT_EQ("true", anon_it->second);
   const auto& anon_hosting_it = captured_lookup_response_.find("x-geo-anon-hosting");
   EXPECT_EQ("true", anon_hosting_it->second);
+  expectStats("anon_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
@@ -174,13 +183,13 @@ TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  expectStats("anon_db");
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
   EXPECT_EQ(2, captured_lookup_response_.size());
   const auto& anon_it = captured_lookup_response_.find("x-geo-anon");
   EXPECT_EQ("true", anon_it->second);
   const auto& anon_tor_it = captured_lookup_response_.find("x-geo-anon-tor");
   EXPECT_EQ("true", anon_tor_it->second);
+  expectStats("anon_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigAnonProxySuccessfulLookup) {
@@ -198,13 +207,13 @@ TEST_F(GeoipProviderTest, ValidConfigAnonProxySuccessfulLookup) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  expectStats("anon_db");
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
   EXPECT_EQ(2, captured_lookup_response_.size());
   const auto& anon_it = captured_lookup_response_.find("x-geo-anon");
   EXPECT_EQ("true", anon_it->second);
   const auto& anon_tor_it = captured_lookup_response_.find("x-geo-anon-proxy");
   EXPECT_EQ("true", anon_tor_it->second);
+  expectStats("anon_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigEmptyLookupResult) {
@@ -221,9 +230,9 @@ TEST_F(GeoipProviderTest, ValidConfigEmptyLookupResult) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  expectStats("anon_db", 1, 0);
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
   EXPECT_EQ(0, captured_lookup_response_.size());
+  expectStats("anon_db", 1, 0);
 }
 
 TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
@@ -242,7 +251,6 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  expectStats("city_db", 2, 2);
   provider_->lookup(std::move(lookup_rq1), std::move(lookup_cb_std));
   EXPECT_EQ(3, captured_lookup_response_.size());
   // Another lookup request.
@@ -254,6 +262,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
   EXPECT_EQ(3, captured_lookup_response_.size());
+  expectStats("city_db", 2, 2);
 }
 
 using GeoipProviderDeathTest = GeoipProviderTest;

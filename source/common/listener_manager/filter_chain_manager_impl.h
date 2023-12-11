@@ -58,31 +58,11 @@ public:
   }
 
   // Configuration::FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  Router::Context& routerContext() override;
-  bool healthCheckFailed() override;
-  Http::Context& httpContext() override;
   Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
-  Stats::Scope& serverScope() override { return parent_context_.serverScope(); }
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::SlotAllocator& threadLocal() override;
-  OptRef<Admin> admin() override;
   const Network::ListenerInfo& listenerInfo() const override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  ProcessContextOptRef processContext() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
