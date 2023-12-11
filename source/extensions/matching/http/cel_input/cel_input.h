@@ -43,7 +43,7 @@ public:
     // and attributes from stream info.
     std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
         Extensions::Filters::Common::Expr::createActivation(
-            data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
+            nullptr, data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
             maybe_response_trailers.ptr());
 
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,

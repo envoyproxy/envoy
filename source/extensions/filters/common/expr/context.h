@@ -90,6 +90,8 @@ constexpr absl::string_view RouteMetadata = "route_metadata";
 constexpr absl::string_view UpstreamHostMetadata = "upstream_host_metadata";
 constexpr absl::string_view FilterChainName = "filter_chain_name";
 
+constexpr absl::string_view Node = "node";
+
 class WrapperFieldValues {
 public:
   using ContainerBackedListImpl = google::api::expr::runtime::ContainerBackedListImpl;
