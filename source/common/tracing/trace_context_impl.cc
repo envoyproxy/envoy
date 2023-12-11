@@ -59,7 +59,11 @@ TraceContextHandler::get(const TraceContext& trace_context) const {
   }
 
   if (handle_.has_value()) {
-    return header_map->getInlineValue(handle_.value());
+    auto* entry = header_map->getInline(handle_.value());
+    if (entry == nullptr) {
+      return absl::nullopt;
+    }
+    return entry->value().getStringView();
   } else {
     auto results = header_map->get(key_);
     if (results.empty()) {

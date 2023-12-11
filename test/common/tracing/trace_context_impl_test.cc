@@ -82,8 +82,7 @@ TEST(TraceContextHandlerTest, TraceContextHandlerRemoveTest) {
     EXPECT_FALSE(normal_key.get(*headers).has_value());
 
     inline_key.remove(*headers);
-    EXPECT_EQ(inline_key.get(*headers).value(), ""); // Inline handle is used and there is always a
-                                                     // value but it is empty.
+    EXPECT_FALSE(inline_key.get(*headers).has_value());
   }
 }
 
