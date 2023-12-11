@@ -51,7 +51,7 @@ private:
   }
 
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
-  const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   const Stats::ScopeSharedPtr stats_scope_;
   DynamicForwardProxyStats filter_stats_;
   bool buffer_enabled_;

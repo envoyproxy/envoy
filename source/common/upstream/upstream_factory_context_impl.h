@@ -17,7 +17,7 @@ public:
                              Init::Manager& init_manager, Stats::Scope& scope)
       : server_context_(context), init_manager_(init_manager), scope_(scope) {}
 
-  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_context_;
   }
 

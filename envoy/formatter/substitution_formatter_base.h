@@ -102,7 +102,7 @@ public:
    */
   virtual CommandParserBasePtr<FormatterContext>
   createCommandParserFromProto(const Protobuf::Message& config,
-                               Server::Configuration::CommonFactoryContext& context) PURE;
+                               Server::Configuration::GenericFactoryContext& context) PURE;
 
   std::string category() const override {
     return fmt::format("envoy.{}.formatters", FormatterContext::category());

@@ -24,7 +24,8 @@ public:
   ActiveMessageTest()
       : stats_(RocketmqFilterStats::generateStats("test.", *store_.rootScope())),
         config_(rocketmq_proxy_config_, factory_context_),
-        connection_manager_(config_, factory_context_.mainThreadDispatcher().timeSource()) {
+        connection_manager_(
+            config_, factory_context_.serverFactoryContext().mainThreadDispatcher().timeSource()) {
     connection_manager_.initializeReadFilterCallbacks(filter_callbacks_);
   }
 

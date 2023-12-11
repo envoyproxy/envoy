@@ -335,6 +335,11 @@ public:
   virtual std::vector<InternalRedirectPredicateSharedPtr> predicates() const PURE;
 
   /**
+   * @return a vector of response header names to preserve in the redirected request.
+   */
+  virtual const std::vector<Http::LowerCaseString>& responseHeadersToCopy() const PURE;
+
+  /**
    * @return the maximum number of allowed internal redirects on this route.
    */
   virtual uint32_t maxInternalRedirects() const PURE;

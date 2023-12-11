@@ -52,7 +52,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 void RateLimitQuotaFilter::createMatcher() {
   RateLimitOnMatchActionContext context;
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext> factory(
-      context, factory_context_.getServerFactoryContext(), visitor_);
+      context, factory_context_.serverFactoryContext(), visitor_);
   if (config_->has_bucket_matchers()) {
     matcher_ = factory.create(config_->bucket_matchers())();
   }
