@@ -154,17 +154,18 @@ void HotRestartingChild::registerUdpForwardingListener(
   udp_forwarding_context_.registerListener(address, listener_config);
 }
 
-void HotRestartingChild::whenDrainComplete(absl::string_view addr,
-                                           absl::AnyInvocable<void()> action) {
+void HotRestartingChild::registerParentDrainedCallback(std::string address,
+                                                       absl::AnyInvocable<void()> callback) {
   if (restart_epoch_ == 0 || parent_terminated_) {
-    action();
+    callback();
   } else {
-    on_drained_actions_.try_emplace(addr, std::move(action));
+    on_drained_actions_.try_emplace(address, std::move(callback));
   }
 }
 
 void HotRestartingChild::allDrainsImplicitlyComplete() {
   for (auto& drain_action : on_drained_actions_) {
+    // call the callback.
     std::move(drain_action.second)();
   }
   on_drained_actions_.clear();

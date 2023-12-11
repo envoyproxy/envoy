@@ -34,10 +34,33 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source),
       // Default prefer_gro to false for downstream server traffic.
       config_(config, false) {
+  parent_drained_callback_registry_ =
+      dynamic_cast<const UdpListenSocket&>(*socket_).parentDrainedCallbackRegistry();
   socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::PlatformDefaultTriggerType,
-      std::dynamic_pointer_cast<UdpListenSocket>(socket)->initialFileEvents());
+      paused() ? 0 : (Event::FileReadyType::Read | Event::FileReadyType::Write));
+  if (paused()) {
+    parent_drained_callback_registry_->registerParentDrainedCallback(
+        socket_->connectionInfoProvider().localAddress()->asString(),
+        [this, &dispatcher, alive = std::weak_ptr<void>(destruction_checker_)]() {
+          dispatcher.post([this, alive = std::move(alive)]() {
+            if (alive.lock()) {
+              unpause();
+            }
+          });
+        });
+  }
+}
+
+void UdpListenerImpl::unpause() {
+  // Remove the paused state so enable will actually start listening to events.
+  parent_drained_callback_registry_ = absl::nullopt;
+  // Start listening to events.
+  enable();
+  // There may have already been events while this instance was ignoring them,
+  // so try reading immediately.
+  socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
 }
 
 UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
@@ -45,7 +68,9 @@ UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
 void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
-  socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
+  if (!paused()) {
+    socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
+  }
 }
 
 void UdpListenerImpl::disableEvent() { socket_->ioHandle().enableFileEvents(0); }

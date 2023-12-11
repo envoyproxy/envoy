@@ -11,7 +11,8 @@ namespace Server {
 /**
  * The child half of hot restarting. Issues requests and commands to the parent.
  */
-class HotRestartingChild : public HotRestartingBase {
+class HotRestartingChild : public HotRestartingBase,
+                           public Network::RegisterParentDrainedCallbackInterface {
 public:
   // A structure to record the set of registered UDP listeners keyed on their addresses,
   // to support QUIC packet forwarding.
@@ -42,7 +43,7 @@ public:
 
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
                      mode_t socket_mode);
-  ~HotRestartingChild() = default;
+  ~HotRestartingChild() override = default;
 
   void initialize(Event::Dispatcher& dispatcher);
   void shutdown();
@@ -50,7 +51,8 @@ public:
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
                                      std::shared_ptr<Network::UdpListenerConfig> listener_config);
-  void whenDrainComplete(absl::string_view addr, absl::AnyInvocable<void()> action);
+  // From Network::RegisterParentDrainedCallbackInterface.
+  void registerParentDrainedCallback(std::string addr, absl::AnyInvocable<void()> action) override;
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();

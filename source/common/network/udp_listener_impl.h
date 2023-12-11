@@ -26,6 +26,8 @@ public:
                   TimeSource& time_source, const envoy::config::core::v3::UdpSocketConfig& config);
   ~UdpListenerImpl() override;
   uint32_t packetsDropped() { return packets_dropped_; }
+  bool paused() const { return parent_drained_callback_registry_ != absl::nullopt; }
+  void unpause();
 
   // Network::Listener
   void disable() override;
@@ -63,6 +65,9 @@ private:
 
   TimeSource& time_source_;
   const ResolvedUdpSocketConfig config_;
+  OptRef<RegisterParentDrainedCallbackInterface> parent_drained_callback_registry_;
+  // Taking a weak_ptr to this lets us detect if the listener has been destroyed.
+  std::shared_ptr<void> destruction_checker_;
 };
 
 class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {

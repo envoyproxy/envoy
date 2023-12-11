@@ -70,13 +70,16 @@ public:
 
   NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options,
-                      uint32_t initial_file_events = Event::FileReadyType::Read |
-                                                     Event::FileReadyType::Write)
-      : ListenSocketImpl(std::move(io_handle), address), initial_file_events_(initial_file_events) {
+                      OptRef<RegisterParentDrainedCallbackInterface>
+                          parent_drained_callback_registry = absl::nullopt)
+      : ListenSocketImpl(std::move(io_handle), address),
+        parent_drained_callback_registry_(parent_drained_callback_registry) {
     setListenSocketOptions(options);
   }
 
-  uint32_t initialFileEvents() const { return initial_file_events_; }
+  OptRef<RegisterParentDrainedCallbackInterface> parentDrainedCallbackRegistry() const {
+    return parent_drained_callback_registry_;
+  }
 
   Socket::Type socketType() const override { return T::type; }
 
@@ -115,10 +118,10 @@ public:
 
 protected:
   // Usually a socket when initialized starts listening for ready-to-read or ready-to-write events;
-  // for a QUIC socket during hot restart this is undesirable as the old instance needs to receive
-  // all packets, so in that case initial_file_events_ is initialized to zero, and enableFileEvents
-  // is called when draining of the old instance completes.
-  uint32_t initial_file_events_ = Event::FileReadyType::Read | Event::FileReadyType::Write;
+  // for a QUIC socket during hot restart this is undesirable as the parent instance needs to
+  // receive all packets; in that case this interface is set, and listening won't begin until the
+  // callback is called.
+  OptRef<RegisterParentDrainedCallbackInterface> parent_drained_callback_registry_;
 
   void setPrebindSocketOptions() {
     // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as

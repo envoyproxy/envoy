@@ -106,7 +106,7 @@ public:
   void registerUdpForwardingListener(
       Network::Address::InstanceConstSharedPtr address,
       std::shared_ptr<Network::UdpListenerConfig> listener_config) override;
-  void whenDrainComplete(absl::string_view addr, absl::AnyInvocable<void()> action) override;
+  OptRef<Network::RegisterParentDrainedCallbackInterface> parentDrainedCallbackRegistry() override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
   void sendParentTerminateRequest() override;

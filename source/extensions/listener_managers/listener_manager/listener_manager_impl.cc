@@ -319,11 +319,8 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
         return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
       } else {
         auto socket = std::make_shared<Network::UdpListenSocket>(
-            std::move(io_handle), address, options, /* initial_file_events= */ 0);
-        server_.hotRestart().whenDrainComplete(addr, [socket]() {
-          socket->ioHandle().enableFileEvents(Event::FileReadyType::Read |
-                                              Event::FileReadyType::Write);
-        });
+            std::move(io_handle), address, options,
+            server_.hotRestart().parentDrainedCallbackRegistry());
         return socket;
       }
     }

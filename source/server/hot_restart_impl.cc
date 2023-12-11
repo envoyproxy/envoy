@@ -124,8 +124,9 @@ void HotRestartImpl::registerUdpForwardingListener(
   as_child_.registerUdpForwardingListener(address, listener_config);
 }
 
-void HotRestartImpl::whenDrainComplete(absl::string_view addr, absl::AnyInvocable<void()> action) {
-  as_child_.whenDrainComplete(addr, std::move(action));
+OptRef<Network::RegisterParentDrainedCallbackInterface>
+HotRestartImpl::parentDrainedCallbackRegistry() {
+  return as_child_;
 }
 
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {

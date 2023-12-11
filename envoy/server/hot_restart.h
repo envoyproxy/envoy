@@ -64,14 +64,15 @@ public:
                                 std::shared_ptr<Network::UdpListenerConfig> listener_config) PURE;
 
   /**
-   * Calls a function on the child instance when an address is fully drained in the parent
-   * instance.
-   * @param addr The string representation of the address which, when drained in the
-   *             parent instance, the action will be performed.
-   * @param action The function to be called when the parent instance has drained the address
-   *               or has been terminated.
+   * @return An interface on which registerParentDrainedCallback can be called during
+   *         creation of a listener, or nullopt if there is no parent instance.
+   *
+   *         If this is set, any UDP listener should start paused and only begin listening
+   *         when the parent instance is drained; this allows draining QUIC listeners to
+   *         catch their own packets and forward unrecognized packets to the child instance.
    */
-  virtual void whenDrainComplete(absl::string_view addr, absl::AnyInvocable<void()> action) PURE;
+  virtual OptRef<Network::RegisterParentDrainedCallbackInterface>
+  parentDrainedCallbackRegistry() PURE;
 
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a
