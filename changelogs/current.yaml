@@ -113,6 +113,9 @@ bug_fixes:
   change: |
     Fixed a bug that the subset load balancer will always be used even if the subset load balancer config does not
     contain any subset selector.
+- area: docker
+  change: |
+    Updated base image to `ubuntu:22.04` to fix memory issue (https://github.com/envoyproxy/envoy/issues/31248).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
