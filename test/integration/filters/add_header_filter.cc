@@ -74,7 +74,7 @@ public:
 
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const test::integration::filters::AddHeaderFilterConfig&>(
-            config, context.getServerFactoryContext().messageValidationVisitor());
+            config, context.serverFactoryContext().messageValidationVisitor());
 
     return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<AddConfigurableHeaderFilter>(

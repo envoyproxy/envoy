@@ -91,7 +91,7 @@ TEST_F(RocketmqFilterConfigTest, RocketmqProxyWithFullConfig) {
 TEST_F(RocketmqFilterConfigTest, ProxyAddress) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Server::Configuration::MockServerFactoryContext factory_context;
-  EXPECT_CALL(context, getServerFactoryContext()).WillRepeatedly(ReturnRef(factory_context));
+  EXPECT_CALL(context, serverFactoryContext()).WillRepeatedly(ReturnRef(factory_context));
 
   LocalInfo::MockLocalInfo local_info;
   EXPECT_CALL(factory_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
@@ -116,7 +116,7 @@ TEST_F(RocketmqFilterConfigTest, ProxyAddress) {
 TEST_F(RocketmqFilterConfigTest, ProxyAddressWithDefaultPort) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Server::Configuration::MockServerFactoryContext factory_context;
-  EXPECT_CALL(context, getServerFactoryContext()).WillRepeatedly(ReturnRef(factory_context));
+  EXPECT_CALL(context, serverFactoryContext()).WillRepeatedly(ReturnRef(factory_context));
 
   LocalInfo::MockLocalInfo local_info;
   EXPECT_CALL(factory_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
@@ -141,7 +141,7 @@ TEST_F(RocketmqFilterConfigTest, ProxyAddressWithDefaultPort) {
 TEST_F(RocketmqFilterConfigTest, ProxyAddressWithNonIpType) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Server::Configuration::MockServerFactoryContext factory_context;
-  EXPECT_CALL(context, getServerFactoryContext()).WillRepeatedly(ReturnRef(factory_context));
+  EXPECT_CALL(context, serverFactoryContext()).WillRepeatedly(ReturnRef(factory_context));
 
   LocalInfo::MockLocalInfo local_info;
   EXPECT_CALL(factory_context, localInfo()).WillRepeatedly(ReturnRef(local_info));

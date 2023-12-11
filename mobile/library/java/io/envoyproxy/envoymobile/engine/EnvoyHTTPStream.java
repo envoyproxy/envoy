@@ -12,15 +12,13 @@ public class EnvoyHTTPStream {
   private final long engineHandle;
   private final long streamHandle;
   private final boolean explicitFlowControl;
-  private final long minDeliverySize;
   private final JvmCallbackContext callbacksContext;
 
   /**
    * Start the stream via the JNI library.
    */
   void start() {
-    JniLibrary.startStream(engineHandle, streamHandle, callbacksContext, explicitFlowControl,
-                           minDeliverySize);
+    JniLibrary.startStream(engineHandle, streamHandle, callbacksContext, explicitFlowControl);
   }
 
   /**
@@ -29,15 +27,12 @@ public class EnvoyHTTPStream {
    * @param streamHandle Underlying handle of the HTTP stream owned by an Envoy engine.
    * @param callbacks The callbacks for the stream.
    * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
-   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
-   *     should be delivered sans end stream.
    */
   public EnvoyHTTPStream(long engineHandle, long streamHandle, EnvoyHTTPCallbacks callbacks,
-                         boolean explicitFlowControl, long minDeliverySize) {
+                         boolean explicitFlowControl) {
     this.engineHandle = engineHandle;
     this.streamHandle = streamHandle;
     this.explicitFlowControl = explicitFlowControl;
-    this.minDeliverySize = minDeliverySize;
     callbacksContext = new JvmCallbackContext(callbacks);
   }
 
