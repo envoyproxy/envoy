@@ -303,7 +303,6 @@ TEST_F(GrpcHttp1BridgeFilterTest, QueryParamsIgnored) {
       {"content-type", "application/grpc"},
       {":path", "/v1/spotify.Concat/Concat?timestamp=1701678591"}};
 
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("/v1/spotify.Concat/Concat", request_headers.getPathValue());
 }
