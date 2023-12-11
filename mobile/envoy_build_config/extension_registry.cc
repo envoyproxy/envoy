@@ -47,7 +47,6 @@
 #include "source/extensions/udp_packet_writer/default/config.h"
 #endif
 #include "source/common/quic/quic_client_transport_socket_factory.h"
-#include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
 #include "extension_registry_platform_additions.h"

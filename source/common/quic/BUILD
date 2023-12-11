@@ -439,6 +439,7 @@ envoy_cc_library(
     srcs = [
         "quic_client_transport_socket_factory.cc",
         "quic_server_transport_socket_factory.cc",
+        "quic_transport_socket_factory.cc",
     ],
     hdrs = [
         "quic_client_transport_socket_factory.h",
