@@ -58,8 +58,8 @@ bool reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Messa
   return reflection.GetBool(message, &field);
 }
 
-// Takes a field of scalar type, which may be a repeated field, and hashes
-// it (or each of it).
+// Takes a field of scalar type, and hashes it. In case the field is a repeated field,
+// the function hashes each of its elements.
 template <typename T, std::enable_if_t<std::is_scalar_v<T>, bool> = true>
 uint64_t hashScalarField(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
                          const Protobuf::FieldDescriptor& field, uint64_t seed) {
@@ -128,7 +128,7 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
     break;
   case FieldDescriptor::CPPTYPE_ENUM:
     if (field.is_repeated()) {
-      int c = reflection.FieldSize(message, &field);
+      const int c = reflection.FieldSize(message, &field);
       for (int i = 0; i < c; i++) {
         seed = HashUtil::xxHash64Value(reflection.GetRepeatedEnumValue(message, &field, i), seed);
       }
@@ -136,16 +136,17 @@ uint64_t reflectionHashField(const Protobuf::Message& message,
       seed = HashUtil::xxHash64Value(reflection.GetEnumValue(message, &field), seed);
     }
     break;
-  case FieldDescriptor::CPPTYPE_STRING: {
+  case FieldDescriptor::CPPTYPE_STRING:
     if (field.is_repeated()) {
       for (const std::string& str : reflection.GetRepeatedFieldRef<std::string>(message, &field)) {
         seed = HashUtil::xxHash64(str, seed);
       }
     } else {
+      // Scratch may be used by GetStringReference if the field is not already a std::string.
       std::string scratch;
       seed = HashUtil::xxHash64(reflection.GetStringReference(message, &field, &scratch), seed);
     }
-  } break;
+    break;
   case FieldDescriptor::CPPTYPE_MESSAGE:
     if (field.is_map()) {
       seed = reflectionHashMapField(message, field, seed);
@@ -200,6 +201,7 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
   seed = HashUtil::xxHash64(descriptor->full_name(), seed);
   if (descriptor->well_known_type() == Protobuf::Descriptor::WELLKNOWNTYPE_ANY) {
     const ProtobufWkt::Any* any = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
+    ASSERT(any != nullptr, "casting to any should always work for WELLKNOWNTYPE_ANY");
     std::unique_ptr<Protobuf::Message> submsg = unpackAnyForReflection(*any);
     if (submsg == nullptr) {
       // If we wanted to handle unknown types in Any, this is where we'd have to do it.
@@ -208,6 +210,7 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
     return reflectionHashMessage(*submsg, seed);
   }
   std::vector<const FieldDescriptor*> fields;
+  // ListFields returned the fields ordered by field number.
   reflection->ListFields(message, &fields);
   // If we wanted to handle unknown fields, we'd need to also GetUnknownFields here.
   for (const FieldDescriptor* field : fields) {

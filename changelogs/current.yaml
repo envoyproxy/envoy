@@ -47,7 +47,7 @@ minor_behavior_changes:
     to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
 - area: config parsing, http cache filter
   change: |
-    replaces protobuf hashing by human-readable string with a dedicated deterministic hashing algorithm.
+    Replaces protobuf hashing by human-readable string with a dedicated deterministic hashing algorithm.
     The performance of the hash operation is improved by 2-10x depending on the structure of the message,
     which is expected to reduce config update time or startup time by 10-25%. The new algorithm is also
     used for http_cache_filter hashing, which will effectively cause a one-time cache flush on update
