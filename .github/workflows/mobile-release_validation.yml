@@ -44,8 +44,7 @@ jobs:
     with:
       args: >-
         build
-        --config=ios
-        --config=mobile-remote-ci-macos
+        --config=mobile-remote-ci-macos-ios
         //:ios_xcframework
       command: ./bazelw
       container-command:

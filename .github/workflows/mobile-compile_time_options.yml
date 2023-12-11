@@ -54,33 +54,19 @@ jobs:
           target: cc-test-no-yaml
           args: >-
             build
-            --config=mobile-remote-ci
-            --define=envoy_yaml=disabled
-            --define=envoy_full_protos=disabled
-            --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+            --config=mobile-remote-ci-cc-no-yaml
             //test/common/integration:client_integration_test
         - name: Running C++ build with exceptions disabled
           target: cc-no-build-exceptions
           args: >-
             build
-            --config=mobile-remote-ci
-            --define envoy_exceptions=disabled
-            --define=envoy_yaml=disabled
-            --copt=-fno-unwind-tables
-            --copt=-fno-exceptions
-            --define=google_grpc=disabled
-            --define=envoy_mobile_xds=disabled
+            --config=mobile-remote-ci-cc-no-exceptions
             //test/performance:test_binary_size //library/cc/...
         - name: Running C++ test
           target: cc-test
           args: >-
             test
-            --test_output=all
-            --config=mobile-remote-ci
-            --define=signal_trace=disabled
-            --define=google_grpc=disabled
-            --define=envoy_mobile_xds=disabled
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+            --config=mobile-remote-ci-cc-test
           entrypoint: |
             #!/bin/bash -e
             export PATH=/opt/llvm/bin:$PATH
@@ -114,15 +100,7 @@ jobs:
         - name: kotlin-build
           args: >-
             build
-            --config=mobile-remote-ci-macos
-            --fat_apk_cpu=x86_64
-            --define=signal_trace=disabled
-            --define=envoy_mobile_request_compression=disabled
-            --define=envoy_enable_http_datagrams=disabled
-            --define=google_grpc=disabled
-            --define=envoy_mobile_xds=disabled
-            --define=envoy_yaml=disabled
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+            --config=mobile-remote-ci-macos-kotlin
             //:android_dist
           source: |
             . ./ci/mac_ci_setup.sh --android
@@ -138,16 +116,7 @@ jobs:
         - name: swift-build
           args: >-
             build
-            --config=ios
-            --config=mobile-remote-ci-macos
-            --define=signal_trace=disabled
-            --define=envoy_mobile_request_compression=disabled
-            --define=envoy_mobile_stats_reporting=disabled
-            --define=envoy_mobile_swift_cxx_interop=disabled
-            --define=google_grpc=disabled
-            --define=envoy_mobile_xds=disabled
-            --@envoy//bazel:http3=False
-            --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+            --config=mobile-remote-ci-macos-swift
             //library/swift:ios_framework
           source: |
             ./ci/mac_ci_setup.sh

@@ -43,9 +43,7 @@ jobs:
     with:
       args: >-
         build
-        --config=mobile-remote-release-clang
-        --fat_apk_cpu=x86_64
-        --linkopt=-fuse-ld=lld
+        --config=mobile-remote-release-clang-android
         //:android_dist
       container: ${{ fromJSON(needs.load.outputs.build-image).mobile }}
       diskspace-hack: true
@@ -71,9 +69,7 @@ jobs:
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       args: >-
         build
-        --config=mobile-remote-release-clang
-        --fat_apk_cpu=x86_64
-        --linkopt=-fuse-ld=lld
+        --config=mobile-remote-release-clang-android
         //examples/kotlin/hello_world:hello_envoy_kt
       request: ${{ needs.load.outputs.request }}
       target: kotlin-hello-world
@@ -127,9 +123,7 @@ jobs:
           target: java-hello-world
           args: >-
             build
-            --config=mobile-remote-release-clang
-            --fat_apk_cpu=x86_64
-            --linkopt=-fuse-ld=lld
+            --config=mobile-remote-release-clang-android
             //examples/java/hello_world:hello_envoy
         - name: kotlin-baseline-app
           # Return to using:
@@ -137,9 +131,7 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release-clang
-            --fat_apk_cpu=x86_64
-            --linkopt=-fuse-ld=lld
+            --config=mobile-remote-release-clang-android
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
             - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.13
@@ -154,9 +146,7 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release-clang
-            --fat_apk_cpu=x86_64
-            --linkopt=-fuse-ld=lld
+            --config=mobile-remote-release-clang-android
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
             - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.13
