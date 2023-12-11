@@ -256,8 +256,6 @@ public:
   // initialization, is done in this method. If the contents of this method are invoked during
   // construction, a derived class cannot override any of the virtual methods and have them invoked
   // instead, since the base class's methods are used when in a base class constructor.
-  //
-  // This method may throw an exception.
   absl::Status init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
@@ -842,7 +840,8 @@ private:
 
   /**
    * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
-   * nullptr if cluster_map did not contain the same cluster.
+   * nullptr if cluster_map did not contain the same cluster or an error if
+   * cluster load fails.
    */
   absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                              const uint64_t cluster_hash,
