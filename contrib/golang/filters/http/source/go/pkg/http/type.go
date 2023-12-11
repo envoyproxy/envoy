@@ -363,7 +363,7 @@ func (b *httpBuffer) WriteUint32(p uint32) error {
 }
 
 func (b *httpBuffer) WriteUint64(p uint64) error {
-	s := strconv.FormatUint(uint64(p), 10)
+	s := strconv.FormatUint(p, 10)
 	_, err := b.WriteString(s)
 	return err
 }

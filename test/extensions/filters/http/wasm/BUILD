@@ -67,6 +67,7 @@ envoy_extension_cc_test(
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/filters/http/wasm:config",
         "//test/extensions/common/wasm:wasm_runtime",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/filters/http/wasm/v3:pkg_cc_proto",

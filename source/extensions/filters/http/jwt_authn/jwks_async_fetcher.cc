@@ -57,7 +57,7 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
   }
   failed_refetch_duration_ = getFailedRefetchDuration(remote_jwks.async_fetch());
 
-  refetch_timer_ = context_.getServerFactoryContext().mainThreadDispatcher().createTimer(
+  refetch_timer_ = context_.serverFactoryContext().mainThreadDispatcher().createTimer(
       [this]() -> void { fetch(); });
 
   // For fast_listener, just trigger a fetch, not register with init_manager.
@@ -84,7 +84,7 @@ void JwksAsyncFetcher::fetch() {
   }
 
   ENVOY_LOG(debug, "{}: started", debug_name_);
-  fetcher_ = create_fetcher_fn_(context_.getServerFactoryContext().clusterManager(), remote_jwks_);
+  fetcher_ = create_fetcher_fn_(context_.serverFactoryContext().clusterManager(), remote_jwks_);
   fetcher_->fetch(Tracing::NullSpan::instance(), *this);
 }
 

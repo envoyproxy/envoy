@@ -91,7 +91,8 @@ public:
     EXPECT_CALL(*mock_client_codec_, setCodecCallbacks(_))
         .WillOnce(Invoke([this](ClientCodecCallbacks& cb) { client_cb_ = &cb; }));
 
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .tcp_conn_pool_,
                 newConnection(_));
   }
 
@@ -102,9 +103,9 @@ public:
       // Only cancel the connection if it is owned by the upstream request. If the connection is
       // bound to the downstream connection, then this won't be called.
       if (!config_->bindUpstreamConnection()) {
-        EXPECT_CALL(
-            factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.handles_.back(),
-            cancel(_));
+        EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                        .tcp_conn_pool_.handles_.back(),
+                    cancel(_));
       }
     }
   }
@@ -123,7 +124,8 @@ public:
         EXPECT_CALL(mock_downstream_connection_, close(Network::ConnectionCloseType::FlushWrite));
       }
 
-      factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(reason);
+      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+          .poolFailure(reason);
 
       if (config_->bindUpstreamConnection()) {
         EXPECT_TRUE(boundUpstreamConnection()->waitingUpstreamRequestsForTest().empty());
@@ -142,8 +144,8 @@ public:
       }
 
       EXPECT_CALL(mock_upstream_connection_, write(_, _)).Times(testing::AtLeast(1));
-      factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
-          mock_upstream_connection_);
+      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+          .poolReady(mock_upstream_connection_);
 
       if (config_->bindUpstreamConnection()) {
         EXPECT_TRUE(boundUpstreamConnection()->waitingUpstreamRequestsForTest().empty());
@@ -238,7 +240,8 @@ public:
     const std::string cluster_name = "cluster_0";
 
     EXPECT_CALL(mock_route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name));
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({cluster_name});
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {cluster_name});
 
     if (boundUpstreamConnection() == nullptr) {
       // Upstream binding is disabled or not set up yet, try to create a new connection.
@@ -392,10 +395,12 @@ TEST_P(RouterFilterTest, UpstreamClusterMaintainMode) {
 
   EXPECT_CALL(mock_route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name));
 
-  factory_context_.cluster_manager_.initializeThreadLocalClusters({cluster_name});
+  factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {cluster_name});
 
   // Maintain mode.
-  EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+  EXPECT_CALL(*factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .cluster_.info_,
               maintenanceMode())
       .WillOnce(Return(true));
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
@@ -419,10 +424,12 @@ TEST_P(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
 
   EXPECT_CALL(mock_route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name));
 
-  factory_context_.cluster_manager_.initializeThreadLocalClusters({cluster_name});
+  factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {cluster_name});
 
   // No conn pool.
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))

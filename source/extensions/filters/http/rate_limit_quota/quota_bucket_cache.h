@@ -100,7 +100,7 @@ private:
 
 struct QuotaBucket {
   QuotaBucket(Envoy::Server::Configuration::FactoryContext& context)
-      : tls(context.getServerFactoryContext().threadLocal()) {
+      : tls(context.serverFactoryContext().threadLocal()) {
     tls.set([](Envoy::Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalBucket>(dispatcher);
     });

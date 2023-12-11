@@ -10,8 +10,8 @@ namespace Maxmind {
 
 namespace {
 static constexpr const char* MMDB_CITY_LOOKUP_ARGS[] = {"city", "names", "en"};
-static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "names", "en"};
-static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "names", "en"};
+static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "iso_code"};
+static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "iso_code"};
 static constexpr const char* MMDB_ASN_LOOKUP_ARGS[] = {"autonomous_system_number"};
 static constexpr const char* MMDB_ANON_LOOKUP_ARGS[] = {"is_anonymous", "is_anonymous_vpn",
                                                         "is_hosting_provider", "is_tor_exit_node",
@@ -27,8 +27,8 @@ GeoipProviderConfig::GeoipProviderConfig(
                                                  : absl::nullopt),
       anon_db_path_(!config.anon_db_path().empty() ? absl::make_optional(config.anon_db_path())
                                                    : absl::nullopt),
-      scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Maxmind")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "maxmind")) {
+      stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
+      stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
   auto geo_headers_to_add = config.common_provider_config().geo_headers_to_add();
   country_header_ = !geo_headers_to_add.country().empty()
                         ? absl::make_optional(geo_headers_to_add.country())
@@ -81,8 +81,7 @@ bool GeoipProviderConfig::isLookupEnabledForHeader(const absl::optional<std::str
 }
 
 void GeoipProviderConfig::incCounter(Stats::StatName name) {
-  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  stats_scope_->counterFromStatName(name).inc();
 }
 
 GeoipProvider::~GeoipProvider() {
@@ -145,13 +144,12 @@ void GeoipProvider::lookupInCityDb(
         if (config_->isLookupEnabledForHeader(config_->regionHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->regionHeader().value(), MMDB_REGION_LOOKUP_ARGS[0],
-                                  MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2],
-                                  MMDB_REGION_LOOKUP_ARGS[3]);
+                                  MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2]);
         }
         if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
-                                  MMDB_COUNTRY_LOOKUP_ARGS[1], MMDB_COUNTRY_LOOKUP_ARGS[2]);
+                                  MMDB_COUNTRY_LOOKUP_ARGS[1]);
         }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit("city_db");

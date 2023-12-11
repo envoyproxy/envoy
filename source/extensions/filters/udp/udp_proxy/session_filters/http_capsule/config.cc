@@ -16,7 +16,7 @@ FilterFactoryCb HttpCapsuleFilterConfigFactory::createFilterFactoryFromProtoType
     const FilterConfig&, Server::Configuration::FactoryContext& context) {
   return [&context](FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addFilter(
-        std::make_shared<HttpCapsuleFilter>(context.getServerFactoryContext().timeSource()));
+        std::make_shared<HttpCapsuleFilter>(context.serverFactoryContext().timeSource()));
   };
 }
 

@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/bin/bash -e
+
+set -o pipefail
 
 # Checks the absolute size and the relative size increase of a file.
 

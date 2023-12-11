@@ -93,7 +93,7 @@ static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierC
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config.
-  ConfigImpl config(genRouteConfig(state, match_type), OptionalHttpFilters(), factory_context,
+  ConfigImpl config(genRouteConfig(state, match_type), factory_context,
                     ProtobufMessage::getNullValidationVisitor(), true);
 
   for (auto _ : state) { // NOLINT

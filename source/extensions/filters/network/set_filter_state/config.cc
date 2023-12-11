@@ -9,6 +9,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/common/factory_base.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {

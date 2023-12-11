@@ -12,7 +12,7 @@ on:
 jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/_env.yml
+    uses: ./.github/workflows/_load.yml
     permissions:
       contents: read
       pull-requests: read
@@ -29,10 +29,10 @@ jobs:
       contents: read
       packages: read
     name: android_release_artifacts
-    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    runs-on: ${{ fromJSON(needs.request.outputs.request).ci.agent-ubuntu }}
     timeout-minutes: 120
     container:
-      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
+      image: ${{ needs.env.outputs.build-image-mobile }}
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -145,10 +145,10 @@ jobs:
       contents: read
       packages: read
     name: android_xds_release_artifacts
-    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    runs-on: ${{ fromJSON(needs.env.outputs.request).ci.agent-ubuntu }}
     timeout-minutes: 120
     container:
-      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
+      image: ${{ needs.env.outputs.build-image-mobile }}
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
