@@ -103,7 +103,6 @@ paths:
     - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/load_balancer_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
-    - source/common/upstream/outlier_detection_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
