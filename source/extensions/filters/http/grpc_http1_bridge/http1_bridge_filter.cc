@@ -23,12 +23,11 @@ namespace GrpcHttp1Bridge {
 // handle these requests, and may return error such as "unknown method". So we remove
 // query params here.
 void Http1BridgeFilter::ignoreQueryParams(Http::RequestHeaderMap& headers) {
-  absl::string_view path = headers.Path()->value().getStringView();
+  absl::string_view path = headers.getPathValue();
   size_t pos = path.find("?");
   if (pos != absl::string_view::npos) {
     absl::string_view new_path = path.substr(0, pos);
     headers.setPath(new_path);
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 }
 
