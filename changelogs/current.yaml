@@ -272,5 +272,10 @@ new_features:
 - area: redis
   change: |
     Added support for the watch command (aborts multi transactions if watched keys change).
+- area: grpc_http_bridge
+  change: |
+    added :ref:`ignore_query_parameters
+    <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.ignore_query_parameters>` option for
+    automatically stripping query parameters in request URL path.
 
 deprecated:
