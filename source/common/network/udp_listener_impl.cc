@@ -38,8 +38,7 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
       dynamic_cast<const UdpListenSocket&>(*socket_).parentDrainedCallbackRegistry();
   socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::PlatformDefaultTriggerType,
-      paused() ? 0 : (Event::FileReadyType::Read | Event::FileReadyType::Write));
+      Event::PlatformDefaultTriggerType, paused() ? 0 : events_when_unpaused_);
   if (paused()) {
     parent_drained_callback_registry_->registerParentDrainedCallback(
         socket_->connectionInfoProvider().localAddress()->asString(),
@@ -68,12 +67,16 @@ UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
 void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
+  events_when_unpaused_ = Event::FileReadyType::Read | Event::FileReadyType::Write;
   if (!paused()) {
-    socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
+    socket_->ioHandle().enableFileEvents(events_when_unpaused_);
   }
 }
 
-void UdpListenerImpl::disableEvent() { socket_->ioHandle().enableFileEvents(0); }
+void UdpListenerImpl::disableEvent() {
+  events_when_unpaused_ = 0;
+  socket_->ioHandle().enableFileEvents(0);
+}
 
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
