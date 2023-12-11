@@ -101,12 +101,12 @@ public:
     ConfigProto config;
     MessageUtil::unpackTo(filter_config.typed_config(), config);
     std::shared_ptr<CacheSingleton> caches =
-        context.getServerFactoryContext().singletonManager().getTyped<CacheSingleton>(
+        context.serverFactoryContext().singletonManager().getTyped<CacheSingleton>(
             SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_singleton), [&context] {
               return std::make_shared<CacheSingleton>(
                   Common::AsyncFiles::AsyncFileManagerFactory::singleton(
-                      &context.getServerFactoryContext().singletonManager()),
-                  context.getServerFactoryContext().api().threadFactory());
+                      &context.serverFactoryContext().singletonManager()),
+                  context.serverFactoryContext().api().threadFactory());
             });
     return caches->get(caches, config, context.scope());
   }

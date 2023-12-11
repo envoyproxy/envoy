@@ -2365,6 +2365,7 @@ message QueryParameterMatcher {
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
+// [#next-free-field: 6]
 message InternalRedirectPolicy {
   // An internal redirect is not handled, unless the number of previous internal redirects that a
   // downstream request has encountered is lower than this value.
@@ -2390,6 +2391,14 @@ message InternalRedirectPolicy {
   // Allow internal redirect to follow a target URI with a different scheme than the value of
   // x-forwarded-proto. The default is false.
   bool allow_cross_scheme_redirect = 4;
+
+  // Specifies a list of headers, by name, to copy from the internal redirect into the subsequent
+  // request. If a header is specified here but not present in the redirect, it will be cleared in
+  // the subsequent request.
+  repeated string response_headers_to_copy = 5 [(validate.rules).repeated = {
+    unique: true
+    items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 }
 
 // A simple wrapper for an HTTP filter config. This is intended to be used as a wrapper for the

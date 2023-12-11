@@ -141,7 +141,7 @@ void BaseClientIntegrationTest::initialize() {
     cc_.terminal_callback->setReady();
   });
 
-  stream_ = (*stream_prototype_).start(explicit_flow_control_, min_delivery_size_);
+  stream_ = (*stream_prototype_).start(explicit_flow_control_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
