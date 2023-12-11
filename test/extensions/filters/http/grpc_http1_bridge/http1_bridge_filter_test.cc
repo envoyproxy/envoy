@@ -299,8 +299,9 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedHeaderSanitized) {
 // Verifies that the query params in URL are removed when ignore_query_parameters is enabled
 TEST_F(GrpcHttp1BridgeFilterTest, QueryParamsIgnored) {
   initialize(false, true);
-  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
-                                                 {":path", "/v1/spotify.Concat/Concat?timestamp=1701678591"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/v1/spotify.Concat/Concat?timestamp=1701678591"}};
 
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
