@@ -46,8 +46,9 @@ protected:
   std::string value_;
 };
 
-class ClientIntegrationTest : public BaseClientIntegrationTest,
-                              public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http::CodecType>> {
+class ClientIntegrationTest
+    : public BaseClientIntegrationTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http::CodecType>> {
 public:
   static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
   static void TearDownTestCase() { test_key_value_store_.reset(); }
@@ -141,13 +142,15 @@ public:
   }
 
   static std::string testParamsToString(
-      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType>> params) {
+      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType>>
+          params) {
     return fmt::format(
         "{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
         protocolToString(std::get<1>(params.param)));
   }
+
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
@@ -157,10 +160,11 @@ protected:
 std::shared_ptr<TestKeyValueStore> ClientIntegrationTest::test_key_value_store_{};
 
 // TODO(alyssawilk) turn up HTTP/2
-INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
-                         testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                          testing::ValuesIn({Http::CodecType::HTTP1, Http::CodecType::HTTP3})),
-                         ClientIntegrationTest::testParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, ClientIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn({Http::CodecType::HTTP1, Http::CodecType::HTTP3})),
+    ClientIntegrationTest::testParamsToString);
 
 void ClientIntegrationTest::basicTest() {
   if (std::get<1>(GetParam()) == Http::CodecType::HTTP3) {
@@ -416,6 +420,29 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   ASSERT_EQ(cc_.status, "400");
   ASSERT_EQ(cc_.on_data_calls, 1);
   ASSERT_EQ(cc_.on_complete_calls, 1);
+}
+
+// TODO(alyssawilk) run HTTP/2 for all tests.
+TEST_P(ClientIntegrationTest, BasicHttp2) {
+  if (std::get<1>(GetParam()) == Http::CodecType::HTTP3) {
+    return;
+  }
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  builder_.enablePlatformCertificatesValidation(true);
+
+  upstream_tls_ = true;
+
+  initialize();
+
+  default_request_headers_.setScheme("https");
+
+  basicTest();
+  // HTTP/2
+  ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
 }
 
 TEST_P(ClientIntegrationTest, BasicHttps) {
@@ -701,8 +728,10 @@ TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
   ASSERT_EQ(cc_.on_complete_calls, 0);
   ASSERT_EQ(cc_.on_error_calls, 1);
 
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+  if (std::get<1>(GetParam()) == Http::CodecType::HTTP3) {
     ASSERT_TRUE(upstream_request->waitForReset());
+  } else {
+    ASSERT_TRUE(upstream_connection->waitForDisconnect());
   }
 }
 
