@@ -8,18 +8,6 @@ parameters:
   default:
   - env
   - prechecks
-- name: macBuildStageDeps
-  displayName: "macOS stage dependencies"
-  type: object
-  default:
-  - env
-  - prechecks
-- name: windowsBuildStageDeps
-  displayName: "Windows stage dependencies"
-  type: object
-  default:
-  - env
-  - prechecks
 - name: checkStageDeps
   displayName: "Check stage dependencies"
   type: object
@@ -158,25 +146,3 @@ stages:
   - template: stage/verify.yml
     parameters:
       authGCP: $(GcpServiceAccountKey)
-
-- stage: macos
-  displayName: macOS
-  dependsOn: ${{ parameters.macBuildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-  jobs:
-  - template: stage/macos.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)
-      runBuild: variables['RUN_BUILD']
-
-- stage: windows
-  displayName: Windows
-  dependsOn: ${{ parameters.windowsBuildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-  jobs:
-  - template: stage/windows.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)
-      runBuild: variables['RUN_BUILD']
