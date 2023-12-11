@@ -238,7 +238,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigDisableDownstream
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("429"));
 
-  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());

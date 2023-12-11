@@ -70,6 +70,8 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
 }
 
 // Inject credential to a request with credential, overwrite is false
@@ -110,6 +112,8 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.already_exists")->value());
 }
 
 // Inject credential to a request with credential, overwrite is true
@@ -150,6 +154,8 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
 }
 
 } // namespace
