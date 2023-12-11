@@ -163,7 +163,7 @@ function bazel_binary_build() {
     # The COMPILE_TYPE variable is redundant in this case and is only here for
     # readability. It is already set in the .bazelrc config for sizeopt.
     COMPILE_TYPE="opt"
-    CONFIG_ARGS="--config=sizeopt"
+    CONFIG_ARGS=("--config=sizeopt")
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
     COMPILE_TYPE="fastbuild"
   fi
@@ -181,7 +181,7 @@ function bazel_binary_build() {
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" "${CONFIG_ARGS[@]}"
   collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the built envoy binary somewhere that we can access outside of the
@@ -191,14 +191,14 @@ function bazel_binary_build() {
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     # Generate dwp file for debugging since we used split DWARF to reduce binary
     # size
-    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" "${CONFIG_ARGS[@]}"
     # Copy the debug information
     cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
   # Validation tools for the tools image.
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
+    //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" external:su-exec
@@ -278,9 +278,7 @@ case $CI_TARGET in
         ;&
 
     api.go)
-        if [[ -z "$NO_BUILD_SETUP" ]]; then
-            setup_clang_toolchain
-        fi
+        setup_clang_toolchain
         GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
         GO_TARGETS=(@envoy_api//...)
         read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
@@ -787,6 +785,8 @@ case $CI_TARGET in
     publish)
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
         PUBLISH_ARGS=(
             --publish-commitish="$BUILD_SHA"
@@ -796,7 +796,8 @@ case $CI_TARGET in
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               @envoy_repo//:publish \
-              -- "${PUBLISH_ARGS[@]}"
+              -- --repo="$ENVOY_REPO" \
+                 "${PUBLISH_ARGS[@]}"
         ;;
 
     release|release.server_only)
@@ -933,7 +934,6 @@ case $CI_TARGET in
         WORKFLOW="envoy-publish.yml"
         # * Note on vars *
         # `ENVOY_REPO`: Should always be envoyproxy/envoy unless testing
-        # `ENVOY_BRANCH`: Target branch for PRs, source branch for others
         # `COMMIT`: This may be a merge commit in a PR
         # `ENVOY_COMMIT`: The actual last commit of branch/PR
         # `ENVOY_HEAD_REF`: must also be set in PRs to provide a unique key for job grouping,
@@ -941,9 +941,10 @@ case $CI_TARGET in
         COMMIT="$(git rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${COMMIT}}"
         ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
+        # Note: CI is always called in main, the CI request is matched from there
         echo "Trigger workflow (${WORKFLOW})"
         echo "  Repo: ${ENVOY_REPO}"
-        echo "  Branch: ${ENVOY_BRANCH}"
+        echo "  Branch: main"
         echo "  Ref: ${COMMIT}"
         echo "  Inputs:"
         echo "    sha: ${ENVOY_COMMIT}"
@@ -956,7 +957,7 @@ case $CI_TARGET in
               -- --repo="$ENVOY_REPO" \
                  --trigger-app-id="$GITHUB_APP_ID" \
                  --trigger-installation-id="$GITHUB_INSTALL_ID" \
-                 --trigger-ref="$ENVOY_BRANCH" \
+                 --trigger-ref="main" \
                  --trigger-workflow="$WORKFLOW" \
                  --trigger-inputs="$INPUTS"
         ;;
