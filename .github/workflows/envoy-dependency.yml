@@ -59,27 +59,43 @@ jobs:
       uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.13
       with:
         token: ${{ steps.appauth.outputs.token }}
-    - id: version
-      name: Shorten (possible) SHA
-      uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.2.13
+    - uses: envoyproxy/toolshed/gh-actions/bson@actions-v0.2.13
+      id: update
+      name: Update dependency (${{ inputs.dependency }})
       with:
-        string: ${{ inputs.version }}
-        length: 7
-        min: 40
-    - run: |
-        echo "Updating(${TASK}): ${DEPENDENCY} -> ${VERSION}"
-        bazel run --config=ci //bazel:${TARGET} $DEPENDENCY $VERSION
-      name: Update dependency
+        input: |
+          dependency: ${{ inputs.dependency }}
+          task: ${{ inputs.task }}
+          version: ${{ inputs.version }}
+        input-format: yaml
+        filter: |
+          .version[:7] as $version
+          | .dependency as $dependency
+          | .task as $task
+          | {}
+          | if $task == "bazel" then
+              .
+              | .task = "bazel"
+              | .target = "update"
+            else
+              .
+              | .task = "api/bazel"
+              | .target = "api-update"
+            end
+          | .task as $task
+          | .target as $target
+          | ("
+          echo \"Updating(\($task)): \($dependency) -> \($version)\"
+          bazel run --config=ci //bazel:\($target) \($dependency) \($version)
+          OUTPUT=\($version)
+          " | bash::output)
       env:
-        DEPENDENCY: ${{ inputs.dependency }}
-        VERSION: ${{ inputs.version }}
-        TARGET: ${{ inputs.task == 'bazel' && 'update' || 'api-update' }}
-        TASK: ${{ inputs.task == 'bazel' && 'bazel' || 'api/bazel' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.2.13
       name: Upload diff
       with:
-        name: ${{ inputs.dependency }}-${{ steps.version.outputs.string }}
+        name: ${{ inputs.dependency }}-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr }}
       uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.13
@@ -90,17 +106,17 @@ jobs:
 
           ${{ inputs.pr-message }}
         branch: >-
-          dependency/${{ inputs.task }}/${{ inputs.dependency }}/${{ steps.version.outputs.string }}
+          dependency/${{ inputs.task }}/${{ inputs.dependency }}/${{ steps.update.outputs.output }}
         commit-message: |
-          ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}` -> ${{ steps.version.outputs.string }}
+          ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}` -> ${{ steps.update.outputs.output }}
 
           Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         title: >-
           ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}`
-          -> ${{ steps.version.outputs.string }}
-        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+          -> ${{ steps.update.outputs.output }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   update-build-image:
     if: >-
