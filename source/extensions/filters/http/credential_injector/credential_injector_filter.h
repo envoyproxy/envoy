@@ -32,7 +32,7 @@ using Envoy::Extensions::InjectedCredentials::Common::CredentialInjectorSharedPt
 /**
  * Configuration for the Credential Injector filter.
  */
-class FilterConfig {
+class FilterConfig : public Logger::Loggable<Logger::Id::credential_injector> {
 public:
   FilterConfig(CredentialInjectorSharedPtr, bool overwrite, bool allow_request_without_credential,
                const std::string& stats_prefix, Stats::Scope& scope);
@@ -43,13 +43,10 @@ public:
   }
 
   // Inject configured credential to the HTTP request header.
-  absl::Status injectCredential(Http::RequestHeaderMap& headers) {
-    return injector_->inject(headers, overwrite_);
-  }
+  // return should continue processing the request or not
+  bool injectCredential(Http::RequestHeaderMap& headers);
 
   bool allowRequestWithoutCredential() const { return allow_request_without_credential_; }
-
-  bool overwrite() const { return overwrite_; }
 
 private:
   static CredentialInjectorStats generateStats(const std::string& prefix, Stats::Scope& scope) {

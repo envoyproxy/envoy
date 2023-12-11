@@ -14,6 +14,33 @@ FilterConfig::FilterConfig(CredentialInjectorSharedPtr credential_injector, bool
       allow_request_without_credential_(allow_request_without_credential),
       stats_(generateStats(stats_prefix + "credential_injector.", scope)) {}
 
+// Inject configured credential to the HTTP request header.
+// return should continue processing the request or not
+bool FilterConfig::injectCredential(Http::RequestHeaderMap& headers) {
+  absl::Status status = injector_->inject(headers, overwrite_);
+
+  // credential already exists in the header and overwrite is false
+  if (absl::IsAlreadyExists(status)) {
+    ASSERT(!overwrite_); // overwrite should be false if AlreadyExists is returned
+    ENVOY_LOG(warn, "Credential already exists in the header");
+    stats_.already_exists_.inc();
+    // continue processing the request if credential already exists in the header
+    return true;
+  }
+
+  // failed to inject the credential
+  if (!status.ok()) {
+    ENVOY_LOG(warn, "Failed to inject credential: {}", status.message());
+    stats_.failed_.inc();
+    return allow_request_without_credential_;
+  }
+
+  // successfully injected the credential
+  ENVOY_LOG(debug, "Successfully injected credential");
+  stats_.injected_.inc();
+  return true;
+}
+
 CredentialInjectorFilter::CredentialInjectorFilter(FilterConfigSharedPtr config)
     : config_(std::move(config)) {}
 
@@ -27,36 +54,16 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
 }
 
 void CredentialInjectorFilter::onSuccess() {
-  // Since onSuccess is called by the credential source in other threads than the event dispatcher,
-  // we need to post the injection to the event dispatcher thread.
+  // Since onSuccess is called by the credential source in other threads than the event
+  // dispatcher, we need to post the injection to the event dispatcher thread.
   decoder_callbacks_->dispatcher().post([this]() {
-    absl::Status status = config_->injectCredential(*request_headers_);
+    bool succeed = config_->injectCredential(*request_headers_);
 
-    // credential already exists in the header and overwrite is false
-    if (absl::IsAlreadyExists(status) && !config_->overwrite()) {
-      ENVOY_LOG(debug, "Credential already exists in the header");
-      config_->stats().already_exists_.inc();
-      decoder_callbacks_->continueDecoding();
-      return;
-    }
-
-    // failed to inject the credential
-    if (!status.ok()) {
-      ENVOY_LOG(warn, "Failed to inject credential: {}", status.message());
-      config_->stats().failed_.inc();
-
-      if (config_->allowRequestWithoutCredential()) {
-        decoder_callbacks_->continueDecoding();
-        return;
-      }
-
+    if (!succeed) {
       decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
                                          nullptr, absl::nullopt, "failed_to_inject_credential");
-      return;
     }
 
-    // Credential injected successfully
-    config_->stats().injected_.inc();
     decoder_callbacks_->continueDecoding();
     return;
   });
