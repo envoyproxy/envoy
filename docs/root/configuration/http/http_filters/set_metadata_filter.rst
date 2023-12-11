@@ -15,9 +15,9 @@ metadata, it is inserted with the configured value.
 If ``allow_overwrite`` is set to false or omitted, untyped dynamic metadata will only be updated if
 there are no existing values at that namespace. If ``allow_overwrite`` is set to true, or if using deprecated ``value``
 field, untyped dynamic metadata values are updated with the following scheme:
-- If a key does not exist, the configured value is copied into the metadata namespace.
-- If the key exists but has a different type, the value is replaced outright by the configured value.
-- Otherwise:
+If a key does not exist, the configured value is copied into the metadata namespace. If the key exists but has a
+different type, the value is replaced outright by the configured value.
+Otherwise:
  - scalar values (null, string, number, boolean): the existing value is replaced.
  - lists: new values are appended to the current list.
  - structures: recursively apply this scheme.
