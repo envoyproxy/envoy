@@ -60,22 +60,22 @@ struct LRLBTestParams {
   // sort the expected and observed selection probabilities and verify each element is within some
   // expected tolerance. Therefore, the vector does not need to be sorted.
   std::vector<double> expected_selection_probs;
-
-  // Observed selection probabilities must be within tolerance_pct of the expected to pass the test.
-  // The expected range is [0,100).
-  double tolerance_pct;
 };
 
 void leastRequestLBWeightTest(LRLBTestParams params) {
-  constexpr uint64_t n = 100000;
+  constexpr uint64_t num_requests = 100000;
+
+  // Observed selection probabilities must be within tolerance_pct of the expected to pass the test.
+  // The expected range is [0,100).
+  constexpr double tolerance_pct = 1.0;
 
   // Validate params.
   ASSERT_GT(params.num_hosts, 0);
   ASSERT_LE(params.num_subset_hosts, params.num_hosts);
   ASSERT_GT(params.weight, 0);
   ASSERT_EQ(params.expected_selection_probs.size(), params.num_hosts);
-  ASSERT_LT(params.tolerance_pct, 100);
-  ASSERT_GE(params.tolerance_pct, 0);
+  ASSERT_LT(tolerance_pct, 100);
+  ASSERT_GE(tolerance_pct, 0);
 
   NiceMock<MockTimeSystem> time_source_;
   HostVector hosts;
@@ -113,20 +113,20 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
       priority_set, nullptr, lb_stats, runtime, random, common_config, least_request_lb_config,
       *time_source};
 
-  for (uint64_t i = 0; i < n; i++) {
+  for (uint64_t i = 0; i < num_requests; i++) {
     host_hits[lb_.chooseHost(nullptr)]++;
   }
 
   std::vector<double> observed_pcts;
   for (const auto& host : host_hits) {
-    observed_pcts.push_back((static_cast<double>(host.second) / n) * 100);
+    observed_pcts.push_back((static_cast<double>(host.second) / num_requests) * 100);
   }
 
   std::sort(observed_pcts.begin(), observed_pcts.end());
   std::sort(params.expected_selection_probs.begin(), params.expected_selection_probs.end());
   ASSERT_EQ(observed_pcts.size(), params.expected_selection_probs.size());
   for (uint64_t i = 0; i < observed_pcts.size(); i++) {
-    EXPECT_NEAR(params.expected_selection_probs[i], observed_pcts[i], params.tolerance_pct);
+    EXPECT_NEAR(params.expected_selection_probs[i], observed_pcts[i], tolerance_pct);
   }
 }
 
@@ -140,7 +140,6 @@ TEST(LeastRequestLoadBalancerWeightTest, Weight) {
   params.active_request_count = 0;
   params.expected_selection_probs = {33.333, 33.333, 33.333};
   params.weight = 1;
-  params.tolerance_pct = 1.0;
   leastRequestLBWeightTest(params);
 
   // Single host (out of 3) with lots of in-flight requests. Given that P2C will choose 2 hosts and
@@ -151,7 +150,6 @@ TEST(LeastRequestLoadBalancerWeightTest, Weight) {
   params.active_request_count = 10;
   params.expected_selection_probs = {44.45, 44.45, 11.1};
   params.weight = 1;
-  params.tolerance_pct = 1.0;
   leastRequestLBWeightTest(params);
 
   // Same as above, but with 2 hosts. The busy host will only be chosen if P2C picks it for both
@@ -161,7 +159,6 @@ TEST(LeastRequestLoadBalancerWeightTest, Weight) {
   params.active_request_count = 10;
   params.expected_selection_probs = {25, 75};
   params.weight = 1;
-  params.tolerance_pct = 1.0;
   leastRequestLBWeightTest(params);
 
   // Heterogeneous weights with no active requests. This should behave identically to weighted
@@ -171,7 +168,6 @@ TEST(LeastRequestLoadBalancerWeightTest, Weight) {
   params.active_request_count = 0;
   params.expected_selection_probs = {66.66, 33.33};
   params.weight = 2;
-  params.tolerance_pct = 1.0;
   leastRequestLBWeightTest(params);
 
   // Same as above, but we'll scale the subset's weight with active requests. With a default
@@ -182,7 +178,6 @@ TEST(LeastRequestLoadBalancerWeightTest, Weight) {
   params.active_request_count = 1;
   params.expected_selection_probs = {50, 50};
   params.weight = 2;
-  params.tolerance_pct = 1.0;
   leastRequestLBWeightTest(params);
 
   // Same as above, but with 3 hosts.
@@ -191,7 +186,6 @@ TEST(LeastRequestLoadBalancerWeightTest, Weight) {
   params.active_request_count = 1;
   params.expected_selection_probs = {33.3, 33.3, 33.3};
   params.weight = 2;
-  params.tolerance_pct = 1.0;
   leastRequestLBWeightTest(params);
 }
 

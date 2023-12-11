@@ -161,11 +161,6 @@ new_features:
     authenticate user credentials in the HTTP Authentication heaer defined in `RFC7617 <https://tools.ietf.org/html/rfc7617>`_.
 - area: upstream
   change: |
-    Added support to use http async client to fetch the credentials from EC2 instance metadata and ECS task metadata providers
-    instead of libcurl which is deprecated. By default this behavior is disabled. To enable set
-    ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` to true.
-- area: upstream
-  change: |
     Implmented API :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`
     which can be used to drop certain percentage of traffic from Envoy.
 - area: stats
