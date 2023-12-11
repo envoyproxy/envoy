@@ -13,7 +13,7 @@ TEST(TraceContextHandlerTest, TraceContextHandlerGetTest) {
   // The key will be lowercase.
   {
     TraceContextHandler handler("KEY");
-    EXPECT_EQ("key", handler.key());
+    EXPECT_EQ("key", handler.key().get());
   }
 
   TraceContextHandler normal_key("key");
@@ -99,23 +99,23 @@ TEST(TraceContextHandlerTest, TraceContextHandlerSetRefKeyTest) {
     normal_key.setRefKey(trace_context, "value");
     auto iter = trace_context.context_map_.find("key");
     // setRefKey make no sense for non-HTTP context.
-    EXPECT_NE(iter->first.data(), normal_key.key().data());
+    EXPECT_NE(iter->first.data(), normal_key.key().get().data());
 
     inline_key.setRefKey(trace_context, "text/html");
     auto iter2 = trace_context.context_map_.find("content-type");
     // setRefKey make no sense for non-HTTP context.
-    EXPECT_NE(iter2->first.data(), inline_key.key().data());
+    EXPECT_NE(iter2->first.data(), inline_key.key().get().data());
 
     normal_key.setRefKey(*headers, "value");
     auto iter3 = headers->get(Http::LowerCaseString("key"));
     // setRefKey make sense for HTTP context.
-    EXPECT_EQ(iter3[0]->key().getStringView().data(), normal_key.key().data());
+    EXPECT_EQ(iter3[0]->key().getStringView().data(), normal_key.key().get().data());
 
     inline_key.setRefKey(*headers, "text/html");
     auto iter4 = headers->get(Http::LowerCaseString("content-type"));
     // Note, setRefKey make no sense for inline key of HTTP context because
     // inline key is stored in central registry and won't be referenced.
-    EXPECT_NE(iter4[0]->key().getStringView().data(), inline_key.key().data());
+    EXPECT_NE(iter4[0]->key().getStringView().data(), inline_key.key().get().data());
   }
 }
 
@@ -144,7 +144,7 @@ TEST(TraceContextHandlerTest, TraceContextHandlerSetRefTest) {
     normal_key.setRef(*headers, value);
     auto iter3 = headers->get(Http::LowerCaseString("key"));
     // setRef make sense for HTTP context.
-    EXPECT_EQ(iter3[0]->key().getStringView().data(), normal_key.key().data());
+    EXPECT_EQ(iter3[0]->key().getStringView().data(), normal_key.key().get().data());
     EXPECT_EQ(iter3[0]->value().getStringView().data(), value.data());
 
     inline_key.setRef(*headers, text_html);
