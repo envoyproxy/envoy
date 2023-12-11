@@ -99,7 +99,7 @@ jobs:
             --config=mobile-remote-ci-macos
             //examples/swift/hello_world:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.8
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
               with:
                 app: //examples/swift/hello_world:app
                 status: 200
@@ -139,7 +139,7 @@ jobs:
             --config=mobile-remote-ci-macos
             //test/swift/apps/baseline:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.8
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
               with:
                 app: //test/swift/apps/baseline:app
                 status: 200
@@ -152,7 +152,7 @@ jobs:
             --define=admin_functionality=enabled
             //test/swift/apps/experimental:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.8
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
               with:
                 app: //test/swift/apps/experimental:app
                 args: >-
@@ -168,7 +168,7 @@ jobs:
             --config=mobile-remote-ci-macos
             //examples/swift/async_await:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.8
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
               with:
                 app: //examples/swift/async_await:app
           target: swift-async-await
@@ -178,7 +178,7 @@ jobs:
             --config=mobile-remote-ci-macos
             //examples/objective-c/hello_world:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.8
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
               with:
                 app: //examples/objective-c/hello_world:app
                 status: 301
