@@ -707,6 +707,11 @@ public:
   virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
+   * @return returns the time source.
+   */
+  virtual TimeSource& timeSource() const PURE;
+
+  /**
    * Sets the upstream information for this stream.
    */
   virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo>) PURE;

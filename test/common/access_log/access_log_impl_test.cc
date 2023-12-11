@@ -1686,6 +1686,26 @@ typed_config:
   logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
 
+TEST_F(AccessLogImplTest, EmitTime) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  log_format:
+    text_format_source:
+      inline_string: "%EMIT_TIME%"
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  EXPECT_CALL(*file_, write(_));
+
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  const std::string time_regex = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$";
+  EXPECT_TRUE(std::regex_match(output_.value(), std::regex(time_regex)));
+}
+
 /**
  * Sample extension filter which allows every 1 of every `sample_rate` log attempts.
  */
