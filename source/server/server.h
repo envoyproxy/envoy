@@ -194,6 +194,7 @@ public:
   Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
+  ProcessContextOptRef processContext() override { return server_.processContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }

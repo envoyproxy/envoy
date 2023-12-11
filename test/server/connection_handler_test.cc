@@ -13,6 +13,8 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/listener_manager/active_raw_udp_listener_config.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -20,8 +22,6 @@
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/listener_managers/listener_manager/active_raw_udp_listener_config.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -105,6 +105,7 @@ public:
       udp_listener_config_->listener_factory_ =
           std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
       udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
+      ON_CALL(listener_info_, direction()).WillByDefault(Return(direction_));
     }
 
     struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
@@ -159,7 +160,7 @@ public:
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-    envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
+    const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
     }
@@ -196,6 +197,7 @@ public:
     const bool ignore_global_conn_limit_;
     envoy::config::core::v3::TrafficDirection direction_;
     absl::flat_hash_map<std::string, Network::UdpListenerCallbacks*> udp_listener_callback_map_{};
+    NiceMock<Network::MockListenerInfo> listener_info_;
   };
 
   class TestListener : public TestListenerBase {
