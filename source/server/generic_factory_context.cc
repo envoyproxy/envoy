@@ -10,13 +10,7 @@ GenericFactoryContextImpl::GenericFactoryContextImpl(
       scope_(server_context.serverScope()), init_manager_(server_context.initManager()) {}
 
 GenericFactoryContextImpl::GenericFactoryContextImpl(
-    Server::Configuration::FactoryContext& factory_context)
-    : server_context_(factory_context.serverFactoryContext()),
-      validation_visitor_(factory_context.messageValidationVisitor()),
-      scope_(factory_context.scope()), init_manager_(factory_context.initManager()) {}
-
-GenericFactoryContextImpl::GenericFactoryContextImpl(
-    const Server::Configuration::GenericFactoryContext& generic_context)
+    Server::Configuration::GenericFactoryContext& generic_context)
     : server_context_(generic_context.serverFactoryContext()),
       validation_visitor_(generic_context.messageValidationVisitor()),
       scope_(generic_context.scope()), init_manager_(generic_context.initManager()) {}
@@ -30,8 +24,8 @@ ProtobufMessage::ValidationVisitor& GenericFactoryContextImpl::messageValidation
   return validation_visitor_;
 }
 
-Stats::Scope& GenericFactoryContextImpl::scope() const { return scope_; }
-Init::Manager& GenericFactoryContextImpl::initManager() const { return init_manager_; }
+Stats::Scope& GenericFactoryContextImpl::scope() { return scope_; }
+Init::Manager& GenericFactoryContextImpl::initManager() { return init_manager_; }
 
 } // namespace Server
 } // namespace Envoy

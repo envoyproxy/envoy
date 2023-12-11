@@ -56,7 +56,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.datadog extension
 /*/extensions/tracers/datadog @cgilmour @dgoffredo @dmehala @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
+/*/extensions/tracers/xray @suniltheta @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
 # tracers.opentelemetry extension
@@ -140,7 +140,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
 /*/extensions/filters/network/echo @htuch @alyssawilk
-/*/extensions/filters/udp/dns_filter @abaptiste @mattklein123 @yanjunxiang-google
+/*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @mattklein123

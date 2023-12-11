@@ -37,7 +37,7 @@ const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, boo
 }
 
 absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
-  static_assert(ResponseFlag::LastFlag == 0x4000000,
+  static_assert(ResponseFlag::LastFlag == 0x8000000,
                 "A flag has been added. Add the new flag to ALL_RESPONSE_STRINGS_FLAGS.");
   absl::flat_hash_map<std::string, ResponseFlag> res;
   for (auto [flag_strings, flag] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {

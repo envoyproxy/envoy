@@ -22,6 +22,13 @@ namespace Http {
 namespace Http2 {
 namespace {
 
+bool skipForUhv() {
+#ifdef ENVOY_ENABLE_UHV
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_oghttp2");
+#else
+  return false;
+#endif
+}
 // For organizational purposes only.
 class RequestFrameCommentTest : public ::testing::Test {};
 class ResponseFrameCommentTest : public ::testing::Test {};
@@ -191,6 +198,9 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
 // https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a non-compressed frame with no
 // Huffman encoding to simplify.
 TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
+  if (skipForUhv()) {
+    return;
+  }
   FileFrame header{"request_header_corpus/simple_example_plain"};
 
   for (size_t offset = 0; offset < header.frame().size(); ++offset) {
@@ -224,6 +234,9 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
 // https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a non-compressed frame with no
 // Huffman encoding to simplify.
 TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
+  if (skipForUhv()) {
+    return;
+  }
   FileFrame header{"response_header_corpus/simple_example_plain"};
 
   for (size_t offset = 0; offset < header.frame().size(); ++offset) {
@@ -258,6 +271,9 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
 // CVE-2019-9900. See also https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a
 // non-compressed frame with no Huffman encoding to simplify.
 TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
+  if (skipForUhv()) {
+    return;
+  }
   FileFrame header{"request_header_corpus/simple_example_plain"};
 
   for (size_t offset = header.frame().size() - 11 /* foo: offset */; offset < header.frame().size();
@@ -296,6 +312,9 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
 // CVE-2019-9900. See also https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a
 // non-compressed frame with no Huffman encoding to simplify.
 TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
+  if (skipForUhv()) {
+    return;
+  }
   FileFrame header{"response_header_corpus/simple_example_plain"};
 
   for (size_t offset = header.frame().size() - 17 /* test: offset */;

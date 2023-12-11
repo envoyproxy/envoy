@@ -1,4 +1,4 @@
-name: Publish
+name: Precheck/deps
 
 permissions:
   contents: read
@@ -6,41 +6,44 @@ permissions:
 on:
   workflow_call:
     inputs:
-      build-image-ubuntu:
-        type: string
-        default: ''
       dependency-review:
         type: boolean
         default: false
-      repo-ref:
+      request:
         type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
   cancel-in-progress: true
 
+
 jobs:
   prechecks:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.target }}
+    with:
+      bazel-extra: '--config=rbe-envoy-engflow'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      request: ${{ inputs.request }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+      rbe: ${{ matrix.rbe }}
+      target: ${{ matrix.target }}
+      trusted: ${{ inputs.trusted }}
     strategy:
       matrix:
         include:
         - target: deps
           rbe: false
-    uses: ./.github/workflows/_ci.yml
-    name: ${{ matrix.target }}
-    permissions:
-      contents: read
-      packages: read
-    with:
-      target: ${{ matrix.target }}
-      rbe: ${{ matrix.rbe }}
-      bazel-extra: '--config=rbe-envoy-engflow'
-      cache-build-image: ${{ inputs.build-image-ubuntu }}
-      repo-ref: ${{ inputs.repo-ref }}
-      catch-errors: true
-      error-match: |
-        ERROR
-        ClientConnectorError
 
   dependency-review:
     runs-on: ubuntu-22.04
@@ -49,7 +52,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
       with:
-        ref: ${{ inputs.repo-ref }}
+        ref: ${{ fromJSON(inputs.request).request.sha }}
         persist-credentials: false
     - name: Dependency Review
-      uses: actions/dependency-review-action@6c5ccdad469c9f8a2996bfecaec55a631a347034
+      uses: actions/dependency-review-action@v3
