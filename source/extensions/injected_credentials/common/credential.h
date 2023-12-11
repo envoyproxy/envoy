@@ -51,7 +51,7 @@ public:
   /**
    * Request credentials asynchronously
    * @param callbacks the callbacks to be notified of request status.
-   * @return a request handle
+   * @return an optional request handle
    */
   virtual RequestPtr requestCredential(Callbacks& callbacks) PURE;
 

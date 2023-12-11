@@ -6,10 +6,10 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace CredentailInjector {
+namespace CredentialInjector {
 namespace {
 
-class CredentailInjectorIntegrationTest : public HttpProtocolIntegrationTest {
+class CredentialInjectorIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initializeFilter(const std::string& filter_config) {
     TestEnvironment::writeStringToFileForTest("credential.yaml", R"EOF(
@@ -25,17 +25,17 @@ resources:
   }
 };
 
-// CredentailInjector integration tests that should run with all protocols
+// CredentialInjector integration tests that should run with all protocols
 
-class CredentailInjectorIntegrationTestAllProtocols : public CredentailInjectorIntegrationTest {};
+class CredentialInjectorIntegrationTestAllProtocols : public CredentialInjectorIntegrationTest {};
 
 INSTANTIATE_TEST_SUITE_P(
-    Protocols, CredentailInjectorIntegrationTestAllProtocols,
+    Protocols, CredentialInjectorIntegrationTestAllProtocols,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Inject credential to a request without credential
-TEST_P(CredentailInjectorIntegrationTestAllProtocols, InjectCredential) {
+TEST_P(CredentialInjectorIntegrationTestAllProtocols, InjectCredential) {
   const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.credential_injector
@@ -73,7 +73,7 @@ typed_config:
 }
 
 // Inject credential to a request with credential, overwrite is false
-TEST_P(CredentailInjectorIntegrationTestAllProtocols, CredentialExistsOverwriteFalse) {
+TEST_P(CredentialInjectorIntegrationTestAllProtocols, CredentialExistsOverwriteFalse) {
   const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.credential_injector
@@ -113,7 +113,7 @@ typed_config:
 }
 
 // Inject credential to a request with credential, overwrite is true
-TEST_P(CredentailInjectorIntegrationTestAllProtocols, CredentialExistsOverwriteTrue) {
+TEST_P(CredentialInjectorIntegrationTestAllProtocols, CredentialExistsOverwriteTrue) {
   const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.credential_injector
@@ -153,7 +153,7 @@ typed_config:
 }
 
 } // namespace
-} // namespace CredentailInjector
+} // namespace CredentialInjector
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

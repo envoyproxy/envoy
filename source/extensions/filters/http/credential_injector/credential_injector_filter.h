@@ -14,7 +14,7 @@ namespace CredentialInjector {
 /**
  * All Credential Injector filter stats. @see stats_macros.h
  */
-#define ALL_credential_injector_STATS(COUNTER)                                                     \
+#define ALL_CREDENTIAL_INJECTOR_STATS(COUNTER)                                                     \
   COUNTER(injected)                                                                                \
   COUNTER(failed)                                                                                  \
   COUNTER(already_exists)
@@ -23,7 +23,7 @@ namespace CredentialInjector {
  * Struct definition for Credential Injector stats. @see stats_macros.h
  */
 struct CredentialInjectorStats {
-  ALL_credential_injector_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_CREDENTIAL_INJECTOR_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 using Envoy::Extensions::InjectedCredentials::Common::CredentialInjector;
@@ -54,12 +54,12 @@ public:
 private:
   static CredentialInjectorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return CredentialInjectorStats{
-        ALL_credential_injector_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+        ALL_CREDENTIAL_INJECTOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
   CredentialInjectorSharedPtr injector_;
-  bool overwrite_;
-  bool allow_request_without_credential_;
+  const bool overwrite_;
+  const bool allow_request_without_credential_;
   CredentialInjectorStats stats_;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

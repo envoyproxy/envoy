@@ -19,10 +19,7 @@ CredentialInjectorFilter::CredentialInjectorFilter(FilterConfigSharedPtr config)
 
 Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                                   bool) {
-  ENVOY_LOG(debug, "Called Filter : {}", __func__);
-
   request_headers_ = &headers;
-
   in_flight_credential_request_ = config_->requestCredential(*this);
 
   // pause while we await the next step from the credential source, for example, an OAuth server
@@ -30,6 +27,8 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
 }
 
 void CredentialInjectorFilter::onSuccess() {
+  // Since onSuccess is called by the credential source in other threads than the event dispatcher,
+  // we need to post the injection to the event dispatcher thread.
   decoder_callbacks_->dispatcher().post([this]() {
     absl::Status status = config_->injectCredential(*request_headers_);
 
@@ -52,7 +51,7 @@ void CredentialInjectorFilter::onSuccess() {
       }
 
       decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                         nullptr, absl::nullopt, "failed_to_get_credential");
+                                         nullptr, absl::nullopt, "failed_to_inject_credential");
       return;
     }
 
@@ -74,7 +73,7 @@ void CredentialInjectorFilter::onFailure(const std::string& reason) {
   }
 
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                     nullptr, absl::nullopt, "failed_to_get_credential");
+                                     nullptr, absl::nullopt, "failed_to_inject_credential");
 }
 
 void CredentialInjectorFilter::setDecoderFilterCallbacks(

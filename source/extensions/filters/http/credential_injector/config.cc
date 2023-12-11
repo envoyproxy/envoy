@@ -15,7 +15,7 @@ Http::FilterFactoryCb CredentialInjectorFilterFactory::createFilterFactoryFromPr
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  // find the credential injector factory
+  // Find the credential injector factory.
   const std::string type{
       TypeUtil::typeUrlToDescriptorFullName(proto_config.credential().typed_config().type_url())};
   NamedCredentialInjectorConfigFactory* const config_factory =
@@ -33,7 +33,7 @@ Http::FilterFactoryCb CredentialInjectorFilterFactory::createFilterFactoryFromPr
       config_factory->createCredentialInjectorFromProto(*message, context);
 
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      credential_injector, proto_config.overwrite(),
+      std::move(credential_injector), proto_config.overwrite(),
       proto_config.allow_request_without_credential(), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<CredentialInjectorFilter>(config));
