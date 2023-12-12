@@ -20,15 +20,16 @@ Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config&
     untyped_.emplace_back(deprecated_api_val);
   }
 
-  for (const auto& untyped : proto_config.untyped_metadata()) {
-    UntypedMetadataEntry untyped_entry{untyped.allow_overwrite(), untyped.metadata_namespace(),
-                                       untyped.value()};
-    untyped_.emplace_back(untyped_entry);
-  }
-  for (const auto& typed : proto_config.typed_metadata()) {
-    TypedMetadataEntry typed_entry{typed.allow_overwrite(), typed.metadata_namespace(),
-                                   typed.value()};
-    typed_.emplace_back(typed_entry);
+  for (const auto& metadata : proto_config.metadata()) {
+    if (metadata.has_untyped_value()) {
+      UntypedMetadataEntry untyped_entry{metadata.allow_overwrite(), metadata.metadata_namespace(),
+                                         metadata.untyped_value()};
+      untyped_.emplace_back(untyped_entry);
+    } else {
+      TypedMetadataEntry typed_entry{metadata.allow_overwrite(), metadata.metadata_namespace(),
+                                     metadata.typed_value()};
+      typed_.emplace_back(typed_entry);
+    }
   }
 }
 

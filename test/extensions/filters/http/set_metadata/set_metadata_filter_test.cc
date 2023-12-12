@@ -138,9 +138,9 @@ TEST_F(SetMetadataFilterTest, DeprecatedWithMerge) {
 
 TEST_F(SetMetadataFilterTest, UntypedSimple) {
   const std::string yaml_config = R"EOF(
-    untyped_metadata:
+    metadata:
     - metadata_namespace: thenamespace
-      value:
+      untyped_value:
         tags:
           mytag0: 1
   )EOF";
@@ -162,9 +162,9 @@ TEST_F(SetMetadataFilterTest, UntypedSimple) {
 
 TEST_F(SetMetadataFilterTest, TypedSimple) {
   const std::string yaml_config = R"EOF(
-    typed_metadata:
+    metadata:
     - metadata_namespace: thenamespace
-      value:
+      typed_value:
         '@type': type.googleapis.com/helloworld.HelloRequest
         name: typed_metadata
   )EOF";
@@ -187,15 +187,15 @@ TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
   envoy::config::core::v3::Metadata metadata;
 
   const std::string yaml_config = R"EOF(
-    untyped_metadata:
+    metadata:
     - metadata_namespace: thenamespace
-      value:
+      untyped_value:
         mynumber: 10
         mylist: ["a"]
         tags:
           mytag0: 1
     - metadata_namespace: thenamespace
-      value:
+      untyped_value:
         mynumber: 20
         mylist: ["b"]
         tags:
@@ -240,15 +240,15 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   envoy::config::core::v3::Metadata metadata;
 
   const std::string yaml_config = R"EOF(
-    untyped_metadata:
+    metadata:
     - metadata_namespace: thenamespace
-      value:
+      untyped_value:
         mynumber: 10
         mylist: ["a"]
         tags:
           mytag0: 1
     - metadata_namespace: thenamespace
-      value:
+      untyped_value:
         mynumber: 20
         mylist: ["b"]
         tags:
@@ -291,9 +291,9 @@ TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
     value:
       tags:
         mytag0: 0
-    untyped_metadata:
+    metadata:
     - metadata_namespace: thenamespace
-      value:
+      untyped_value:
         tags:
           mytag0: 1
       allow_overwrite: true
@@ -320,9 +320,9 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
     value:
       tags:
         mytag0: 0
-    typed_metadata:
+    metadata:
     - metadata_namespace: thenamespace
-      value:
+      typed_value:
         '@type': type.googleapis.com/helloworld.HelloRequest
         name: typed_metadata
   )EOF";

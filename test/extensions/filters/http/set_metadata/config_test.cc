@@ -29,17 +29,16 @@ value:
   mylist: ["b"]
   tags:
     mytag1: 1
-untyped_metadata:
+metadata:
 - metadata_namespace: thenamespace
-  value:
+  untyped_value:
     mynumber: 20
     mylist: ["b"]
     tags:
       mytag1: 1
   allow_overwrite: true
-typed_metadata:
 - metadata_namespace: thenamespace
-  value:
+  typed_value:
     '@type': type.googleapis.com/helloworld.HelloRequest
     name: typed_metadata
   allow_overwrite: true
@@ -66,17 +65,16 @@ value:
   mylist: ["b"]
   tags:
     mytag1: 1
-untyped_metadata:
+metadata:
 - metadata_namespace: thenamespace
-  value:
+  untyped_value:
     mynumber: 20
     mylist: ["b"]
     tags:
       mytag1: 1
   allow_overwrite: true
-typed_metadata:
 - metadata_namespace: thenamespace
-  value:
+  typed_value:
     '@type': type.googleapis.com/helloworld.HelloRequest
     name: typed_metadata
   allow_overwrite: true
