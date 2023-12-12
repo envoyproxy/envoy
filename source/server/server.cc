@@ -714,7 +714,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
     throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
 #endif
   } else {
-    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
+    ENVOY_LOG(info, "No admin address given, so no admin HTTP server started.");
   }
   if (admin_) {
     config_tracker_entry_ = admin_->getConfigTracker().add(

@@ -63,6 +63,9 @@ minor_behavior_changes:
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
     This feature improves flow control within the proxy by deferring work on the receiving end if the other
     end is backed up.
+- area: admin
+  change: |
+    Switch no admin ``warning`` -> ``info``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
