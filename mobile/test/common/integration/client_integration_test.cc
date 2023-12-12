@@ -142,7 +142,7 @@ public:
 
   void basicTest();
   void trickleTest();
-  void explicitFlowControlWithCancels();
+  void explicitFlowControlWithCancels(uint32_t body_size = 1000);
 
   static std::string protocolToString(Http::CodecType type) {
     if (type == Http::CodecType::HTTP3) {
@@ -344,8 +344,9 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   ASSERT_EQ(num_requests, cc_.on_complete_calls);
 }
 
-void ClientIntegrationTest::explicitFlowControlWithCancels() {
-  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1000));
+void ClientIntegrationTest::explicitFlowControlWithCancels(uint32_t body_size) {
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES,
+                                   std::to_string(body_size));
 
   uint32_t num_requests = 100;
   std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
@@ -403,6 +404,12 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
   explicit_flow_control_ = true;
   initialize();
   explicitFlowControlWithCancels();
+}
+
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsAfterComplete) {
+  explicit_flow_control_ = true;
+  initialize();
+  explicitFlowControlWithCancels(100);
 }
 
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
@@ -500,6 +507,17 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
   ASSERT_EQ(cc_.on_complete_calls, 1);
 }
 
+TEST_P(ClientIntegrationTest, InvalidDomain) {
+  initialize();
+
+  default_request_headers_.setHost("www.doesnotexist.com");
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+  ASSERT_EQ(cc_.on_headers_calls, 0);
+}
+
 TEST_P(ClientIntegrationTest, BasicReset) {
   initialize();
 
@@ -512,7 +530,40 @@ TEST_P(ClientIntegrationTest, BasicReset) {
   ASSERT_EQ(cc_.on_headers_calls, 0);
 }
 
-TEST_P(ClientIntegrationTest, BasicCancel) {
+TEST_P(ClientIntegrationTest, CancelBeforeRequestHeadersSent) {
+  autonomous_upstream_ = false;
+  initialize();
+  ConditionalInitializer headers_callback;
+
+  stream_->cancel();
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_cancel_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, CancelAfterRequestHeadersSent) {
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESPOND_AFTER_REQUEST_HEADERS, "yes");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  stream_->cancel();
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.on_cancel_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, CancelAfterRequestComplete) {
+  autonomous_upstream_ = false;
+  initialize();
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  stream_->cancel();
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.on_cancel_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, CancelDuringResponse) {
   autonomous_upstream_ = false;
   initialize();
   ConditionalInitializer headers_callback;
