@@ -112,6 +112,10 @@ bug_fixes:
     used for retrieval. This caused cache misses on initial use, even though the host DNS entry
     was pre-resolved. The fix is guarded by runtime guard ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns``,
     which defaults to true.
+- area: otlp_stat_sink
+  change: |
+    Fixed a bug where a histogram bucket counts were wrong. Additionally, the number of buckets is fixed and is now
+    one element larger than the explicit bounds elements, as required by the specification.
 - area: DNS
   change: |
     Fixed a race condition that when multiple requests with the same authority header are sent to Envoy, sometimes some requests
