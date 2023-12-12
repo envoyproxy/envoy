@@ -174,7 +174,7 @@ public:
     auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
         bootstrap, factory, stats, tls, runtime, local_info, log_manager, main_thread_dispatcher,
         admin, validation_context, api, http_context, grpc_context, router_context, server)};
-    cluster_manager->init(bootstrap);
+    THROW_IF_NOT_OK(cluster_manager->init(bootstrap));
     return cluster_manager;
   }
 
