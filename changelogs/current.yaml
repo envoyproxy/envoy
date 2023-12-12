@@ -115,7 +115,7 @@ bug_fixes:
     contain any subset selector.
 - area: docker
   change: |
-    Updated base image to `ubuntu:22.04` to fix memory issue (https://github.com/envoyproxy/envoy/issues/31248).
+    Updated base image to ``ubuntu:22.04`` to fix Redis memory issue (https://github.com/envoyproxy/envoy/issues/31248).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
