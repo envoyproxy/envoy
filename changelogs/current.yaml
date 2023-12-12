@@ -36,9 +36,6 @@ behavior_changes:
     Handle empty response bodies in grpc_http1_reverse_bridge. This may cause problems for clients expecting the filter to crash
     for empty responses.  This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` to false.
-- area: admin
-  change: |
-    Switch no admin ``warning`` -> ``info``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -66,6 +63,9 @@ minor_behavior_changes:
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
     This feature improves flow control within the proxy by deferring work on the receiving end if the other
     end is backed up.
+- area: admin
+  change: |
+    Switch no admin ``warning`` -> ``info``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
