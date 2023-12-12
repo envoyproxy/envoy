@@ -5,9 +5,9 @@
 namespace Envoy {
 namespace Config {
 
-// Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
+// Oversees communication for gRPC xDS implementations (parent to both SotW xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
-// requests. This interface is for a specific discovery Request and Response types.
+// requests.
 template <class RequestProto, class ResponseProto>
 class GrpcStreamInterface : public Grpc::AsyncStreamCallbacks<ResponseProto> {
 public:
