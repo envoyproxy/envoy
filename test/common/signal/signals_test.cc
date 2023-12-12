@@ -178,6 +178,7 @@ TEST(SignalsDeathTest, CanRunAllFatalActions) {
 }
 
 TEST(SignalsDeathTest, ShouldJustExitIfFatalActionsRaiseAnotherSignal) {
+  // Does this test actually pass with no changes?
   SignalAction actions;
   TestFatalErrorHandler handler;
   FatalErrorHandler::registerFatalErrorHandler(handler);
