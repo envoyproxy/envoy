@@ -1,9 +1,15 @@
 #include "source/common/tracing/trace_context_impl.h"
 
+#include "source/common/http/header_map_impl.h"
+
 namespace Envoy {
 namespace Tracing {
 
 TraceContextHandler::TraceContextHandler(absl::string_view key) : key_(key) {
+  // This will force the header map to be finalized in unit tests and do nothing in prod (
+  // where the header map is already finalized when the server is initializing).
+  Http::TypedHeaderMapImpl<Http::RequestHeaderMap>::inlineHeadersSize();
+
   handle_ = Http::CustomInlineHeaderRegistry::getInlineHeader<
       Http::CustomInlineHeaderRegistry::Type::RequestHeaders>(key_);
 }

@@ -112,6 +112,7 @@ envoy_cc_library(
     deps = [
         "//envoy/http:header_map_interface",
         "//envoy/tracing:trace_context_interface",
+        "//source/common/http:header_map_lib",
     ],
 )
 
