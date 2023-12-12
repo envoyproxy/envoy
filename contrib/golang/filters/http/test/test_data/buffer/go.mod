@@ -7,4 +7,4 @@ require (
     google.golang.org/protobuf v1.31.0
 )
 
-replace github.com/envoyproxy/envoy => ../../../../../../../
+replace github.com/envoyproxy/envoy => ../../../../../../../../
