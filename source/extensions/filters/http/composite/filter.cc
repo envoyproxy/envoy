@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/composite/filter.h"
 
 #include <map>
-#include <vector>
 
 #include "envoy/http/filter.h"
 
@@ -12,36 +11,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
-
-constexpr absl::string_view MatchedActionsFilterStateKey =
-    "envoy.extensions.filters.http.composite.matched_actions";
-
-class MatchedActionInfoType : public StreamInfo::FilterState::Object {
-public:
-  MatchedActionInfoType() {}
-
-  ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
-
-  absl::optional<std::string> serializeAsString() const override {
-    return Json::Factory::loadFromProtobufStruct(*buildProtoStruct().get())->asJsonString();
-  }
-
-  void setFilterAction(const std::string& filter, const std::string& action) {
-    actions[filter] = action;
-  }
-
-private:
-  std::unique_ptr<ProtobufWkt::Struct> buildProtoStruct() const {
-    auto message = std::make_unique<ProtobufWkt::Struct>();
-    auto& fields = *message->mutable_fields();
-    for (const auto& p : actions) {
-      fields[p.first] = ValueUtil::stringValue(p.second);
-    }
-    return message;
-  }
-
-  std::map<std::string, std::string> actions;
-};
 
 namespace {
 // Helper that returns `filter->func(args...)` if the filter is not null, returning `rval`
@@ -61,6 +30,24 @@ template <class... Ts> struct Overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
 } // namespace
+
+std::unique_ptr<ProtobufWkt::Struct> MatchedActionInfoType::buildProtoStruct() const {
+  auto message = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *message->mutable_fields();
+  for (const auto& p : actions) {
+    fields[p.first] = ValueUtil::stringValue(p.second);
+  }
+  return message;
+}
+
+absl::optional<std::string> MatchedActionInfoType::serializeAsString() const {
+  return Json::Factory::loadFromProtobufStruct(*buildProtoStruct().get())->asJsonString();
+}
+
+void MatchedActionInfoType::setFilterAction(const std::string& filter, const std::string& action) {
+  actions[filter] = action;
+}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   decoded_headers_ = true;
 
@@ -129,18 +116,27 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
                   wrapper.errors_, [](const auto& status) { return status.ToString(); }));
     return;
   }
+  std::string actionName = composite_action.actionName();
 
   if (wrapper.filter_to_inject_.has_value()) {
     stats_.filter_delegation_success_.inc();
 
     auto createDelegatedFilterFn = Overloaded{
-        [this](Http::StreamDecoderFilterSharedPtr filter) {
+        [this, actionName](Http::StreamDecoderFilterSharedPtr filter) {
           delegated_filter_ = std::make_shared<StreamFilterWrapper>(std::move(filter));
+          updateFilterState(decoder_callbacks_, std::string(decoder_callbacks_->filterConfigName()),
+                            actionName);
         },
-        [this](Http::StreamEncoderFilterSharedPtr filter) {
+        [this, actionName](Http::StreamEncoderFilterSharedPtr filter) {
           delegated_filter_ = std::make_shared<StreamFilterWrapper>(std::move(filter));
+          updateFilterState(encoder_callbacks_, std::string(encoder_callbacks_->filterConfigName()),
+                            actionName);
         },
-        [this](Http::StreamFilterSharedPtr filter) { delegated_filter_ = std::move(filter); }};
+        [this, actionName](Http::StreamFilterSharedPtr filter) {
+          delegated_filter_ = std::move(filter);
+          updateFilterState(decoder_callbacks_, std::string(decoder_callbacks_->filterConfigName()),
+                            actionName);
+        }};
     absl::visit(createDelegatedFilterFn, std::move(wrapper.filter_to_inject_.value()));
 
     delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
@@ -157,7 +153,6 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 
 void Filter::updateFilterState(Http::StreamFilterCallbacks* callback,
                                const std::string& filter_name, const std::string& action_name) {
-
   auto* info = callback->streamInfo().filterState()->getDataMutable<MatchedActionInfoType>(
       MatchedActionsFilterStateKey);
   if (info != nullptr) {

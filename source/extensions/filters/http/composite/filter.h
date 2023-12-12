@@ -15,6 +15,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
+constexpr absl::string_view MatchedActionsFilterStateKey =
+    "envoy.extensions.filters.http.composite.matched_actions";
+
 struct FactoryCallbacksWrapper;
 
 #define ALL_COMPOSITE_FILTER_STATS(COUNTER)                                                        \
@@ -23,6 +26,22 @@ struct FactoryCallbacksWrapper;
 
 struct FilterStats {
   ALL_COMPOSITE_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class MatchedActionInfoType : public StreamInfo::FilterState::Object {
+public:
+  MatchedActionInfoType() {}
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
+
+  absl::optional<std::string> serializeAsString() const override;
+
+  void setFilterAction(const std::string& filter, const std::string& action);
+
+private:
+  std::unique_ptr<ProtobufWkt::Struct> buildProtoStruct() const;
+
+  std::map<std::string, std::string> actions;
 };
 
 class Filter : public Http::StreamFilter,

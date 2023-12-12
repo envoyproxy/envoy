@@ -9,6 +9,8 @@
 
 #include "gtest/gtest.h"
 
+using Envoy::Protobuf::util::MessageDifferencer;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -71,12 +73,29 @@ public:
     filter_.encodeComplete();
   }
 
+  template <class T>
+  void setupStreamInfo(T& callback, std::shared_ptr<StreamInfo::FilterState> filter_state) {
+    EXPECT_CALL(callback, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info_));
+    EXPECT_CALL(callback, filterConfigName()).WillRepeatedly(testing::Return("rootFilterName"));
+    EXPECT_CALL(stream_info_, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
+  }
+
+  void expectFilterStateInfo(std::shared_ptr<StreamInfo::FilterState> filter_state) {
+    auto* info = filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey);
+    EXPECT_NE(nullptr, info);
+    ProtobufWkt::Struct expected;
+    auto& fields = *expected.mutable_fields();
+    fields["rootFilterName"] = ValueUtil::stringValue("actionName");
+    EXPECT_TRUE(MessageDifferencer::Equals(expected, *(info->serializeAsProto())));
+  }
+
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Stats::MockCounter error_counter_;
   Stats::MockCounter success_counter_;
   FilterStats stats_{error_counter_, success_counter_};
   Filter filter_;
+  StreamInfo::MockStreamInfo stream_info_;
 
   Http::TestRequestHeaderMapImpl default_request_headers_{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
@@ -89,6 +108,10 @@ public:
 TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
 
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(encoder_callbacks_, filter_state);
+
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);
   };
@@ -98,9 +121,12 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
+  expectFilterStateInfo(filter_state);
+
   doAllDecodingCallbacks();
   expectDelegatedEncoding(*stream_filter);
   doAllEncodingCallbacks();
+
   EXPECT_CALL(*stream_filter, onStreamComplete());
   EXPECT_CALL(*stream_filter, onDestroy());
   filter_.onStreamComplete();
@@ -110,6 +136,10 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
 TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   auto stream_filter = std::make_shared<Http::MockStreamDecoderFilter>();
 
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(decoder_callbacks_, filter_state);
+
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamDecoderFilter(stream_filter);
   };
@@ -118,6 +148,8 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
+
+  expectFilterStateInfo(filter_state);
 
   expectDelegatedDecoding(*stream_filter);
   doAllDecodingCallbacks();
@@ -131,6 +163,10 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
 TEST_F(FilterTest, StreamFilterDelegation) {
   auto stream_filter = std::make_shared<Http::MockStreamFilter>();
 
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(decoder_callbacks_, filter_state);
+
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamFilter(stream_filter);
   };
@@ -140,6 +176,8 @@ TEST_F(FilterTest, StreamFilterDelegation) {
   EXPECT_CALL(success_counter_, inc());
   ExecuteFilterAction action(factory_callback, "actionName");
   filter_.onMatchCallback(action);
+
+  expectFilterStateInfo(filter_state);
 
   expectDelegatedDecoding(*stream_filter);
   doAllDecodingCallbacks();
@@ -153,6 +191,10 @@ TEST_F(FilterTest, StreamFilterDelegation) {
 TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
   auto stream_filter = std::make_shared<Http::MockStreamFilter>();
 
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(decoder_callbacks_, filter_state);
+
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamFilter(stream_filter);
     cb.addStreamFilter(stream_filter);
@@ -161,6 +203,9 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
   ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
+
+  EXPECT_EQ(nullptr,
+            filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -171,6 +216,10 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
 TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
   auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
 
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(decoder_callbacks_, filter_state);
+
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamDecoderFilter(decoder_filter);
     cb.addStreamDecoderFilter(decoder_filter);
@@ -179,6 +228,9 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
   ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
+
+  EXPECT_EQ(nullptr,
+            filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -189,6 +241,10 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
 TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
 
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(encoder_callbacks_, filter_state);
+
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(encode_filter);
     cb.addStreamEncoderFilter(encode_filter);
@@ -197,6 +253,9 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
+
+  EXPECT_EQ(nullptr,
+            filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -210,6 +269,10 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   auto access_log_1 = std::make_shared<AccessLog::MockInstance>();
   auto access_log_2 = std::make_shared<AccessLog::MockInstance>();
 
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(encoder_callbacks_, filter_state);
+
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(encode_filter);
     cb.addAccessLogHandler(access_log_1);
@@ -221,6 +284,8 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
+  expectFilterStateInfo(filter_state);
+
   doAllDecodingCallbacks();
   expectDelegatedEncoding(*encode_filter);
   doAllEncodingCallbacks();
@@ -230,7 +295,71 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
 
   EXPECT_CALL(*access_log_1, log(_, _));
   EXPECT_CALL(*access_log_2, log(_, _));
-  filter_.log({}, StreamInfo::MockStreamInfo());
+  filter_.log({}, stream_info_);
+}
+
+TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
+  auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(encoder_callbacks_, filter_state);
+  auto filter_state_object = std::make_shared<MatchedActionInfoType>();
+  filter_state_object->setFilterAction("rootFilterName", "oldActionName");
+  filter_state->setData(MatchedActionsFilterStateKey, filter_state_object,
+                        StreamInfo::FilterState::StateType::Mutable,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamEncoderFilter(stream_filter);
+  };
+
+  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  ExecuteFilterAction action(factory_callback, "actionName");
+  EXPECT_CALL(success_counter_, inc());
+  filter_.onMatchCallback(action);
+
+  expectFilterStateInfo(filter_state);
+
+  EXPECT_CALL(*stream_filter, onStreamComplete());
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onStreamComplete();
+  filter_.onDestroy();
+}
+
+TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
+  auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  setupStreamInfo(encoder_callbacks_, filter_state);
+  auto filter_state_object = std::make_shared<MatchedActionInfoType>();
+  filter_state_object->setFilterAction("otherRootFilterName", "anyActionName");
+  filter_state->setData(MatchedActionsFilterStateKey, filter_state_object,
+                        StreamInfo::FilterState::StateType::Mutable,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamEncoderFilter(stream_filter);
+  };
+
+  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  ExecuteFilterAction action(factory_callback, "actionName");
+  EXPECT_CALL(success_counter_, inc());
+  filter_.onMatchCallback(action);
+
+  auto* info = filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey);
+  EXPECT_NE(nullptr, info);
+  ProtobufWkt::Struct expected;
+  auto& fields = *expected.mutable_fields();
+  fields["otherRootFilterName"] = ValueUtil::stringValue("anyActionName");
+  fields["rootFilterName"] = ValueUtil::stringValue("actionName");
+  EXPECT_TRUE(MessageDifferencer::Equals(expected, *(info->serializeAsProto())));
+
+  EXPECT_CALL(*stream_filter, onStreamComplete());
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onStreamComplete();
+  filter_.onDestroy();
 }
 
 } // namespace
