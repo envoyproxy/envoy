@@ -172,9 +172,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_stream_interface",
+    hdrs = ["grpc_stream_interface.h"],
+    deps = [
+        "//source/common/grpc:async_client_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_stream_lib",
     hdrs = ["grpc_stream.h"],
     deps = [
+        ":grpc_stream_interface",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
         "//envoy/grpc:async_client_interface",
