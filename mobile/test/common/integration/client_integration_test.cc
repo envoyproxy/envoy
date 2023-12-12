@@ -132,7 +132,7 @@ public:
   void explicitFlowControlWithCancels();
 
   static std::string protocolToString(Http::CodecType type) {
-    if (type == Http::CodecType::HTTP1) {
+    if (type == Http::CodecType::HTTP3) {
       return "Http3Upstream";
     }
     if (type == Http::CodecType::HTTP2) {
