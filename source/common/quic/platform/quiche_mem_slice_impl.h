@@ -13,6 +13,7 @@
 #include "source/common/buffer/buffer_impl.h"
 
 #include "quiche/common/quiche_buffer_allocator.h"
+#include "quiche/common/quiche_callbacks.h"
 
 namespace quiche {
 
@@ -28,6 +29,7 @@ public:
   // Constructs a QuicheMemSliceImpl by taking ownership of the memory in `buffer`.
   QuicheMemSliceImpl(quiche::QuicheBuffer buffer);
   QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
+  QuicheMemSliceImpl(char buffer[], size_t length, SingleUseCallback<void(const char*)>);
 
   // Constructs a QuicheMemSliceImpl and moves the first slice of `buffer` into
   // it. Prerequisite: `buffer` must be non-empty, and its first slice must

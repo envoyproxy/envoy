@@ -11,4 +11,4 @@ if [[ -z "$DEP" ]]; then
     exit 1
 fi
 
-$JQ -r ".${DEP}" "$VERSIONS"
+$JQ -r ".[\"${DEP}\"]" "$VERSIONS"

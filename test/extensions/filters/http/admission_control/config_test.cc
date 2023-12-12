@@ -77,7 +77,7 @@ success_criteria:
   EXPECT_THROW_WITH_MESSAGE(
       admission_control_filter_factory
           .createFilterFactoryFromProtoTyped(proto, "whatever", dual_info_,
-                                             factory_context.getServerFactoryContext())
+                                             factory_context.serverFactoryContext())
           .status()
           .IgnoreError(),
       EnvoyException, "Success rate threshold cannot be less than 1.0%.");
@@ -108,7 +108,7 @@ success_criteria:
   EXPECT_THROW_WITH_MESSAGE(
       admission_control_filter_factory
           .createFilterFactoryFromProtoTyped(proto, "whatever", dual_info_,
-                                             factory_context.getServerFactoryContext())
+                                             factory_context.serverFactoryContext())
           .status()
           .IgnoreError(),
       EnvoyException, "Success rate threshold cannot be less than 1.0%.");

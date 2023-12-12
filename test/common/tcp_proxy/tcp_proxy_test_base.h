@@ -60,7 +60,7 @@ inline Config constructConfigFromYaml(const std::string& yaml,
 class TcpProxyTestBase : public testing::Test {
 public:
   TcpProxyTestBase() {
-    ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
+    ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
         .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {

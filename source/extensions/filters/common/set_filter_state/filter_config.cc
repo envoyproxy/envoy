@@ -10,7 +10,7 @@ namespace SetFilterState {
 
 std::vector<Value>
 Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
-              Server::Configuration::CommonFactoryContext& context) const {
+              Server::Configuration::GenericFactoryContext& context) const {
   std::vector<Value> values;
   values.reserve(proto_values.size());
   for (const auto& proto_value : proto_values) {

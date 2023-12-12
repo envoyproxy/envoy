@@ -95,13 +95,9 @@ genrule(
 envoy_genjson(
     name = "build-images",
     filter = """
-    .[0].on.workflow_call.inputs
-      | to_entries
-      | map(select(.key | startswith("build_image") and . != "build_image_repo")
-         | {(.key | gsub("build_image_"; "")): .value.default})
-      | add
+    .[0]["build-image"]
     """,
-    yaml_srcs = ["//:.github/workflows/_env.yml"],
+    yaml_srcs = ["//:.github/config.yml"],
 )
 
 sh_binary(

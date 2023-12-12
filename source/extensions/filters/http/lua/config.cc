@@ -14,7 +14,7 @@ namespace Lua {
 Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   FilterConfigConstSharedPtr filter_config(
       new FilterConfig{proto_config, server_context.threadLocal(), server_context.clusterManager(),

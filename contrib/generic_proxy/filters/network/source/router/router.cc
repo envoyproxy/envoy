@@ -11,6 +11,7 @@
 #include "source/common/tracing/tracer_impl.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
+#include "contrib/generic_proxy/filters/network/source/tracing.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -270,7 +271,7 @@ void OwnedGenericUpstream::onDecodingFailure() {
 
 UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr generic_upstream)
     : parent_(parent), generic_upstream_(std::move(generic_upstream)),
-      stream_info_(parent.context_.mainThreadDispatcher().timeSource(), nullptr) {
+      stream_info_(parent.context_.serverFactoryContext().timeSource(), nullptr) {
 
   // Set the upstream info for the stream info.
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -288,7 +289,7 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr 
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         tracing_config_.value().get(),
         absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
-        parent.context_.mainThreadDispatcher().timeSource().systemTime());
+        parent.context_.serverFactoryContext().timeSource().systemTime());
   }
 }
 
@@ -308,7 +309,8 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
   if (span_ != nullptr) {
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, resetReasonToStringView(reason));
-    Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_stream_, stream_info_,
+    TraceContextBridge trace_context{*parent_.request_stream_};
+    Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
                                          tracing_config_.value().get(), true);
   }
 
@@ -327,7 +329,8 @@ void UpstreamRequest::clearStream(bool close_connection) {
   ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request");
 
   if (span_ != nullptr) {
-    Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_stream_, stream_info_,
+    TraceContextBridge trace_context{*parent_.request_stream_};
+    Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
                                          tracing_config_.value().get(), true);
   }
 
@@ -408,7 +411,8 @@ void UpstreamRequest::onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr 
   onUpstreamHostSelected(std::move(host));
 
   if (span_ != nullptr) {
-    span_->injectContext(*parent_.request_stream_, upstream_host_);
+    TraceContextBridge trace_context{*parent_.request_stream_};
+    span_->injectContext(trace_context, upstream_host_);
   }
 
   sendRequestStartToUpstream();
@@ -540,7 +544,8 @@ void RouterFilter::resetStream(StreamResetReason reason) {
 void RouterFilter::kickOffNewUpstreamRequest() {
   const auto& cluster_name = route_entry_->clusterName();
 
-  auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster_name);
+  auto thread_local_cluster =
+      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
     filter_complete_ = true;
     callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));

@@ -147,9 +147,9 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   if (!bootstrap) {
     result = run_engine(engine, string_config, string_log_level);
   } else {
-    auto options = std::make_unique<Envoy::OptionsImpl>();
+    auto options = std::make_unique<Envoy::OptionsImplBase>();
     options->setConfigProto(std::move(bootstrap));
-    options->setLogLevel(options->parseAndValidateLogLevel(string_log_level));
+    ENVOY_BUG(options->setLogLevel(string_log_level).ok(), "invalid log level");
     options->setConcurrency(1);
     result = reinterpret_cast<Envoy::Engine*>(engine)->run(std::move(options));
   }
@@ -921,7 +921,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_startStream(
     JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject j_context,
-    jboolean explicit_flow_control, jlong min_delivery_size) {
+    jboolean explicit_flow_control) {
 
   // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref.
   jobject retained_context = env->NewGlobalRef(j_context);
@@ -936,7 +936,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
                                            retained_context};
   envoy_status_t result = start_stream(static_cast<envoy_engine_t>(engine_handle),
                                        static_cast<envoy_stream_t>(stream_handle), native_callbacks,
-                                       explicit_flow_control, min_delivery_size);
+                                       explicit_flow_control);
   if (result != ENVOY_SUCCESS) {
     env->DeleteGlobalRef(retained_context); // No callbacks are fired and we need to release
   }
