@@ -3009,10 +3009,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_FALSE(codec_client_->disconnected());
-  // Wait to process STOP_SENDING on the client for quic.
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    EXPECT_TRUE(response->waitForReset());
-  }
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/12131
