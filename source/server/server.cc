@@ -789,7 +789,9 @@ void InstanceBase::onClusterManagerPrimaryInitializationComplete() {
 void InstanceBase::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
   // Initializing can throw exceptions, so catch these.
-  TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
+  TRY_ASSERT_MAIN_THREAD {
+    THROW_IF_NOT_OK(clusterManager().initializeSecondaryClusters(bootstrap_));
+  }
   END_TRY
   CATCH(const EnvoyException& e, {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
