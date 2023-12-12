@@ -55,19 +55,13 @@ jobs:
           target: java_tests_linux
           args: >-
             test
-            --build_tests_only
-            --config=test-android
-            --config=mobile-remote-ci
-            --define=signal_trace=disabled
+            --config=mobile-remote-ci-android
             //test/java/...
         - name: kotlin
           target: kotlin_tests_linux
           args: >-
             test
-            --build_tests_only
-            --config=test-android
-            --config=mobile-remote-ci
-            --define=signal_trace=disabled
+            --config=mobile-remote-ci-android
             //test/kotlin/...
 
   request:

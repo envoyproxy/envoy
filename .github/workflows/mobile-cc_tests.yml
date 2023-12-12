@@ -43,9 +43,7 @@ jobs:
     with:
       args: >-
         test
-        --action_env=LD_LIBRARY_PATH
-        --copt=-DUSE_API_LISTENER
-        --config=mobile-remote-ci
+        --config=mobile-remote-ci-cc
         //test/cc/...
       request: ${{ needs.load.outputs.request }}
       target: cc-tests

@@ -57,19 +57,14 @@ jobs:
         - name: Run swift library tests
           args: >-
             test
-            --experimental_ui_max_stdouterr_bytes=10485760
-            --config=ios
-            --build_tests_only
-            --config=mobile-remote-ci-macos
+            --config=mobile-remote-ci-macos-ios-swift
             //test/swift/...
           target: swift-tests
           timeout-minutes: 120
         - name: Run Objective-C library tests
           args: >-
             test
-            --config=ios
-            --build_tests_only
-            --config=mobile-remote-ci-macos
+            --config=mobile-remote-ci-macos-ios-obj-c
             //test/objective-c/...
             //test/cc/unit:envoy_config_test
           target: c-and-objc-tests

@@ -44,7 +44,6 @@ jobs:
     with:
       args: >-
         test
-        --test_env=ENVOY_IP_TEST_VERSIONS=v4only
         --config=mobile-remote-ci-linux-tsan
         //test/common/...
         //test/cc/...
