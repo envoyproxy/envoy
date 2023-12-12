@@ -538,7 +538,7 @@ message CertificateValidationContext {
   // Defines maximum depth of a certificate chain accepted in verification, the default limit is 100, though this can be system-dependent.
   // This number does not include the leaf but includes the trust anchor, so a depth of 1 allows the leaf and one CA certificate. If a trusted issuer
   // appears in the chain, but in a depth larger than configured, the certificate validation will fail.
-  // This matches the semantics of `SSL_CTX_set_verify_depth` in OpenSSL 1.0.x and older versions of BoringSSL. It differs from `SSL_CTX_set_verify_depth`
+  // This matches the semantics of ``SSL_CTX_set_verify_depth`` in OpenSSL 1.0.x and older versions of BoringSSL. It differs from ``SSL_CTX_set_verify_depth``
   // in OpenSSL 1.1.x and newer versions of BoringSSL in that the trust anchor is included.
   // Trusted issues are specified by setting :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`
   google.protobuf.UInt32Value max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
