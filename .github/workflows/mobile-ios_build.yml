@@ -100,7 +100,7 @@ jobs:
             - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
               with:
                 app: //examples/swift/hello_world:app
-                status: 200
+                status: 301
           target: swift-hello-world
           timeout-minutes: 50
 
@@ -140,7 +140,7 @@ jobs:
             - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
               with:
                 app: //test/swift/apps/baseline:app
-                status: 200
+                status: 301
           target: swift-baseline-app
         - name: Build swift experimental app
           args: >-
@@ -153,7 +153,7 @@ jobs:
                 app: //test/swift/apps/experimental:app
                 args: >-
                   --config=mobile-remote-ci-macos-ios-admin
-                status: 200
+                status: 301
           target: swift-experimental-app
         - name: Build swift async await
           args: >-
