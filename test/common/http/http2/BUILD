@@ -180,6 +180,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -190,6 +191,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

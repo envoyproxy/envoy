@@ -1,51 +1,53 @@
-name: Envoy/windows
+name: Envoy/Windows
 
 permissions:
   contents: read
 
 on:
-  push:
-    branches:
-    - main
-    - release/v*
-  pull_request_target:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
+
 jobs:
-  env:
-    uses: ./.github/workflows/_env.yml
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
     permissions:
+      actions: read
       contents: read
+      packages: read
       pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
     with:
-      prime-build-image: false
-      check-mobile-run: false
+      cache-docker: false
+      check-name: windows
 
   windows:
-    needs:
-    - env
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - target: ci/windows_ci_steps.sh
-          name: Windows 2019
-    uses: ./.github/workflows/_ci.yml
-    name: CI ${{ matrix.name || matrix.target }}
+    permissions:
+      contents: read
+      packages: read
     secrets:
       rbe-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.build-windows }}
+    needs:
+    - load
+    uses: ./.github/workflows/_run.yml
+    name: CI ${{ matrix.name || matrix.target }}
     with:
-      target: ${{ matrix.target }}
+      command:
+      request: ${{ needs.load.outputs.request }}
       runs-on: envoy-win19-small
-      command-ci:
-      repo-ref: ${{ needs.env.outputs.repo-ref }}
-      steps-post:
-      temp-dir: 'C:\Users\runner\AppData\Local\Temp\bazel-shared'
-      upload-name: windows.release
-      upload-path: 'C:\Users\runner\AppData\Local\Temp\envoy'
       source: |
         export ENVOY_SHARED_TMP_DIR="C:\Users\runner\AppData\Local\Temp\bazel-shared"
         export ENVOY_DOCKER_BUILD_DIR="C:\Users\runner\AppData\Local\Temp"
@@ -60,10 +62,22 @@ jobs:
           --jobs=75
           --flaky_test_attempts=2)
         export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
+      steps-post:
+      target: ${{ matrix.target }}
+      temp-dir: 'C:\Users\runner\AppData\Local\Temp\bazel-shared'
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      upload-name: windows.release
+      upload-path: 'C:\Users\runner\AppData\Local\Temp\envoy'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: ci/windows_ci_steps.sh
+          name: Windows 2019
 
   docker:
     needs:
-    - env
+    - load
     - windows
     strategy:
       fail-fast: false
@@ -85,7 +99,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: ${{ needs.env.outputs.repo_ref  }}
+        ref: ${{ needs.load.outputs.repo_ref  }}
     - uses: actions/download-artifact@v3
       with:
         name: windows.release
@@ -99,8 +113,27 @@ jobs:
       shell: bash
       env:
         CI_BRANCH: ${{ github.ref }}
-        DOCKERHUB_USERNAME: ${{ needs.env.outputs.trusted == 'true' && secrets.DOCKERHUB_USERNAME || '' }}
-        DOCKERHUB_PASSWORD: ${{ needs.env.outputs.trusted == 'true' && secrets.DOCKERHUB_PASSWORD || '' }}
+        DOCKERHUB_USERNAME: ${{ fromJSON(needs.load.outputs.trusted) && secrets.DOCKERHUB_USERNAME || '' }}
+        DOCKERHUB_PASSWORD: ${{ fromJSON(needs.load.outputs.trusted) && secrets.DOCKERHUB_PASSWORD || '' }}
         WINDOWS_BUILD_TYPE: ${{ matrix.build-type }}
         WINDOWS_IMAGE_BASE: ${{ matrix.image-base }}
         WINDOWS_IMAGE_TAG: ${{ matrix.image-tag }}
+  request:
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.build-windows }}
+    needs:
+    - load
+    - windows
+    - docker
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

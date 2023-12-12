@@ -170,6 +170,7 @@ public:
   MOCK_METHOD(std::vector<InternalRedirectPredicateSharedPtr>, predicates, (), (const));
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(bool, isCrossSchemeRedirectAllowed, (), (const));
+  MOCK_METHOD(const std::vector<Http::LowerCaseString>&, responseHeadersToCopy, (), (const));
 };
 
 class MockInternalRedirectPredicate : public InternalRedirectPredicate {

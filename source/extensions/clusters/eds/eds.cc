@@ -214,6 +214,12 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
     }
   }
 
+  // Drop overload configuration parsing.
+  absl::Status status = parseDropOverloadConfig(cluster_load_assignment);
+  if (!status.ok()) {
+    return status;
+  }
+
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
   if (transport_factory_context_->clusterManager().adsMux()) {

@@ -28,7 +28,7 @@ public:
   template <class FormatterContext = HttpFormatterContext>
   static FormatterBasePtr<FormatterContext>
   fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
-                  Server::GenericFactoryContextImpl context) {
+                  Server::Configuration::GenericFactoryContext& context) {
     // Instantiate formatter extensions.
     std::vector<CommandParserBasePtr<FormatterContext>> commands;
     for (const auto& formatter : config.formatters()) {

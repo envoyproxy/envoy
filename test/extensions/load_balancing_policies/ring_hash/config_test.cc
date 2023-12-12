@@ -16,7 +16,7 @@ namespace RingHash {
 namespace {
 
 TEST(RingHashConfigTest, Validate) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Upstream::MockClusterInfo> cluster_info;
   NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
   NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
