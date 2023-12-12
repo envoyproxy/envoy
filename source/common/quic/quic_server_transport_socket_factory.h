@@ -1,8 +1,17 @@
 #pragma once
 
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/server/transport_socket_config.h"
+#include "envoy/ssl/context_config.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 namespace Envoy {
+namespace Quic {
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
 // differentiate server and client side context config.
@@ -47,6 +56,7 @@ private:
   Ssl::ServerContextConfigPtr config_;
   bool enable_early_data_;
 };
+
 class QuicServerTransportSocketConfigFactory
     : public QuicTransportSocketConfigFactory,
       public Server::Configuration::DownstreamTransportSocketConfigFactory {
@@ -63,4 +73,5 @@ public:
 
 DECLARE_FACTORY(QuicServerTransportSocketConfigFactory);
 
+} // namespace Quic
 } // namespace Envoy

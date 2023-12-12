@@ -8,6 +8,7 @@
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
+namespace Quic {
 
 Network::DownstreamTransportSocketFactoryPtr
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
@@ -38,4 +39,5 @@ ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyCon
 REGISTER_FACTORY(QuicServerTransportSocketConfigFactory,
                  Server::Configuration::DownstreamTransportSocketConfigFactory);
 
+} // namespace Quic
 } // namespace Envoy

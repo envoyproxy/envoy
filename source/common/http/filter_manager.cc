@@ -577,8 +577,14 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ |= FilterCallState::EndOfStream;
+    }
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
+    }
     if (state_.decoder_filter_chain_aborted_) {
       executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace,
@@ -708,7 +714,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     // is called in decodeData during a previous filter invocation, at which point we communicate to
     // the current and future filters that the stream has not yet ended.
     if (end_stream) {
-      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+      state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
 
     recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
@@ -721,7 +727,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     }
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
     if (end_stream) {
-      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+      state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
     }
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
@@ -762,7 +768,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
 RequestTrailerMap& FilterManager::addDecodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
-  ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
+  ASSERT(state_.filter_call_state_ & FilterCallState::EndOfStream);
 
   filter_manager_callbacks_.setRequestTrailers(RequestTrailerMapImpl::create());
   return *filter_manager_callbacks_.requestTrailers();
@@ -1204,6 +1210,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == encoder_filters_.end());
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ |= FilterCallState::EndOfStream;
+    }
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace,
@@ -1217,6 +1226,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
            "encodeHeaders when end_stream is already false");
 
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
+    }
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
@@ -1324,7 +1336,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
 
 ResponseTrailerMap& FilterManager::addEncodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
-  ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
+  ASSERT(state_.filter_call_state_ & FilterCallState::EndOfStream);
 
   // Trailers can only be added once.
   ASSERT(!filter_manager_callbacks_.responseTrailers());
@@ -1383,7 +1395,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     // the current and future filters that the stream has not yet ended.
     state_.filter_call_state_ |= FilterCallState::EncodeData;
     if (end_stream) {
-      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+      state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
 
     recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
@@ -1400,7 +1412,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     }
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     if (end_stream) {
-      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+      state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
     }
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));

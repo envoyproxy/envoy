@@ -31,6 +31,11 @@ behavior_changes:
     Discard the ``Host`` header if the ``:authority`` header was received to bring Envoy into compliance with
     https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1 This behavioral change can be reverted by setting runtime flag
     ``envoy.reloadable_features.http2_discard_host_header`` to false.
+- area: grpc reverse bridge
+  change: |
+    Handle empty response bodies in grpc_http1_reverse_bridge. This may cause problems for clients expecting the filter to crash
+    for empty responses.  This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -277,5 +282,8 @@ new_features:
     added :ref:`ignore_query_parameters
     <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.ignore_query_parameters>` option for
     automatically stripping query parameters in request URL path.
+- area: access_log
+  change: |
+    Added new access log command operator ``%EMIT_TIME%`` to get the time when the log entry is emitted.
 
 deprecated:
