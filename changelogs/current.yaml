@@ -38,7 +38,7 @@ behavior_changes:
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` to false.
 - area: admin
   change: |
-    Switch no admin ``warning`` -> ``info``
+    Switch no admin ``warning`` -> ``info``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
