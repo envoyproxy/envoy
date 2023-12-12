@@ -2987,6 +2987,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_TRUE(response->complete());
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
