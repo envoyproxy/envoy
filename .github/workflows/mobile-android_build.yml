@@ -43,9 +43,7 @@ jobs:
     with:
       args: >-
         build
-        --config=mobile-remote-release-clang
-        --fat_apk_cpu=x86_64
-        --linkopt=-fuse-ld=lld
+        --config=mobile-remote-release-clang-android
         //:android_dist
       container: ${{ fromJSON(needs.load.outputs.build-image).mobile }}
       diskspace-hack: true
@@ -71,17 +69,15 @@ jobs:
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       args: >-
         build
-        --config=mobile-remote-release-clang
-        --fat_apk_cpu=x86_64
-        --linkopt=-fuse-ld=lld
+        --config=mobile-remote-release-clang-android
         //examples/kotlin/hello_world:hello_envoy_kt
       request: ${{ needs.load.outputs.request }}
       target: kotlin-hello-world
       runs-on: envoy-x64-small
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.13
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.14
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.13
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.14
           with:
             apk: bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
             app: io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
@@ -108,7 +104,7 @@ jobs:
       target: ${{ matrix.target }}
       runs-on: envoy-x64-small
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.13
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.14
       steps-post: ${{ matrix.steps-post }}
       timeout-minutes: 50
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
@@ -119,7 +115,7 @@ jobs:
         include:
         - name: java-hello-world
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.13
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.14
               with:
                 apk: bazel-bin/examples/java/hello_world/hello_envoy.apk
                 app: io.envoyproxy.envoymobile.helloenvoy/.MainActivity
@@ -127,9 +123,7 @@ jobs:
           target: java-hello-world
           args: >-
             build
-            --config=mobile-remote-release-clang
-            --fat_apk_cpu=x86_64
-            --linkopt=-fuse-ld=lld
+            --config=mobile-remote-release-clang-android
             //examples/java/hello_world:hello_envoy
         - name: kotlin-baseline-app
           # Return to using:
@@ -137,12 +131,10 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release-clang
-            --fat_apk_cpu=x86_64
-            --linkopt=-fuse-ld=lld
+            --config=mobile-remote-release-clang-android
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.13
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.14
               with:
                 apk: bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
@@ -154,12 +146,10 @@ jobs:
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
-            --config=mobile-remote-release-clang
-            --fat_apk_cpu=x86_64
-            --linkopt=-fuse-ld=lld
+            --config=mobile-remote-release-clang-android
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.13
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.14
               with:
                 apk: bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity

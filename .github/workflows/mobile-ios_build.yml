@@ -58,8 +58,7 @@ jobs:
         - name: Build Envoy.framework distributable
           args: >-
             build
-            --config=ios
-            --config=mobile-remote-ci-macos
+            --config=mobile-remote-ci-macos-ios
             //library/swift:ios_framework
           target: ios
           timeout-minutes: 120
@@ -95,11 +94,10 @@ jobs:
         - name: Build swift hello world
           args: >-
             build
-            --config=ios
-            --config=mobile-remote-ci-macos
+            --config=mobile-remote-ci-macos-ios
             //examples/swift/hello_world:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.14
               with:
                 app: //examples/swift/hello_world:app
                 status: 200
@@ -135,11 +133,11 @@ jobs:
         include:
         - name: Build swift baseline app
           args: >-
-            --config=ios
-            --config=mobile-remote-ci-macos
+            build
+            --config=mobile-remote-ci-macos-ios
             //test/swift/apps/baseline:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.14
               with:
                 app: //test/swift/apps/baseline:app
                 status: 200
@@ -147,38 +145,32 @@ jobs:
         - name: Build swift experimental app
           args: >-
             build
-            --config=ios
-            --config=mobile-remote-ci-macos
-            --define=admin_functionality=enabled
+            --config=mobile-remote-ci-macos-ios-admin
             //test/swift/apps/experimental:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.14
               with:
                 app: //test/swift/apps/experimental:app
                 args: >-
-                  --config=ios
-                  --config=mobile-remote-ci-macos
-                  --define=admin_functionality=enabled
+                  --config=mobile-remote-ci-macos-ios-admin
                 status: 200
           target: swift-experimental-app
         - name: Build swift async await
           args: >-
             build
-            --config=ios
-            --config=mobile-remote-ci-macos
+            --config=mobile-remote-ci-macos-ios
             //examples/swift/async_await:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.14
               with:
                 app: //examples/swift/async_await:app
           target: swift-async-await
         - name: Build objc hello world
           args: >-
-            --config=ios
-            --config=mobile-remote-ci-macos
+            --config=mobile-remote-ci-macos-ios
             //examples/objective-c/hello_world:app
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.13
+            - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.14
               with:
                 app: //examples/objective-c/hello_world:app
                 status: 301

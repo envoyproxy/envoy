@@ -43,7 +43,6 @@ jobs:
     with:
       args: >-
         test
-        --test_env=ENVOY_IP_TEST_VERSIONS=v4only
         --config=mobile-remote-ci-linux-asan
         //test/common/...
       request: ${{ needs.load.outputs.request }}

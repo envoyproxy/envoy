@@ -279,5 +279,8 @@ new_features:
     added :ref:`ignore_query_parameters
     <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.ignore_query_parameters>` option for
     automatically stripping query parameters in request URL path.
+- area: access_log
+  change: |
+    Added new access log command operator ``%EMIT_TIME%`` to get the time when the log entry is emitted.
 
 deprecated:

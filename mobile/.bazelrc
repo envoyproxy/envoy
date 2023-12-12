@@ -117,6 +117,10 @@ build:mobile-remote-release-clang --remote_download_toplevel
 build:mobile-remote-release-clang --config=ci
 build:mobile-remote-release-clang --config=remote
 
+build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
+build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
+build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
+
 # Compile releases optimizing for size (eg -Os, etc).
 build:mobile-release-common --config=sizeopt
 
@@ -186,6 +190,7 @@ build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
 build:mobile-remote-ci-linux-asan --config=clang-asan
 build:mobile-remote-ci-linux-asan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-asan --config=remote-ci
+test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 #############################################################################
 # mobile-remote-ci-linux-tsan: These options are Linux-only using Clang and ThreadSanitizer
@@ -193,6 +198,7 @@ build:mobile-remote-ci-linux-asan --config=remote-ci
 build:mobile-remote-ci-linux-tsan --config=clang-tsan
 build:mobile-remote-ci-linux-tsan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-tsan --config=remote-ci
+test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 #############################################################################
 # ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
@@ -235,3 +241,76 @@ build:mobile-remote-ci-macos --config=remote
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
+
+build:mobile-remote-ci-android --config=mobile-remote-ci
+test:mobile-remote-ci-android --build_tests_only
+test:mobile-remote-ci-android --config=test-android
+test:mobile-remote-ci-android --config=mobile-remote-ci
+test:mobile-remote-ci-android --define=signal_trace=disabled
+
+build:mobile-remote-ci-cc --config=mobile-remote-ci
+test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
+test:mobile-remote-ci-cc --copt=-DUSE_API_LISTENER
+
+build:mobile-remote-ci-cc-no-yaml --config=mobile-remote-ci
+build:mobile-remote-ci-cc-no-yaml --define=envoy_yaml=disabled
+build:mobile-remote-ci-cc-no-yaml --define=envoy_full_protos=disabled
+build:mobile-remote-ci-cc-no-yaml --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+
+build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci
+build:mobile-remote-ci-cc-no-exceptions --define=envoy_yaml=disabled
+build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
+build:mobile-remote-ci-cc-no-exceptions --copt=-fno-unwind-tables
+build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
+build:mobile-remote-ci-cc-no-exceptions --define=google_grpc=disabled
+build:mobile-remote-ci-cc-no-exceptions --define=envoy_mobile_xds=disabled
+
+
+build:mobile-remote-ci-cc-test --config=mobile-remote-ci
+test:mobile-remote-ci-cc-test --test_output=all
+test:mobile-remote-ci-cc-test --config=mobile-remote-ci
+test:mobile-remote-ci-cc-test --define=signal_trace=disabled
+test:mobile-remote-ci-cc-test --define=google_grpc=disabled
+test:mobile-remote-ci-cc-test --define=envoy_mobile_xds=disabled
+test:mobile-remote-ci-cc-test --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+
+build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
+build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
+build:mobile-remote-ci-macos-kotlin --define=signal_trace=disabled
+build:mobile-remote-ci-macos-kotlin --define=envoy_mobile_request_compression=disabled
+build:mobile-remote-ci-macos-kotlin --define=envoy_enable_http_datagrams=disabled
+build:mobile-remote-ci-macos-kotlin --define=google_grpc=disabled
+build:mobile-remote-ci-macos-kotlin --define=envoy_mobile_xds=disabled
+build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
+build:mobile-remote-ci-macos-kotlin --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+
+build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
+build:mobile-remote-ci-macos-swift --config=ios
+build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
+build:mobile-remote-ci-macos-swift --define=signal_trace=disabled
+build:mobile-remote-ci-macos-swift --define=envoy_mobile_request_compression=disabled
+build:mobile-remote-ci-macos-swift --define=envoy_mobile_stats_reporting=disabled
+build:mobile-remote-ci-macos-swift --define=envoy_mobile_swift_cxx_interop=disabled
+build:mobile-remote-ci-macos-swift --define=google_grpc=disabled
+build:mobile-remote-ci-macos-swift --define=envoy_mobile_xds=disabled
+build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
+build:mobile-remote-ci-macos-swift --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+
+build:mobile-remote-ci-core --config=mobile-remote-ci
+test:mobile-remote-ci-core --build_tests_only
+test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
+test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+
+build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
+build:mobile-remote-ci-macos-ios --config=ios
+
+build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
+build:mobile-remote-ci-macos-ios-admin --define=admin_functionality=enabled
+
+
+build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
+test:mobile-remote-ci-macos-ios-swift --experimental_ui_max_stdouterr_bytes=10485760
+test:mobile-remote-ci-macos-ios-swift --build_tests_only
+
+build:mobile-remote-ci-macos-ios-obj-c --config=mobile-remote-ci-macos-ios
+test:mobile-remote-ci-macos-ios-obj-c --build_tests_only
