@@ -46,12 +46,12 @@ using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
-#define TSAN_TIMEOUT_FACTOR 3
+#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(memory_sanitizer))
+#define TIMEOUT_FACTOR 3
 #elif defined(ENVOY_CONFIG_COVERAGE)
-#define TSAN_TIMEOUT_FACTOR 3
+#define TIMEOUT_FACTOR 3
 #else
-#define TSAN_TIMEOUT_FACTOR 1
+#define TIMEOUT_FACTOR 1
 #endif
 
 /*
@@ -586,7 +586,7 @@ public:
                                  const std::string& output_format);
 
   static constexpr std::chrono::milliseconds DefaultTimeout =
-      std::chrono::milliseconds(10000) * TSAN_TIMEOUT_FACTOR;
+      std::chrono::milliseconds(10000) * TIMEOUT_FACTOR;
 
   /**
    * Return a prefix string matcher.
