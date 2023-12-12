@@ -55,4 +55,9 @@ public:
   if (!variable.status().ok()) {                                                                   \
     return variable.status();                                                                      \
   }
+
+#define RETURN_IF_NOT_OK(variable)                                                                 \
+  if (!variable.ok()) {                                                                            \
+    return variable;                                                                               \
+  }
 } // namespace Envoy

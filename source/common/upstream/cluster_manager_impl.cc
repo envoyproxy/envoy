@@ -371,7 +371,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       makeOptRefFromPtr(xds_config_tracker_.get()));
 }
 
-void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+absl::Status ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   ASSERT(!initialized_);
   initialized_ = true;
 
@@ -405,8 +405,10 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
       // TODO(abeyad): Consider passing a lambda for a "post-cluster-init" callback, which would
       // include a conditional ads_mux_->start() call, if other uses cases for "post-cluster-init"
       // functionality pops up.
-      loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
-                  required_for_ads, active_clusters_);
+      auto status_or_cluster =
+          loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
+                      required_for_ads, active_clusters_);
+      RETURN_IF_STATUS_NOT_OK(status_or_cluster);
     }
   }
 
@@ -432,7 +434,8 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
         Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads");
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-      THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(dyn_resources.ads_config()));
+      absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
+      RETURN_IF_NOT_OK(status);
       std::string name;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         name = "envoy.config_mux.delta_grpc_mux_factory";
@@ -441,7 +444,7 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
       }
       auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
       if (!factory) {
-        throwEnvoyExceptionOrPanic(fmt::format("{} not found", name));
+        return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
       ads_mux_ = factory->create(
           Config::Utility::factoryForGrpcApiConfigSource(
@@ -451,7 +454,8 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
           std::move(custom_config_validators), std::move(backoff_strategy),
           makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
-      THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(dyn_resources.ads_config()));
+      absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
+      RETURN_IF_NOT_OK(status);
       auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
       std::string name;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
@@ -462,7 +466,7 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
 
       auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
       if (!factory) {
-        throwEnvoyExceptionOrPanic(fmt::format("{} not found", name));
+        return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
       ads_mux_ = factory->create(
           Config::Utility::factoryForGrpcApiConfigSource(
@@ -484,8 +488,12 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
             cluster.eds_cluster_config().eds_config().config_source_specifier_case())) {
       const bool required_for_ads = isBlockingAdsCluster(bootstrap, cluster.name());
       has_ads_cluster |= required_for_ads;
-      loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
-                  required_for_ads, active_clusters_);
+      auto status_or_cluster =
+          loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
+                      required_for_ads, active_clusters_);
+      if (!status_or_cluster.status().ok()) {
+        return status_or_cluster.status();
+      }
     }
   }
 
@@ -496,7 +504,7 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
   if (local_cluster_name_) {
     auto local_cluster = active_clusters_.find(local_cluster_name_.value());
     if (local_cluster == active_clusters_.end()) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("local cluster '{}' must be defined", local_cluster_name_.value()));
     }
     local_cluster_params.emplace();
@@ -540,9 +548,10 @@ void ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootstrap& boo
     // initializing, so we must start ADS here.
     ads_mux_->start();
   }
+  return absl::OkStatus();
 }
 
-void ClusterManagerImpl::initializeSecondaryClusters(
+absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   init_helper_.startInitializingSecondaryClusters();
 
@@ -550,7 +559,8 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
 
-    THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(load_stats_config));
+    absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
+    RETURN_IF_NOT_OK(status);
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
@@ -558,6 +568,7 @@ void ClusterManagerImpl::initializeSecondaryClusters(
             ->createUncachedRawAsyncClient(),
         dispatcher_);
   }
+  return absl::OkStatus();
 }
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
@@ -798,8 +809,10 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
   // before destroy to avoid early initialization complete.
-  const auto previous_cluster = loadCluster(cluster, new_hash, version_info, /*added_via_api=*/true,
-                                            /*required_for_ads=*/false, warming_clusters_);
+  auto status_or_cluster = loadCluster(cluster, new_hash, version_info, /*added_via_api=*/true,
+                                       /*required_for_ads=*/false, warming_clusters_);
+  THROW_IF_STATUS_NOT_OK(status_or_cluster, throw);
+  const ClusterDataPtr previous_cluster = std::move(status_or_cluster.value());
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   cluster_entry->cluster_->info()->configUpdateStats().warming_state_.set(1);
   if (!all_clusters_initialized) {
@@ -880,7 +893,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   return removed;
 }
 
-ClusterManagerImpl::ClusterDataPtr
+absl::StatusOr<ClusterManagerImpl::ClusterDataPtr>
 ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                 const uint64_t cluster_hash, const std::string& version_info,
                                 bool added_via_api, const bool required_for_ads,
@@ -890,7 +903,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
           factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
 
   if (!new_cluster_pair_or_error.ok()) {
-    throwEnvoyExceptionOrPanic(std::string(new_cluster_pair_or_error.status().message()));
+    return absl::InvalidArgumentError(std::string(new_cluster_pair_or_error.status().message()));
   }
   auto& new_cluster = new_cluster_pair_or_error->first;
   auto& lb = new_cluster_pair_or_error->second;
@@ -900,7 +913,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
 
   if (!added_via_api) {
     if (cluster_map.find(cluster_info->name()) != cluster_map.end()) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("cluster manager: duplicate cluster '{}'", cluster_info->name()));
     }
   }
@@ -916,13 +929,13 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   }
 
   if (cluster_provided_lb && lb == nullptr) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("cluster manager: cluster provided LB specified but cluster "
                     "'{}' did not provide one. Check cluster documentation.",
                     cluster_info->name()));
   }
   if (!cluster_provided_lb && lb != nullptr) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("cluster manager: cluster provided LB not specified but cluster "
                     "'{}' provided one. Check cluster documentation.",
                     cluster_info->name()));
@@ -1130,14 +1143,16 @@ void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicat
   });
 }
 
-void ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
+absl::Status ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
   const auto& it = active_clusters_.find(cluster);
   if (it == active_clusters_.end()) {
-    throwEnvoyExceptionOrPanic(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+    return absl::InvalidArgumentError(fmt::format("Unknown gRPC client cluster '{}'", cluster));
   }
   if (it->second->added_via_api_) {
-    throwEnvoyExceptionOrPanic(fmt::format("gRPC client cluster '{}' is not static", cluster));
+    return absl::InvalidArgumentError(
+        fmt::format("gRPC client cluster '{}' is not static", cluster));
   }
+  return absl::OkStatus();
 }
 
 void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
@@ -2210,7 +2225,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
       context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
       context_.messageValidationContext(), context_.api(), http_context_, context_.grpcContext(),
       context_.routerContext(), server_)};
-  cluster_manager_impl->init(bootstrap);
+  THROW_IF_NOT_OK(cluster_manager_impl->init(bootstrap));
   return cluster_manager_impl;
 }
 
