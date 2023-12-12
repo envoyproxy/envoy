@@ -21,7 +21,6 @@ public:
   void setUpFilter(std::string&& proto_str) {
     envoymobile::extensions::filters::http::assertion::Assertion config;
     Protobuf::TextFormat::ParseFromString(proto_str, &config);
-    std::cerr << config.DebugString();
     config_ = std::make_shared<AssertionFilterConfig>(config);
     filter_ = std::make_unique<AssertionFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
