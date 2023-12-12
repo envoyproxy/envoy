@@ -284,8 +284,7 @@ new_features:
   change: |
     Added support for injecting typed and untyped dynamic metadata with this filter, also adds the ability
     to add multiple namespaces with one filter and config to overwrite existing metadata is opt-in.
-    :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.untyped_metadata>`
-    and :ref:`typed_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.typed_metadata>`
+    :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata>`
     may now be used to configure the ``set_metadata`` filter.
 
 deprecated:
@@ -293,7 +292,6 @@ deprecated:
   change: |
     :ref:`metadata_namespace <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata_namespace>`
     and :ref:`value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.value>`
-    are deprecated. Please use the new fields
-    :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.untyped_metadata>`
-    and :ref:`typed_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.typed_metadata>`
+    are deprecated. Please use the new field
+    :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata>`
     to configure static metadata to inject.

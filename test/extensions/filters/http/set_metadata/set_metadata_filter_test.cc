@@ -5,7 +5,6 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/proto/helloworld.pb.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -165,8 +164,10 @@ TEST_F(SetMetadataFilterTest, TypedSimple) {
     metadata:
     - metadata_namespace: thenamespace
       typed_value:
-        '@type': type.googleapis.com/helloworld.HelloRequest
-        name: typed_metadata
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: foo_namespace
+        value:
+          foo: bar
   )EOF";
 
   envoy::config::core::v3::Metadata metadata;
@@ -177,10 +178,11 @@ TEST_F(SetMetadataFilterTest, TypedSimple) {
   const auto it_namespace2 = typed_metadata.find("thenamespace");
   ASSERT_NE(typed_metadata.end(), it_namespace2);
   const auto any_val = it_namespace2->second;
-  ASSERT_EQ("type.googleapis.com/helloworld.HelloRequest", any_val.type_url());
-  helloworld::HelloRequest hello_req;
-  ASSERT_TRUE(any_val.UnpackTo(&hello_req));
-  EXPECT_EQ("typed_metadata", hello_req.name());
+  ASSERT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config",
+            any_val.type_url());
+  envoy::extensions::filters::http::set_metadata::v3::Config test_cfg;
+  ASSERT_TRUE(any_val.UnpackTo(&test_cfg));
+  EXPECT_EQ("foo_namespace", test_cfg.metadata_namespace());
 }
 
 TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
@@ -323,8 +325,10 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
     metadata:
     - metadata_namespace: thenamespace
       typed_value:
-        '@type': type.googleapis.com/helloworld.HelloRequest
-        name: typed_metadata
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: foo_namespace
+        value:
+          foo: bar
   )EOF";
 
   envoy::config::core::v3::Metadata metadata;
@@ -346,10 +350,11 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
   const auto it_namespace2 = typed_metadata.find("thenamespace");
   ASSERT_NE(typed_metadata.end(), it_namespace2);
   const auto any_val = it_namespace2->second;
-  ASSERT_EQ("type.googleapis.com/helloworld.HelloRequest", any_val.type_url());
-  helloworld::HelloRequest hello_req;
-  ASSERT_TRUE(any_val.UnpackTo(&hello_req));
-  EXPECT_EQ("typed_metadata", hello_req.name());
+  ASSERT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config",
+            any_val.type_url());
+  envoy::extensions::filters::http::set_metadata::v3::Config test_cfg;
+  ASSERT_TRUE(any_val.UnpackTo(&test_cfg));
+  EXPECT_EQ("foo_namespace", test_cfg.metadata_namespace());
 }
 
 } // namespace SetMetadataFilter
