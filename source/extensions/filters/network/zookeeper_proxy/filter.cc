@@ -24,7 +24,7 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
     const std::string& stat_prefix, const uint32_t max_packet_bytes,
     const bool enable_per_opcode_request_bytes_metrics,
     const bool enable_per_opcode_response_bytes_metrics,
-    const bool enable_per_opcode_decoder_error_metrics, const bool enable_latency_threshold_metrics,
+    const bool enable_latency_threshold_metrics,
     const std::chrono::milliseconds default_latency_threshold,
     const LatencyThresholdOverrideList& latency_threshold_overrides, Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
@@ -35,7 +35,6 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
       unknown_opcode_latency_(stat_name_set_->add("unknown_opcode_latency")),
       enable_per_opcode_request_bytes_metrics_(enable_per_opcode_request_bytes_metrics),
       enable_per_opcode_response_bytes_metrics_(enable_per_opcode_response_bytes_metrics),
-      enable_per_opcode_decoder_error_metrics_(enable_per_opcode_decoder_error_metrics),
       enable_latency_threshold_metrics_(enable_latency_threshold_metrics),
       default_latency_threshold_(default_latency_threshold),
       latency_threshold_override_map_(parseLatencyThresholdOverrides(latency_threshold_overrides)) {
@@ -46,89 +45,79 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
       {"auth_rq", "digest_rq", "host_rq", "ip_rq", "ping_response_rq", "world_rq", "x509_rq"});
 
   initOpCode(OpCodes::Ping, stats_.ping_resp_, stats_.ping_resp_fast_, stats_.ping_resp_slow_,
-             stats_.ping_rq_bytes_, stats_.ping_resp_bytes_, stats_.ping_decoder_error_,
-             "ping_response");
+             stats_.ping_rq_bytes_, stats_.ping_resp_bytes_, "ping_response");
   initOpCode(OpCodes::SetAuth, stats_.auth_resp_, stats_.auth_resp_fast_, stats_.auth_resp_slow_,
-             stats_.auth_rq_bytes_, stats_.auth_resp_bytes_, stats_.auth_decoder_error_,
-             "auth_response");
+             stats_.auth_rq_bytes_, stats_.auth_resp_bytes_, "auth_response");
   initOpCode(OpCodes::GetData, stats_.getdata_resp_, stats_.getdata_resp_fast_,
              stats_.getdata_resp_slow_, stats_.getdata_rq_bytes_, stats_.getdata_resp_bytes_,
-             stats_.getdata_decoder_error_, "getdata_resp");
+             "getdata_resp");
   initOpCode(OpCodes::Create, stats_.create_resp_, stats_.create_resp_fast_,
              stats_.create_resp_slow_, stats_.create_rq_bytes_, stats_.create_resp_bytes_,
-             stats_.create_decoder_error_, "create_resp");
+             "create_resp");
   initOpCode(OpCodes::Create2, stats_.create2_resp_, stats_.create2_resp_fast_,
              stats_.create2_resp_slow_, stats_.create2_rq_bytes_, stats_.create2_resp_bytes_,
-             stats_.create2_decoder_error_, "create2_resp");
+             "create2_resp");
   initOpCode(OpCodes::CreateContainer, stats_.createcontainer_resp_,
              stats_.createcontainer_resp_fast_, stats_.createcontainer_resp_slow_,
              stats_.createcontainer_rq_bytes_, stats_.createcontainer_resp_bytes_,
-             stats_.createcontainer_decoder_error_, "createcontainer_resp");
+             "createcontainer_resp");
   initOpCode(OpCodes::CreateTtl, stats_.createttl_resp_, stats_.createttl_resp_fast_,
              stats_.createttl_resp_slow_, stats_.createttl_rq_bytes_, stats_.createttl_resp_bytes_,
-             stats_.createttl_decoder_error_, "createttl_resp");
+             "createttl_resp");
   initOpCode(OpCodes::SetData, stats_.setdata_resp_, stats_.setdata_resp_fast_,
              stats_.setdata_resp_slow_, stats_.setdata_rq_bytes_, stats_.setdata_resp_bytes_,
-             stats_.setdata_decoder_error_, "setdata_resp");
+             "setdata_resp");
   initOpCode(OpCodes::GetChildren, stats_.getchildren_resp_, stats_.getchildren_resp_fast_,
              stats_.getchildren_resp_slow_, stats_.getchildren_rq_bytes_,
-             stats_.getchildren_resp_bytes_, stats_.getchildren_decoder_error_, "getchildren_resp");
+             stats_.getchildren_resp_bytes_, "getchildren_resp");
   initOpCode(OpCodes::GetChildren2, stats_.getchildren2_resp_, stats_.getchildren2_resp_fast_,
              stats_.getchildren2_resp_slow_, stats_.getchildren2_rq_bytes_,
-             stats_.getchildren2_resp_bytes_, stats_.getchildren2_decoder_error_,
-             "getchildren2_resp");
+             stats_.getchildren2_resp_bytes_, "getchildren2_resp");
   initOpCode(OpCodes::Delete, stats_.delete_resp_, stats_.delete_resp_fast_,
              stats_.delete_resp_slow_, stats_.delete_rq_bytes_, stats_.delete_resp_bytes_,
-             stats_.delete_decoder_error_, "delete_resp");
+             "delete_resp");
   initOpCode(OpCodes::Exists, stats_.exists_resp_, stats_.exists_resp_fast_,
              stats_.exists_resp_slow_, stats_.exists_rq_bytes_, stats_.exists_resp_bytes_,
-             stats_.exists_decoder_error_, "exists_resp");
+             "exists_resp");
   initOpCode(OpCodes::GetAcl, stats_.getacl_resp_, stats_.getacl_resp_fast_,
              stats_.getacl_resp_slow_, stats_.getacl_rq_bytes_, stats_.getacl_resp_bytes_,
-             stats_.getacl_decoder_error_, "getacl_resp");
+             "getacl_resp");
   initOpCode(OpCodes::SetAcl, stats_.setacl_resp_, stats_.setacl_resp_fast_,
              stats_.setacl_resp_slow_, stats_.setacl_rq_bytes_, stats_.setacl_resp_bytes_,
-             stats_.setacl_decoder_error_, "setacl_resp");
+             "setacl_resp");
   initOpCode(OpCodes::Sync, stats_.sync_resp_, stats_.sync_resp_fast_, stats_.sync_resp_slow_,
-             stats_.sync_rq_bytes_, stats_.sync_resp_bytes_, stats_.sync_decoder_error_,
-             "sync_resp");
+             stats_.sync_rq_bytes_, stats_.sync_resp_bytes_, "sync_resp");
   initOpCode(OpCodes::Check, stats_.check_resp_, stats_.check_resp_fast_, stats_.check_resp_slow_,
-             stats_.check_rq_bytes_, stats_.check_resp_bytes_, stats_.check_decoder_error_,
-             "check_resp");
+             stats_.check_rq_bytes_, stats_.check_resp_bytes_, "check_resp");
   initOpCode(OpCodes::Multi, stats_.multi_resp_, stats_.multi_resp_fast_, stats_.multi_resp_slow_,
-             stats_.multi_rq_bytes_, stats_.multi_resp_bytes_, stats_.multi_decoder_error_,
-             "multi_resp");
+             stats_.multi_rq_bytes_, stats_.multi_resp_bytes_, "multi_resp");
   initOpCode(OpCodes::Reconfig, stats_.reconfig_resp_, stats_.reconfig_resp_fast_,
              stats_.reconfig_resp_slow_, stats_.reconfig_rq_bytes_, stats_.reconfig_resp_bytes_,
-             stats_.reconfig_decoder_error_, "reconfig_resp");
+             "reconfig_resp");
   initOpCode(OpCodes::SetWatches, stats_.setwatches_resp_, stats_.setwatches_resp_fast_,
              stats_.setwatches_resp_slow_, stats_.setwatches_rq_bytes_,
-             stats_.setwatches_resp_bytes_, stats_.setwatches_decoder_error_, "setwatches_resp");
+             stats_.setwatches_resp_bytes_, "setwatches_resp");
   initOpCode(OpCodes::SetWatches2, stats_.setwatches2_resp_, stats_.setwatches2_resp_fast_,
              stats_.setwatches2_resp_slow_, stats_.setwatches2_rq_bytes_,
-             stats_.setwatches2_resp_bytes_, stats_.setwatches2_decoder_error_, "setwatches2_resp");
+             stats_.setwatches2_resp_bytes_, "setwatches2_resp");
   initOpCode(OpCodes::AddWatch, stats_.addwatch_resp_, stats_.addwatch_resp_fast_,
              stats_.addwatch_resp_slow_, stats_.addwatch_rq_bytes_, stats_.addwatch_resp_bytes_,
-             stats_.addwatch_decoder_error_, "addwatch_resp");
+             "addwatch_resp");
   initOpCode(OpCodes::CheckWatches, stats_.checkwatches_resp_, stats_.checkwatches_resp_fast_,
              stats_.checkwatches_resp_slow_, stats_.checkwatches_rq_bytes_,
-             stats_.checkwatches_resp_bytes_, stats_.checkwatches_decoder_error_,
-             "checkwatches_resp");
+             stats_.checkwatches_resp_bytes_, "checkwatches_resp");
   initOpCode(OpCodes::RemoveWatches, stats_.removewatches_resp_, stats_.removewatches_resp_fast_,
              stats_.removewatches_resp_slow_, stats_.removewatches_rq_bytes_,
-             stats_.removewatches_resp_bytes_, stats_.removewatches_decoder_error_,
-             "removewatches_resp");
+             stats_.removewatches_resp_bytes_, "removewatches_resp");
   initOpCode(OpCodes::GetEphemerals, stats_.getephemerals_resp_, stats_.getephemerals_resp_fast_,
              stats_.getephemerals_resp_slow_, stats_.getephemerals_rq_bytes_,
-             stats_.getephemerals_resp_bytes_, stats_.getephemerals_decoder_error_,
-             "getephemerals_resp");
+             stats_.getephemerals_resp_bytes_, "getephemerals_resp");
   initOpCode(OpCodes::GetAllChildrenNumber, stats_.getallchildrennumber_resp_,
              stats_.getallchildrennumber_resp_fast_, stats_.getallchildrennumber_resp_slow_,
              stats_.getallchildrennumber_rq_bytes_, stats_.getallchildrennumber_resp_bytes_,
-             stats_.getallchildrennumber_decoder_error_, "getallchildrennumber_resp");
+             "getallchildrennumber_resp");
   initOpCode(OpCodes::Close, stats_.close_resp_, stats_.close_resp_fast_, stats_.close_resp_slow_,
-             stats_.close_rq_bytes_, stats_.close_resp_bytes_, stats_.close_decoder_error_,
-             "close_resp");
+             stats_.close_rq_bytes_, stats_.close_resp_bytes_, "close_resp");
 }
 
 ErrorBudgetResponseType
@@ -157,16 +146,13 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& resp_coun
                                        Stats::Counter& resp_fast_counter,
                                        Stats::Counter& resp_slow_counter,
                                        Stats::Counter& rq_bytes_counter,
-                                       Stats::Counter& resp_bytes_counter,
-                                       Stats::Counter& decoder_error_counter,
-                                       absl::string_view name) {
+                                       Stats::Counter& resp_bytes_counter, absl::string_view name) {
   OpCodeInfo& opcode_info = op_code_map_[opcode];
   opcode_info.resp_counter_ = &resp_counter;
   opcode_info.resp_fast_counter_ = &resp_fast_counter;
   opcode_info.resp_slow_counter_ = &resp_slow_counter;
   opcode_info.rq_bytes_counter_ = &rq_bytes_counter;
   opcode_info.resp_bytes_counter_ = &resp_bytes_counter;
-  opcode_info.decoder_error_counter_ = &decoder_error_counter;
   opcode_info.opname_ = std::string(name);
   opcode_info.latency_name_ = stat_name_set_->add(absl::StrCat(name, "_latency"));
 }
@@ -253,18 +239,8 @@ void ZooKeeperFilter::onConnect(const bool readonly) {
   }
 }
 
-void ZooKeeperFilter::onDecodeError(const absl::optional<OpCodes> opcode) {
+void ZooKeeperFilter::onDecodeError() {
   config_->stats_.decoder_error_.inc();
-
-  if (config_->enable_per_opcode_decoder_error_metrics_ && opcode.has_value() &&
-      config_->op_code_map_.contains(*opcode)) {
-    if (*opcode == OpCodes::Connect) {
-      config_->stats_.connect_decoder_error_.inc();
-    } else {
-      config_->op_code_map_[*opcode].decoder_error_counter_->inc();
-    }
-  }
-
   setDynamicMetadata("opname", "error");
 }
 
@@ -388,12 +364,8 @@ void ZooKeeperFilter::onSetAclRequest(const std::string& path, const int32_t ver
   setDynamicMetadata({{"opname", "setacl"}, {"path", path}, {"version", std::to_string(version)}});
 }
 
-absl::Status ZooKeeperFilter::onSyncRequest(const absl::StatusOr<std::string>& path,
-                                            const OpCodes opcode) {
-  if (!path.ok()) {
-    onDecodeError(opcode);
-    return absl::InvalidArgumentError(path.status().message());
-  }
+absl::Status ZooKeeperFilter::onSyncRequest(const absl::StatusOr<std::string>& path) {
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   config_->stats_.sync_rq_.inc();
   setDynamicMetadata({{"opname", "sync"}, {"path", path.value()}});
@@ -440,12 +412,8 @@ void ZooKeeperFilter::onAddWatchRequest(const std::string& path, const int32_t m
   setDynamicMetadata({{"opname", "addwatch"}, {"path", path}, {"mode", std::to_string(mode)}});
 }
 
-absl::Status ZooKeeperFilter::onGetEphemeralsRequest(const absl::StatusOr<std::string>& path,
-                                                     const OpCodes opcode) {
-  if (!path.ok()) {
-    onDecodeError(opcode);
-    return absl::InvalidArgumentError(path.status().message());
-  }
+absl::Status ZooKeeperFilter::onGetEphemeralsRequest(const absl::StatusOr<std::string>& path) {
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   config_->stats_.getephemerals_rq_.inc();
   setDynamicMetadata({{"opname", "getephemerals"}, {"path", path.value()}});
@@ -453,12 +421,9 @@ absl::Status ZooKeeperFilter::onGetEphemeralsRequest(const absl::StatusOr<std::s
   return absl::OkStatus();
 }
 
-absl::Status ZooKeeperFilter::onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path,
-                                                            const OpCodes opcode) {
-  if (!path.ok()) {
-    onDecodeError(opcode);
-    return absl::InvalidArgumentError(path.status().message());
-  }
+absl::Status
+ZooKeeperFilter::onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) {
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
 
   config_->stats_.getallchildrennumber_rq_.inc();
   setDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", path.value()}});
