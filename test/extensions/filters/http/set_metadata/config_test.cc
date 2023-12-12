@@ -32,10 +32,10 @@ metadata:
   allow_overwrite: true
 - metadata_namespace: thenamespace
   typed_value:
-  '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
-  metadata_namespace: foo_namespace
-  value:
-    foo: bar
+    '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+    metadata_namespace: foo_namespace
+    value:
+      foo: bar
   allow_overwrite: true
   )EOF";
 
@@ -64,10 +64,10 @@ metadata:
   allow_overwrite: true
 - metadata_namespace: thenamespace
   typed_value:
-  '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
-  metadata_namespace: foo_namespace
-  value:
-    foo: bar
+    '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+    metadata_namespace: foo_namespace
+    value:
+      foo: bar
   allow_overwrite: true
   )EOF";
 
