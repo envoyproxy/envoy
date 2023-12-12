@@ -8,7 +8,6 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
-#include "test/proto/helloworld.pb.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -23,12 +22,6 @@ using SetMetadataProtoConfig = envoy::extensions::filters::http::set_metadata::v
 
 TEST(SetMetadataFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
-metadata_namespace: thenamespace
-value:
-  mynumber: 20
-  mylist: ["b"]
-  tags:
-    mytag1: 1
 metadata:
 - metadata_namespace: thenamespace
   untyped_value:
@@ -39,8 +32,10 @@ metadata:
   allow_overwrite: true
 - metadata_namespace: thenamespace
   typed_value:
-    '@type': type.googleapis.com/helloworld.HelloRequest
-    name: typed_metadata
+  '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+  metadata_namespace: foo_namespace
+  value:
+    foo: bar
   allow_overwrite: true
   )EOF";
 
@@ -59,12 +54,6 @@ metadata:
 
 TEST(SetMetadataFilterConfigTest, SimpleConfigServerContext) {
   const std::string yaml = R"EOF(
-metadata_namespace: thenamespace
-value:
-  mynumber: 20
-  mylist: ["b"]
-  tags:
-    mytag1: 1
 metadata:
 - metadata_namespace: thenamespace
   untyped_value:
@@ -75,8 +64,10 @@ metadata:
   allow_overwrite: true
 - metadata_namespace: thenamespace
   typed_value:
-    '@type': type.googleapis.com/helloworld.HelloRequest
-    name: typed_metadata
+  '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+  metadata_namespace: foo_namespace
+  value:
+    foo: bar
   allow_overwrite: true
   )EOF";
 

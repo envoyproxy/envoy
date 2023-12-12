@@ -173,7 +173,7 @@ TEST_F(SetMetadataFilterTest, TypedSimple) {
   envoy::config::core::v3::Metadata metadata;
   runFilter(metadata, yaml_config);
 
-  // Verify that `metadata` contains our typed HelloRequest
+  // Verify that `metadata` contains our typed Config
   const auto& typed_metadata = metadata.typed_filter_metadata();
   const auto it_namespace2 = typed_metadata.find("thenamespace");
   ASSERT_NE(typed_metadata.end(), it_namespace2);
@@ -345,7 +345,7 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
   ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 0);
 
-  // Verify that `metadata` contains our typed HelloRequest
+  // Verify that `metadata` contains our typed Config
   const auto& typed_metadata = metadata.typed_filter_metadata();
   const auto it_namespace2 = typed_metadata.find("thenamespace");
   ASSERT_NE(typed_metadata.end(), it_namespace2);

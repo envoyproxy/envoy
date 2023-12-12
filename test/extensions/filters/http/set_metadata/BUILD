@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/set_metadata:config",
         "//test/integration:http_integration_lib",
         "//test/mocks/api:api_mocks",
-        "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:utility_lib",
     ],
 )
@@ -34,7 +33,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/set_metadata:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
-        "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
     ],
