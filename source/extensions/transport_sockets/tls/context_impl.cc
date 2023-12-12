@@ -609,8 +609,7 @@ void ContextImpl::updateCertStats() {
 
   // Update TLS certs' expiration time.
   for (auto& ctx : tls_contexts_) {
-    auto seconds_since_epoch_of_expiration =
-        Utility::getSecondsSinceEpoch(ctx.cert_chain_.get());
+    auto seconds_since_epoch_of_expiration = Utility::getSecondsSinceEpoch(ctx.cert_chain_.get());
     if (seconds_since_epoch_of_expiration.has_value()) {
       ctx.setExpirationOnCertStats(
           std::chrono::duration<uint64_t>(seconds_since_epoch_of_expiration.value()));

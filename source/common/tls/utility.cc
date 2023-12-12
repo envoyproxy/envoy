@@ -433,16 +433,17 @@ absl::optional<uint64_t> Utility::getSecondsUntilExpiration(const X509* cert,
   }
   return 0.L;
 
-absl::optional<uint64_t> Utility::getSecondsSinceEpoch(const X509* cert) {  
-  if (cert == nullptr) {  
-    return absl::nullopt;  
-  }  
+absl::optional<uint64_t> Utility::getSecondsSinceEpoch(const X509* cert) {
+  if (cert == nullptr) {
+    return absl::nullopt;
+  }
 
   // Obtain the expiration time as system time
   auto expiration_time = Utility::getExpirationTime(*cert);
 
   // Convert the time to duration since epoch
-  auto duration_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch());
+  auto duration_since_epoch =
+      std::chrono::duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch());
 
   // Convert the duration to uint64_t and return
   return absl::make_optional(static_cast<uint64_t>(duration_since_epoch.count()));
