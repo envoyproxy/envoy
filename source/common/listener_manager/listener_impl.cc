@@ -229,12 +229,11 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Server::ListenerInfoConstSharedPtr listener_info,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : Server::FactoryContextImplBase(
           server, validation_visitor, server.stats().createScope(""),
           server.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config))),
-          std::move(listener_info)),
+          std::make_shared<ListenerInfoImpl>(config)),
       drain_manager_(std::move(drain_manager)) {}
 
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
@@ -269,12 +268,12 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                             [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
-      listener_info_(std::make_shared<ListenerInfoImpl>(config)), version_info_(version_info),
+      config_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
-          parent.server_, validation_visitor_, config, listener_info_, *this,
+          parent.server_, validation_visitor_, config, *this,
           parent_.factory_->createDrainManager(config.drain_type()))),
       reuse_port_(getReusePortOrDefault(parent_.server_, config, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config.name() +
@@ -399,13 +398,15 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
-      listener_info_(std::make_shared<ListenerInfoImpl>(config)), version_info_(version_info),
+      config_(config), version_info_(version_info),
       listen_socket_options_list_(origin.listen_socket_options_list_),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       udp_listener_config_(origin.udp_listener_config_),
       connection_balancers_(origin.connection_balancers_),
+      // Reuse the listener_factory_context_base_ from the origin listener because the filter chain
+      // only updates will not change the listener_factory_context_base_.
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           origin.listener_factory_context_->listener_factory_context_base_, *this)),
       filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
@@ -809,12 +810,10 @@ void ListenerImpl::buildProxyProtocolListenerFilter(
 }
 PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const envoy::config::listener::v3::Listener& config_message,
-    ListenerInfoConstSharedPtr listener_info, ListenerImpl& listener_impl,
+    const envoy::config::listener::v3::Listener& config_message, ListenerImpl& listener_impl,
     DrainManagerPtr drain_manager)
     : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-          server, validation_visitor, std::move(listener_info), config_message,
-          std::move(drain_manager))),
+          server, validation_visitor, config_message, std::move(drain_manager))),
       listener_impl_(listener_impl) {}
 
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }

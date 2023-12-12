@@ -128,7 +128,6 @@ class ListenerFactoryContextBaseImpl final : public Server::FactoryContextImplBa
 public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 ListenerInfoConstSharedPtr listener_info,
                                  const envoy::config::listener::v3::Listener& config,
                                  Server::DrainManagerPtr drain_manager);
 
@@ -159,7 +158,6 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                ListenerInfoConstSharedPtr listener_info,
                                 ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
 
   PerListenerFactoryContextImpl(
@@ -242,7 +240,7 @@ public:
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
     return addresses_;
   }
-  const envoy::config::listener::v3::Listener& config() const { return listener_info_->config(); }
+  const envoy::config::listener::v3::Listener& config() const { return config_; }
   const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
     return socket_factories_;
   }
@@ -317,7 +315,10 @@ public:
   }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
-  const Network::ListenerInfo& listenerInfo() const override { return *listener_info_; }
+  const Network::ListenerInfo& listenerInfo() const override {
+    ASSERT(listener_factory_context_ != nullptr);
+    return listener_factory_context_->listenerInfo();
+  }
 
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {
@@ -439,7 +440,7 @@ private:
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   Filter::QuicListenerFilterFactoriesList quic_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
-  const std::shared_ptr<const ListenerInfoImpl> listener_info_;
+  const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
   // Using std::vector instead of hash map for supporting multiple zero port addresses.
   std::vector<Network::Socket::OptionsSharedPtr> listen_socket_options_list_;
