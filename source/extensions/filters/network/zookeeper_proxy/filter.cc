@@ -293,8 +293,8 @@ void ZooKeeperFilter::onGetDataRequest(const std::string& path, const bool watch
   setDynamicMetadata({{"opname", "getdata"}, {"path", path}, {"watch", watch ? "true" : "false"}});
 }
 
-absl::Status ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags flags,
-                                              const OpCodes opcode) {
+void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags flags,
+                                      const OpCodes opcode) {
   std::string opname;
 
   switch (opcode) {
@@ -315,14 +315,12 @@ absl::Status ZooKeeperFilter::onCreateRequest(const std::string& path, const Cre
     config_->stats_.createttl_rq_.inc();
     break;
   default:
-    return absl::InvalidArgumentError(fmt::format("unknown opcode: {}", enumToSignedInt(opcode)));
+    throw EnvoyException(fmt::format("Unknown opcode: {}", enumToSignedInt(opcode)));
     break;
   }
 
   setDynamicMetadata(
       {{"opname", opname}, {"path", path}, {"create_type", createFlagsToString(flags)}});
-
-  return absl::OkStatus();
 }
 
 void ZooKeeperFilter::onSetRequest(const std::string& path) {
@@ -364,13 +362,9 @@ void ZooKeeperFilter::onSetAclRequest(const std::string& path, const int32_t ver
   setDynamicMetadata({{"opname", "setacl"}, {"path", path}, {"version", std::to_string(version)}});
 }
 
-absl::Status ZooKeeperFilter::onSyncRequest(const absl::StatusOr<std::string>& path) {
-  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
-
+void ZooKeeperFilter::onSyncRequest(const std::string& path) {
   config_->stats_.sync_rq_.inc();
-  setDynamicMetadata({{"opname", "sync"}, {"path", path.value()}});
-
-  return absl::OkStatus();
+  setDynamicMetadata({{"opname", "sync"}, {"path", path}});
 }
 
 void ZooKeeperFilter::onCheckRequest(const std::string&, const int32_t) {
@@ -412,23 +406,14 @@ void ZooKeeperFilter::onAddWatchRequest(const std::string& path, const int32_t m
   setDynamicMetadata({{"opname", "addwatch"}, {"path", path}, {"mode", std::to_string(mode)}});
 }
 
-absl::Status ZooKeeperFilter::onGetEphemeralsRequest(const absl::StatusOr<std::string>& path) {
-  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
-
+void ZooKeeperFilter::onGetEphemeralsRequest(const std::string& path) {
   config_->stats_.getephemerals_rq_.inc();
-  setDynamicMetadata({{"opname", "getephemerals"}, {"path", path.value()}});
-
-  return absl::OkStatus();
+  setDynamicMetadata({{"opname", "getephemerals"}, {"path", path}});
 }
 
-absl::Status
-ZooKeeperFilter::onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path) {
-  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(path, path.status().message());
-
+void ZooKeeperFilter::onGetAllChildrenNumberRequest(const std::string& path) {
   config_->stats_.getallchildrennumber_rq_.inc();
-  setDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", path.value()}});
-
-  return absl::OkStatus();
+  setDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", path}});
 }
 
 void ZooKeeperFilter::onCloseRequest() {
