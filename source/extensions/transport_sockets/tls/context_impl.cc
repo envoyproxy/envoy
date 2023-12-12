@@ -116,7 +116,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
     ssl_contexts[i] = ctx.ssl_ctx_.get();
 
-    // No need to store cert name for default tls context of there are no TLS certificates.
+    // No need to store cert name for default tls context as there are no TLS certificates.
     if (!tls_certificates.empty()) {
       ctx.cert_name_ = tls_certificates[i].get().certificateName();
       ctx.createCertStats(scope, ctx.cert_name_);
@@ -609,11 +609,11 @@ void ContextImpl::updateCertStats() {
 
   // Update TLS certs' expiration time.
   for (auto& ctx : tls_contexts_) {
-    auto seconds_until_expiration =
-        Utility::getSecondsUntilExpiration(ctx.cert_chain_.get(), time_source_);
-    if (seconds_until_expiration.has_value()) {
+    auto seconds_since_epoch_of_expiration =
+        Utility::getSecondsSinceEpoch(ctx.cert_chain_.get());
+    if (seconds_since_epoch_of_expiration.has_value()) {
       ctx.setExpirationOnCertStats(
-          std::chrono::duration<uint64_t>(seconds_until_expiration.value()));
+          std::chrono::duration<uint64_t>(seconds_since_epoch_of_expiration.value()));
     }
   }
 }
@@ -1543,7 +1543,7 @@ void TlsContext::createCertStats(Stats::Scope& scope, std::string cert_name) {
 }
 
 void TlsContext::setExpirationOnCertStats(std::chrono::duration<uint64_t> duration) {
-  cert_stats_->seconds_until_cert_expiring_.set(duration.count());
+  cert_stats_->seconds_since_epoch_of_expiration_.set(duration.count());
 }
 
 } // namespace Tls

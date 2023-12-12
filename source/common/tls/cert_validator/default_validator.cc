@@ -591,12 +591,12 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
 }
 
 void DefaultCertValidator::refreshCertStatsWithExpirationTime() {
-  auto seconds_until_expiration = Utility::getSecondsUntilExpiration(ca_cert_.get(), time_source_);
-  if (seconds_until_expiration.has_value()) {
+  auto seconds_since_epoch_of_expiration = Utility::getSecondsSinceEpoch(ca_cert_.get());
+  if (seconds_since_epoch_of_expiration.has_value()) {
     if (!cert_stats_) {
       cert_stats_ = std::make_unique<CertStats>(generateCertStats(scope_, config_->caCertName()));
     }
-    cert_stats_->seconds_until_cert_expiring_.set(seconds_until_expiration.value());
+    cert_stats_->seconds_since_epoch_of_expiration_.set(seconds_since_epoch_of_expiration.value());
   }
 }
 

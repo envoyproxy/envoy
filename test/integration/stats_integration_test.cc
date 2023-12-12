@@ -202,23 +202,15 @@ TEST_P(StatsIntegrationTest, WithExpiringCert) {
   initialize();
   auto cert_expiry = TestUtility::parseTime(TEST_SERVER_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
   int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
-  int64_t seconds_until_expiry = absl::ToInt64Seconds(cert_expiry - absl::Now());
+
   EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(),
             days_until_expiry);
 
-  // There may be several seconds of difference between the actual time and the expected time.
-  // This is due to the different times for when we measure the current time.
-  // We check if the difference between the expected time and the metric time is less than 5 seconds
-  auto actual_cert_expire_time =
+  auto actual_cert_expire_time_since_epoch =
       test_server_
-          ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.seconds_until_cert_expiring")
+          ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.seconds_since_epoch_of_expiration")
           ->value();
-  EXPECT_LE(std::abs(static_cast<long>(actual_cert_expire_time - seconds_until_expiry)), 5);
-  auto actual_validation_expire_time =
-      test_server_
-          ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.seconds_until_cert_expiring")
-          ->value();
-  EXPECT_LE(std::abs(static_cast<long>(actual_validation_expire_time - seconds_until_expiry)), 5);
+  EXPECT_EQ(actual_cert_expire_time_since_epoch, absl::ToUnixSeconds(cert_expiry));
 }
 
 TEST_P(StatsIntegrationTest, WithExpiredCert) {
@@ -262,9 +254,9 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
   EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(), 0);
   EXPECT_EQ(
       test_server_
-          ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.seconds_until_cert_expiring")
+          ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.seconds_since_epoch_of_expiration")
           ->value(),
-      0);
+      1621998942);
 }
 
 // TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved

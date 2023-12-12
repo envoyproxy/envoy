@@ -2,4 +2,4 @@
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   seconds_until_cert_expiring, Gauge, Number of seconds until the certificate will expire. Will have a value of 0 if the certificate has already expired.
+   seconds_since_epoch_of_expiration, Gauge, Number of seconds since UNIX epoch of the expiration date of the certificate.
