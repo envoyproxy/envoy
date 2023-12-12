@@ -28,7 +28,6 @@ package cluster_specifier
 #include <string.h>
 
 #include "api.h"
-
 */
 import "C"
 import (
