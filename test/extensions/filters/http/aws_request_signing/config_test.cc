@@ -52,6 +52,46 @@ match_excluded_headers:
   cb(filter_callbacks);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4A) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: '*'
+host_rewrite: new-host
+signing_algorithm: aws_sigv4a
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("*");
+  expected_config.set_host_rewrite("new-host");
+  expected_config.set_signing_algorithm(envoy::extensions::filters::http::aws_request_signing::v3::
+                                            AwsRequestSigning_SigningAlgorithm_AWS_SigV4A);
+  expected_config.add_match_excluded_headers()->set_prefix("x-envoy");
+  expected_config.add_match_excluded_headers()->set_exact("foo");
+  expected_config.add_match_excluded_headers()->set_exact("bar");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfig) {
   const std::string yaml = R"EOF(
 aws_request_signing:

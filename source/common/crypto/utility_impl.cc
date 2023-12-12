@@ -35,6 +35,15 @@ std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
   return hmac;
 }
 
+std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
+                                                const std::vector<uint8_t>& message) {
+  std::vector<uint8_t> hmac(SHA256_DIGEST_LENGTH);
+  const auto ret = HMAC(EVP_sha256(), key.data(), key.size(), message.data(), message.size(),
+                        hmac.data(), nullptr);
+  RELEASE_ASSERT(ret != nullptr, "Failed to create HMAC");
+  return hmac;
+}
+
 const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, CryptoObject& key,
                                                       const std::vector<uint8_t>& signature,
                                                       const std::vector<uint8_t>& text) {

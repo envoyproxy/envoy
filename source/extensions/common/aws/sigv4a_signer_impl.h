@@ -15,47 +15,57 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class SignatureHeaderValues {
+class SigV4ASignatureHeaderValues {
 public:
   const Http::LowerCaseString ContentSha256{"x-amz-content-sha256"};
   const Http::LowerCaseString Date{"x-amz-date"};
   const Http::LowerCaseString SecurityToken{"x-amz-security-token"};
+  const Http::LowerCaseString RegionSet{"x-amz-region-set"};
 };
 
-using SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
+using SigV4ASignatureHeaders = ConstSingleton<SigV4ASignatureHeaderValues>;
 
-class SignatureConstantValues {
+class SigV4ASignatureConstantValues {
 public:
   const std::string Aws4Request{"aws4_request"};
-  const std::string AuthorizationHeaderFormat{
-      "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
-  const std::string CredentialScopeFormat{"{}/{}/{}/aws4_request"};
+  const std::string SigV4AAuthorizationHeaderFormat{
+      "AWS4-ECDSA-P256-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
+  const std::string SigV4ACredentialScopeFormat{"{}/{}/aws4_request"};
   const std::string HashedEmptyString{
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"};
-  const std::string SignatureVersion{"AWS4"};
-  const std::string StringToSignFormat{"AWS4-HMAC-SHA256\n{}\n{}\n{}"};
+  const std::string SigV4ASignatureVersion{"AWS4A"};
+  const std::string SigV4AStringToSignFormat{"AWS4-ECDSA-P256-SHA256\n{}\n{}\n{}"};
+  const std::string SigV4ALabel = "AWS4-ECDSA-P256-SHA256";
 
   const std::string LongDateFormat{"%Y%m%dT%H%M00Z"};
   const std::string ShortDateFormat{"%Y%m%d"};
   const std::string UnsignedPayload{"UNSIGNED-PAYLOAD"};
 };
 
-using SignatureConstants = ConstSingleton<SignatureConstantValues>;
+enum SigV4AKeyDerivationResult {
+  AkdrSuccess,
+  AkdrNextCounter,
+  AkdrFailure,
+};
 
-using AwsSigV4HeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
+using SigV4ASignatureConstants = ConstSingleton<SigV4ASignatureConstantValues>;
+
+using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
- * Implementation of the Signature V4 signing process.
+ * Implementation of the Signature V4A signing process.
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
  */
-class SignerImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
+
+class SigV4ASignerImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
-  SignerImpl(absl::string_view service_name, absl::string_view region,
-             const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-             const AwsSigV4HeaderExclusionVector& matcher_config)
+  SigV4ASignerImpl(absl::string_view service_name, absl::string_view region,
+                   const CredentialsProviderSharedPtr& credentials_provider,
+                   TimeSource& time_source, const AwsSigningHeaderExclusionVector& matcher_config)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
-        time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
-        short_date_formatter_(SignatureConstants::get().ShortDateFormat) {
+        time_source_(time_source),
+        long_date_formatter_(SigV4ASignatureConstants::get().LongDateFormat),
+        short_date_formatter_(SigV4ASignatureConstants::get().ShortDateFormat) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
@@ -75,15 +85,13 @@ public:
 private:
   std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
 
-  std::string createCredentialScope(absl::string_view short_date,
-                                    const absl::string_view override_region) const;
+  std::string createCredentialScope(absl::string_view short_date) const;
 
   std::string createStringToSign(absl::string_view canonical_request, absl::string_view long_date,
                                  absl::string_view credential_scope) const;
 
-  std::string createSignature(absl::string_view secret_access_key, absl::string_view short_date,
-                              absl::string_view string_to_sign,
-                              const absl::string_view override_region) const;
+  std::string createSignature(absl::string_view access_key_id, absl::string_view secret_access_key,
+                              absl::string_view string_to_sign) const;
 
   std::string createAuthorizationHeader(absl::string_view access_key_id,
                                         absl::string_view credential_scope,
