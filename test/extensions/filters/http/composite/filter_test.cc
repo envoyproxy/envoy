@@ -73,13 +73,6 @@ public:
     filter_.encodeComplete();
   }
 
-  template <class T>
-  void setupStreamInfo(T& callback, std::shared_ptr<StreamInfo::FilterState> filter_state) {
-    EXPECT_CALL(callback, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info_));
-    EXPECT_CALL(callback, filterConfigName()).WillRepeatedly(testing::Return("rootFilterName"));
-    EXPECT_CALL(stream_info_, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
-  }
-
   void expectFilterStateInfo(std::shared_ptr<StreamInfo::FilterState> filter_state) {
     auto* info = filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey);
     EXPECT_NE(nullptr, info);
@@ -95,7 +88,6 @@ public:
   Stats::MockCounter success_counter_;
   FilterStats stats_{error_counter_, success_counter_};
   Filter filter_;
-  StreamInfo::MockStreamInfo stream_info_;
 
   Http::TestRequestHeaderMapImpl default_request_headers_{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
@@ -107,10 +99,13 @@ public:
 
 TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(encoder_callbacks_, filter_state);
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(encoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);
@@ -135,10 +130,13 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
 
 TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   auto stream_filter = std::make_shared<Http::MockStreamDecoderFilter>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(decoder_callbacks_, filter_state);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(decoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamDecoderFilter(stream_filter);
@@ -162,10 +160,13 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
 
 TEST_F(FilterTest, StreamFilterDelegation) {
   auto stream_filter = std::make_shared<Http::MockStreamFilter>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(decoder_callbacks_, filter_state);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(decoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamFilter(stream_filter);
@@ -190,10 +191,13 @@ TEST_F(FilterTest, StreamFilterDelegation) {
 // Adding multiple stream filters should cause delegation to be skipped.
 TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
   auto stream_filter = std::make_shared<Http::MockStreamFilter>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(decoder_callbacks_, filter_state);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(decoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamFilter(stream_filter);
@@ -215,10 +219,13 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
 // Adding multiple decoder filters should cause delegation to be skipped.
 TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
   auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(decoder_callbacks_, filter_state);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(decoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamDecoderFilter(decoder_filter);
@@ -240,10 +247,13 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
 // Adding multiple encoder filters should cause delegation to be skipped.
 TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(encoder_callbacks_, filter_state);
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(encoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(encode_filter);
@@ -268,10 +278,13 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
   auto access_log_1 = std::make_shared<AccessLog::MockInstance>();
   auto access_log_2 = std::make_shared<AccessLog::MockInstance>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(encoder_callbacks_, filter_state);
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(encoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(encode_filter);
@@ -295,15 +308,19 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
 
   EXPECT_CALL(*access_log_1, log(_, _));
   EXPECT_CALL(*access_log_2, log(_, _));
-  filter_.log({}, stream_info_);
+  filter_.log({}, stream_info);
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
   auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(encoder_callbacks_, filter_state);
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(encoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
+
   auto filter_state_object = std::make_shared<MatchedActionInfoType>();
   filter_state_object->setFilterAction("rootFilterName", "oldActionName");
   filter_state->setData(MatchedActionsFilterStateKey, filter_state_object,
@@ -329,10 +346,14 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
 
 TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
   auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-
+  StreamInfo::MockStreamInfo stream_info;
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupStreamInfo(encoder_callbacks_, filter_state);
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(encoder_callbacks_, filterConfigName())
+      .WillRepeatedly(testing::Return("rootFilterName"));
+  EXPECT_CALL(stream_info, filterState()).WillRepeatedly(testing::ReturnRef(filter_state));
+
   auto filter_state_object = std::make_shared<MatchedActionInfoType>();
   filter_state_object->setFilterAction("otherRootFilterName", "anyActionName");
   filter_state->setData(MatchedActionsFilterStateKey, filter_state_object,
