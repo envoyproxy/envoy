@@ -85,7 +85,8 @@ protected:
           : parent_(parent), dispatcher_(dispatcher),
             connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
                 parent.parent_.address_, parent.parent_.address_)),
-            stream_info_(parent_.parent_.factory_context_.timeSource(), connection_info_provider_),
+            stream_info_(parent_.parent_.factory_context_.serverFactoryContext().timeSource(),
+                         connection_info_provider_),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
       void raiseConnectionEvent(Network::ConnectionEvent event);
@@ -190,8 +191,6 @@ protected:
   const envoy::config::listener::v3::Listener& config_;
   const std::string name_;
   Network::Address::InstanceConstSharedPtr address_;
-  Stats::ScopeSharedPtr global_scope_;
-  Stats::ScopeSharedPtr listener_scope_;
   FactoryContextImpl factory_context_;
 };
 

@@ -40,6 +40,9 @@ def jvm_flags(lib_name):
     ] + select({
         "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],
         "//conditions:default": [],
+    }) + select({
+        "@envoy//bazel:disable_envoy_mobile_xds": ["-Denvoy_jni_envoy_mobile_xds_disabled=true"],
+        "//conditions:default": [],
     })
 
 # A basic macro to make it easier to declare and run kotlin tests which depend on a JNI lib

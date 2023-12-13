@@ -1,5 +1,10 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_android_test", "envoy_mobile_jni_kt_test")
+
+licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 envoy_mobile_jni_kt_test(
     name = "engine_start_test",
@@ -81,26 +86,6 @@ envoy_mobile_jni_kt_test(
     name = "set_logger_test",
     srcs = [
         "SetLoggerTest.kt",
-    ],
-    native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
-    native_lib_name = "envoy_jni_with_test_extensions",
-    deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-    ],
-)
-
-envoy_mobile_jni_kt_test(
-    name = "stat_flush_integration_test",
-    srcs = [
-        "StatFlushIntegrationTest.kt",
-        "TestStatsdServer.kt",
     ],
     native_deps = [
         "//test/common/jni:libenvoy_jni_with_test_extensions.so",
@@ -215,29 +200,6 @@ envoy_mobile_jni_kt_test(
     name = "receive_data_test",
     srcs = [
         "ReceiveDataTest.kt",
-    ],
-    exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
-    native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
-    native_lib_name = "envoy_jni_with_test_extensions",
-    deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-    ],
-)
-
-envoy_mobile_jni_kt_test(
-    name = "receive_data_delivery_limits_test",
-    srcs = [
-        "ReceiveDataWithDeliveryLimitsTest.kt",
     ],
     exec_properties = {
         # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
@@ -384,6 +346,7 @@ envoy_mobile_android_test(
         "XdsTest.kt",
     ],
     native_deps = [
+        "@envoy//test/config/integration/certs",
         "//test/common/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [

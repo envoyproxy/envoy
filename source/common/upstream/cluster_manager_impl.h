@@ -41,7 +41,6 @@
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/server/factory_context_base_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -62,7 +61,8 @@ public:
       : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
         dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls, {context}),
+        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls,
+                                                   {context, context.messageValidationVisitor()}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
         server_(server) {}
 
@@ -256,9 +256,7 @@ public:
   // initialization, is done in this method. If the contents of this method are invoked during
   // construction, a derived class cannot override any of the virtual methods and have them invoked
   // instead, since the base class's methods are used when in a base class constructor.
-  //
-  // This method may throw an exception.
-  void init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  absl::Status init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -337,7 +335,7 @@ public:
 
   Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
 
-  void
+  absl::Status
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
   const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
@@ -366,7 +364,7 @@ public:
 
   void drainConnections(DrainConnectionsHostPredicate predicate) override;
 
-  void checkActiveStaticCluster(const std::string& cluster) override;
+  absl::Status checkActiveStaticCluster(const std::string& cluster) override;
 
   // Upstream::MissingClusterNotifier
   void notifyMissingCluster(absl::string_view name) override;
@@ -434,18 +432,20 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostMapConstSharedPtr map);
+                                HostMapConstSharedPtr map, UnitFloat drop_overload);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-        LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map);
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+        UnitFloat drop_overload);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
     const HostMapConstSharedPtr cross_priority_host_map_;
+    UnitFloat drop_overload_{0};
   };
 
   using ClusterInitializationObjectConstSharedPtr =
@@ -614,6 +614,8 @@ private:
       // Drain any connection pools associated with the hosts filtered by the predicate.
       void drainConnPools(DrainConnectionsHostPredicate predicate,
                           ConnectionPool::DrainBehavior behavior);
+      UnitFloat dropOverload() const override { return drop_overload_; }
+      void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
 
     private:
       Http::ConnectionPool::Instance*
@@ -629,6 +631,7 @@ private:
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
+      UnitFloat drop_overload_{0};
 
       // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
       // may keep a reference to the cluster_info_.
@@ -842,11 +845,13 @@ private:
 
   /**
    * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
-   * nullptr if cluster_map did not contain the same cluster.
+   * nullptr if cluster_map did not contain the same cluster or an error if
+   * cluster load fails.
    */
-  ClusterDataPtr loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                             const uint64_t cluster_hash, const std::string& version_info,
-                             bool added_via_api, bool required_for_ads, ClusterMap& cluster_map);
+  absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                             const uint64_t cluster_hash,
+                                             const std::string& version_info, bool added_via_api,
+                                             bool required_for_ads, ClusterMap& cluster_map);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
@@ -875,7 +880,8 @@ private:
    */
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-      LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map);
+      LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+      UnitFloat drop_overload);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 

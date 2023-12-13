@@ -14,12 +14,9 @@ public interface EnvoyEngine {
    *
    * @param callbacks The callbacks for receiving callbacks from the stream.
    * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
-   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
-   *     should be delivered sans end stream.
    * @return A stream that may be used for sending data.
    */
-  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl,
-                              long minDeliverySize);
+  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl);
 
   /**
    * Terminates the running engine.
@@ -68,13 +65,6 @@ public interface EnvoyEngine {
   int recordCounterInc(String elements, Map<String, String> tags, int count);
 
   int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
-
-  /**
-   * Flush the stats sinks outside of a flushing interval.
-   * Note: stat flushing is done asynchronously, this function will never block.
-   * This is a noop if called before the underlying EnvoyEngine has started.
-   */
-  void flushStats();
 
   String dumpStats();
 

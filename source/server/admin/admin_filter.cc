@@ -61,10 +61,11 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
   return *request_headers_;
 }
 
-Http::Utility::QueryParams AdminFilter::queryParams() const {
+Http::Utility::QueryParamsMulti AdminFilter::queryParams() const {
   absl::string_view path = request_headers_->getPathValue();
-  Http::Utility::QueryParams query = Http::Utility::parseAndDecodeQueryString(path);
-  if (!query.empty()) {
+  Http::Utility::QueryParamsMulti query =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+  if (!query.data().empty()) {
     return query;
   }
 
@@ -73,7 +74,7 @@ Http::Utility::QueryParams AdminFilter::queryParams() const {
       Http::Headers::get().ContentTypeValues.FormUrlEncoded) {
     const Buffer::Instance* body = getRequestBody();
     if (body != nullptr) {
-      query = Http::Utility::parseFromBody(body->toString());
+      query = Http::Utility::QueryParamsMulti::parseParameters(body->toString(), 0, true);
     }
   }
 

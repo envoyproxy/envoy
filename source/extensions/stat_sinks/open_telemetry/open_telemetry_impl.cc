@@ -131,10 +131,16 @@ void OtlpMetricsFlusherImpl::flushHistogram(opentelemetry::proto::metrics::v1::M
   data_point->set_sum(histogram_stats.sampleSum());
   // TODO(ohadvano): support min/max optional fields for ``HistogramDataPoint``
 
+  std::vector<uint64_t> bucket_counts = histogram_stats.computeDisjointBuckets();
   for (size_t i = 0; i < histogram_stats.supportedBuckets().size(); i++) {
     data_point->add_explicit_bounds(histogram_stats.supportedBuckets()[i]);
-    data_point->add_bucket_counts(histogram_stats.computedBuckets()[i]);
+    data_point->add_bucket_counts(bucket_counts[i]);
   }
+
+  // According to the spec, the number of bucket counts needs to be one element bigger
+  // than the size of the explicit bounds, and the last bucket should contain the count
+  // of values which are outside the explicit boundaries (to +infinity).
+  data_point->add_bucket_counts(histogram_stats.outOfBoundCount());
 }
 
 template <class StatType>

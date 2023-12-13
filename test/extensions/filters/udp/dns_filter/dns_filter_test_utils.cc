@@ -375,7 +375,7 @@ DnsAnswerRecordPtr DnsResponseValidator::parseDnsAnswerRecord(const Buffer::Inst
   offset += sizeof(uint16_t);
   available_bytes -= sizeof(uint16_t);
 
-  // TODO(abaptiste): Support Extension Mechanisms for DNS (RFC2671)
+  // TODO(suniltheta): Support Extension Mechanisms for DNS (RFC2671)
   //
   // We may see optional records indicating DNS extension support. We need to skip
   // these records until we have proper support. Encountering one of these records

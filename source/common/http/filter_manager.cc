@@ -297,11 +297,13 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
     result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
 
     if (result != nullptr) {
-      ENVOY_LOG_FIRST_N(warn, 10,
-                        "No per filter config is found by filter config name and fallback to use "
-                        "filter canonical name. This is deprecated and will be forbidden very "
-                        "soon. Please use the filter config name to index per filter config. See "
-                        "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+      ENVOY_LOG_FIRST_N(
+          warn, 10,
+          "No per filter config is found by filter config name \"{}\" and fallback to use "
+          "filter canonical name \"{}\". This is deprecated and will be forbidden very "
+          "soon. Please use the filter config name to index per filter config. See "
+          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
+          filter_context_.config_name, filter_context_.filter_name);
     }
   }
   return result;
@@ -328,12 +330,14 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
   }
 
   current_route->traversePerFilterConfig(
-      filter_context_.filter_name, [&cb](const Router::RouteSpecificFilterConfig& config) {
-        ENVOY_LOG_FIRST_N(warn, 10,
-                          "No per filter config is found by filter config name and fallback to use "
-                          "filter canonical name. This is deprecated and will be forbidden very "
-                          "soon. Please use the filter config name to index per filter config. See "
-                          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+      filter_context_.filter_name, [&cb, this](const Router::RouteSpecificFilterConfig& config) {
+        ENVOY_LOG_FIRST_N(
+            warn, 10,
+            "No per filter config is found by filter config name \"{}\" and fallback to use "
+            "filter canonical name \"{}\". This is deprecated and will be forbidden very "
+            "soon. Please use the filter config name to index per filter config. See "
+            "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
+            filter_context_.config_name, filter_context_.filter_name);
         cb(config);
       });
 }
@@ -573,8 +577,14 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ |= FilterCallState::EndOfStream;
+    }
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
+    }
     if (state_.decoder_filter_chain_aborted_) {
       executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace,
@@ -704,7 +714,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     // is called in decodeData during a previous filter invocation, at which point we communicate to
     // the current and future filters that the stream has not yet ended.
     if (end_stream) {
-      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+      state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
 
     recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
@@ -717,7 +727,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     }
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
     if (end_stream) {
-      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+      state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
     }
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
@@ -758,7 +768,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
 RequestTrailerMap& FilterManager::addDecodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
-  ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
+  ASSERT(state_.filter_call_state_ & FilterCallState::EndOfStream);
 
   filter_manager_callbacks_.setRequestTrailers(RequestTrailerMapImpl::create());
   return *filter_manager_callbacks_.requestTrailers();
@@ -1185,7 +1195,7 @@ void FilterManager::maybeContinueEncoding(
 
 void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
                                   bool end_stream) {
-  // See encodeHeaders() comments in include/envoy/http/filter.h for why the 1xx precondition holds.
+  // See encodeHeaders() comments in envoy/http/filter.h for why the 1xx precondition holds.
   ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
          Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols));
   filter_manager_callbacks_.resetIdleTimer();
@@ -1200,6 +1210,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == encoder_filters_.end());
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ |= FilterCallState::EndOfStream;
+    }
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace,
@@ -1213,6 +1226,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
            "encodeHeaders when end_stream is already false");
 
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
+    if ((*entry)->end_stream_) {
+      state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
+    }
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
@@ -1320,7 +1336,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
 
 ResponseTrailerMap& FilterManager::addEncodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
-  ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
+  ASSERT(state_.filter_call_state_ & FilterCallState::EndOfStream);
 
   // Trailers can only be added once.
   ASSERT(!filter_manager_callbacks_.responseTrailers());
@@ -1379,7 +1395,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     // the current and future filters that the stream has not yet ended.
     state_.filter_call_state_ |= FilterCallState::EncodeData;
     if (end_stream) {
-      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+      state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
 
     recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
@@ -1396,7 +1412,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     }
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     if (end_stream) {
-      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+      state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
     }
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
@@ -1772,11 +1788,13 @@ Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const 
   return parent_.account();
 }
 
-void ActiveStreamDecoderFilter::setUpstreamOverrideHost(absl::string_view host) {
-  parent_.upstream_override_host_.emplace(std::move(host));
+void ActiveStreamDecoderFilter::setUpstreamOverrideHost(
+    Upstream::LoadBalancerContext::OverrideHost upstream_override_host) {
+  parent_.upstream_override_host_ = upstream_override_host;
 }
 
-absl::optional<absl::string_view> ActiveStreamDecoderFilter::upstreamOverrideHost() const {
+absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+ActiveStreamDecoderFilter::upstreamOverrideHost() const {
   return parent_.upstream_override_host_;
 }
 

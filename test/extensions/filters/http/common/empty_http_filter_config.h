@@ -53,7 +53,7 @@ public:
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
                                Server::Configuration::UpstreamFactoryContext& context) override {
-    return createDualFilter(stat_prefix, context.getServerFactoryContext());
+    return createDualFilter(stat_prefix, context.serverFactoryContext());
   }
 };
 
@@ -64,7 +64,7 @@ public:
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string& stat_prefix,
                Server::Configuration::FactoryContext& context) override {
-    return createDualFilter(stat_prefix, context.getServerFactoryContext());
+    return createDualFilter(stat_prefix, context.serverFactoryContext());
   }
 };
 

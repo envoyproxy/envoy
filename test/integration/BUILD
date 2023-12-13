@@ -353,11 +353,9 @@ envoy_cc_test_binary(
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
-        "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
-        "//source/extensions/load_balancing_policies/subset:config",
     ],
 )
 
@@ -1076,6 +1074,8 @@ envoy_cc_test_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:codec_stats_lib",
+        "//source/common/listener_manager:active_raw_udp_listener_config",
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -1084,8 +1084,6 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
-        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -1101,7 +1099,7 @@ envoy_cc_test_library(
         "//source/common/quic:quic_server_factory_lib",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]) + envoy_select_envoy_mobile_listener([
-        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "//source/common/listener_manager:listener_manager_lib",
     ]),
 )
 
@@ -1279,6 +1277,7 @@ envoy_cc_test_library(
         "//source/common/http:headers_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -1294,7 +1293,6 @@ envoy_cc_test_library(
         "//source/extensions/health_checkers/grpc:health_checker_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
-        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",

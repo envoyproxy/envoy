@@ -19,6 +19,7 @@ package http
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -53,10 +54,12 @@ func (h *requestOrResponseHeaderMapImpl) initHeaders() {
 }
 
 func (h *requestOrResponseHeaderMapImpl) GetRaw(key string) string {
+	// GetRaw is case-sensitive
 	return cAPI.HttpGetHeader(unsafe.Pointer(h.request.req), key)
 }
 
 func (h *requestOrResponseHeaderMapImpl) Get(key string) (string, bool) {
+	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initHeaders()
@@ -68,6 +71,7 @@ func (h *requestOrResponseHeaderMapImpl) Get(key string) (string, bool) {
 }
 
 func (h *requestOrResponseHeaderMapImpl) Values(key string) []string {
+	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initHeaders()
@@ -79,6 +83,7 @@ func (h *requestOrResponseHeaderMapImpl) Values(key string) []string {
 }
 
 func (h *requestOrResponseHeaderMapImpl) Set(key, value string) {
+	key = strings.ToLower(key)
 	// Get all header values first before setting a value, since the set operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
@@ -92,6 +97,7 @@ func (h *requestOrResponseHeaderMapImpl) Set(key, value string) {
 }
 
 func (h *requestOrResponseHeaderMapImpl) Add(key, value string) {
+	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initHeaders()
@@ -106,6 +112,7 @@ func (h *requestOrResponseHeaderMapImpl) Add(key, value string) {
 }
 
 func (h *requestOrResponseHeaderMapImpl) Del(key string) {
+	key = strings.ToLower(key)
 	// Get all header values first before removing a key, since the del operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
@@ -154,11 +161,6 @@ type requestHeaderMapImpl struct {
 }
 
 var _ api.RequestHeaderMap = (*requestHeaderMapImpl)(nil)
-
-func (h *requestHeaderMapImpl) Protocol() string {
-	v, _ := h.Get(":protocol")
-	return v
-}
 
 func (h *requestHeaderMapImpl) Scheme() string {
 	v, _ := h.Get(":scheme")
@@ -210,6 +212,7 @@ func (h *requestOrResponseTrailerMapImpl) GetRaw(key string) string {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Get(key string) (string, bool) {
+	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initTrailers()
@@ -221,6 +224,7 @@ func (h *requestOrResponseTrailerMapImpl) Get(key string) (string, bool) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Values(key string) []string {
+	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initTrailers()
@@ -232,6 +236,7 @@ func (h *requestOrResponseTrailerMapImpl) Values(key string) []string {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Set(key, value string) {
+	key = strings.ToLower(key)
 	// Get all header values first before setting a value, since the set operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
@@ -246,6 +251,7 @@ func (h *requestOrResponseTrailerMapImpl) Set(key, value string) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Add(key, value string) {
+	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initTrailers()
@@ -260,6 +266,7 @@ func (h *requestOrResponseTrailerMapImpl) Add(key, value string) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Del(key string) {
+	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.initTrailers()
@@ -356,7 +363,7 @@ func (b *httpBuffer) WriteUint32(p uint32) error {
 }
 
 func (b *httpBuffer) WriteUint64(p uint64) error {
-	s := strconv.FormatUint(uint64(p), 10)
+	s := strconv.FormatUint(p, 10)
 	_, err := b.WriteString(s)
 	return err
 }
