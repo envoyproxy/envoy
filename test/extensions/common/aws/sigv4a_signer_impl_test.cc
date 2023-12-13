@@ -29,7 +29,6 @@ public:
         credentials_("akid", "secret"), token_credentials_("akid", "secret", "token") {
     // 20180102T030405Z
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
-    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   }
 
   void addMethod(const std::string& method) { message_->headers().setMethod(method); }
