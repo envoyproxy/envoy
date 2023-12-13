@@ -183,6 +183,8 @@ following attributes:
    xds.route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata
    xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
    xds.filter_chain_name, string, Listener filter chain name
+   xds.listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata
+   xds.listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`
 
 
 Wasm attributes

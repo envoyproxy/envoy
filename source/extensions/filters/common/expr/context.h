@@ -89,6 +89,8 @@ constexpr absl::string_view RouteName = "route_name";
 constexpr absl::string_view RouteMetadata = "route_metadata";
 constexpr absl::string_view UpstreamHostMetadata = "upstream_host_metadata";
 constexpr absl::string_view FilterChainName = "filter_chain_name";
+constexpr absl::string_view ListenerMetadata = "listener_metadata";
+constexpr absl::string_view ListenerDirection = "listener_direction";
 
 class WrapperFieldValues {
 public:
