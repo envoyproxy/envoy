@@ -13,6 +13,8 @@
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/extensions/filters/udp/udp_proxy/mocks.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/socket.h"
@@ -1510,6 +1512,47 @@ hash_policies:
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
+}
+
+TEST_F(UdpProxyFilterTest, EnrichAccessLogOnSessionComplete) {
+  InSequence s;
+
+  const std::string session_access_log_format =
+      "%FILTER_STATE(test.udp_session.drainer.on_session_complete)%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionReadFilterConfig
+    downstream_bytes_to_drain: 0
+    stop_iteration_on_new_session: false
+    stop_iteration_on_first_read: false
+    continue_filter_chain: false
+  )EOF",
+                        session_access_log_format, ""));
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  test_sessions_[0].idle_timer_->invokeCallback();
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+
+  filter_.reset();
+  EXPECT_EQ(output_.size(), 1);
+  EXPECT_THAT(output_.front(), testing::HasSubstr("session_complete"));
 }
 
 class HttpUpstreamImplTest : public testing::Test {

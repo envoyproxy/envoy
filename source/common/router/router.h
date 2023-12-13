@@ -549,6 +549,8 @@ private:
                                    UpstreamRequest& upstream_request, bool end_stream,
                                    uint64_t grpc_to_http_status);
   Http::Context& httpContext() { return config_.http_context_; }
+  bool checkDropOverload(Upstream::ThreadLocalCluster& cluster,
+                         std::function<void(Http::ResponseHeaderMap&)>& modify_headers);
 
   RetryStatePtr retry_state_;
   FilterConfig& config_;
