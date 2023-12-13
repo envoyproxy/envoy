@@ -175,6 +175,12 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   ProtobufWkt::Struct s;
   (*s.mutable_fields())["ab"].set_string_value("fgh");
   (*s.mutable_fields())["cde"].set_string_value("ij");
+  ProtobufWkt::Struct s2;
+  (*s2.mutable_fields())["ab"].set_string_value("ij");
+  (*s2.mutable_fields())["cde"].set_string_value("fgh");
+  ProtobufWkt::Struct s3;
+  (*s3.mutable_fields())["ac"].set_string_value("fgh");
+  (*s3.mutable_fields())["cdb"].set_string_value("ij");
 
   ProtobufWkt::Any a1;
   a1.PackFrom(s);
@@ -184,11 +190,26 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   a2.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
   ProtobufWkt::Any a3 = a1;
   a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  ProtobufWkt::Any a4, a5;
+  a4.PackFrom(s2);
+  a5.PackFrom(s3);
 
-  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
-  EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
-  EXPECT_NE(0, MessageUtil::hash(a1));
-  EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
+  TestScopedRuntime runtime_;
+  for (std::string runtime_value : {"true", "false"}) {
+    // TODO(ravenblack): when the runtime flag is removed, keep the expects
+    // but remove the loop around them and the extra output.
+    runtime_.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", runtime_value}});
+    EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2)) << runtime_value;
+    EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3)) << runtime_value;
+    EXPECT_NE(0, MessageUtil::hash(a1)) << runtime_value;
+    // Same keys and values but with the values in a different order should not have
+    // the same hash.
+    EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a4)) << runtime_value;
+    // Different keys with the values in the same order should not have the same hash.
+    EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a5)) << runtime_value;
+    // Struct without 'any' around it should not hash the same as struct inside 'any'.
+    EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1)) << runtime_value;
+  }
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {

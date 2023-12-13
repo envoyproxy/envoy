@@ -4,6 +4,7 @@
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 
 #include "test/common/integration/base_client_integration_test.h"
@@ -46,13 +47,16 @@ protected:
   std::string value_;
 };
 
-class ClientIntegrationTest : public BaseClientIntegrationTest,
-                              public testing::TestWithParam<Network::Address::IpVersion> {
+class ClientIntegrationTest
+    : public BaseClientIntegrationTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http::CodecType>> {
 public:
   static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
   static void TearDownTestCase() { test_key_value_store_.reset(); }
 
-  ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {
+  Http::CodecType getCodecType() { return std::get<1>(GetParam()); }
+
+  ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/std::get<0>(GetParam())) {
     // For H3 tests.
     Network::forceRegisterUdpDefaultWriterFactoryFactory();
     Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
@@ -60,33 +64,40 @@ public:
     Quic::forceRegisterQuicServerTransportSocketConfigFactory();
     Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
     Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+    // For H2 tests.
+    Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
   }
 
-  void initializeWithHttp3AndFakeDns() {
-    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+  void initialize() override {
+    if (getCodecType() == Http::CodecType::HTTP3) {
+      setUpstreamProtocol(Http::CodecType::HTTP3);
+      builder_.enablePlatformCertificatesValidation(true);
+      // Create a k-v store for DNS lookup which createEnvoy() will use to point
+      // www.lyft.com -> fake H3 backend.
+      builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
+      builder_.enableDnsCache(true, /* save_interval_seconds */ 1);
+      upstream_tls_ = true;
+      add_quic_hints_ = true;
+    } else if (getCodecType() == Http::CodecType::HTTP2) {
+      setUpstreamProtocol(Http::CodecType::HTTP2);
+      builder_.enablePlatformCertificatesValidation(true);
+      upstream_tls_ = true;
+    }
 
-    setUpstreamProtocol(Http::CodecType::HTTP3);
-    builder_.enablePlatformCertificatesValidation(true);
-    // Create a k-v store for DNS lookup which createEnvoy() will use to point
-    // www.lyft.com -> fake H3 backend.
-    builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
-    builder_.enableDnsCache(true, /* save_interval_seconds */ 1);
-    upstream_tls_ = true;
-    add_quic_hints_ = true;
+    BaseClientIntegrationTest::initialize();
 
-    initialize();
-
-    auto address = fake_upstreams_[0]->localAddress();
-    auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
-    default_request_headers_.setHost(fmt::format("www.lyft.com:{}", upstream_port));
-    default_request_headers_.setScheme("https");
+    if (getCodecType() == Http::CodecType::HTTP3) {
+      auto address = fake_upstreams_[0]->localAddress();
+      auto upstream_port = fake_upstreams_[0]->localAddress()->ip()->port();
+      default_request_headers_.setHost(fmt::format("www.lyft.com:{}", upstream_port));
+      default_request_headers_.setScheme("https");
+    } else if (getCodecType() == Http::CodecType::HTTP2) {
+      default_request_headers_.setScheme("https");
+    }
   }
 
   void SetUp() override {
     setUpstreamCount(config_helper_.bootstrap().static_resources().clusters_size());
-    // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
@@ -120,25 +131,62 @@ public:
     BaseClientIntegrationTest::createEnvoy();
   }
 
-  void TearDown() override { BaseClientIntegrationTest::TearDown(); }
+  void TearDown() override {
+    if (upstream_connection_) {
+      ASSERT_TRUE(upstream_connection_->close());
+      ASSERT_TRUE(upstream_connection_->waitForDisconnect());
+      upstream_connection_.reset();
+    }
+    BaseClientIntegrationTest::TearDown();
+  }
 
   void basicTest();
   void trickleTest();
   void explicitFlowControlWithCancels();
 
+  static std::string protocolToString(Http::CodecType type) {
+    if (type == Http::CodecType::HTTP3) {
+      return "Http3Upstream";
+    }
+    if (type == Http::CodecType::HTTP2) {
+      return "Http2Upstream";
+    }
+    return "Http1Upstream";
+  }
+
+  static std::string testParamsToString(
+      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType>>
+          params) {
+    return fmt::format(
+        "{}_{}",
+        TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
+            std::get<0>(params.param), params.index)),
+        protocolToString(std::get<1>(params.param)));
+  }
+
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
   static std::shared_ptr<TestKeyValueStore> test_key_value_store_;
+  FakeHttpConnectionPtr upstream_connection_;
+  FakeStreamPtr upstream_request_;
 };
 
 std::shared_ptr<TestKeyValueStore> ClientIntegrationTest::test_key_value_store_{};
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, ClientIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn({Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                                        Http::CodecType::HTTP3})),
+    ClientIntegrationTest::testParamsToString);
 
 void ClientIntegrationTest::basicTest() {
+  if (getCodecType() != Http::CodecType::HTTP1) {
+    EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+  }
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
                                    std::to_string(request_data.length()));
@@ -169,15 +217,26 @@ void ClientIntegrationTest::basicTest() {
   ASSERT_EQ(cc_.on_complete_calls, 1);
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+    // HTTP/1
+    ASSERT_EQ(1, last_stream_final_intel_.upstream_protocol);
+  } else if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
+  } else {
+    // This verifies the H3 attempt was made due to the quic hints
+    absl::MutexLock l(&engine_lock_);
+    std::string stats = engine_->dumpStats();
+    EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
+    // Make sure the client reported protocol was also HTTP/3.
+    ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
   }
 }
 
 TEST_P(ClientIntegrationTest, Basic) {
   initialize();
   basicTest();
-  ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
-  // HTTP/1
-  ASSERT_EQ(1, last_stream_final_intel_.upstream_protocol);
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+  }
 }
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
@@ -185,7 +244,11 @@ TEST_P(ClientIntegrationTest, LargeResponse) {
   std::string data(1024 * 32, 'a');
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->setResponseBody(data);
   basicTest();
-  ASSERT_EQ(cc_.on_complete_received_byte_count, 32828);
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_complete_received_byte_count, 32828);
+  } else {
+    ASSERT_GE(cc_.on_complete_received_byte_count, 32000);
+  }
 }
 
 void ClientIntegrationTest::trickleTest() {
@@ -214,16 +277,15 @@ void ClientIntegrationTest::trickleTest() {
       std::make_shared<Platform::RequestTrailers>(builder.build());
   stream_->close(trailers);
 
-  FakeHttpConnectionPtr upstream_connection;
-  FakeStreamPtr upstream_request;
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
-                                                        upstream_connection));
+                                                        upstream_connection_));
   ASSERT_TRUE(
-      upstream_connection->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request));
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*BaseIntegrationTest::dispatcher_));
 
-  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   for (int i = 0; i < 10; ++i) {
-    upstream_request->encodeData(1, i == 9);
+    upstream_request_->encodeData(1, i == 9);
   }
 
   terminal_callback_.waitReady();
@@ -343,14 +405,10 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
   explicitFlowControlWithCancels();
 }
 
-TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsHttp3) {
-  explicit_flow_control_ = true;
-  initializeWithHttp3AndFakeDns();
-
-  explicitFlowControlWithCancels();
-}
-
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
+  if (getCodecType() != Http::CodecType::HTTP1) {
+    return;
+  }
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).WillRepeatedly(Return(false));
 
   expect_data_streams_ = false;
@@ -376,42 +434,6 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   ASSERT_EQ(cc_.status, "400");
   ASSERT_EQ(cc_.on_data_calls, 1);
   ASSERT_EQ(cc_.on_complete_calls, 1);
-}
-
-TEST_P(ClientIntegrationTest, BasicHttp2) {
-  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
-
-  setUpstreamProtocol(Http::CodecType::HTTP2);
-  builder_.enablePlatformCertificatesValidation(true);
-
-  upstream_tls_ = true;
-
-  initialize();
-
-  default_request_headers_.setScheme("https");
-
-  basicTest();
-  // HTTP/2
-  ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
-}
-
-// Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
-TEST_P(ClientIntegrationTest, Http3WithQuicHints) {
-  initializeWithHttp3AndFakeDns();
-
-  basicTest();
-
-  {
-    // This verifies the H3 attempt was made due to the quic hints
-    absl::MutexLock l(&engine_lock_);
-    std::string stats = engine_->dumpStats();
-    EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
-  }
-
-  // Make sure the client reported protocol was also HTTP/3.
-  ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
 }
 
 TEST_P(ClientIntegrationTest, BasicHttps) {
@@ -454,10 +476,11 @@ TEST_P(ClientIntegrationTest, BasicHttps) {
 
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 2);
+  ASSERT_GE(cc_.on_data_calls, 1);
   ASSERT_EQ(cc_.on_complete_calls, 1);
-  ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
-  ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+  }
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
@@ -466,7 +489,7 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
   // Set response header status to be non-2xx to test that the correct stats get charged.
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestResponseHeaderMapImpl({{":status", "503"}, {"content-length", "0"}})));
+          Http::TestResponseHeaderMapImpl({{":status", "503"}})));
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();
@@ -505,16 +528,12 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
 
-  Envoy::FakeRawConnectionPtr upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
-
-  std::string upstream_request;
-  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
-                                               &upstream_request));
-
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
   // Send an incomplete response.
-  auto response = "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\n";
-  ASSERT_TRUE(upstream_connection->write(response));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
   headers_callback.waitReady();
   ASSERT_EQ(cc_.on_headers_calls, 1);
@@ -532,12 +551,16 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   ASSERT_EQ(cc_.on_data_calls, 0);
   ASSERT_EQ(cc_.on_complete_calls, 0);
   ASSERT_EQ(cc_.on_cancel_calls, 1);
+
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
 }
 
-TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStreamHttp3) {
+TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStream) {
   autonomous_upstream_ = false;
 
-  initializeWithHttp3AndFakeDns();
+  initialize();
   ConditionalInitializer headers_callback;
 
   stream_prototype_->setOnHeaders(
@@ -551,13 +574,11 @@ TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStreamHttp3) {
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
 
-  FakeHttpConnectionPtr upstream_connection;
-  FakeStreamPtr upstream_request;
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
-                                                        upstream_connection));
+                                                        upstream_connection_));
   ASSERT_TRUE(
-      upstream_connection->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request));
-  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.on_headers_calls, 1);
@@ -586,22 +607,21 @@ TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
 
-  Envoy::FakeRawConnectionPtr upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
-
-  std::string upstream_request;
-  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
-                                               &upstream_request));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
 
   // Send a complete response with body.
-  auto response = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nasd";
-  ASSERT_TRUE(upstream_connection->write(response));
-  headers_callback.waitReady();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1, true);
 
+  headers_callback.waitReady();
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 0);
   ASSERT_EQ(cc_.on_complete_calls, 0);
+
   // Due to explicit flow control, the upstream stream is complete, but the
   // callbacks will not be called for data and completion. Cancel the stream
   // and make sure the cancel is received.
@@ -615,12 +635,11 @@ TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
   ASSERT_EQ(cc_.on_cancel_calls, 1);
 }
 
-// TODO(junr03): test with envoy local reply with local stream not closed, which causes a reset
-// fired from the Http:ConnectionManager rather than the Http::Client. This cannot be done in
-// unit tests because the Http::ConnectionManager is mocked using a mock response encoder.
-
 // Test header key case sensitivity.
 TEST_P(ClientIntegrationTest, CaseSensitive) {
+  if (getCodecType() != Http::CodecType::HTTP1) {
+    return;
+  }
   autonomous_upstream_ = false;
   initialize();
 
@@ -672,18 +691,23 @@ TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
 
-  Envoy::FakeRawConnectionPtr upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
 
-  std::string upstream_request;
-  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
-                                               &upstream_request));
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_headers_calls, 0);
   ASSERT_EQ(cc_.on_data_calls, 0);
   ASSERT_EQ(cc_.on_complete_calls, 0);
   ASSERT_EQ(cc_.on_error_calls, 1);
+
+  if (getCodecType() != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  } else {
+    ASSERT_TRUE(upstream_connection_->waitForDisconnect());
+  }
 }
 
 TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
@@ -693,17 +717,15 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
 
-  Envoy::FakeRawConnectionPtr upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
-
-  std::string upstream_request;
-  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
-                                               &upstream_request));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
 
   // Send response headers but no body.
-  auto response = "HTTP/1.1 200 OK\r\nContent-Length: 10\r\nMy-ResponsE-Header: foo\r\n\r\n";
-  ASSERT_TRUE(upstream_connection->write(response));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
+  // Wait for timeout.
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_headers_calls, 1);
@@ -711,9 +733,16 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
   ASSERT_EQ(cc_.on_data_calls, 0);
   ASSERT_EQ(cc_.on_complete_calls, 0);
   ASSERT_EQ(cc_.on_error_calls, 1);
+
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
 }
 
 TEST_P(ClientIntegrationTest, Proxying) {
+  if (getCodecType() != Http::CodecType::HTTP1) {
+    return;
+  }
   builder_.addLogLevel(Platform::LogLevel::trace);
   initialize();
 
