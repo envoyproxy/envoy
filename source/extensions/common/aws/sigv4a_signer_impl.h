@@ -72,7 +72,7 @@ private:
                               const absl::string_view secret_access_key,
                               ABSL_ATTRIBUTE_UNUSED const absl::string_view short_date,
                               const absl::string_view string_to_sign,
-                              const absl::string_view override_region) const override;
+                              ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const override;
 
   std::string createAuthorizationHeader(const absl::string_view access_key_id,
                                         const absl::string_view credential_scope,

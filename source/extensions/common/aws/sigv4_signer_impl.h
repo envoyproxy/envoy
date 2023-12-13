@@ -50,7 +50,7 @@ private:
                                  const absl::string_view long_date,
                                  const absl::string_view credential_scope) const override;
 
-  std::string createSignature(const absl::string_view access_key_id,
+  std::string createSignature(ABSL_ATTRIBUTE_UNUSED const absl::string_view access_key_id,
                               const absl::string_view secret_access_key,
                               const absl::string_view short_date,
                               const absl::string_view string_to_sign,
