@@ -949,7 +949,9 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
 
   // Handle the lb subset config case first.
-  if (cluster.has_lb_subset_config()) {
+  // Note it is possible to have a lb_subset_config without actually having any subset selectors.
+  // In this case the subset load balancer should not be used.
+  if (cluster.has_lb_subset_config() && !cluster.lb_subset_config().subset_selectors().empty()) {
     auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.subset");
     if (lb_factory != nullptr) {
@@ -1286,7 +1288,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
+        helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
                                           http_filter_factories_));

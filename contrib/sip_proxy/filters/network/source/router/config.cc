@@ -20,11 +20,11 @@ SipFilters::FilterFactoryCb RouterFilterConfigFactory::createFilterFactoryFromPr
   std::shared_ptr<RouterFilterConfig> config(
       new RouterFilterConfigImpl(proto_config, stat_prefix, context));
 
-  return
-      [config, &context, stat_prefix](SipFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addDecoderFilter(std::make_shared<Router>(
-            config, context.getServerFactoryContext().clusterManager(), context));
-      };
+  return [config, &context,
+          stat_prefix](SipFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addDecoderFilter(
+        std::make_shared<Router>(config, context.serverFactoryContext().clusterManager(), context));
+  };
 }
 
 /**

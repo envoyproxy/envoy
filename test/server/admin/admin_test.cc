@@ -355,7 +355,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.listener().name();
   peer.listener().udpListenerConfig();
-  peer.listener().direction();
+  peer.listener().listenerInfo().direction();
   peer.listener().tcpBacklogSize();
 }
 

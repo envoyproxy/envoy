@@ -29,7 +29,7 @@ Envoy::Compression::Decompressor::DecompressorFactoryPtr
 ZstdDecompressorLibraryFactory::createDecompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::zstd::decompressor::v3::Zstd& proto_config,
     Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
   return std::make_unique<ZstdDecompressorFactory>(
       proto_config, context.scope(), server_context.mainThreadDispatcher(), server_context.api(),
       server_context.threadLocal());

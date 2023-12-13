@@ -17,7 +17,7 @@ namespace Squash {
 Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::squash::v3::Squash& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   SquashFilterConfigSharedPtr config = std::make_shared<SquashFilterConfig>(
       SquashFilterConfig(proto_config, server_context.clusterManager()));

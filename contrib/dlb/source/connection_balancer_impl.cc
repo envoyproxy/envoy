@@ -47,7 +47,7 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
 
   fallback_policy = dlb_config.fallback_policy();
 
-  const uint32_t worker_num = context.getServerFactoryContext().options().concurrency();
+  const uint32_t worker_num = context.serverFactoryContext().options().concurrency();
 
   if (worker_num > 32) {
     return fallback("Dlb connection balanncer only supports up to 32 worker threads, "

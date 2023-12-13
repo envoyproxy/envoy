@@ -8,6 +8,7 @@
 #include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/common/http/http2/frame_replay.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Http {
@@ -36,6 +37,12 @@ void replay(const Frame& frame, ClientCodecFrameInjector& codec) {
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+#ifdef ENVOY_ENABLE_UHV
+  // Temporarily disable oghttp2 for these fuzz tests when UHV is enabled.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+#endif
+
   ClientCodecFrameInjector codec;
   Frame frame;
   frame.assign(buf, buf + len);

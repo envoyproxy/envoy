@@ -64,7 +64,7 @@ cc_library(
     deps = [
         ":server_envoy_jni_lib",
         "//library/common/jni:envoy_jni_lib",
-        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "@envoy//source/common/listener_manager:listener_manager_lib",
     ],
 )
 

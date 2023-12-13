@@ -33,8 +33,8 @@ namespace {
 class ThriftRateLimitConfigurationTest : public testing::Test {
 public:
   ThriftRateLimitConfigurationTest() {
-    route_config_provider_manager_ =
-        std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
+    route_config_provider_manager_ = std::make_unique<RouteConfigProviderManagerImpl>(
+        factory_context_.server_factory_context_.admin_);
   }
 
   void initializeClusters(const std::vector<std::string>& cluster_names) {
