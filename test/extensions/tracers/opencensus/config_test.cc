@@ -174,6 +174,11 @@ TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(OpenCensusHttpTracerGrp
         google_grpc:
           target_uri: 127.0.0.1:55678
           stat_prefix: test
+        initial_metadata:
+        - key: foo
+          value: bar
+        - key: foo2
+          value: bar2
       incoming_trace_context: b3
       incoming_trace_context: trace_context
       incoming_trace_context: grpc_trace_bin
