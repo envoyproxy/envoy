@@ -44,7 +44,6 @@ WORKDIR /build
 # Resolve and build Go dependencies as Docker cache
 COPY go.mod /build/go.mod
 COPY go.sum /build/go.sum
-COPY kv/go.mod /build/kv/go.mod
 ENV GO111MODULE=on
 RUN go mod download
 COPY service.go /build/main.go
