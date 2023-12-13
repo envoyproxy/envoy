@@ -71,8 +71,7 @@ public:
    *         when the parent instance is drained; this allows draining QUIC listeners to
    *         catch their own packets and forward unrecognized packets to the child instance.
    */
-  virtual OptRef<Network::RegisterParentDrainedCallbackInterface>
-  parentDrainedCallbackRegistry() PURE;
+  virtual OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() PURE;
 
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/instance.h"
+#include "envoy/network/parent_drained_callback_registrar.h"
 
 #include "source/common/stats/stat_merger.h"
 #include "source/server/hot_restarting_base.h"
@@ -12,7 +13,7 @@ namespace Server {
  * The child half of hot restarting. Issues requests and commands to the parent.
  */
 class HotRestartingChild : public HotRestartingBase,
-                           public Network::RegisterParentDrainedCallbackInterface {
+                           public Network::ParentDrainedCallbackRegistrar {
 public:
   // A structure to record the set of registered UDP listeners keyed on their addresses,
   // to support QUIC packet forwarding.
@@ -51,7 +52,7 @@ public:
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
                                      std::shared_ptr<Network::UdpListenerConfig> listener_config);
-  // From Network::RegisterParentDrainedCallbackInterface.
+  // From Network::ParentDrainedCallbackRegistrar.
   void registerParentDrainedCallback(std::string addr, absl::AnyInvocable<void()> action) override;
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();

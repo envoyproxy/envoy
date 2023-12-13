@@ -68,17 +68,17 @@ public:
     }
   }
 
-  NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
-                      const Network::Socket::OptionsSharedPtr& options,
-                      OptRef<RegisterParentDrainedCallbackInterface>
-                          parent_drained_callback_registry = absl::nullopt)
+  NetworkListenSocket(
+      IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
+      const Network::Socket::OptionsSharedPtr& options,
+      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar = absl::nullopt)
       : ListenSocketImpl(std::move(io_handle), address),
-        parent_drained_callback_registry_(parent_drained_callback_registry) {
+        parent_drained_callback_registrar_(parent_drained_callback_registrar) {
     setListenSocketOptions(options);
   }
 
-  OptRef<RegisterParentDrainedCallbackInterface> parentDrainedCallbackRegistry() const {
-    return parent_drained_callback_registry_;
+  OptRef<ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() const override {
+    return parent_drained_callback_registrar_;
   }
 
   Socket::Type socketType() const override { return T::type; }
@@ -121,7 +121,7 @@ protected:
   // for a QUIC socket during hot restart this is undesirable as the parent instance needs to
   // receive all packets; in that case this interface is set, and listening won't begin until the
   // callback is called.
-  OptRef<RegisterParentDrainedCallbackInterface> parent_drained_callback_registry_;
+  OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar_;
 
   void setPrebindSocketOptions() {
     // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as

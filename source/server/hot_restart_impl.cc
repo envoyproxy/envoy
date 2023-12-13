@@ -124,8 +124,7 @@ void HotRestartImpl::registerUdpForwardingListener(
   as_child_.registerUdpForwardingListener(address, listener_config);
 }
 
-OptRef<Network::RegisterParentDrainedCallbackInterface>
-HotRestartImpl::parentDrainedCallbackRegistry() {
+OptRef<Network::ParentDrainedCallbackRegistrar> HotRestartImpl::parentDrainedCallbackRegistrar() {
   return as_child_;
 }
 

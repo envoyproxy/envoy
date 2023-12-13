@@ -323,7 +323,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       } else {
         auto socket = std::make_shared<Network::UdpListenSocket>(
             std::move(io_handle), address, options,
-            server_.hotRestart().parentDrainedCallbackRegistry());
+            server_.hotRestart().parentDrainedCallbackRegistrar());
         return socket;
       }
     }
