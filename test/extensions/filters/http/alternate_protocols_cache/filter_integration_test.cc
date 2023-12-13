@@ -67,6 +67,18 @@ typed_config:
     HttpProtocolIntegrationTest::initialize();
   }
 
+  void writeFile(uint32_t index) {
+    uint32_t port = fake_upstreams_[index]->localAddress()->ip()->port();
+    std::string key = absl::StrCat("https://sni.lyft.com:", port);
+
+    size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
+                         timeSystem().monotonicTime().time_since_epoch())
+                         .count();
+    std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds, "|0|0");
+    TestEnvironment::writeStringToFileForTest(
+        "alt_svc_cache.txt", absl::StrCat(key.length(), "\n", key, value.length(), "\n", value));
+  }
+
   // This function will create 2 upstreams, but Envoy will only point at the
   // first, the HTTP/2 upstream.
   void createUpstreams() override {
@@ -94,6 +106,9 @@ typed_config:
         fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
             std::move(http3_factory), fake_upstreams_[0]->localAddress()->ip()->port(), version_,
             http3_config));
+        if (fill_cache_) {
+          writeFile(1);
+        }
         return;
       }
       END_TRY
@@ -105,6 +120,7 @@ typed_config:
     }
     throw EnvoyException("Failed to find a port after 10 tries");
   }
+  bool fill_cache_ = false;
 };
 
 TEST_P(FilterIntegrationTest, AltSvc) {
@@ -142,6 +158,118 @@ TEST_P(FilterIntegrationTest, AltSvc) {
                                                  response_size, 1, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response2.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+}
+
+TEST_P(FilterIntegrationTest, AltSvcCached) {
+  // Start with the alt-svc header in the cache.
+  fill_cache_ = true;
+
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},       {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
+  int port = fake_upstreams_[1]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  // First request should go out over HTTP/3 (upstream index 1) because of the Alt-Svc information.
+  auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                 response_size, 1, timeout);
+  checkSimpleRequestSuccess(request_size, response_size, response2.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+}
+
+TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
+  // Start with the alt-svc header in the cache.
+  fill_cache_ = true;
+
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  absl::Notification block_until_notify;
+  // Block the H3 upstream so it can't process packets.
+  fake_upstreams_[1]->runOnDispatcherThread([&] { block_until_notify.WaitForNotification(); });
+
+  ASSERT(codec_client_ != nullptr);
+  // Send the request to Envoy.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // The request should fail over to the HTTP/2 upstream (index 0) as the H3 upstream is wedged.
+  waitForNextUpstreamRequest(0);
+
+  // Now unblock the HTTP/3 server and wait for the connection.
+  block_until_notify.Notify();
+  FakeHttpConnectionPtr h3_connection;
+  waitForNextUpstreamConnection(std::vector<uint64_t>{1}, TestUtility::DefaultTimeout,
+                                h3_connection);
+
+  // Send a second request. This should go out over the H3 connection.
+  FakeStreamPtr upstream_request2;
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(h3_connection->waitForNewStream(*dispatcher_, upstream_request2));
+  upstream_request2->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream(timeout));
+
+  // Now close the connection to make sure it doesn't cause problems for the
+  // downstream stream.
+  ASSERT_TRUE(h3_connection->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  // Finish the response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  // Wait for the response to be read by the codec client.
+  ASSERT_TRUE(response->waitForEndStream(timeout));
+
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+}
+
+TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
+  // Start with the alt-svc header in the cache.
+  fill_cache_ = true;
+
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  absl::Notification block_http2;
+  absl::Notification block_http3;
+  // Block both upstreams.
+  fake_upstreams_[0]->runOnDispatcherThread([&] { block_http2.WaitForNotification(); });
+  fake_upstreams_[1]->runOnDispatcherThread([&] { block_http3.WaitForNotification(); });
+
+  ASSERT(codec_client_ != nullptr);
+  // Send the request to Envoy.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for both connections to be attempted.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+
+  // Unblock Http3.
+  block_http3.Notify();
+  // Make sure the HTTP3 connection is established.
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Unblock the H2 upstream.
+  block_http2.Notify();
+
+  // Make sure the response is completed.
+  ASSERT_TRUE(response->waitForEndStream(timeout));
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
 TEST_P(FilterIntegrationTest, AltSvcIgnoredWithProxyConfig) {
@@ -312,18 +440,6 @@ class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
   MixedUpstreamIntegrationTest() { default_request_headers_.setHost("sni.lyft.com"); }
 
-  void writeFile() {
-    uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
-    std::string key = absl::StrCat("https://sni.lyft.com:", port);
-
-    size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
-                         timeSystem().monotonicTime().time_since_epoch())
-                         .count();
-    std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds, "|0|0");
-    TestEnvironment::writeStringToFileForTest(
-        "alt_svc_cache.txt", absl::StrCat(key.length(), "\n", key, value.length(), "\n", value));
-  }
-
   void createUpstreams() override {
     ASSERT_EQ(upstreamProtocol(), Http::CodecType::HTTP3);
     ASSERT_EQ(fake_upstreams_count_, 1);
@@ -337,7 +453,7 @@ protected:
       auto config = configWithType(Http::CodecType::HTTP3);
       Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
       addFakeUpstream(std::move(factory), Http::CodecType::HTTP3, /*autonomous_upstream=*/false);
-      writeFile();
+      writeFile(0);
     }
   }
 

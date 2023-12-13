@@ -787,6 +787,8 @@ public:
   Event::DispatcherPtr& dispatcher() { return dispatcher_; }
   absl::Mutex& lock() { return lock_; }
 
+  void runOnDispatcherThread(std::function<void()> cb);
+
 protected:
   const FakeUpstreamConfig& config() const { return config_; }
 
