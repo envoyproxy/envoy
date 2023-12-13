@@ -213,11 +213,16 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
   waitForNextUpstreamConnection(std::vector<uint64_t>{1}, TestUtility::DefaultTimeout,
                                 h3_connection);
 
-  // Send a second request. This should go out over the H3 connection.
+  // The created stream will reset.
   FakeStreamPtr upstream_request2;
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(h3_connection->waitForNewStream(*dispatcher_, upstream_request2));
-  upstream_request2->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(upstream_request2->waitForReset());
+
+  // Send a second request. This should go out over the H3 connection.
+  FakeStreamPtr upstream_request3;
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(h3_connection->waitForNewStream(*dispatcher_, upstream_request3));
+  upstream_request3->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream(timeout));
 
   // Now close the connection to make sure it doesn't cause problems for the
@@ -243,7 +248,6 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
 
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
   absl::Notification block_http2;
   absl::Notification block_http3;
@@ -251,7 +255,8 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
   fake_upstreams_[0]->runOnDispatcherThread([&] { block_http2.WaitForNotification(); });
   fake_upstreams_[1]->runOnDispatcherThread([&] { block_http3.WaitForNotification(); });
 
-  ASSERT(codec_client_ != nullptr);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
   // Send the request to Envoy.
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 

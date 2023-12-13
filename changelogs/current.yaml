@@ -69,6 +69,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: upstream
+  change: |
+    Fixed a bug with upstream auto-config with HTTP/3 where certain network configurations would result in zombie
+    streams left in the grid. Guarded by ``envoy.reloadable_features.avoid_zombie_streams``.
 - area: buffer
   change: |
     Fixed a bug (https://github.com/envoyproxy/envoy/issues/28760) that the internal listener causes an undefined
