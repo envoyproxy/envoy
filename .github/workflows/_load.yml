@@ -89,9 +89,9 @@ jobs:
     steps:
     # Load env data
     # Handle any failure in triggering job
-    # Remove the `checks` object, and shift the one we care about to `check`
+    # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.2.15
+    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.2.17
       name: Load env
       id: data
       with:
@@ -102,13 +102,13 @@ jobs:
         GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.15
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.17
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.2.15
+    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.2.17
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -116,35 +116,41 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.15
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.17
       name: Print request summary
       with:
-        input: ${{ steps.data.outputs.data }}
+        input: |
+          action: ${{ fromJSON(steps.data.outputs.data).data.check.action }}
+          summary: ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary) }}
+        input-format: yaml
         output-path: GITHUB_STEP_SUMMARY
         options: -r
         filter: |
-          .data as $data
-          | if ($data.check.action != "RUN") then
+          .action as $action
+          | .summary as $summary
+          | if ($action != "RUN") then
               "### ${{ github.workflow }} was skipped"
             else "" end
           | . as $extra
-          | $data.summary.summary as $summary
-          | $data.summary["linked-title"] as $linkedTitle
+          | $summary["linked-title"] as $linkedTitle
+          | $summary.summary as $summary
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.15
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.17
       id: request-output
       name: Load request
       with:
-        input: ${{ steps.data.outputs.data }}
-        output-path: ${{ steps.tmpfile.outputs.output }}
+        input: |
+          check: ${{ toJSON(fromJSON(steps.data.outputs.data).data.check) }}
+          config: ${{ toJSON(fromJSON(steps.data.outputs.data).data.config) }}
+          request: ${{ toJSON(fromJSON(steps.data.outputs.data).data.request) }}
+          run: ${{ toJSON(fromJSON(steps.data.outputs.data).data.run) }}
+          summary_title: ${{ fromJSON(steps.data.outputs.data).data.summary.title }}
+        input-format: yaml
         filter: |
-          .data
-          | del(
-              .checks,
-              .request.message,
-              .summary.summary,
-              .summary["linked-title"])
+          .
+          | .summary = {title: .summary_title}
+          | del(.request.message, .summary_title)
         print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
 
   cache:

@@ -282,12 +282,6 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
-  directory: "/examples/grpc-bridge/server/kv"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
   directory: "/examples/golang-http/simple"
   schedule:
     interval: daily

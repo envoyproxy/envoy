@@ -131,6 +131,8 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
 // TODO(pksohn): enable after fixing https://github.com/envoyproxy/envoy/issues/29930
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
+// TODO(#31276): flip this to true after some test time.
+FALSE_RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

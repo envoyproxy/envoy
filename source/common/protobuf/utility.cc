@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/documentation_url.h"
 #include "source/common/common/fmt.h"
+#include "source/common/protobuf/deterministic_hash.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/visitor.h"
@@ -129,22 +130,22 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
-  std::string text_format;
-
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-  {
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
+    return DeterministicProtoHash::hash(message);
+  } else {
+    std::string text_format;
     Protobuf::TextFormat::Printer printer;
     printer.SetExpandAny(true);
     printer.SetUseFieldNumber(true);
     printer.SetSingleLineMode(true);
     printer.SetHideUnknownFields(true);
     printer.PrintToString(message, &text_format);
+    return HashUtil::xxHash64(text_format);
   }
 #else
-  absl::StrAppend(&text_format, message.SerializeAsString());
+  return HashUtil::xxHash64(message.SerializeAsString());
 #endif
-
-  return HashUtil::xxHash64(text_format);
 }
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
@@ -368,6 +369,17 @@ absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
   }
   // Ok Status is returned if `UnpackTo` succeeded.
   return absl::OkStatus();
+}
+
+std::string MessageUtil::convertToStringForLogs(const Protobuf::Message& message, bool pretty_print,
+                                                bool always_print_primitive_fields) {
+#ifdef ENVOY_ENABLE_YAML
+  return getJsonStringFromMessageOrError(message, pretty_print, always_print_primitive_fields);
+#else
+  UNREFERENCED_PARAMETER(pretty_print);
+  UNREFERENCED_PARAMETER(always_print_primitive_fields);
+  return message.DebugString();
+#endif
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {

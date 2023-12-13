@@ -40,9 +40,9 @@ envoy_headers make_envoy_headers(std::vector<std::pair<std::string, std::string>
 
 class PlatformBridgeFilterTest : public testing::Test {
 public:
-  void setUpFilter(std::string&& yaml, envoy_http_filter* platform_filter) {
+  void setUpFilter(std::string name, envoy_http_filter* platform_filter) {
     envoymobile::extensions::filters::http::platform_bridge::PlatformBridge config;
-    TestUtility::loadFromYaml(yaml, config);
+    config.set_platform_filter_name(name);
     Api::External::registerApi(config.platform_filter_name(), platform_filter);
 
     config_ = std::make_shared<PlatformBridgeFilterConfig>(context_, config);
@@ -110,7 +110,7 @@ public:
 TEST_F(PlatformBridgeFilterTest, NullImplementation) {
   envoy_http_filter* null_filter =
       static_cast<envoy_http_filter*>(safe_calloc(1, sizeof(envoy_http_filter)));
-  setUpFilter("platform_filter_name: NullImplementation\n", null_filter);
+  setUpFilter("NullImplementation", null_filter);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -155,7 +155,7 @@ TEST_F(PlatformBridgeFilterTest, PartialNullImplementation) {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     invocations->release_filter_calls++;
   };
-  setUpFilter("platform_filter_name: PartialNullImplementation\n", noop_filter);
+  setUpFilter("PartialNullImplementation", noop_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -205,10 +205,7 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestHeaders) {
     return {kEnvoyFilterHeadersStatusContinue, c_headers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnRequestHeaders
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnRequestHeaders", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -252,10 +249,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnData) {
     return {kEnvoyFilterDataStatusResumeIteration, c_data, modified_headers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -317,10 +311,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecoding)
     return {kEnvoyFilterResumeStatusResumeIteration, modified_headers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -390,10 +381,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingW
     return {kEnvoyFilterResumeStatusResumeIteration, modified_headers, modified_data, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -464,10 +452,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingW
     return {kEnvoyFilterResumeStatusResumeIteration, modified_headers, nullptr, modified_trailers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -538,10 +523,7 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeDecodingIsNoopAfterPreviousResume) {
     return {kEnvoyFilterResumeStatusResumeIteration, nullptr, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: AsyncResumeDecodingIsNoopAfterPreviousResume
-)EOF",
-              &platform_filter);
+  setUpFilter("AsyncResumeDecodingIsNoopAfterPreviousResume", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -590,10 +572,7 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestData) {
     return {kEnvoyFilterDataStatusContinue, c_data, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnRequestData
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
@@ -634,10 +613,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnRequestData) {
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopAndBufferOnRequestData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopAndBufferOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -696,10 +672,7 @@ TEST_F(PlatformBridgeFilterTest, BasicError) {
     release_envoy_error(c_error);
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicError
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicError", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -766,10 +739,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopAndBufferThenResumeOnRequestData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopAndBufferThenResumeOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -852,10 +822,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnData)
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -907,10 +874,7 @@ TEST_F(PlatformBridgeFilterTest, StopNoBufferOnRequestData) {
     return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopNoBufferOnRequestData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopNoBufferOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -948,10 +912,7 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestTrailers) {
     return {kEnvoyFilterTrailersStatusContinue, c_trailers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnRequestTrailers
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnRequestTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer", "test trailer"}};
@@ -1022,10 +983,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrail
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnTrailers
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -1150,10 +1108,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -1281,10 +1236,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -1346,10 +1298,7 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseHeaders) {
     return {kEnvoyFilterHeadersStatusContinue, c_headers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnResponseHeaders
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnResponseHeaders", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1393,10 +1342,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnData) {
     return {kEnvoyFilterDataStatusResumeIteration, c_data, modified_headers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenResumeOnData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1458,10 +1404,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnResumeEncoding
     return {kEnvoyFilterResumeStatusResumeIteration, modified_headers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenResumeOnResumeEncoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenResumeOnResumeEncoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1526,10 +1469,7 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterPreviousResume) {
     return {kEnvoyFilterResumeStatusResumeIteration, nullptr, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: AsyncResumeEncodingIsNoopAfterPreviousResume
-)EOF",
-              &platform_filter);
+  setUpFilter("AsyncResumeEncodingIsNoopAfterPreviousResume", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1592,10 +1532,7 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterFilterIsPendingDe
     invocations->release_filter_calls++;
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: AsyncResumeEncodingIsNoopAfterFilterIsPendingDestruction
-)EOF",
-              &platform_filter);
+  setUpFilter("AsyncResumeEncodingIsNoopAfterFilterIsPendingDestruction", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1645,10 +1582,7 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseData) {
     return {kEnvoyFilterDataStatusContinue, c_data, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnResponseData
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl response_data = Buffer::OwnedImpl("response body");
@@ -1689,10 +1623,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnResponseData) {
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopAndBufferOnResponseData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopAndBufferOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -1763,10 +1694,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnResponseData) {
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopAndBufferThenResumeOnResponseData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopAndBufferThenResumeOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -1848,10 +1776,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnData
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1903,10 +1828,7 @@ TEST_F(PlatformBridgeFilterTest, StopNoBufferOnResponseData) {
     return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopNoBufferOnResponseData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopNoBufferOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -1944,10 +1866,7 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseTrailers) {
     return {kEnvoyFilterTrailersStatusContinue, c_trailers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnResponseTrailers
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnResponseTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseTrailerMapImpl response_trailers{{"x-test-trailer", "test trailer"}};
@@ -2018,10 +1937,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrai
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnTrailers
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -2146,10 +2062,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -2233,10 +2146,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingP
     return {kEnvoyFilterResumeStatusResumeIteration, pending_headers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
