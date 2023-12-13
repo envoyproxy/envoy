@@ -46,6 +46,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_connect_udp_support);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
 RUNTIME_GUARD(envoy_reloadable_features_enable_zone_routing_different_zone_counts);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_send_original_xff);
+RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_handle_empty_response);
 RUNTIME_GUARD(envoy_reloadable_features_handle_uppercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_hmac_base64_encoding_only);
 RUNTIME_GUARD(envoy_reloadable_features_http1_allow_codec_error_response_after_1xx_headers);
@@ -115,6 +116,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
+// TODO(steveWang) flip this to true after this is verified in prod.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quiche_use_mem_slice_releasor_api);
 // TODO(suniltheta): Once the newly added http async technique is stabilized move it under
 // RUNTIME_GUARD so that this option becomes default enabled. Once this option proves effective
 // remove the feature flag and remove code path that relies on old technique to fetch credentials

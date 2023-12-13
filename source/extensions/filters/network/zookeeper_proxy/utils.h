@@ -48,9 +48,9 @@ private:
     return status;                                                                                 \
   }
 
-#define EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, opcode)                               \
+#define EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status)                                       \
   if (!status.ok()) {                                                                              \
-    callbacks_.onDecodeError(opcode);                                                              \
+    callbacks_.onDecodeError();                                                                    \
     return status;                                                                                 \
   }
 
@@ -59,9 +59,9 @@ private:
     return absl::InvalidArgumentError(message);                                                    \
   }
 
-#define EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, opcode, message)      \
+#define EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, message)              \
   if (!status.ok()) {                                                                              \
-    callbacks_.onDecodeError(opcode);                                                              \
+    callbacks_.onDecodeError();                                                                    \
     return absl::InvalidArgumentError(message);                                                    \
   }
 } // namespace ZooKeeperProxy

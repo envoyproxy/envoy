@@ -31,6 +31,11 @@ behavior_changes:
     Discard the ``Host`` header if the ``:authority`` header was received to bring Envoy into compliance with
     https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1 This behavioral change can be reverted by setting runtime flag
     ``envoy.reloadable_features.http2_discard_host_header`` to false.
+- area: grpc reverse bridge
+  change: |
+    Handle empty response bodies in grpc_http1_reverse_bridge. This may cause problems for clients expecting the filter to crash
+    for empty responses.  This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -58,6 +63,9 @@ minor_behavior_changes:
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
     This feature improves flow control within the proxy by deferring work on the receiving end if the other
     end is backed up.
+- area: admin
+  change: |
+    Switch no admin ``warning`` -> ``info``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -104,6 +112,10 @@ bug_fixes:
     used for retrieval. This caused cache misses on initial use, even though the host DNS entry
     was pre-resolved. The fix is guarded by runtime guard ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns``,
     which defaults to true.
+- area: otlp_stat_sink
+  change: |
+    Fixed a bug where a histogram bucket counts were wrong. Additionally, the number of buckets is fixed and is now
+    one element larger than the explicit bounds elements, as required by the specification.
 - area: DNS
   change: |
     Fixed a race condition that when multiple requests with the same authority header are sent to Envoy, sometimes some requests
@@ -113,6 +125,9 @@ bug_fixes:
   change: |
     Fixed a bug that the subset load balancer will always be used even if the subset load balancer config does not
     contain any subset selector.
+- area: docker
+  change: |
+    Updated base image to ``ubuntu:22.04`` to fix Redis memory issue (https://github.com/envoyproxy/envoy/issues/31248).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -254,10 +269,6 @@ new_features:
     Added support to copy headers from the redirect response to the
     triggered request. See
     :ref:`response_headers_to_copy<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.response_headers_to_copy>`.
-- area: zookeeper
-  change: |
-    Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
-    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
 - area: stateful_session
   change: |
     Added :ref:`strict mode <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.strict>`

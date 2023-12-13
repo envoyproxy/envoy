@@ -324,8 +324,11 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/dependabot.yml
     - "**/*.bzl"
     - "**/requirements.txt"
+    - "**/go.mod"
+    - "**/Dockerfile*"
   publish:
     paths:
     - .bazelrc

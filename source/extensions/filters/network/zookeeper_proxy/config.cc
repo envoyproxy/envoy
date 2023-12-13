@@ -31,8 +31,6 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
       proto_config.enable_per_opcode_request_bytes_metrics();
   const bool enable_per_opcode_response_bytes_metrics =
       proto_config.enable_per_opcode_response_bytes_metrics();
-  const bool enable_per_opcode_decoder_error_metrics =
-      proto_config.enable_per_opcode_decoder_error_metrics();
   const bool enable_latency_threshold_metrics = proto_config.enable_latency_threshold_metrics();
   const std::chrono::milliseconds default_latency_threshold(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, default_latency_threshold, 100));
@@ -51,9 +49,8 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
 
   ZooKeeperFilterConfigSharedPtr filter_config(std::make_shared<ZooKeeperFilterConfig>(
       stat_prefix, max_packet_bytes, enable_per_opcode_request_bytes_metrics,
-      enable_per_opcode_response_bytes_metrics, enable_per_opcode_decoder_error_metrics,
-      enable_latency_threshold_metrics, default_latency_threshold, latency_threshold_overrides,
-      context.scope()));
+      enable_per_opcode_response_bytes_metrics, enable_latency_threshold_metrics,
+      default_latency_threshold, latency_threshold_overrides, context.scope()));
   auto& time_source = context.serverFactoryContext().mainThreadDispatcher().timeSource();
 
   return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {

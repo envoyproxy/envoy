@@ -383,8 +383,9 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
   }
 }
 
-// Regression tests that header-only responses do not get the content-length
-// adjusted (https://github.com/envoyproxy/envoy/issues/11099)
+// Regression tests that header-only responses get the gRPC frame appended and
+// content-length header adjusted, as well as trailers added.
+// (https://github.com/envoyproxy/envoy/issues/29989).
 TEST_F(ReverseBridgeTest, GrpcRequestHeaderOnlyResponse) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
@@ -424,11 +425,17 @@ TEST_F(ReverseBridgeTest, GrpcRequestHeaderOnlyResponse) {
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   }
 
+  // call should prefix the buffer with the gRPC frame header and insert the
+  // gRPC status into trailers.
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false));
+  Http::TestResponseTrailerMapImpl trailers;
+  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
+
   Http::TestResponseHeaderMapImpl headers(
       {{":status", "200"}, {"content-length", "0"}, {"content-type", "application/x-protobuf"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "0"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "5"));
 }
 
 // Tests that a gRPC is downgraded to application/x-protobuf and upgraded back

@@ -34,7 +34,7 @@ namespace Outlier {
  */
 class DetectorImplFactory {
 public:
-  static DetectorSharedPtr
+  static absl::StatusOr<DetectorSharedPtr>
   createForCluster(Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
                    Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                    EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
@@ -372,7 +372,7 @@ private:
  */
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
-  static std::shared_ptr<DetectorImpl>
+  static absl::StatusOr<std::shared_ptr<DetectorImpl>>
   create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
