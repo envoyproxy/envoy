@@ -9,20 +9,6 @@ namespace Envoy {
 namespace Extensions {
 namespace InjectedCredentials {
 namespace Common {
-
-inline Secret::GenericSecretConfigProviderSharedPtr
-secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-                Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
-                Init::Manager& init_manager) {
-  if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory, init_manager);
-  } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
-  }
-}
-
 // Helper class used to fetch secrets (usually from SDS).
 class SecretReader {
 public:
