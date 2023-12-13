@@ -18,19 +18,37 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "sigv4_signer_impl_lib",
-    srcs = ["sigv4_signer_impl.cc"],
-    hdrs = ["sigv4_signer_impl.h"],
+    name = "signer_base",
+    srcs = ["signer_base.cc"],
+    hdrs = ["signer_base.h"],
     deps = [
-        ":credentials_provider_interface",
         ":signer_interface",
         ":utility_lib",
+        ":credentials_provider_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "sigv4_signer_impl_lib",
+    srcs = ["sigv4_signer_impl.cc"],
+    hdrs = ["sigv4_signer_impl.h","signer_base.h"],
+    deps = [
+        ":credentials_provider_interface",
+        ":signer_interface",
+        ":signer_base",
+        ":utility_lib",
+        # "//source/common/buffer:buffer_lib",
+        # "//source/common/common:hex_lib",
+        # "//source/common/common:logger_lib",
+        # "//source/common/common:utility_lib",
+        # "//source/common/crypto:utility_lib",
+        # "//source/common/http:message_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -38,18 +56,19 @@ envoy_cc_library(
 envoy_cc_library(
     name = "sigv4a_signer_impl_lib",
     srcs = ["sigv4a_signer_impl.cc"],
-    hdrs = ["sigv4a_signer_impl.h"],
+    hdrs = ["sigv4a_signer_impl.h", "signer_base.h"],
     deps = [
         ":credentials_provider_interface",
         ":signer_interface",
+        ":signer_base",
         ":sigv4a_key_derivation_lib",
         ":utility_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:hex_lib",
-        "//source/common/common:logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/crypto:utility_lib",
-        "//source/common/http:message_lib",
+        # "//source/common/buffer:buffer_lib",
+        # "//source/common/common:hex_lib",
+        # "//source/common/common:logger_lib",
+        # "//source/common/common:utility_lib",
+        # "//source/common/crypto:utility_lib",
+        # "//source/common/http:message_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -65,6 +84,7 @@ envoy_cc_library(
         ":credentials_provider_interface",
         ":signer_interface",
         ":utility_lib",
+        ":signer_base",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
