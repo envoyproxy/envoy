@@ -879,6 +879,19 @@ public:
     for (const auto& value : values) {
       context_map_[value.first] = value.second;
     }
+    // Backwards compatibility for tracing tests.
+    if (context_map_.contains(":protocol")) {
+      context_protocol_ = context_map_[":protocol"];
+    }
+    if (context_map_.contains(":authority")) {
+      context_host_ = context_map_[":authority"];
+    }
+    if (context_map_.contains(":path")) {
+      context_path_ = context_map_[":path"];
+    }
+    if (context_map_.contains(":method")) {
+      context_method_ = context_map_[":method"];
+    }
   }
   absl::string_view protocol() const override { return context_protocol_; }
   absl::string_view host() const override { return context_host_; }
@@ -891,6 +904,9 @@ public:
       }
     }
   }
+  absl::optional<absl::string_view> get(absl::string_view key) const { return getByKey(key); }
+  void set(absl::string_view key, absl::string_view value) { setByKey(key, value); }
+  void remove(absl::string_view key) { removeByKey(key); }
   absl::optional<absl::string_view> getByKey(absl::string_view key) const override {
     auto iter = context_map_.find(key);
     if (iter == context_map_.end()) {
@@ -898,6 +914,7 @@ public:
     }
     return iter->second;
   }
+
   void setByKey(absl::string_view key, absl::string_view val) override {
     context_map_.insert({std::string(key), std::string(val)});
   }

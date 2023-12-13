@@ -26,7 +26,7 @@ jobs:
 
     steps:
     - name: Pre-cleanup
-      uses: envoyproxy/toolshed/gh-actions/diskspace@8bcde82323799942b86a3d928f100e2c969e0d50
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.15
       with:
         to_remove: |
           /usr/local/lib/android
