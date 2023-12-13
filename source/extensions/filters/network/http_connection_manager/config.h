@@ -109,15 +109,15 @@ public:
 
     // TODO: cleanup isInternalAddress and default to initializing cidr_ranges_
     // based on RFC1918 / RFC4193, if config is unset.
-    if (cidr_ranges_.getIpListSize() != 0 && address.type() == Network::Address::Type::Ip) {
-      return cidr_ranges_.contains(address);
+    if (cidr_ranges_->getIpListSize() != 0 && address.type() == Network::Address::Type::Ip) {
+      return cidr_ranges_->contains(address);
     }
     return Network::Utility::isInternalAddress(address);
   }
 
 private:
   const bool unix_sockets_;
-  const Network::Address::IpList cidr_ranges_;
+  std::unique_ptr<Network::Address::IpList> cidr_ranges_;
 };
 
 /**
