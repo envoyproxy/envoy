@@ -16,14 +16,14 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class SigV4ASignatureHeaderValues: public SignatureHeaderValues {
+class SigV4ASignatureHeaderValues : public SignatureHeaderValues {
 public:
   const Http::LowerCaseString RegionSet{"x-amz-region-set"};
 };
 
 using SigV4ASignatureHeaders = ConstSingleton<SigV4ASignatureHeaderValues>;
 
-class SigV4ASignatureConstantValues: public SignatureConstantValues {
+class SigV4ASignatureConstantValues : public SignatureConstantValues {
 public:
   const std::string SigV4AAuthorizationHeaderFormat{
       "AWS4-ECDSA-P256-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
@@ -51,25 +51,25 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
  */
 
 class SigV4ASignerImpl : public SignerBase {
-  public:
-      SigV4ASignerImpl(absl::string_view service_name, absl::string_view region,
-                  const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-                  const AwsSigningHeaderExclusionVector& matcher_config) : SignerBase(service_name, region,
-                  credentials_provider, time_source,
-                  matcher_config) {}
+public:
+  SigV4ASignerImpl(absl::string_view service_name, absl::string_view region,
+                   const CredentialsProviderSharedPtr& credentials_provider,
+                   TimeSource& time_source, const AwsSigningHeaderExclusionVector& matcher_config)
+      : SignerBase(service_name, region, credentials_provider, time_source, matcher_config) {}
 
 private:
+  void addRegionHeader(Http::RequestHeaderMap& headers,
+                       const absl::string_view override_region) const override;
 
-  void addRegionHeader(Http::RequestHeaderMap &headers, const absl::string_view override_region) const override;
+  std::string createCredentialScope(const absl::string_view short_date,
+                                    const absl::string_view override_region) const override;
 
-  std::string createCredentialScope(const absl::string_view short_date, const absl::string_view override_region) const override;
-
-  std::string createStringToSign(const absl::string_view canonical_request, const absl::string_view long_date,
+  std::string createStringToSign(const absl::string_view canonical_request,
+                                 const absl::string_view long_date,
                                  const absl::string_view credential_scope) const override;
 
-   std::string createSignature(
-                              const absl::string_view access_key_id,
-                              const absl::string_view secret_access_key, 
+  std::string createSignature(const absl::string_view access_key_id,
+                              const absl::string_view secret_access_key,
                               ABSL_ATTRIBUTE_UNUSED const absl::string_view short_date,
                               const absl::string_view string_to_sign,
                               const absl::string_view override_region) const override;
@@ -78,7 +78,6 @@ private:
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) const override;
-
 };
 
 } // namespace Aws

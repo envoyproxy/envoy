@@ -21,7 +21,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-
 std::string SigV4ASignerImpl::createAuthorizationHeader(
     const absl::string_view access_key_id, const absl::string_view credential_scope,
     const std::map<std::string, std::string>& canonical_headers,
@@ -31,7 +30,9 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
                      access_key_id, credential_scope, signed_headers, signature);
 }
 
-std::string SigV4ASignerImpl::createCredentialScope(const absl::string_view short_date, ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
+std::string SigV4ASignerImpl::createCredentialScope(
+    const absl::string_view short_date,
+    ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
   return fmt::format(fmt::runtime(SigV4ASignatureConstants::get().SigV4ACredentialScopeFormat),
                      short_date, service_name_);
 }
@@ -46,19 +47,17 @@ std::string SigV4ASignerImpl::createStringToSign(const absl::string_view canonic
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
-void SigV4ASignerImpl::addRegionHeader(Http::RequestHeaderMap &headers, const absl::string_view override_region) const
-{
+void SigV4ASignerImpl::addRegionHeader(Http::RequestHeaderMap& headers,
+                                       const absl::string_view override_region) const {
   headers.addCopy(SigV4ASignatureHeaders::get().RegionSet,
                   override_region.empty() ? getRegion() : override_region);
 }
 
-   std::string SigV4ASignerImpl::createSignature(
-                              const absl::string_view access_key_id,
-                              const absl::string_view secret_access_key, 
-                              ABSL_ATTRIBUTE_UNUSED const absl::string_view short_date,
-                              const absl::string_view string_to_sign,
-                              ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const
-{
+std::string SigV4ASignerImpl::createSignature(
+    const absl::string_view access_key_id, const absl::string_view secret_access_key,
+    ABSL_ATTRIBUTE_UNUSED const absl::string_view short_date,
+    const absl::string_view string_to_sign,
+    ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
 
   uint signature_size;
 

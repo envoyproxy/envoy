@@ -22,9 +22,9 @@ envoy_cc_library(
     srcs = ["signer_base.cc"],
     hdrs = ["signer_base.h"],
     deps = [
+        ":credentials_provider_interface",
         ":signer_interface",
         ":utility_lib",
-        ":credentials_provider_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
@@ -37,7 +37,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "sigv4_signer_impl_lib",
     srcs = ["sigv4_signer_impl.cc"],
-    hdrs = ["sigv4_signer_impl.h","signer_base.h"],
+    hdrs = [
+        "signer_base.h",
+        "sigv4_signer_impl.h",
+    ],
     deps = [
         ":credentials_provider_interface",
         ":signer_interface",
@@ -56,7 +59,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "sigv4a_signer_impl_lib",
     srcs = ["sigv4a_signer_impl.cc"],
-    hdrs = ["sigv4a_signer_impl.h", "signer_base.h"],
+    hdrs = [
+        "signer_base.h",
+        "sigv4a_signer_impl.h",
+    ],
     deps = [
         ":credentials_provider_interface",
         ":signer_interface",
@@ -82,9 +88,9 @@ envoy_cc_library(
     ],
     deps = [
         ":credentials_provider_interface",
+        ":signer_base",
         ":signer_interface",
         ":utility_lib",
-        ":signer_base",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",

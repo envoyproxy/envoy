@@ -18,7 +18,7 @@ namespace Aws {
 
 using SigV4SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 
-class SigV4SignatureConstantValues: public SignatureConstantValues {
+class SigV4SignatureConstantValues : public SignatureConstantValues {
 public:
   const std::string SigV4AuthorizationHeaderFormat{
       "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
@@ -35,24 +35,23 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
  * Implementation of the Signature V4 signing process.
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
  */
-class SigV4SignerImpl: public SignerBase {
-  public:
-      SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
+class SigV4SignerImpl : public SignerBase {
+public:
+  SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                   const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-                  const AwsSigningHeaderExclusionVector& matcher_config) : SignerBase(service_name, region,
-                  credentials_provider, time_source,
-                  matcher_config) {}
-private:
+                  const AwsSigningHeaderExclusionVector& matcher_config)
+      : SignerBase(service_name, region, credentials_provider, time_source, matcher_config) {}
 
+private:
   std::string createCredentialScope(const absl::string_view short_date,
                                     const absl::string_view override_region) const override;
 
-  std::string createStringToSign(const absl::string_view canonical_request, const absl::string_view long_date,
+  std::string createStringToSign(const absl::string_view canonical_request,
+                                 const absl::string_view long_date,
                                  const absl::string_view credential_scope) const override;
 
- std::string createSignature(
-                              const absl::string_view access_key_id,
-                              const absl::string_view secret_access_key, 
+  std::string createSignature(const absl::string_view access_key_id,
+                              const absl::string_view secret_access_key,
                               const absl::string_view short_date,
                               const absl::string_view string_to_sign,
                               const absl::string_view override_region) const override;
@@ -61,7 +60,6 @@ private:
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) const override;
-
 };
 
 } // namespace Aws

@@ -46,11 +46,10 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SignerBase : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SignerBase(absl::string_view service_name, absl::string_view region,
-                  const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-                  const AwsSigningHeaderExclusionVector& matcher_config)
+             const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
+             const AwsSigningHeaderExclusionVector& matcher_config)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
-        time_source_(time_source),
-        long_date_formatter_(SignatureConstants::get().LongDateFormat),
+        time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
@@ -73,25 +72,27 @@ public:
 protected:
   std::string createContentHash(Http::RequestMessage& message, const bool sign_body) const;
 
-  virtual void addRegionHeader(Http::RequestHeaderMap &headers, const absl::string_view override_region) const;
-  
+  virtual void addRegionHeader(Http::RequestHeaderMap& headers,
+                               const absl::string_view override_region) const;
+
   virtual std::string createCredentialScope(const absl::string_view short_date,
-                                    const absl::string_view override_region) const PURE;
+                                            const absl::string_view override_region) const PURE;
 
-  virtual std::string createStringToSign(const absl::string_view canonical_request, const absl::string_view long_date,
-                                 const absl::string_view credential_scope) const PURE;
+  virtual std::string createStringToSign(const absl::string_view canonical_request,
+                                         const absl::string_view long_date,
+                                         const absl::string_view credential_scope) const PURE;
 
-  virtual std::string createSignature(
-                              const absl::string_view access_key_id,
-                              const absl::string_view secret_access_key, 
-                              const absl::string_view short_date,
-                              const absl::string_view string_to_sign,
-                              const absl::string_view override_region) const PURE;
+  virtual std::string createSignature(const absl::string_view access_key_id,
+                                      const absl::string_view secret_access_key,
+                                      const absl::string_view short_date,
+                                      const absl::string_view string_to_sign,
+                                      const absl::string_view override_region) const PURE;
 
-  virtual std::string createAuthorizationHeader(const absl::string_view access_key_id,
-                                        const absl::string_view credential_scope,
-                                        const std::map<std::string, std::string>& canonical_headers,
-                                        const absl::string_view signature) const PURE;
+  virtual std::string
+  createAuthorizationHeader(const absl::string_view access_key_id,
+                            const absl::string_view credential_scope,
+                            const std::map<std::string, std::string>& canonical_headers,
+                            const absl::string_view signature) const PURE;
 
   std::vector<Matchers::StringMatcherPtr> defaultMatchers() const {
     std::vector<Matchers::StringMatcherPtr> matcher_ptrs{};
@@ -116,7 +117,6 @@ protected:
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
   const std::string BlankStr = std::string();
-
 };
 
 } // namespace Aws

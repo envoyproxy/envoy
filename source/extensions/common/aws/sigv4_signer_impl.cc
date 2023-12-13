@@ -38,11 +38,9 @@ std::string SigV4SignerImpl::createStringToSign(absl::string_view canonical_requ
 }
 
 std::string SigV4SignerImpl::createSignature(
-                              ABSL_ATTRIBUTE_UNUSED const absl::string_view access_key_id,
-                              const absl::string_view secret_access_key, 
-                              const absl::string_view short_date,
-                              const absl::string_view string_to_sign,
-                              const absl::string_view override_region) const {
+    ABSL_ATTRIBUTE_UNUSED const absl::string_view access_key_id,
+    const absl::string_view secret_access_key, const absl::string_view short_date,
+    const absl::string_view string_to_sign, const absl::string_view override_region) const {
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto secret_key =
