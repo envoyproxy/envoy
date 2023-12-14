@@ -293,7 +293,7 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   const auto& tags_struct = tags.struct_value();
 
   checkKeyInt(tags_struct, "mytag0", 1);
-  EXPECT_EQ(0, config_->stats().overwrite_denied_.value());
+  EXPECT_EQ(1, config_->stats().overwrite_denied_.value());
 }
 
 TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
