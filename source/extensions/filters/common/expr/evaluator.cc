@@ -16,7 +16,7 @@ namespace {
 
 #define ACTIVATION_TOKENS(_f)                                                                      \
   _f(Request) _f(Response) _f(Connection) _f(Upstream) _f(Source) _f(Destination) _f(Metadata)     \
-      _f(FilterState) _f(XDS) _f(Node)
+      _f(FilterState) _f(XDS)
 
 #define _DECLARE(_t) _t,
 enum class ActivationToken { ACTIVATION_TOKENS(_DECLARE) };
@@ -64,13 +64,9 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
     return CelValue::CreateMap(
         Protobuf::Arena::Create<FilterStateWrapper>(arena, *arena, info.filterState()));
   case ActivationToken::XDS:
-    return CelValue::CreateMap(Protobuf::Arena::Create<XDSWrapper>(arena, *arena, info));
-  case ActivationToken::Node:
-    if (local_info_ == nullptr) {
-      return {};
-    }
-    return CelProtoWrapper::CreateMessage(&local_info_->node(), arena);
-  };
+    return CelValue::CreateMap(
+        Protobuf::Arena::Create<XDSWrapper>(arena, *arena, info, local_info_));
+  }
   return {};
 }
 

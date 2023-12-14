@@ -41,6 +41,7 @@ public:
 
     // CEL library supports mixed matching of request/response attributes(e.g., headers, trailers)
     // and attributes from stream info.
+    // TODO: pass local info to CEL activation.
     std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
         Extensions::Filters::Common::Expr::createActivation(
             nullptr, data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
