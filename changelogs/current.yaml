@@ -308,4 +308,4 @@ new_features:
 deprecated:
 - area: wasm
   change: |
-    Wasm-specific configuration attributes are deprecated in favor of `xds` attributes.
+    Wasm-specific configuration attributes are deprecated in favor of ``xds`` attributes.
