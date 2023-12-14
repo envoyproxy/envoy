@@ -169,6 +169,10 @@ removed_config_or_runtime:
     runtime flag and legacy code path.
 
 new_features:
+- area: composite filter
+  change: |
+    added :ref:`ExtensionConfiguration discovery service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>` support for
+    :ref:`composite filter <config_http_filters_composite>`.
 - area: aws
   change: |
     Added support for AWS common utility to fetch metadata credentials from AWS STS by using ``WebIdentityToken``. To enable

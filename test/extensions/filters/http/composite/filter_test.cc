@@ -2,10 +2,13 @@
 
 #include "envoy/http/metadata_interface.h"
 
+#include "source/extensions/filters/http/composite/action.h"
 #include "source/extensions/filters/http/composite/filter.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 
 #include "gtest/gtest.h"
 
@@ -231,6 +234,43 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   EXPECT_CALL(*access_log_1, log(_, _));
   EXPECT_CALL(*access_log_2, log(_, _));
   filter_.log({}, StreamInfo::MockStreamInfo());
+}
+
+// Validate that when dynamic_config and typed_config are both set, an exception is thrown.
+TEST(ConfigTest, TestConfig) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: set-response-code
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+            percentage:
+              numerator: 0
+              denominator: HUNDRED
+      dynamic_config:
+        name: set-response-code
+        config_discovery:
+          config_source:
+              resource_api_version: V3
+              path_config_source:
+                path: "{{ test_tmpdir }}/set_response_code.yaml"
+          type_urls:
+          - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+)EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
+                                                                server_factory_context};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "Error: Only one of `dynamic_config` or `typed_config` can be set.");
 }
 
 } // namespace

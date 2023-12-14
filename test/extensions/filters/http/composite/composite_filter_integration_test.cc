@@ -139,11 +139,111 @@ public:
                                                  name));
   }
 
+  void prependCompositeDynamicFilter(const std::string& name = "composite",
+                                     const std::string& path = "set_response_code.yaml") {
+    config_helper_.prependFilter(TestEnvironment::substitute(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                        dynamic_config:
+                          name: set-response-code
+                          config_discovery:
+                            config_source:
+                                resource_api_version: V3
+                                path_config_source:
+                                  path: "{{ test_tmpdir }}/%s"
+                            type_urls:
+                            - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+    )EOF",
+                                                                             name, path)));
+    TestEnvironment::writeStringToFileForTest("set_response_code.yaml", R"EOF(
+resources:
+  - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+    name: set-response-code
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+      code: 403)EOF",
+                                              false);
+  }
+
+  void prependMissingCompositeDynamicFilter(const std::string& name = "composite") {
+    config_helper_.prependFilter(TestEnvironment::substitute(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                        dynamic_config:
+                          name: missing-config
+                          config_discovery:
+                            config_source:
+                                resource_api_version: V3
+                                api_config_source:
+                                  api_type: GRPC
+                                  transport_api_version: V3
+                                  grpc_services:
+                                    envoy_grpc:
+                                      cluster_name: "ecds_cluster"
+                            type_urls:
+                            - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+    )EOF",
+                                                                             name)));
+  }
+
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
                                                                  {":path", "/somepath"},
                                                                  {":scheme", "http"},
                                                                  {"match-header", "match"},
                                                                  {":authority", "blah"}};
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ecds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ecds_cluster->set_name("ecds_cluster");
+      ecds_cluster->mutable_load_assignment()->set_cluster_name("ecds_cluster");
+    });
+    HttpIntegrationTest::initialize();
+  }
+
+  void createUpstreams() override {
+    BaseIntegrationTest::createUpstreams();
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterIntegrationTest,
@@ -171,6 +271,51 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
   }
+}
+
+// Verifies that if we don't match the match action the request is proxied as normal, while if the
+// match action is hit we apply the specified dynamic filter to the stream.
+TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
+  prependCompositeDynamicFilter("composite-dynamic");
+  initialize();
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
+}
+
+// Verifies that if ECDS response is not sent, the missing filter config is applied that returns
+// 500.
+TEST_P(CompositeFilterIntegrationTest, TestMissingDynamicFilter) {
+  prependMissingCompositeDynamicFilter("composite-dynamic-missing");
+
+  initialize();
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.http_filter.missing-config.config_fail", 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("500"));
 }
 
 // Verifies function of the per-route config in the ExtensionWithMatcher class.
