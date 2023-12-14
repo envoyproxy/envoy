@@ -846,6 +846,13 @@ TEST(Context, XDSAttributes) {
   filter_chain_info->filter_chain_name_ = "fake_filter_chain_name";
   info.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
 
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  envoy::config::core::v3::Metadata listener_metadata;
+  EXPECT_CALL(*listener_info, metadata()).WillRepeatedly(ReturnRef(listener_metadata));
+  EXPECT_CALL(*listener_info, direction())
+      .WillRepeatedly(Return(envoy::config::core::v3::TrafficDirection::OUTBOUND));
+  info.downstream_connection_info_provider_->setListenerInfo(listener_info);
+
   Protobuf::Arena arena;
   XDSWrapper wrapper(arena, info);
 
@@ -884,6 +891,18 @@ TEST(Context, XDSAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(chain_name, value.value().StringOrDie().value());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ListenerMetadata)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_EQ(&listener_metadata, value.value().MessageOrDie());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ListenerDirection)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(2, value.value().Int64OrDie());
   }
   {
     const auto value = wrapper[CelValue::CreateStringView(XDS)];

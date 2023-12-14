@@ -388,9 +388,9 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
   } else if (value == ListenerMetadata) {
     const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
     if (listener_info) {
-      return CelProtoWrapper::CreateMessage(listener_info->metadata(), &arena_);
+      return CelProtoWrapper::CreateMessage(&listener_info->metadata(), &arena_);
     }
-  } else if (value == ListenerMetadata) {
+  } else if (value == ListenerDirection) {
     const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
     if (listener_info) {
       return CelValue::CreateInt64(listener_info->direction());
