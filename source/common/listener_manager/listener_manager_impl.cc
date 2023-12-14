@@ -101,7 +101,7 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
 
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrError(
+              MessageUtil::convertToStringForLogs(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
@@ -164,7 +164,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",
-                MessageUtil::getJsonStringFromMessageOrError(
+                MessageUtil::convertToStringForLogs(
                     static_cast<const Protobuf::Message&>(proto_config.typed_config())));
       // For static configuration, now see if there is a factory that will accept the config.
       auto& factory =
@@ -192,7 +192,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrError(
+              MessageUtil::convertToStringForLogs(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
     if (proto_config.config_type_case() ==
         envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
@@ -251,7 +251,7 @@ ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
           createListenerFilterMatcher(proto_config)));
     } else {
       ENVOY_LOG(debug, "  config: {}",
-                MessageUtil::getJsonStringFromMessageOrError(
+                MessageUtil::convertToStringForLogs(
                     static_cast<const Protobuf::Message&>(proto_config.typed_config())));
       // For static configuration, now see if there is a factory that will accept the config.
       auto& factory =
