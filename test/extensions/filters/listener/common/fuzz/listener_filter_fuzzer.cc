@@ -34,8 +34,7 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
           Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4))),
       connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
       name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-      init_manager_(nullptr),
-      listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
+      init_manager_(nullptr) {
   socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
   EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
               socketType())

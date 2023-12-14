@@ -1,4 +1,3 @@
-#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/server/admin/admin_factory_context.h"
 
 #include "test/mocks/server/instance.h"
@@ -11,9 +10,8 @@ namespace {
 
 TEST(AdminFactoryContextTest, AdminFactoryContextTest) {
   testing::NiceMock<MockInstance> server;
-  const auto listener_info = std::make_shared<ListenerInfoImpl>();
 
-  AdminFactoryContext context(server, listener_info);
+  AdminFactoryContext context(server);
 
   context.serverFactoryContext();
   context.getTransportSocketFactoryContext();

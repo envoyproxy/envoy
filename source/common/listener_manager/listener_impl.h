@@ -119,8 +119,6 @@ private:
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
 
-class ListenerImpl;
-
 /**
  * The common functionality shared by PerListenerFilterFactoryContexts and
  * PerFilterChainFactoryFactoryContexts.
@@ -145,11 +143,12 @@ public:
     return nullptr;
   }
   Server::DrainManager& drainManager();
-  friend class ListenerImpl;
 
 private:
   const Server::DrainManagerPtr drain_manager_;
 };
+
+class ListenerImpl;
 
 // TODO(lambdai): Strip the interface since ListenerFactoryContext only need to support
 // ListenerFilterChain creation. e.g, Is listenerMetaData() required? Is it required only at
@@ -316,9 +315,9 @@ public:
   }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
-  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+  const Network::ListenerInfo& listenerInfo() const override {
     ASSERT(listener_factory_context_ != nullptr);
-    return listener_factory_context_->listener_factory_context_base_->listener_info_;
+    return listener_factory_context_->listenerInfo();
   }
 
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {

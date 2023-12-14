@@ -131,8 +131,8 @@ TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
 
 // Test that METADATA(LISTENER accesses stream_info listener metadata.
 TEST_F(MetadataFormatterTest, ListenerMetadata) {
-  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
-  EXPECT_CALL(*listener_info, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
+  NiceMock<Network::MockListenerInfo> listener_info;
+  EXPECT_CALL(listener_info, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
   stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
   EXPECT_EQ(
       "test_value",

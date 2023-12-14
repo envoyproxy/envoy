@@ -306,3 +306,6 @@ new_features:
     Added support for listener metadata and listener direction in XDS attributes.
 
 deprecated:
+- area: wasm
+  change: |
+    Wasm-specific configuration attributes are deprecated in favor of `xds` attributes.

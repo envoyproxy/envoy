@@ -846,10 +846,10 @@ TEST(Context, XDSAttributes) {
   filter_chain_info->filter_chain_name_ = "fake_filter_chain_name";
   info.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
 
-  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  NiceMock<Network::MockListenerInfo> listener_info;
   envoy::config::core::v3::Metadata listener_metadata;
-  EXPECT_CALL(*listener_info, metadata()).WillRepeatedly(ReturnRef(listener_metadata));
-  EXPECT_CALL(*listener_info, direction())
+  EXPECT_CALL(listener_info, metadata()).WillRepeatedly(ReturnRef(listener_metadata));
+  EXPECT_CALL(listener_info, direction())
       .WillRepeatedly(Return(envoy::config::core::v3::TrafficDirection::OUTBOUND));
   info.downstream_connection_info_provider_->setListenerInfo(listener_info);
 

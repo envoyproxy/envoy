@@ -65,8 +65,7 @@ public:
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr),
-        listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
+        init_manager_(nullptr) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -102,9 +101,7 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
-    return listener_info_;
-  }
+  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -228,7 +225,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
-  const Network::ListenerInfoConstSharedPtr listener_info_;
+  NiceMock<Network::MockListenerInfo> listener_info_;
 };
 
 // Parameterize the listener socket address version.
@@ -1972,8 +1969,7 @@ public:
             socket_->connectionInfoProvider().localAddress()->ip()->port())),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr),
-        listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
+        init_manager_(nullptr) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -2018,9 +2014,7 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
-    return listener_info_;
-  }
+  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -2104,7 +2098,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
-  const Network::ListenerInfoConstSharedPtr listener_info_;
+  NiceMock<Network::MockListenerInfo> listener_info_;
 };
 
 // Parameterize the listener socket address version.

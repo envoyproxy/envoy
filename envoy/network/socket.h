@@ -335,7 +335,7 @@ public:
   /**
    * @param listener_info the listener info provider backing this socket.
    */
-  virtual void setListenerInfo(std::shared_ptr<const ListenerInfo> listener_info) PURE;
+  virtual void setListenerInfo(const ListenerInfo& listener_info) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;

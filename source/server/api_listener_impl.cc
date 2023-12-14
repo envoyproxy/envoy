@@ -5,7 +5,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/http/conn_manager_impl.h"
-#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
