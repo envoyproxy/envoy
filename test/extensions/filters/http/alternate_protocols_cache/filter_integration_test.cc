@@ -131,7 +131,7 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
 
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},       {":path", "/test/long/url"},
@@ -171,7 +171,7 @@ TEST_P(FilterIntegrationTest, AltSvcCached) {
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
 
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},       {":path", "/test/long/url"},
@@ -197,7 +197,7 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
 
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   absl::Notification block_until_notify;
   // Block the H3 upstream so it can't process packets.
@@ -298,7 +298,7 @@ TEST_P(FilterIntegrationTest, AltSvcIgnoredWithProxyConfig) {
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
 
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},       {":path", "/test/long/url"},
@@ -339,7 +339,7 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   config_helper_.setConnectTimeout(std::chrono::seconds(2));
 
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   int port = fake_upstreams_[0]->localAddress()->ip()->port();
   std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
@@ -404,7 +404,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
 
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -489,7 +489,7 @@ int getSrtt(std::string alt_svc, TimeSource& time_source) {
 // occur over HTTP/3.
 TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
   cleanupUpstreamAndDownstream();
   std::string alt_svc;
@@ -526,7 +526,7 @@ TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp2) {
   // Only create an HTTP/2 upstream.
   use_http2_ = true;
   initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
 }
 
