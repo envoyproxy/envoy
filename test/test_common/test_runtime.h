@@ -10,7 +10,7 @@
 //
 // TestScopedRuntime depends on the admin interface being compiled into the binary.
 // For build options where the admin interface is not available (particularly, Envoy Mobile), use
-// TestScopedStaticReloadableFeaturesRuntime.  As the name suggests, it only works with reloadable
+// TestScopedStaticReloadableFeaturesRuntime. As the name suggests, it only works with reloadable
 // features:
 //
 //  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
