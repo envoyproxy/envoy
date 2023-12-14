@@ -44,7 +44,7 @@ message Config {
   }
 
   // The metadata namespace.
-  // metadata_namespace is deprecated; use untyped_metadata or typed_metadata
+  // ``metadata_namespace`` is deprecated; use ``metadata``.
   string metadata_namespace = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -52,9 +52,7 @@ message Config {
   // :ref:`the filter documentation <config_http_filters_set_metadata>` for
   // more information on how this value is merged with potentially existing
   // ones.
-  // value is deprecated; to configure a filter to set untyped dynamic metadata,
-  // use the untyped_metadata field. To configure a filter to set typed dynamic
-  // metadata, use the typed_metadata field.
+  // ``value`` is deprecated; use ``metadata``.
   google.protobuf.Struct value = 2
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
