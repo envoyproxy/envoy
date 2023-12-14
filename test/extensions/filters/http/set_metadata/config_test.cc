@@ -24,7 +24,7 @@ TEST(SetMetadataFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
 metadata:
 - metadata_namespace: thenamespace
-  untyped_value:
+  value:
     mynumber: 20
     mylist: ["b"]
     tags:
@@ -56,7 +56,7 @@ TEST(SetMetadataFilterConfigTest, SimpleConfigServerContext) {
   const std::string yaml = R"EOF(
 metadata:
 - metadata_namespace: thenamespace
-  untyped_value:
+  value:
     mynumber: 20
     mylist: ["b"]
     tags:

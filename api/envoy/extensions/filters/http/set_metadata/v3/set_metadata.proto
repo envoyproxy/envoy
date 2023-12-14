@@ -29,18 +29,18 @@ message Config {
     // Allow the filter to overwrite or merge with an existing value in the namespace.
     bool allow_overwrite = 2;
 
-    oneof value {
-      // The value to place at the namespace. If ``allow_overwrite``, this will
-      // overwrite or merge with any existing values in that namespace. See
-      // :ref:`the filter documentation <config_http_filters_set_metadata>` for
-      // more information on how this value is merged with potentially existing
-      // ones if ``allow_overwrite`` is configured.
-      google.protobuf.Struct untyped_value = 3;
+    // The value to place at the namespace. If ``allow_overwrite``, this will
+    // overwrite or merge with any existing values in that namespace. See
+    // :ref:`the filter documentation <config_http_filters_set_metadata>` for
+    // more information on how this value is merged with potentially existing
+    // ones if ``allow_overwrite`` is configured. Only one of ``value`` and
+    // ``typed_value`` may be set.
+    google.protobuf.Struct value = 3;
 
-      // The value to place at the namespace. If ``allow_overwrite``, this will
-      // overwrite any existing values in that namespace.
-      google.protobuf.Any typed_value = 4;
-    }
+    // The value to place at the namespace. If ``allow_overwrite``, this will
+    // overwrite any existing values in that namespace. Only one of ``value`` and
+    // ``typed_value`` may be set.
+    google.protobuf.Any typed_value = 4;
   }
 
   // The metadata namespace.

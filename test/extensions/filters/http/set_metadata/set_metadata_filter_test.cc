@@ -139,7 +139,7 @@ TEST_F(SetMetadataFilterTest, UntypedSimple) {
   const std::string yaml_config = R"EOF(
     metadata:
     - metadata_namespace: thenamespace
-      untyped_value:
+      value:
         tags:
           mytag0: 1
   )EOF";
@@ -191,13 +191,13 @@ TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
   const std::string yaml_config = R"EOF(
     metadata:
     - metadata_namespace: thenamespace
-      untyped_value:
+      value:
         mynumber: 10
         mylist: ["a"]
         tags:
           mytag0: 1
     - metadata_namespace: thenamespace
-      untyped_value:
+      value:
         mynumber: 20
         mylist: ["b"]
         tags:
@@ -244,13 +244,13 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   const std::string yaml_config = R"EOF(
     metadata:
     - metadata_namespace: thenamespace
-      untyped_value:
+      value:
         mynumber: 10
         mylist: ["a"]
         tags:
           mytag0: 1
     - metadata_namespace: thenamespace
-      untyped_value:
+      value:
         mynumber: 20
         mylist: ["b"]
         tags:
@@ -295,7 +295,7 @@ TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
         mytag0: 0
     metadata:
     - metadata_namespace: thenamespace
-      untyped_value:
+      value:
         tags:
           mytag0: 1
       allow_overwrite: true

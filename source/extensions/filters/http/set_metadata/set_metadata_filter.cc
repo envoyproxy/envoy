@@ -21,14 +21,17 @@ Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config&
   }
 
   for (const auto& metadata : proto_config.metadata()) {
-    if (metadata.has_untyped_value()) {
+    if (metadata.has_value()) {
       UntypedMetadataEntry untyped_entry{metadata.allow_overwrite(), metadata.metadata_namespace(),
-                                         metadata.untyped_value()};
+                                         metadata.value()};
       untyped_.emplace_back(untyped_entry);
-    } else {
+    } else if (metadata.has_typed_value()) {
       TypedMetadataEntry typed_entry{metadata.allow_overwrite(), metadata.metadata_namespace(),
                                      metadata.typed_value()};
       typed_.emplace_back(typed_entry);
+    } else {
+      ENVOY_LOG(warn, "set_metadata filter configuration contains metadata entries without value "
+                      "or typed_value");
     }
   }
 }
@@ -40,7 +43,7 @@ SetMetadataFilter::~SetMetadataFilter() = default;
 Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
 
   // add configured untyped metadata
-  if (config_->untyped().size() > 0) {
+  if (!config_->untyped().empty()) {
     auto& mut_untyped_metadata =
         *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata();
 
@@ -59,7 +62,7 @@ Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMa
   }
 
   // add configured typed metadata
-  if (config_->typed().size() > 0) {
+  if (!config_->typed().empty()) {
     auto& mut_typed_metadata =
         *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_typed_filter_metadata();
 
