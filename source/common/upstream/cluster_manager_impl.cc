@@ -424,11 +424,12 @@ absl::Status ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootst
             validation_context_.dynamicValidationVisitor(), server_,
             dyn_resources.ads_config().config_validators());
 
-    JitteredExponentialBackOffStrategyPtr backoff_strategy =
-        Config::Utility::prepareJitteredExponentialBackOffStrategy(
-            dyn_resources.ads_config(), random_,
-            Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
-            Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
+    auto strategy_or_error = Config::Utility::prepareJitteredExponentialBackOffStrategy(
+        dyn_resources.ads_config(), random_,
+        Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
+        Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
+    THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
+    JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
     const bool use_eds_cache =
         Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads");
@@ -446,13 +447,14 @@ absl::Status ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootst
       if (!factory) {
         return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
-      ads_mux_ = factory->create(
-          Config::Utility::factoryForGrpcApiConfigSource(
-              *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false)
-              ->createUncachedRawAsyncClient(),
-          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-          std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
+      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+      ads_mux_ =
+          factory->create(factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_,
+                          random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+                          std::move(custom_config_validators), std::move(backoff_strategy),
+                          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -468,11 +470,12 @@ absl::Status ClusterManagerImpl::init(const envoy::config::bootstrap::v3::Bootst
       if (!factory) {
         return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
+      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       ads_mux_ = factory->create(
-          Config::Utility::factoryForGrpcApiConfigSource(
-              *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false)
-              ->createUncachedRawAsyncClient(),
-          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+          factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_, random_,
+          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
           std::move(custom_config_validators), std::move(backoff_strategy),
           makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
     }
@@ -561,12 +564,12 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
 
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
+    auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+        *async_client_manager_, load_stats_config, *stats_.rootScope(), false);
+    THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(),
-        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
-                                                       *stats_.rootScope(), false)
-            ->createUncachedRawAsyncClient(),
-        dispatcher_);
+        factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_);
   }
   return absl::OkStatus();
 }
