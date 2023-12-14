@@ -5,7 +5,6 @@
 
 #include "source/extensions/filters/http/cache/range_utils.h"
 
-#include "test/extensions/filters/http/cache/common.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
