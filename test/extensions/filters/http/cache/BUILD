@@ -69,6 +69,7 @@ envoy_extension_cc_test(
         "//source/extensions/http/cache/simple_http_cache:config",
         "//test/mocks/http:http_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

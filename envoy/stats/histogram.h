@@ -86,6 +86,12 @@ public:
    * Returns sum of all values during the period.
    */
   virtual double sampleSum() const PURE;
+
+  /**
+   * Returns the count of values which are out of the boundaries of the histogram bins.
+   * I.e., the count of values in the (bound_of_last_bucket, +inf) bucket.
+   */
+  virtual uint64_t outOfBoundCount() const PURE;
 };
 
 /**
