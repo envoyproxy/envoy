@@ -26,8 +26,8 @@ namespace Config {
  * Both the primary and failover streams are either SotW or Delta-xDS.
  *
  * The use of this class will be as follows: the GrpcMux object will own an instance of
- * the GrpcMuxFailoverManager. The GrpcMuxFailoverManager will own 2 GrpcStreams, primary
- * and secondary. Each of the primary and secondary streams will invoke GrpcStreamCallbacks
+ * the GrpcMuxFailover. The GrpcMuxFailover will own 2 GrpcStreams, primary and secondary.
+ * Each of the primary and secondary streams will invoke GrpcStreamCallbacks
  * on their corresponding objects (also owned by the GrpcMuxFailoverProxy). These invocations
  * will be followed by the GrpcMuxFailoverProxy calling the GrpcStreamCallbacks on the GrpcMux
  * object that initialized it.
