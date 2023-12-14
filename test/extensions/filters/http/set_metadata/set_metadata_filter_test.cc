@@ -18,29 +18,31 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SetMetadataFilter {
 
+using FilterSharedPtr = std::shared_ptr<SetMetadataFilter>;
+
 class SetMetadataFilterTest : public testing::Test {
 
 public:
   SetMetadataFilterTest() = default;
 
   void runFilter(envoy::config::core::v3::Metadata& metadata, const std::string& yaml_config) {
-    envoy::extensions::filters::http::set_metadata::v3::Config ext_config;
-    TestUtility::loadFromYaml(yaml_config, ext_config);
-    auto config = std::make_shared<Config>(ext_config);
-    auto filter = std::make_shared<SetMetadataFilter>(config);
+    envoy::extensions::filters::http::set_metadata::v3::Config proto_config;
+    TestUtility::loadFromYaml(yaml_config, proto_config);
+    config_ = std::make_shared<Config>(proto_config, *stats_store_.rootScope(), "");
+    filter_ = std::make_shared<SetMetadataFilter>(config_);
 
     Http::TestRequestHeaderMapImpl headers;
 
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info;
-    filter->setDecoderFilterCallbacks(decoder_callbacks);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks);
 
     EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(req_info));
     EXPECT_CALL(req_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers, true));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     Buffer::OwnedImpl buffer;
-    EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer, true));
-    filter->onDestroy();
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+    filter_->onDestroy();
   }
 
   void checkKeyInt(const ProtobufWkt::Struct& s, std::string key, int val) {
@@ -51,6 +53,12 @@ public:
     ASSERT_EQ(pbval.kind_case(), ProtobufWkt::Value::kNumberValue);
     EXPECT_EQ(pbval.number_value(), val);
   }
+
+  ConfigSharedPtr config_;
+  FilterSharedPtr filter_;
+
+private:
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
 };
 
 TEST_F(SetMetadataFilterTest, DeprecatedSimple) {
@@ -285,6 +293,7 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   const auto& tags_struct = tags.struct_value();
 
   checkKeyInt(tags_struct, "mytag0", 1);
+  EXPECT_EQ(0, config_->stats().overwrite_denied_.value());
 }
 
 TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
@@ -355,6 +364,18 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
   envoy::extensions::filters::http::set_metadata::v3::Config test_cfg;
   ASSERT_TRUE(any_val.UnpackTo(&test_cfg));
   EXPECT_EQ("foo_namespace", test_cfg.metadata_namespace());
+}
+
+TEST_F(SetMetadataFilterTest, LogsErrorWhenNoValueConfigured) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+  )EOF";
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "set_metadata filter configuration contains metadata entries without value or typed_value",
+      runFilter(metadata, yaml_config));
 }
 
 } // namespace SetMetadataFilter

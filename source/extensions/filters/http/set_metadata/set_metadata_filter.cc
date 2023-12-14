@@ -13,7 +13,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SetMetadataFilter {
 
-Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config) {
+Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+               Stats::Scope& scope, const std::string& stats_prefix)
+    : stats_(generateStats(stats_prefix, scope)) {
   if (proto_config.has_value() && !proto_config.metadata_namespace().empty()) {
     UntypedMetadataEntry deprecated_api_val{true, proto_config.metadata_namespace(),
                                             proto_config.value()};
@@ -34,6 +36,11 @@ Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config&
                       "or typed_value");
     }
   }
+}
+
+FilterStats Config::generateStats(const std::string& prefix, Stats::Scope& scope) {
+  std::string final_prefix = prefix + "set_metadata.";
+  return {ALL_SET_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
 SetMetadataFilter::SetMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
@@ -57,6 +64,9 @@ Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMa
 
         // merge the new metadata into the existing metadata
         StructUtil::update(orig_fields, to_merge);
+      } else {
+        // entry exists, not allowed to overwrite -- emit a stat
+        config_->stats().overwrite_denied_.inc();
       }
     }
   }
@@ -67,9 +77,15 @@ Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMa
         *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_typed_filter_metadata();
 
     for (const auto& entry : config_->typed()) {
-      if (!mut_typed_metadata.contains(entry.metadata_namespace) || entry.allow_overwrite) {
+      if (!mut_typed_metadata.contains(entry.metadata_namespace)) {
+        // insert the entry
+        mut_typed_metadata[entry.metadata_namespace] = entry.value;
+      } else if (entry.allow_overwrite) {
         // overwrite the existing typed metadata at this key
         mut_typed_metadata[entry.metadata_namespace] = entry.value;
+      } else {
+        // entry exists, not allowed to overwrite -- emit a stat
+        config_->stats().overwrite_denied_.inc();
       }
     }
   }
