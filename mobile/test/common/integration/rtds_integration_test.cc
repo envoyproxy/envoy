@@ -98,16 +98,12 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw)));
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithDfpMixedScheme) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.dfp_mixed_scheme", "true"}});
-
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"dfp_mixed_scheme", true}});
   runReloadTest();
 }
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.dfp_mixed_scheme", "false"}});
-
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"dfp_mixed_scheme", false}});
   runReloadTest();
 }
 
