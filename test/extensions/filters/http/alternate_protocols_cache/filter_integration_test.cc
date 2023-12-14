@@ -240,6 +240,8 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
 }
 
 TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
+  // TODO(alyssawilk) remove after debug.
+  LogLevelSetter save_levels(spdlog::level::trace);
   // Start with the alt-svc header in the cache.
   fill_cache_ = true;
 
