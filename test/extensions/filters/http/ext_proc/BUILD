@@ -118,7 +118,10 @@ envoy_extension_cc_test(
     name = "ext_proc_integration_test",
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_integration_test.cc"],
-    extension_names = ["envoy.filters.http.ext_proc"],
+    extension_names = [
+        "envoy.filters.http.ext_proc",
+        "envoy.filters.http.set_metadata",
+    ],
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -127,12 +130,14 @@ envoy_extension_cc_test(
         ":logging_test_filter_lib",
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
+        "//source/extensions/filters/http/set_metadata:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
