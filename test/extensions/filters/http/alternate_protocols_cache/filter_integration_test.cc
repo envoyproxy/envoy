@@ -67,7 +67,7 @@ typed_config:
     HttpProtocolIntegrationTest::initialize();
   }
 
-  void writeFile(uint32_t index) {
+  void writeAltSvcToFile(uint32_t index) {
     uint32_t port = fake_upstreams_[index]->localAddress()->ip()->port();
     std::string key = absl::StrCat("https://sni.lyft.com:", port);
 
@@ -106,8 +106,8 @@ typed_config:
         fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
             std::move(http3_factory), fake_upstreams_[0]->localAddress()->ip()->port(), version_,
             http3_config));
-        if (fill_cache_) {
-          writeFile(1);
+        if (write_alt_svc_to_file_) {
+          writeAltSvcToFile(1);
         }
         return;
       }
@@ -120,7 +120,9 @@ typed_config:
     }
     throw EnvoyException("Failed to find a port after 10 tries");
   }
-  bool fill_cache_ = false;
+  // If this is set to true, it pre-fills the alt-svc cache, setting up HTTP/3
+  // support and pointing at the HTTP/3 upstream.
+  bool write_alt_svc_to_file_ = false;
 };
 
 TEST_P(FilterIntegrationTest, AltSvc) {
@@ -162,7 +164,7 @@ TEST_P(FilterIntegrationTest, AltSvc) {
 
 TEST_P(FilterIntegrationTest, AltSvcCached) {
   // Start with the alt-svc header in the cache.
-  fill_cache_ = true;
+  write_alt_svc_to_file_ = true;
 
   const uint64_t request_size = 0;
   const uint64_t response_size = 0;
@@ -188,7 +190,7 @@ TEST_P(FilterIntegrationTest, AltSvcCached) {
 
 TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
   // Start with the alt-svc header in the cache.
-  fill_cache_ = true;
+  write_alt_svc_to_file_ = true;
 
   const uint64_t request_size = 0;
   const uint64_t response_size = 0;
@@ -240,10 +242,8 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
 }
 
 TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
-  // TODO(alyssawilk) remove after debug.
-  LogLevelSetter save_levels(spdlog::level::trace);
   // Start with the alt-svc header in the cache.
-  fill_cache_ = true;
+  write_alt_svc_to_file_ = true;
 
   const uint64_t request_size = 0;
   const uint64_t response_size = 0;
@@ -253,11 +253,23 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
 
   absl::Notification block_http2;
   absl::Notification block_http3;
+  absl::Notification http2_blocked;
+  absl::Notification http3_blocked;
   // Block both upstreams.
-  fake_upstreams_[0]->runOnDispatcherThread([&] { block_http2.WaitForNotification(); });
-  fake_upstreams_[1]->runOnDispatcherThread([&] { block_http3.WaitForNotification(); });
+  fake_upstreams_[0]->runOnDispatcherThread([&] {
+    http2_blocked.Notify();
+    block_http2.WaitForNotification();
+  });
+  fake_upstreams_[1]->runOnDispatcherThread([&] {
+    http3_blocked.Notify();
+    block_http3.WaitForNotification();
+  });
 
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // Make sure the upstreams are blocked.
+  http2_blocked.WaitForNotification();
+  http3_blocked.WaitForNotification();
 
   // Send the request to Envoy.
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -460,7 +472,7 @@ protected:
       auto config = configWithType(Http::CodecType::HTTP3);
       Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
       addFakeUpstream(std::move(factory), Http::CodecType::HTTP3, /*autonomous_upstream=*/false);
-      writeFile(0);
+      writeAltSvcToFile(0);
     }
   }
 
