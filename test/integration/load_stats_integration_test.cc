@@ -53,6 +53,17 @@ public:
                                    const LocalityAssignment& p1_dragon_upstreams) {
     uint32_t num_endpoints = 0;
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+
+    if (drop_overload_test_) {
+      // Config drop_overload to drop 100% requests.
+      auto* policy = cluster_load_assignment.mutable_policy();
+      auto* drop_overload = policy->add_drop_overloads();
+      drop_overload->set_category("drop_overload");
+      auto* drop_percentage = drop_overload->mutable_drop_percentage();
+      drop_percentage->set_numerator(100);
+      drop_percentage->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+    }
+
     // EDS service_name is set in cluster_0
     cluster_load_assignment.set_cluster_name("service_name_0");
 
@@ -191,6 +202,20 @@ public:
 
     cluster_stats->set_total_dropped_requests(cluster_stats->total_dropped_requests() +
                                               local_cluster_stats.total_dropped_requests());
+    if (local_cluster_stats.dropped_requests().size() > 0) {
+      uint64_t local_drop_count = local_cluster_stats.dropped_requests(0).dropped_count();
+      if (local_drop_count > 0 ) {
+        envoy::config::endpoint::v3::ClusterStats::DroppedRequests* drop_request;
+        if (cluster_stats->dropped_requests().size() > 0) {
+          drop_request = cluster_stats->mutable_dropped_requests(0);
+          drop_request->set_dropped_count(drop_request->dropped_count() + local_drop_count);
+        } else {
+          drop_request = cluster_stats->add_dropped_requests();
+          drop_request->set_dropped_count(local_drop_count);
+        }
+        drop_request->set_category("drop_overload");
+      }
+    }
 
     for (int i = 0; i < local_cluster_stats.upstream_locality_stats_size(); ++i) {
       const auto& local_upstream_locality_stats = local_cluster_stats.upstream_locality_stats(i);
@@ -253,6 +278,11 @@ public:
       cluster_stats->set_cluster_service_name("service_name_0");
       if (dropped > 0) {
         cluster_stats->set_total_dropped_requests(dropped);
+        if (drop_overload_test_) {
+          auto* drop_request = cluster_stats->add_dropped_requests();
+          drop_request->set_category("drop_overload");
+          drop_request->set_dropped_count(dropped);
+        }
       }
       std::copy(
           expected_locality_stats.begin(), expected_locality_stats.end(),
@@ -368,6 +398,31 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
+  void dropLoadTest() {
+    initialize();
+
+    waitForLoadStatsStream();
+    ASSERT_TRUE(waitForLoadStatsRequest({}));
+    loadstats_stream_->startGrpcStream();
+
+    updateClusterLoadAssignment({{0}}, {}, {}, {});
+    requestLoadStatsResponse({"cluster_0"});
+    initiateClientConnection();
+    ASSERT_TRUE(response_->waitForEndStream());
+    ASSERT_TRUE(response_->complete());
+    EXPECT_EQ("503", response_->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+
+    ASSERT_TRUE(waitForLoadStatsRequest({}, 1));
+
+    EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
+    EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
+    EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
+    cleanupLoadStatsConnection();
+  }
+
+
   static constexpr uint32_t upstream_endpoints_ = 5;
 
   IntegrationStreamDecoderPtr response_;
@@ -379,6 +434,7 @@ public:
   uint32_t load_requests_{};
   EdsHelper eds_helper_;
   bool locality_weighted_lb_{};
+  bool drop_overload_test_{false};
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
@@ -622,28 +678,13 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
     auto* thresholds = cluster_0->mutable_circuit_breakers()->add_thresholds();
     thresholds->mutable_max_pending_requests()->set_value(0);
   });
-  initialize();
+  dropLoadTest();
+}
 
-  waitForLoadStatsStream();
-  ASSERT_TRUE(waitForLoadStatsRequest({}));
-  loadstats_stream_->startGrpcStream();
-
-  updateClusterLoadAssignment({{0}}, {}, {}, {});
-  requestLoadStatsResponse({"cluster_0"});
-  // This should count as dropped, since we trigger circuit breaking.
-  initiateClientConnection();
-  ASSERT_TRUE(response_->waitForEndStream());
-  ASSERT_TRUE(response_->complete());
-  EXPECT_EQ("503", response_->headers().getStatusValue());
-  cleanupUpstreamAndDownstream();
-
-  ASSERT_TRUE(waitForLoadStatsRequest({}, 1));
-
-  EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
-  EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
-  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
-
-  cleanupLoadStatsConnection();
+// Validate the load reports for dropped requests due to drop_overload make sense.
+TEST_P(LoadStatsIntegrationTest, DropOverloadDropped) {
+  drop_overload_test_ = true;
+  dropLoadTest();
 }
 
 } // namespace
