@@ -36,7 +36,7 @@
     {
       "label": "Local Fix Format",
       "type": "shell",
-      "command": "tools/vscode/local_fix_format.sh -all",
+      "command": "tools/local_fix_format.sh -all",
       "problemMatcher": []
     }
   ]
