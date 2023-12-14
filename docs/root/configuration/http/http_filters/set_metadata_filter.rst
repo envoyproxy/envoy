@@ -56,4 +56,12 @@ After applying this filter, the namespace will contain:
 Statistics
 ----------
 
-Currently, this filter generates no statistics.
+The ``set_metadata`` filter outputs statistics in the ``http.<stat_prefix>.set_metadata.`` namespace. The :ref:`stat prefix
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
+owning HTTP connection manager.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  overwrite_denied, Counter, Total number of denied attempts to overwrite an existing metadata value
