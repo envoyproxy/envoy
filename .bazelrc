@@ -1,5 +1,7 @@
 # Envoy specific Bazel build/test options.
 
+common --noenable_bzlmod
+
 # Bazel doesn't need more than 200MB of memory for local build based on memory profiling:
 # https://docs.bazel.build/versions/master/skylark/performance.html#memory-profiling
 # The default JVM max heapsize is 1/4 of physical memory up to 32GB which could be large
