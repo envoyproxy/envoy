@@ -87,7 +87,8 @@ DatadogTracerNamingTest::DatadogTracerNamingTest() {
   cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
 }
 
-void DatadogTracerNamingTest::asDatadogSpan(const datadog::tracing::Span** result, const Tracing::SpanPtr& span) {
+void DatadogTracerNamingTest::asDatadogSpan(const datadog::tracing::Span** result,
+                                            const Tracing::SpanPtr& span) {
   ASSERT_TRUE(span);
   const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
   ASSERT_NE(nullptr, as_dd_span_wrapper);
@@ -98,13 +99,16 @@ void DatadogTracerNamingTest::asDatadogSpan(const datadog::tracing::Span** resul
   *result = &*maybe_dd_span;
 }
 
-void DatadogTracerNamingTest::serviceNameTest(const std::string& config_yaml, const std::string& expected_service_name) {
+void DatadogTracerNamingTest::serviceNameTest(const std::string& config_yaml,
+                                              const std::string& expected_service_name) {
   auto config_proto = makeConfig<envoy::config::trace::v3::DatadogConfig>(config_yaml);
 
-  Tracer tracer{config_proto.collector_cluster(), config_proto.collector_hostname(),
-                  DatadogTracerFactory::makeConfig(config_proto),
-                  cluster_manager_, *store_.rootScope(),
-                  thread_local_slot_allocator_};
+  Tracer tracer{config_proto.collector_cluster(),
+                config_proto.collector_hostname(),
+                DatadogTracerFactory::makeConfig(config_proto),
+                cluster_manager_,
+                *store_.rootScope(),
+                thread_local_slot_allocator_};
 
   // Any values will do for the sake of this test. What we care about is the
   // `expected_service_name`.
@@ -116,15 +120,16 @@ void DatadogTracerNamingTest::serviceNameTest(const std::string& config_yaml, co
 
   const Tracing::SpanPtr span =
       tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, decision);
-  const datadog::tracing::Span *dd_span;
+  const datadog::tracing::Span* dd_span;
   asDatadogSpan(&dd_span, span);
 
   EXPECT_EQ(expected_service_name, dd_span->service_name());
 
   const auto child_start = time_.timeSystem().systemTime();
   const std::string child_operation_name = "some.other.operation.name";
-  const Tracing::SpanPtr child = span->spawnChild(Tracing::MockConfig{}, child_operation_name, child_start);
-  const datadog::tracing::Span *dd_child;
+  const Tracing::SpanPtr child =
+      span->spawnChild(Tracing::MockConfig{}, child_operation_name, child_start);
+  const datadog::tracing::Span* dd_child;
   asDatadogSpan(&dd_child, child);
 
   EXPECT_EQ(expected_service_name, dd_child->service_name());
@@ -137,7 +142,7 @@ TEST_F(DatadogTracerNamingTest, ServiceNameConfigured) {
     collector_cluster: fake_cluster
     service_name: mr_bigglesworth
    )EOF",
-   "mr_bigglesworth");
+                  "mr_bigglesworth");
 }
 
 TEST_F(DatadogTracerNamingTest, ServiceNameDefault) {
@@ -146,7 +151,7 @@ TEST_F(DatadogTracerNamingTest, ServiceNameDefault) {
   serviceNameTest(R"EOF(
     collector_cluster: fake_cluster
    )EOF",
-   "envoy");
+                  "envoy");
 }
 
 TEST_F(DatadogTracerNamingTest, OperationNameAndResourceName) {
@@ -165,10 +170,12 @@ TEST_F(DatadogTracerNamingTest, OperationNameAndResourceName) {
     collector_cluster: fake_cluster
    )EOF");
 
-  Tracer tracer{config_proto.collector_cluster(), config_proto.collector_hostname(),
-                  DatadogTracerFactory::makeConfig(config_proto),
-                  cluster_manager_, *store_.rootScope(),
-                  thread_local_slot_allocator_};
+  Tracer tracer{config_proto.collector_cluster(),
+                config_proto.collector_hostname(),
+                DatadogTracerFactory::makeConfig(config_proto),
+                cluster_manager_,
+                *store_.rootScope(),
+                thread_local_slot_allocator_};
 
   // Any values will do for the sake of this test. What we care about are the
   // operation names and the resource names.
@@ -180,7 +187,7 @@ TEST_F(DatadogTracerNamingTest, OperationNameAndResourceName) {
   const std::string operation_name = "some.operation.name";
   const Tracing::SpanPtr span =
       tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, decision);
-  const datadog::tracing::Span *dd_span;
+  const datadog::tracing::Span* dd_span;
   asDatadogSpan(&dd_span, span);
 
   EXPECT_EQ("envoy.proxy", dd_span->name());
@@ -194,8 +201,9 @@ TEST_F(DatadogTracerNamingTest, OperationNameAndResourceName) {
 
   const auto child_start = time_.timeSystem().systemTime();
   const std::string child_operation_name = "some.child.operation.name";
-  const Tracing::SpanPtr child = span->spawnChild(Tracing::MockConfig{}, child_operation_name, child_start);
-  const datadog::tracing::Span *dd_child;
+  const Tracing::SpanPtr child =
+      span->spawnChild(Tracing::MockConfig{}, child_operation_name, child_start);
+  const datadog::tracing::Span* dd_child;
   asDatadogSpan(&dd_child, child);
 
   EXPECT_EQ("envoy.proxy", dd_child->name());
