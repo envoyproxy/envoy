@@ -564,7 +564,7 @@ envoy_cmake(
         # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
         "WITH_OPTIM": "on",
         # However turning off SSE4 fixes it.
-        "WITH_SSE4": "off",
+        "WITH_SSE42": "off",
 
         # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
         # Turning this off means falling into NO_QUICK_STRATEGY route.
