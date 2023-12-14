@@ -316,6 +316,13 @@ TEST(OpenCensusTracerTest, ConstantSamplerAlwaysOn) {
   EXPECT_EQ(1, samplerTestHelper(oc_config));
 }
 
+// Test no sampler set.
+TEST(OpenCensusTracerTest, NoSamplerSet) {
+  OpenCensusConfig oc_config;
+  oc_config.mutable_trace_config();
+  samplerTestHelper(oc_config);
+}
+
 // Test constant_sampler that's always off.
 TEST(OpenCensusTracerTest, ConstantSamplerAlwaysOff) {
   OpenCensusConfig oc_config;
