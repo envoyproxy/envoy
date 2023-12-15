@@ -20,7 +20,7 @@ jobs:
     name: cc-tests
     uses: ./.github/workflows/_mobile_container_ci.yml
     secrets:
-      GCP_TEST_PROJECT_API_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_TEST_PROJECT_API_KEY || '' }}
+      GCP_TEST_PROJECT_API_KEY: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
     with:
       args: >-
         run
