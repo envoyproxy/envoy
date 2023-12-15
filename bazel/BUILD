@@ -865,7 +865,7 @@ platform(
 updater(
     name = "update",
     data = ["//tools/dependency:check"],
-    dependencies = ":repository_locations",
+    dependencies = "//tools/dependency:filtered-dependencies",
     post_script = ":version_update_post.sh",
     pydict = True,
     tags = ["skip_on_windows"],
