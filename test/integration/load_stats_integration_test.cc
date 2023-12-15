@@ -54,16 +54,6 @@ public:
     uint32_t num_endpoints = 0;
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
-    if (drop_overload_test_) {
-      // Config drop_overload to drop 100% requests.
-      auto* policy = cluster_load_assignment.mutable_policy();
-      auto* drop_overload = policy->add_drop_overloads();
-      drop_overload->set_category("drop_overload");
-      auto* drop_percentage = drop_overload->mutable_drop_percentage();
-      drop_percentage->set_numerator(100);
-      drop_percentage->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-    }
-
     // EDS service_name is set in cluster_0
     cluster_load_assignment.set_cluster_name("service_name_0");
 
@@ -268,7 +258,7 @@ public:
   ABSL_MUST_USE_RESULT AssertionResult
   waitForLoadStatsRequest(const std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats>&
                               expected_locality_stats,
-                          uint64_t dropped = 0) {
+                          uint64_t dropped = 0, bool drop_overload_test = false) {
     Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats;
     if (!expected_locality_stats.empty() || dropped != 0) {
@@ -278,7 +268,7 @@ public:
       cluster_stats->set_cluster_service_name("service_name_0");
       if (dropped > 0) {
         cluster_stats->set_total_dropped_requests(dropped);
-        if (drop_overload_test_) {
+        if (drop_overload_test) {
           auto* drop_request = cluster_stats->add_dropped_requests();
           drop_request->set_category("drop_overload");
           drop_request->set_dropped_count(dropped);
@@ -398,6 +388,19 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
+  void updateDropOverloadConfig() {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+    cluster_load_assignment.set_cluster_name("service_name_0");
+    // Config drop_overload to drop 100% requests.
+    auto* policy = cluster_load_assignment.mutable_policy();
+    auto* drop_overload = policy->add_drop_overloads();
+    drop_overload->set_category("drop_overload");
+    auto* drop_percentage = drop_overload->mutable_drop_percentage();
+    drop_percentage->set_numerator(100);
+    drop_percentage->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+    eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
+  }
+
   void dropLoadTest() {
     initialize();
 
@@ -434,7 +437,6 @@ public:
   uint32_t load_requests_{};
   EdsHelper eds_helper_;
   bool locality_weighted_lb_{};
-  bool drop_overload_test_{false};
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
@@ -678,13 +680,52 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
     auto* thresholds = cluster_0->mutable_circuit_breakers()->add_thresholds();
     thresholds->mutable_max_pending_requests()->set_value(0);
   });
-  dropLoadTest();
+  initialize();
+
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+  requestLoadStatsResponse({"cluster_0"});
+  initiateClientConnection();
+  ASSERT_TRUE(response_->waitForEndStream());
+  ASSERT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+
+  ASSERT_TRUE(waitForLoadStatsRequest({}, 1));
+
+  EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
+  cleanupLoadStatsConnection();
 }
 
 // Validate the load reports for dropped requests due to drop_overload make sense.
 TEST_P(LoadStatsIntegrationTest, DropOverloadDropped) {
-  drop_overload_test_ = true;
-  dropLoadTest();
+  initialize();
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+  updateDropOverloadConfig();
+
+  requestLoadStatsResponse({"cluster_0"});
+  initiateClientConnection();
+  ASSERT_TRUE(response_->waitForEndStream());
+  ASSERT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+
+  ASSERT_TRUE(waitForLoadStatsRequest({}, 1, true));
+
+  EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
+  cleanupLoadStatsConnection();
 }
 
 } // namespace
