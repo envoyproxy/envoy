@@ -10,14 +10,12 @@ This filters adds or updates dynamic metadata with static data.
 
 Dynamic metadata values are updated with the following rules. If a key does not exist, it is copied into the current metadata. If the key exists, then following rules will be used:
 
-* if :ref:`typed metadata value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.typed_value>` is used, it will overwrite existing values iff :ref:`allow_overwrite <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.allow_overwrite>` is
-set to true, otherwise nothing is done.
-* if :ref:`untyped metadata value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.value>` is used and ``allow_overwrite`` is set to true, or if deprecated :ref:`value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.value>`
-field is used, the values are updated with the following scheme:
-- existing value with different type: the existing value is replaced.
-- scalar values (null, string, number, boolean): the existing value is replaced.
-- lists: new values are appended to the current list.
-- structures: recursively apply this scheme.
+* if :ref:`typed metadata value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.typed_value>` is used, it will overwrite existing values iff :ref:`allow_overwrite <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.allow_overwrite>` is set to true, otherwise nothing is done.
+* if :ref:`untyped metadata value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.value>` is used and ``allow_overwrite`` is set to true, or if deprecated :ref:`value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.value>` field is used, the values are updated with the following scheme:
+  - existing value with different type: the existing value is replaced.
+  - scalar values (null, string, number, boolean): the existing value is replaced.
+  - lists: new values are appended to the current list.
+  - structures: recursively apply this scheme.
 
 For instance, if the namespace already contains this structure:
 
