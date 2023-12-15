@@ -17,7 +17,6 @@ concurrency:
 jobs:
   cc-tests:
     if: ${{ fromJSON(needs.load.outputs.request).run.mobile-traffic-director }}
-    needs: load
     name: cc-tests
     uses: ./.github/workflows/_mobile_container_ci.yml
     secrets:
