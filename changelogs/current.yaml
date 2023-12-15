@@ -300,9 +300,12 @@ new_features:
     Added new access log command operator ``%EMIT_TIME%`` to get the time when the log entry is emitted.
 - area: access_log
   change: |
-    Added support for listener metadata in ``%METADATA%` formatter.
+    Added support for listener metadata in ``%METADATA%`` formatter.
 - area: attributes
   change: |
     Added support for listener metadata and listener direction in XDS attributes.
 
 deprecated:
+- area: wasm
+  change: |
+    Wasm-specific configuration attributes are deprecated in favor of ``xds`` attributes.
