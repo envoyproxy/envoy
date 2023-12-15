@@ -454,7 +454,7 @@ void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& b
 void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
   // TODO(suniltheta): increment fetch failed stats
   if (continue_on_async_fetch_failure_) {
-    ENVOY_LOG(critical, "{}. Reason: {}", continue_on_async_fetch_failure_reason_,
+    ENVOY_LOG(warn, "{}. Reason: {}", continue_on_async_fetch_failure_reason_,
               metadata_fetcher_->failureToString(reason));
     continue_on_async_fetch_failure_ = false;
     continue_on_async_fetch_failure_reason_ = "";
