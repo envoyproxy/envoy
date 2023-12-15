@@ -17,6 +17,7 @@ concurrency:
 jobs:
   load:
     secrets:
+      GCP_TEST_PROJECT_API_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_TEST_PROJECT_API_KEY || '' }}
       app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
       lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
