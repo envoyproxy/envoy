@@ -21,12 +21,24 @@ config_setting(
     flag_values = {
         ":preload_cve_data": "true",
     },
+
+# Currently we are unable to check for the libdrdkafka dep
+# this is a workaround to just exclude it from checks for now
+# which is sub-optimal as it also excludes it from CVE scanning
+# https://github.com/envoyproxy/envoy/issues/31394
+envoy_genjson(
+    name = "filtered-dependencies",
+    filter = """
+    .[0]
+    | del(.edenhill_librdkafka)
+    """,
+    srcs = ["//bazel:all_repository_locations"],
 )
 
 envoy_entry_point(
     name = "check",
     args = [
-        "--repository_locations=$(location //bazel:all_repository_locations)",
+        "--repository_locations=$(location :filtered-dependencies)",
         "--cve_config=$(location :cve.yaml)",
     ] + select({
         ":preloaded_cve_data": ["--cve_data=$(location :cve_data)"],
@@ -34,7 +46,7 @@ envoy_entry_point(
     }),
     data = [
         ":cve.yaml",
-        "//bazel:all_repository_locations",
+        ":filtered-dependencies",
     ] + select({
         ":preloaded_cve_data": [":cve_data"],
         "//conditions:default": [],
