@@ -2,7 +2,7 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_repo//:path.bzl", "PATH")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_pytool_binary")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_genjson", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
@@ -21,6 +21,7 @@ config_setting(
     flag_values = {
         ":preload_cve_data": "true",
     },
+)
 
 # Currently we are unable to check for the libdrdkafka dep
 # this is a workaround to just exclude it from checks for now
@@ -28,11 +29,11 @@ config_setting(
 # https://github.com/envoyproxy/envoy/issues/31394
 envoy_genjson(
     name = "filtered-dependencies",
+    srcs = ["//bazel:all_repository_locations"],
     filter = """
     .[0]
-    | del(.edenhill_librdkafka)
+    | del(.confluentinc_librdkafka)
     """,
-    srcs = ["//bazel:all_repository_locations"],
 )
 
 envoy_entry_point(
@@ -48,7 +49,6 @@ envoy_entry_point(
         ":cve.yaml",
         ":filtered-dependencies",
     ] + select({
-        ":preloaded_cve_data": [":cve_data"],
         "//conditions:default": [],
     }),
     pkg = "envoy.dependency.check",
