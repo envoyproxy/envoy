@@ -29,11 +29,11 @@ config_setting(
 # https://github.com/envoyproxy/envoy/issues/31394
 envoy_genjson(
     name = "filtered-dependencies",
+    srcs = ["//bazel:all_repository_locations"],
     filter = """
     .[0]
     | del(.edenhill_librdkafka)
     """,
-    srcs = ["//bazel:all_repository_locations"],
 )
 
 envoy_entry_point(
