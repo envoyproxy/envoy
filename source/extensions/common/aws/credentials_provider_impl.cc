@@ -42,7 +42,7 @@ constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult"
 
 constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
 constexpr char AWS_PROFILE[] = "AWS_PROFILE";
-constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "~/.aws/credentials";
+constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "/.aws/credentials";
 constexpr char DEFAULT_AWS_PROFILE[] = "default";
 
 constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
