@@ -21,21 +21,21 @@ namespace Common {
 namespace Aws {
 
 void SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
-                      const absl::string_view override_region) {
+                          const absl::string_view override_region) {
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
   sign(headers, content_hash, override_region);
 }
 
 void SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
-                                  const absl::string_view override_region) {
+                                      const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().HashedEmptyString);
   sign(headers, SignatureConstants::get().HashedEmptyString, override_region);
 }
 
 void SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
-                                     const absl::string_view override_region) {
+                                         const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().UnsignedPayload);
   sign(headers, SignatureConstants::get().UnsignedPayload, override_region);
@@ -49,7 +49,7 @@ void SignerBaseImpl::addRegionHeader(
 std::string SignerBaseImpl::getRegion() const { return region_; }
 
 void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-                      const absl::string_view override_region) {
+                          const absl::string_view override_region) {
   headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
@@ -99,7 +99,7 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
 }
 
 std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message,
-                                          const bool sign_body) const {
+                                              const bool sign_body) const {
   if (!sign_body) {
     return SignatureConstants::get().HashedEmptyString;
   }
