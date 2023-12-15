@@ -1320,7 +1320,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/apache/kafka/blob/{version}/LICENSE",
     ),
-    edenhill_librdkafka = dict(
+    confluentinc_librdkafka = dict(
         project_name = "Kafka (C/C++ client)",
         project_desc = "C/C++ client for Apache Kafka (open-source distributed event streaming platform)",
         project_url = "https://github.com/confluentinc/librdkafka",
