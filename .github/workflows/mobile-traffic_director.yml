@@ -15,29 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  load:
-    secrets:
-      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
-      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
-      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
-      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-      pull-requests: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: ./.github/workflows/_load.yml
-    with:
-      check-name: mobile-traffic-director
-
   cc-tests:
     if: ${{ fromJSON(needs.load.outputs.request).run.mobile-traffic-director }}
     needs: load
     name: cc-tests
     uses: ./.github/workflows/_mobile_container_ci.yml
-    env:
-      GCP_TEST_PROJECT_API_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_TEST_PROJECT_API_KEY || '' }}
     secrets:
       GCP_TEST_PROJECT_API_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_TEST_PROJECT_API_KEY || '' }}
     with:
@@ -50,21 +32,3 @@ jobs:
       request: ${{ needs.load.outputs.request }}
       target: cc-tests
       timeout-minutes: 90
-
-  request:
-    secrets:
-      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
-      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
-    permissions:
-      actions: read
-      contents: read
-    if: >-
-      ${{ always()
-          && github.event.workflow_run.conclusion == 'success'
-          && fromJSON(needs.load.outputs.request).run.mobile-traffic-director }}
-    needs:
-    - load
-    - cc-tests
-    uses: ./.github/workflows/_finish.yml
-    with:
-      needs: ${{ toJSON(needs) }}
