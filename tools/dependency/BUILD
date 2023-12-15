@@ -49,6 +49,7 @@ envoy_entry_point(
         ":cve.yaml",
         ":filtered-dependencies",
     ] + select({
+        ":preloaded_cve_data": [":cve_data"],
         "//conditions:default": [],
     }),
     pkg = "envoy.dependency.check",
