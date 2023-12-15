@@ -49,23 +49,24 @@ SetMetadataFilter::~SetMetadataFilter() = default;
 
 Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
 
-  // add configured untyped metadata
+  // Add configured untyped metadata.
   if (!config_->untyped().empty()) {
     auto& mut_untyped_metadata =
         *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata();
 
     for (const auto& entry : config_->untyped()) {
       if (!mut_untyped_metadata.contains(entry.metadata_namespace)) {
+        // Insert the new entry.
         mut_untyped_metadata[entry.metadata_namespace] = entry.value;
       } else if (entry.allow_overwrite) {
-        // get the existing metadata at this key for merging
+        // Get the existing metadata at this key for merging.
         ProtobufWkt::Struct& orig_fields = mut_untyped_metadata[entry.metadata_namespace];
         const auto& to_merge = entry.value;
 
-        // merge the new metadata into the existing metadata
+        // Merge the new metadata into the existing metadata.
         StructUtil::update(orig_fields, to_merge);
       } else {
-        // entry exists, not allowed to overwrite -- emit a stat
+        // The entry exists, and we are not allowed to overwrite -- emit a stat.
         config_->stats().overwrite_denied_.inc();
       }
     }
@@ -78,13 +79,13 @@ Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMa
 
     for (const auto& entry : config_->typed()) {
       if (!mut_typed_metadata.contains(entry.metadata_namespace)) {
-        // insert the entry
+        // Insert the new entry.
         mut_typed_metadata[entry.metadata_namespace] = entry.value;
       } else if (entry.allow_overwrite) {
-        // overwrite the existing typed metadata at this key
+        // Overwrite the existing typed metadata at this key.
         mut_typed_metadata[entry.metadata_namespace] = entry.value;
       } else {
-        // entry exists, not allowed to overwrite -- emit a stat
+        // The entry exists, and we are not allowed to overwrite -- emit a stat.
         config_->stats().overwrite_denied_.inc();
       }
     }

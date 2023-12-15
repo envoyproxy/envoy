@@ -8,19 +8,17 @@ Set Metadata
 
 This filters adds or updates dynamic metadata with static data.
 
-Typed dynamic metadata will overwrite existing values at the configured namespace if and only if ``allow_overwrite`` is
-set to true, otherwise nothing is done. If the namespace does not already exist in the typed dynamic
-metadata, it is inserted with the configured value.
+Dynamic metadata values are updated with the following rules. If a key does not exist, it is copied into the current metadata. If the key exists, then following rules will be used:
 
-If ``allow_overwrite`` is set to false or omitted, untyped dynamic metadata will only be updated if
-there are no existing values at that namespace. If ``allow_overwrite`` is set to true, or if using deprecated ``value``
-field, untyped dynamic metadata values are updated with the following scheme:
-If a key does not exist, the configured value is copied into the metadata namespace. If the key exists but has a
-different type, the value is replaced outright by the configured value.
-Otherwise:
-- scalar values (null, string, number, boolean): the existing value is replaced.
-- lists: new values are appended to the current list.
-- structures: recursively apply this scheme.
+* if :ref:`typed metadata value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.typed_value>` is used, it will overwrite existing values iff :ref:`allow_overwrite <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.allow_overwrite>` is
+set to true, otherwise nothing is done.
+* if :ref:`untyped metadata value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.value>` is used and ``allow_overwrite`` is set to true, or if deprecated :ref:`value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.value>`
+field is used, the values are updated with the following scheme:
+
+  - existing value with different type: the existing value is replaced.
+  - scalar values (null, string, number, boolean): the existing value is replaced.
+  - lists: new values are appended to the current list.
+  - structures: recursively apply this scheme.
 
 For instance, if the namespace already contains this structure:
 
@@ -32,7 +30,7 @@ For instance, if the namespace already contains this structure:
    mytags:
      tag0: 1
 
-and the untyped_metadata.value to set is:
+and the value to set is:
 
 .. code-block:: yaml
 
