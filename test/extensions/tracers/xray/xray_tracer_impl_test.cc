@@ -38,12 +38,12 @@ public:
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Tracing::MockConfig> tracing_config_;
-  Http::TestRequestHeaderMapImpl request_headers_{
+  Tracing::TestTraceContextImpl request_headers_{
       {":authority", "api.amazon.com"}, {":path", "/"}, {":method", "GET"}};
 };
 
 TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
-  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=0");
+  request_headers_.set(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=0");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -59,7 +59,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
-  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=1");
+  request_headers_.set(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=1");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -73,7 +73,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
-  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=");
+  request_headers_.set(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -91,7 +91,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderWithoutSamplingDecision) {
-  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;");
+  request_headers_.set(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;");
   // sampling rules with default fixed_target = 0 & rate = 0
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", R"EOF(
 {
@@ -134,7 +134,7 @@ TEST_F(XRayDriverTest, NoXRayTracerHeader) {
 }
 
 TEST_F(XRayDriverTest, XForwardedForHeaderSet) {
-  request_headers_.addCopy(std::string(XForwardedForHeader), "191.251.191.251");
+  request_headers_.set(std::string(XForwardedForHeader), "191.251.191.251");
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
