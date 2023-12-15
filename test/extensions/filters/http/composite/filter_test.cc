@@ -300,72 +300,41 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   filter_.log({}, StreamInfo::MockStreamInfo());
 }
 
-TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
-  auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-  StreamInfo::FilterStateSharedPtr filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  ON_CALL(encoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
-  ON_CALL(encoder_callbacks_.stream_info_, filterState())
-      .WillByDefault(testing::ReturnRef(filter_state));
+// Validate that when dynamic_config and typed_config are both set, an exception is thrown.
+TEST(ConfigTest, TestConfig) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: set-response-code
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+            percentage:
+              numerator: 0
+              denominator: HUNDRED
+      dynamic_config:
+        name: set-response-code
+        config_discovery:
+          config_source:
+              resource_api_version: V3
+              path_config_source:
+                path: "{{ test_tmpdir }}/set_response_code.yaml"
+          type_urls:
+          - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+)EOF";
 
-  auto filter_state_object = std::make_shared<MatchedActionInfoType>();
-  filter_state_object->setFilterAction("rootFilterName", "oldActionName");
-  filter_state->setData(MatchedActionsFilterStateKey, filter_state_object,
-                        StreamInfo::FilterState::StateType::Mutable,
-                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
 
-  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamEncoderFilter(stream_filter);
-  };
-
-  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  ExecuteFilterAction action(factory_callback, "actionName");
-  EXPECT_CALL(success_counter_, inc());
-  filter_.onMatchCallback(action);
-
-  expectFilterStateInfo(filter_state);
-
-  EXPECT_CALL(*stream_filter, onStreamComplete());
-  EXPECT_CALL(*stream_filter, onDestroy());
-  filter_.onStreamComplete();
-  filter_.onDestroy();
-}
-
-TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
-  auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-  StreamInfo::FilterStateSharedPtr filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  ON_CALL(encoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
-  ON_CALL(encoder_callbacks_.stream_info_, filterState())
-      .WillByDefault(testing::ReturnRef(filter_state));
-
-  auto filter_state_object = std::make_shared<MatchedActionInfoType>();
-  filter_state_object->setFilterAction("otherRootFilterName", "anyActionName");
-  filter_state->setData(MatchedActionsFilterStateKey, filter_state_object,
-                        StreamInfo::FilterState::StateType::Mutable,
-                        StreamInfo::FilterState::LifeSpan::FilterChain);
-
-  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamEncoderFilter(stream_filter);
-  };
-
-  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  ExecuteFilterAction action(factory_callback, "actionName");
-  EXPECT_CALL(success_counter_, inc());
-  filter_.onMatchCallback(action);
-
-  auto* info = filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey);
-  EXPECT_NE(nullptr, info);
-  ProtobufWkt::Struct expected;
-  auto& fields = *expected.mutable_fields();
-  fields["otherRootFilterName"] = ValueUtil::stringValue("anyActionName");
-  fields["rootFilterName"] = ValueUtil::stringValue("actionName");
-  EXPECT_TRUE(MessageDifferencer::Equals(expected, *(info->serializeAsProto())));
-
-  EXPECT_CALL(*stream_filter, onStreamComplete());
-  EXPECT_CALL(*stream_filter, onDestroy());
-  filter_.onStreamComplete();
-  filter_.onDestroy();
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
+                                                                server_factory_context};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "Error: Only one of `dynamic_config` or `typed_config` can be set.");
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {

@@ -36,15 +36,15 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
             ->createDynamicFilterConfigProvider(
                 config_discovery, composite_action.dynamic_config().name(), server_factory_context,
                 factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
-    return [provider = std::move(provider)]() -> Matcher::ActionPtr {
+    return [provider = std::move(provider), n = std::move(name)]() -> Matcher::ActionPtr {
       auto config_value = provider->config();
       if (config_value.has_value()) {
         auto factory_cb = config_value.value().get().factory_cb;
-        return std::make_unique<ExecuteFilterAction>(factory_cb);
+        return std::make_unique<ExecuteFilterAction>(factory_cb, n);
       }
       // There is no dynamic config available. Apply missing config filter.
       auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
-      return std::make_unique<ExecuteFilterAction>(factory_cb);
+      return std::make_unique<ExecuteFilterAction>(factory_cb, n);
     };
   }
 
