@@ -436,7 +436,7 @@ func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (str
 
 func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
 	var value C.uint32_t
-	res := C.envoyGoFilterHttpDefineMetric(unsafe.Pointer(cfg), C.uint32_t(metricType), unsafe.Pointer(unsafe.StringData(name)), C.int(len(name)), &value)
+	res := C.envoyGoFilterHttpDefineMetric(cfg, C.uint32_t(metricType), unsafe.Pointer(unsafe.StringData(name)), C.int(len(name)), &value)
 	handleCApiStatus(res)
 	return uint32(value)
 }

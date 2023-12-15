@@ -10,7 +10,9 @@ using ::testing::ReturnRef;
 MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       http_context_(store_.symbolTable()), grpc_context_(store_.symbolTable()),
-      router_context_(store_.symbolTable()) {
+      router_context_(store_.symbolTable()),
+      filter_config_provider_manager_(
+          std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
@@ -39,6 +41,20 @@ MockServerFactoryContext::~MockServerFactoryContext() = default;
 
 MockStatsConfig::MockStatsConfig() = default;
 MockStatsConfig::~MockStatsConfig() = default;
+
+StatelessMockServerFactoryContext::StatelessMockServerFactoryContext()
+    : filter_config_provider_manager_(
+          std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
+
+MockGenericFactoryContext::~MockGenericFactoryContext() = default;
+
+MockGenericFactoryContext::MockGenericFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(*store_.rootScope()));
+  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+}
 
 } // namespace Configuration
 } // namespace Server

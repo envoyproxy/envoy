@@ -64,11 +64,12 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   // Send a RTDS request and get back the RTDS response.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_resource"},
                                       {"some_rtds_resource"}, {}, true));
-  auto some_rtds_resource = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
-    name: some_rtds_resource
-    layer:
-      envoy.reloadable_features.test_feature_false: True
-  )EOF");
+
+  envoy::service::runtime::v3::Runtime some_rtds_resource;
+  some_rtds_resource.set_name("some_rtds_resource");
+  auto* static_layer = some_rtds_resource.mutable_layer();
+  (*static_layer->mutable_fields())["envoy.reloadable_features.test_feature_false"].set_bool_value(
+      true);
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_resource}, {some_rtds_resource}, {}, "1");
   // Wait until the RTDS updates from the DiscoveryResponse have been applied.
@@ -80,11 +81,8 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   load_success_value = getCounterValue(load_success_counter);
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_resource"},
                                       {"some_rtds_resource"}, {}));
-  some_rtds_resource = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
-    name: some_rtds_resource
-    layer:
-      envoy.reloadable_features.test_feature_false: False
-  )EOF");
+  (*static_layer->mutable_fields())["envoy.reloadable_features.test_feature_false"].set_bool_value(
+      false);
   // Send another response with Resource wrapper.
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_resource}, {some_rtds_resource}, {}, "2",

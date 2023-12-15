@@ -96,17 +96,17 @@ paths:
     - envoy/common/exception.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
+    - source/common/listener_manager/listener_impl.cc
+    - source/common/listener_manager/listener_manager_impl.cc
+    - source/common/listener_manager/filter_chain_manager_impl.cc
     - source/common/upstream/thread_aware_lb_impl.cc
     - source/common/upstream/subset_lb_config.cc
-    - source/common/upstream/load_balancer_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
-    - source/common/upstream/outlier_detection_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
-    - source/common/network/cidr_range.cc
     - source/common/network/utility.cc
     - source/common/network/dns_resolver/dns_factory_util.cc
     - source/common/network/resolver_impl.cc

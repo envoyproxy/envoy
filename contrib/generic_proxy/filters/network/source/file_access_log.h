@@ -94,7 +94,7 @@ public:
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, typed_config.path()};
     return std::make_shared<FileAccessLogBase<Context>>(
         file_info, std::move(filter), std::move(formatter),
-        context.getServerFactoryContext().accessLogManager());
+        context.serverFactoryContext().accessLogManager());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

@@ -14,7 +14,7 @@ namespace Init {
 
 /**
  * Init::ManagerImpl coordinates initialization of one or more "targets." See comments in
- * include/envoy/init/manager.h for an overview.
+ * envoy/init/manager.h for an overview.
  *
  * When the logging level is set to "debug" or "trace," the log will contain entries for all
  * significant events in the initialization flow:

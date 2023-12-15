@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.validate.h"
 
+#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 

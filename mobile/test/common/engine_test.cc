@@ -57,7 +57,7 @@ TEST_F(EngineTest, EarlyExit) {
   ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
-  start_stream(handle, 0, {}, false, 0);
+  start_stream(handle, 0, {}, false);
 
   engine_.reset();
 }

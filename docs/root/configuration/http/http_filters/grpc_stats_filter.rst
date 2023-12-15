@@ -30,10 +30,10 @@ and :ref:`stats_for_all_methods <envoy_v3_api_field_extensions.filters.http.grpc
 
 To enable *upstream_rq_time* (v3 API only) see :ref:`enable_upstream_stats <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.enable_upstream_stats>`.
 
-Buf Connect
+Connect RPC
 -----------
 
-In addition to supporting gRPC, this filter also transparently supports telemetry for RPC calls using the `Buf Connect protocol <https://connect.build>`_.
+In addition to supporting gRPC, this filter also transparently supports telemetry for RPC calls using the `Connect protocol <https://connectrpc.com>`_.
 
 Connect calls will be counted in the same stats as equivalent gRPC calls.
 

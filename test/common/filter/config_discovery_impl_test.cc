@@ -185,7 +185,7 @@ template <class FactoryCb, class FactoryCtx, class CfgProviderMgrImpl, class Fil
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() : inject_factory_(filter_factory_) {
-    ON_CALL(factory_context_, getServerFactoryContext())
+    ON_CALL(factory_context_, serverFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
@@ -275,7 +275,7 @@ public:
 // HTTP filter test
 class HttpFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          NamedHttpFilterFactoryCb, Server::Configuration::FactoryContext,
+          Http::NamedHttpFilterFactoryCb, Server::Configuration::FactoryContext,
           HttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
           Server::Configuration::NamedHttpFilterConfigFactory,
           Server::Configuration::MockFactoryContext> {
@@ -292,7 +292,7 @@ public:
 // Upstream HTTP filter test
 class HttpUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          NamedHttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
+          Http::NamedHttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
           UpstreamHttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
           Server::Configuration::UpstreamHttpFilterConfigFactory,
           Server::Configuration::MockUpstreamFactoryContext> {

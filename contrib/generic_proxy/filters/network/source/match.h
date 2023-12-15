@@ -136,7 +136,7 @@ public:
   PropertyMatchDataInput(const std::string& property_name) : name_(property_name) {}
 
   Matcher::DataInputGetResult get(const Request& data) const override {
-    const auto value = data.getByKey(name_);
+    const auto value = data.get(name_);
     Matcher::MatchingDataType matching_data =
         value.has_value() ? Matcher::MatchingDataType(std::string(value.value()))
                           : absl::monostate();
