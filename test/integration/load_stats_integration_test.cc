@@ -53,7 +53,6 @@ public:
                                    const LocalityAssignment& p1_dragon_upstreams) {
     uint32_t num_endpoints = 0;
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-
     // EDS service_name is set in cluster_0
     cluster_load_assignment.set_cluster_name("service_name_0");
 
@@ -401,31 +400,6 @@ public:
     eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
   }
 
-  void dropLoadTest() {
-    initialize();
-
-    waitForLoadStatsStream();
-    ASSERT_TRUE(waitForLoadStatsRequest({}));
-    loadstats_stream_->startGrpcStream();
-
-    updateClusterLoadAssignment({{0}}, {}, {}, {});
-    requestLoadStatsResponse({"cluster_0"});
-    initiateClientConnection();
-    ASSERT_TRUE(response_->waitForEndStream());
-    ASSERT_TRUE(response_->complete());
-    EXPECT_EQ("503", response_->headers().getStatusValue());
-    cleanupUpstreamAndDownstream();
-
-    ASSERT_TRUE(waitForLoadStatsRequest({}, 1));
-
-    EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
-    EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
-    EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
-
-    cleanupLoadStatsConnection();
-  }
-
-
   static constexpr uint32_t upstream_endpoints_ = 5;
 
   IntegrationStreamDecoderPtr response_;
@@ -688,6 +662,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
 
   updateClusterLoadAssignment({{0}}, {}, {}, {});
   requestLoadStatsResponse({"cluster_0"});
+  // This should count as dropped, since we trigger circuit breaking.
   initiateClientConnection();
   ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_TRUE(response_->complete());
