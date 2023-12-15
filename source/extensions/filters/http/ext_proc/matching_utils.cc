@@ -39,15 +39,16 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
   return expressions;
 }
 
-std::unique_ptr<ProtobufWkt::Struct>
+ProtobufWkt::Struct
 ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& activation,
                                       const absl::flat_hash_map<std::string, CelExpression>& expr) {
 
+  ProtobufWkt::Struct proto;
+
   if (expr.empty()) {
-    return nullptr;
+    return proto;
   }
 
-  auto proto = std::make_unique<ProtobufWkt::Struct>();
   for (const auto& hash_entry : expr) {
     ProtobufWkt::Arena arena;
     const auto result = hash_entry.second.compiled_expr_->Evaluate(activation, &arena);
@@ -76,7 +77,7 @@ ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& a
       value.set_string_value(Filters::Common::Expr::print(result.value()));
     }
 
-    auto proto_mut_fields = proto->mutable_fields();
+    auto proto_mut_fields = proto.mutable_fields();
     (*proto_mut_fields)[hash_entry.first] = value;
   }
 

@@ -297,7 +297,7 @@ private:
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      std::unique_ptr<ProtobufWkt::Struct> proto);
+                                      ProtobufWkt::Struct* proto);
 
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
