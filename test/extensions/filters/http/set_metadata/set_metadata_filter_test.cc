@@ -296,6 +296,77 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   EXPECT_EQ(1, config_->stats().overwrite_denied_.value());
 }
 
+TEST_F(SetMetadataFilterTest, TypedWithAllowOverwrite) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      typed_value:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: foo_namespace
+        value:
+          foo: bar
+    - metadata_namespace: thenamespace
+      typed_value:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: bat_namespace
+        value:
+          bat: baz
+      allow_overwrite: true
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config);
+
+  // Verify that `metadata` contains our typed Config.
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace2 = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace2);
+  const auto any_val = it_namespace2->second;
+  ASSERT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config",
+            any_val.type_url());
+  envoy::extensions::filters::http::set_metadata::v3::Config test_cfg;
+  ASSERT_TRUE(any_val.UnpackTo(&test_cfg));
+  EXPECT_EQ("bat_namespace", test_cfg.metadata_namespace());
+  ASSERT_TRUE(test_cfg.has_value());
+  EXPECT_TRUE(test_cfg.value().fields().contains("bat"));
+}
+
+TEST_F(SetMetadataFilterTest, TypedWithNoAllowOverwrite) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      typed_value:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: foo_namespace
+        value:
+          foo: bar
+    - metadata_namespace: thenamespace
+      typed_value:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: bat_namespace
+        value:
+          bat: baz
+      allow_overwrite: false
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config);
+
+  // Verify that `metadata` contains our typed Config.
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace2 = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace2);
+  const auto any_val = it_namespace2->second;
+  ASSERT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config",
+            any_val.type_url());
+  envoy::extensions::filters::http::set_metadata::v3::Config test_cfg;
+  ASSERT_TRUE(any_val.UnpackTo(&test_cfg));
+  EXPECT_EQ("foo_namespace", test_cfg.metadata_namespace());
+  ASSERT_TRUE(test_cfg.has_value());
+  EXPECT_TRUE(test_cfg.value().fields().contains("foo"));
+  EXPECT_EQ(1, config_->stats().overwrite_denied_.value());
+}
+
 TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
   const std::string yaml_config = R"EOF(
     metadata_namespace: thenamespace
