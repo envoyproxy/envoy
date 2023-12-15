@@ -1240,6 +1240,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.formatter.cel",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
+            "envoy.filters.http.ext_proc",
             "envoy.filters.http.rate_limit_quota",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
