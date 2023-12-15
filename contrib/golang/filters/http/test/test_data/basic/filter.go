@@ -89,7 +89,7 @@ func (f *filter) sendLocalReply(phase string) api.StatusType {
 	headers := map[string][]string{
 		"Content-type": {"text/html"},
 		"test-phase":   {phase},
-		"x-two-values": {"foo", "bar"}
+		"x-two-values": {"foo", "bar"},
 	}
 	body := fmt.Sprintf("forbidden from go in %s\r\n", phase)
 	f.callbacks.SendLocalReply(403, body, headers, 0, "")
