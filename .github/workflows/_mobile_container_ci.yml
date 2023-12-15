@@ -42,6 +42,7 @@ on:
           -e COVERAGE_THRESHOLD
           -e BAZEL_BUILD_OPTION_LIST
           -e MOBILE_DOCS_CHECKOUT_DIR
+          -e GCP_TEST_PROJECT_API_KEY
       diskspace-hack:
         type: boolean
         default: false
