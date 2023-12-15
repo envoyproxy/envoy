@@ -9,7 +9,7 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
-#include "source/extensions/common/aws/signer_base.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,12 +50,12 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
  */
 
-class SigV4ASignerImpl : public SignerBase {
+class SigV4ASignerImpl : public SignerBaseImpl {
 public:
   SigV4ASignerImpl(absl::string_view service_name, absl::string_view region,
                    const CredentialsProviderSharedPtr& credentials_provider,
                    TimeSource& time_source, const AwsSigningHeaderExclusionVector& matcher_config)
-      : SignerBase(service_name, region, credentials_provider, time_source, matcher_config) {}
+      : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config) {}
 
 private:
   void addRegionHeader(Http::RequestHeaderMap& headers,

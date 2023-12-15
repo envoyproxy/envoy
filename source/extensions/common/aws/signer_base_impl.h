@@ -43,9 +43,9 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
  * Implementation of the Signature V4 signing process.
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
  */
-class SignerBase : public Signer, public Logger::Loggable<Logger::Id::aws> {
+class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
-  SignerBase(absl::string_view service_name, absl::string_view region,
+  SignerBaseImpl(absl::string_view service_name, absl::string_view region,
              const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
              const AwsSigningHeaderExclusionVector& matcher_config)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),

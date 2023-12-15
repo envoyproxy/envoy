@@ -1,4 +1,4 @@
-#include "source/extensions/common/aws/signer_base.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
 
 #include <openssl/ssl.h>
 
@@ -20,21 +20,21 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-void SignerBase::sign(Http::RequestMessage& message, bool sign_body,
+void SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
                       const absl::string_view override_region) {
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
   sign(headers, content_hash, override_region);
 }
 
-void SignerBase::signEmptyPayload(Http::RequestHeaderMap& headers,
+void SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
                                   const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().HashedEmptyString);
   sign(headers, SignatureConstants::get().HashedEmptyString, override_region);
 }
 
-void SignerBase::signUnsignedPayload(Http::RequestHeaderMap& headers,
+void SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
                                      const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().UnsignedPayload);
@@ -42,13 +42,13 @@ void SignerBase::signUnsignedPayload(Http::RequestHeaderMap& headers,
 }
 
 // Required only for sigv4a
-void SignerBase::addRegionHeader(
+void SignerBaseImpl::addRegionHeader(
     ABSL_ATTRIBUTE_UNUSED Http::RequestHeaderMap& headers,
     ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {}
 
-std::string SignerBase::getRegion() const { return region_; }
+std::string SignerBaseImpl::getRegion() const { return region_; }
 
-void SignerBase::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
                       const absl::string_view override_region) {
   headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   const auto& credentials = credentials_provider_->getCredentials();
@@ -98,7 +98,7 @@ void SignerBase::sign(Http::RequestHeaderMap& headers, const std::string& conten
   headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 }
 
-std::string SignerBase::createContentHash(Http::RequestMessage& message,
+std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message,
                                           const bool sign_body) const {
   if (!sign_body) {
     return SignatureConstants::get().HashedEmptyString;
