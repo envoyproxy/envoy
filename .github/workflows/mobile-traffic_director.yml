@@ -21,6 +21,11 @@ jobs:
     uses: ./.github/workflows/_mobile_container_ci.yml
     secrets:
       GCP_TEST_PROJECT_API_KEY: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
     with:
       args: >-
         run
