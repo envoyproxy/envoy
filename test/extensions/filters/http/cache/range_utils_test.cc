@@ -326,6 +326,14 @@ TEST(GetRangeDetailsTest, NotSatisfiableRange) {
   ASSERT_TRUE(result->ranges_.empty());
 }
 
+// operator<<(ostream&, const AdjustedByteRange&) is only used in tests, but lives in //source,
+// and so needs test coverage. This test provides that coverage, to keep the coverage test happy.
+TEST(AdjustedByteRange, StreamingTest) {
+  std::ostringstream os;
+  os << AdjustedByteRange(0, 1);
+  EXPECT_EQ(os.str(), "[0,1)");
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters

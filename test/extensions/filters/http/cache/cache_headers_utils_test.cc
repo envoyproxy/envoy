@@ -154,6 +154,27 @@ TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
   EXPECT_EQ(expected_request_cache_control, RequestCacheControl(cache_control_header));
 }
 
+// operator<<(ostream&, const RequestCacheControl&) is only used in tests, but lives in //source,
+// and so needs test coverage. This test provides that coverage, to keep the coverage test happy.
+TEST(RequestCacheControl, StreamingTest) {
+  std::ostringstream os;
+  RequestCacheControl request_cache_control(
+      "no-cache, no-store, no-transform, only-if-cached, max-age=0, min-fresh=1, max-stale=2");
+  os << request_cache_control;
+  EXPECT_EQ(os.str(), "{must_validate, no_store, no_transform, only_if_cached, max-age=0, "
+                      "min-fresh=1000000, max-stale=2000000}");
+}
+
+// operator<<(ostream&, const ResponseCacheControl&) is only used in tests, but lives in //source,
+// and so needs test coverage. This test provides that coverage, to keep the coverage test happy.
+TEST(ResponseCacheControl, StreamingTest) {
+  std::ostringstream os;
+  ResponseCacheControl response_cache_control(
+      "no-cache, must-revalidate, no-store, no-transform, max-age=0");
+  os << response_cache_control;
+  EXPECT_EQ(os.str(), "{must_validate, no_store, no_transform, no_stale, max-age=0}");
+}
+
 struct TestResponseCacheControl : public ResponseCacheControl {
   TestResponseCacheControl(bool must_validate, bool no_store, bool no_transform, bool no_stale,
                            bool is_public, OptionalDuration max_age) {
