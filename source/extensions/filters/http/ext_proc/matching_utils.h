@@ -51,7 +51,7 @@ private:
   const absl::flat_hash_map<std::string, CelExpression> response_expr_;
 };
 
-const std::vector<Matchers::StringMatcherPtr>
+std::vector<Matchers::StringMatcherPtr>
 initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list);
 
 } // namespace ExternalProcessing

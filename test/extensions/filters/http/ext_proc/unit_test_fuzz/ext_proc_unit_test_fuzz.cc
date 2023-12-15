@@ -57,17 +57,15 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
-// ASAN fuzz testing is producing an error on CEL parsing that is believed to be a false positive.
-// It is determined that the error is unrelated to the implementation of request and response
-// attributes as demonstrated here
-// https://github.com/envoyproxy/envoy/compare/main...jbohanon:envoy:bug/cel-parser-antlr-exception-use-after-free.
-// Discussion on this is located at https://github.com/envoyproxy/envoy/pull/31017
-#ifdef ASAN_FUZZER
+  // ASAN fuzz testing is producing an error on CEL parsing that is believed to be a false positive.
+  // It is determined that the error is unrelated to the implementation of request and response
+  // attributes as demonstrated here
+  // https://github.com/envoyproxy/envoy/compare/main...jbohanon:envoy:bug/cel-parser-antlr-exception-use-after-free.
+  // Discussion on this is located at https://github.com/envoyproxy/envoy/pull/31017
   if (!input.config().request_attributes().empty() ||
       !input.config().response_attributes().empty()) {
     return;
   }
-#endif
 
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
