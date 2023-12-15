@@ -34,7 +34,7 @@ jobs:
   cc_test:
     if: ${{ fromJSON(needs.load.outputs.request).run.mobile-traffic-director }}
     needs: load
-    name: cc-test
+    name: cc-tests
     uses: ./.github/workflows/_mobile_container_ci.yml
     secrets:
       GCP_TEST_PROJECT_API_KEY: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_TEST_PROJECT_API_KEY || '' }}
