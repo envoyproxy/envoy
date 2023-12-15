@@ -133,7 +133,7 @@ std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
 
     // XXX (adam.kotwasinski) There could be something more present in the consumer,
     // and we could drain it (at least a little) in the next commits.
-    // See: https://github.com/edenhill/librdkafka/discussions/3897
+    // See: https://github.com/confluentinc/librdkafka/discussions/3897
     return {inbound_record};
   } else {
     // Nothing extraordinary (timeout because there is nothing upstream),
