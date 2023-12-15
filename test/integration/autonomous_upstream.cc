@@ -24,6 +24,7 @@ const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 const char AutonomousStream::CLOSE_AFTER_RESPONSE[] = "close_after_response";
 const char AutonomousStream::NO_TRAILERS[] = "no_trailers";
 const char AutonomousStream::NO_END_STREAM[] = "no_end_stream";
+const char AutonomousStream::RESPOND_AFTER_REQUEST_HEADERS[] = "respond_after_request_headers";
 
 AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                                    AutonomousUpstream& upstream, bool allow_incomplete_streams)
@@ -36,10 +37,20 @@ AutonomousStream::~AutonomousStream() {
   }
 }
 
+void AutonomousStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
+  bool send_response = !headers->get(Http::LowerCaseString(RESPOND_AFTER_REQUEST_HEADERS)).empty();
+  FakeStream::decodeHeaders(std::move(headers), end_stream);
+
+  if (send_response) {
+    absl::MutexLock lock(&lock_);
+    sendResponse();
+  }
+}
+
 // By default, automatically send a response when the request is complete.
 void AutonomousStream::setEndStream(bool end_stream) {
   FakeStream::setEndStream(end_stream);
-  if (end_stream) {
+  if (end_stream && headers_->get(Http::LowerCaseString(RESPOND_AFTER_REQUEST_HEADERS)).empty()) {
     sendResponse();
   }
 }

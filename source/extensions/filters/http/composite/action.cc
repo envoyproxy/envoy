@@ -15,6 +15,37 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
 
+  if (composite_action.has_dynamic_config() && composite_action.has_typed_config()) {
+    throw EnvoyException(
+        fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
+  }
+
+  if (composite_action.has_dynamic_config()) {
+    if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
+      throw EnvoyException(fmt::format("Failed to get factory context or server factory context."));
+    }
+    // Create a dynamic filter config provider and register it with the server factory context.
+    auto config_discovery = composite_action.dynamic_config().config_discovery();
+    Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
+    Server::Configuration::ServerFactoryContext& server_factory_context =
+        context.server_factory_context_.value();
+    Server::Configuration::HttpExtensionConfigProviderSharedPtr provider =
+        server_factory_context.downstreamHttpFilterConfigProviderManager()
+            ->createDynamicFilterConfigProvider(
+                config_discovery, composite_action.dynamic_config().name(), server_factory_context,
+                factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
+    return [provider = std::move(provider)]() -> Matcher::ActionPtr {
+      auto config_value = provider->config();
+      if (config_value.has_value()) {
+        auto factory_cb = config_value.value().get().factory_cb;
+        return std::make_unique<ExecuteFilterAction>(factory_cb);
+      }
+      // There is no dynamic config available. Apply missing config filter.
+      auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
+      return std::make_unique<ExecuteFilterAction>(factory_cb);
+    };
+  }
+
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           composite_action.typed_config());
