@@ -159,10 +159,10 @@ TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
 TEST(RequestCacheControl, StreamingTest) {
   std::ostringstream os;
   RequestCacheControl request_cache_control(
-      "no-cache, no-store, no-transform, only-if-cached, max-age=0, min-fresh=1, max-stale=2");
+      "no-cache, no-store, no-transform, only-if-cached, max-age=0, min-fresh=0, max-stale=0");
   os << request_cache_control;
   EXPECT_EQ(os.str(), "{must_validate, no_store, no_transform, only_if_cached, max-age=0, "
-                      "min-fresh=1000000, max-stale=2000000}");
+                      "min-fresh=0, max-stale=0}");
 }
 
 // operator<<(ostream&, const ResponseCacheControl&) is only used in tests, but lives in //source,
