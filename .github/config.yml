@@ -118,6 +118,9 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/dependabot.yml
+    - bazel/BUILD
+    - tools/dependency/*
     - "**/*.bzl"
     - "**/requirements.txt"
   publish:
