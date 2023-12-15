@@ -18,7 +18,8 @@ Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromPro
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
-      context.scope(), stats_prefix, Envoy::Extensions::Filters::Common::Expr::getBuilder(context));
+      context.scope(), stats_prefix,
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()));
 
   return [filter_config, grpc_service = proto_config.grpc_service(),
           &context](Http::FilterChainFactoryCallbacks& callbacks) {
