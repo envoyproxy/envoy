@@ -203,7 +203,7 @@ public:
     cluster_stats->set_total_dropped_requests(cluster_stats->total_dropped_requests() +
                                               local_cluster_stats.total_dropped_requests());
     if (local_cluster_stats.dropped_requests().size() > 0) {
-      uint64_t local_drop_count = local_cluster_stats.dropped_requests(0).dropped_count();
+      const uint64_t local_drop_count = local_cluster_stats.dropped_requests(0).dropped_count();
       if (local_drop_count > 0 ) {
         envoy::config::endpoint::v3::ClusterStats::DroppedRequests* drop_request;
         if (cluster_stats->dropped_requests().size() > 0) {
