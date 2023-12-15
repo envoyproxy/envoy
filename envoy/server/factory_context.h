@@ -7,6 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/dynamic_extension_config_provider.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/grpc/context.h"
@@ -36,9 +37,14 @@
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
+namespace Filter {
+template <class FactoryCb, class FactoryCtx> class FilterConfigProviderManager;
+} // namespace Filter
 namespace Server {
 namespace Configuration {
 
+using HttpExtensionConfigProviderSharedPtr =
+    std::shared_ptr<Config::DynamicExtensionConfigProvider<Envoy::Http::NamedHttpFilterFactoryCb>>;
 /**
  * Common interface for downstream and upstream network filters to access server
  * wide resources. This could be treated as limited form of server factory context.
@@ -131,6 +137,14 @@ public:
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 };
 
+class FactoryContext;
+
+using DownstreamHTTPFilterConfigProviderManager =
+    Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
+                                        Server::Configuration::FactoryContext>;
+using DownstreamHTTPFilterConfigProviderManagerSharedPtr =
+    std::shared_ptr<DownstreamHTTPFilterConfigProviderManager>;
+
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
  * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
@@ -195,6 +209,14 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() const PURE;
+
+  /**
+   * Returns the downstream HTTP filter config provider manager.
+   *
+   * @return DownstreamHTTPFilterConfigProviderManagerSharedPtr
+   */
+  virtual DownstreamHTTPFilterConfigProviderManagerSharedPtr
+  downstreamHttpFilterConfigProviderManager() PURE;
 };
 
 /**
