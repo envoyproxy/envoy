@@ -250,7 +250,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     }
 
     status = onHeaders(decoding_state_, headers, end_stream,
-        config_->expressionManager().hasRequestExpr() ? &proto : nullptr);
+                       config_->expressionManager().hasRequestExpr() ? &proto : nullptr);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
@@ -537,7 +537,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     }
 
     status = onHeaders(encoding_state_, headers, end_stream,
-        config_->expressionManager().hasResponseExpr() ? &proto : nullptr);
+                       config_->expressionManager().hasResponseExpr() ? &proto : nullptr);
     ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
@@ -570,7 +570,7 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 
 ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                                          bool end_stream) {
-  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
+  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stream {}", data.length(), end_stream);
   ProcessingRequest req;
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);

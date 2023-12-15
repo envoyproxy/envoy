@@ -87,7 +87,8 @@ public:
     if (!tls->isShutdown()) {
       tls->runOnAllThreads([](OptRef<ThreadLocalConfig> tls) { tls->config_ = {}; },
                            // Extend the lifetime of TLS by capturing main_config_, because
-                           // otherwise, the callback to clear TLS worker content is not executed.
+                           // otherwise, the callback to clear TLS worker content is not
+                           // executed.
                            [main_config = main_config_]() {
                              // Explicitly delete TLS on the main thread.
                              main_config->tls_.reset();
@@ -178,20 +179,12 @@ private:
   const ProtobufTypes::MessagePtr default_configuration_;
 };
 
-// Struct of canonical filter name and HTTP stream filter factory callback.
-struct NamedHttpFilterFactoryCb {
-  // Canonical filter name.
-  std::string name;
-  // Factory function used to create filter instances.
-  Http::FilterFactoryCb factory_cb;
-};
-
 // Implementation of a HTTP dynamic filter config provider.
 // NeutralHttpFilterConfigFactory can either be a NamedHttpFilterConfigFactory
 // or an UpstreamHttpFilterConfigFactory.
 template <class FactoryCtx, class NeutralHttpFilterConfigFactory>
 class HttpDynamicFilterConfigProviderImpl
-    : public DynamicFilterConfigProviderImpl<NamedHttpFilterFactoryCb> {
+    : public DynamicFilterConfigProviderImpl<Http::NamedHttpFilterFactoryCb> {
 public:
   HttpDynamicFilterConfigProviderImpl(
       FilterConfigSubscriptionSharedPtr& subscription,
@@ -215,7 +208,7 @@ public:
   }
 
 private:
-  NamedHttpFilterFactoryCb
+  Http::NamedHttpFilterFactoryCb
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
@@ -309,7 +302,7 @@ public:
       const std::string& filter_chain_type, absl::string_view stat_prefix,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
       : DynamicFilterConfigProviderImpl<FactoryCb>(
-            subscription, require_type_urls, factory_context.threadLocal(),
+            subscription, require_type_urls, factory_context.serverFactoryContext().threadLocal(),
             std::move(default_config), last_filter_in_filter_chain, filter_chain_type, stat_prefix,
             listener_filter_matcher),
         factory_context_(factory_context) {}
@@ -648,7 +641,7 @@ protected:
 // HTTP filter
 class HttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::NamedHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
+          Server::Configuration::NamedHttpFilterConfigFactory, Http::NamedHttpFilterFactoryCb,
           Server::Configuration::FactoryContext,
           HttpDynamicFilterConfigProviderImpl<
               Server::Configuration::FactoryContext,
@@ -675,7 +668,7 @@ protected:
 // HTTP filter
 class UpstreamHttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::UpstreamHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
+          Server::Configuration::UpstreamHttpFilterConfigFactory, Http::NamedHttpFilterFactoryCb,
           Server::Configuration::UpstreamFactoryContext,
           HttpDynamicFilterConfigProviderImpl<
               Server::Configuration::UpstreamFactoryContext,

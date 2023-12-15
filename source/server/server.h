@@ -172,7 +172,9 @@ class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
                                  public Configuration::TransportSocketFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
-      : server_(server), server_scope_(server_.stats().createScope("")) {}
+      : server_(server), server_scope_(server_.stats().createScope("")),
+        filter_config_provider_manager_(
+            std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
@@ -194,12 +196,17 @@ public:
   Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
+  ProcessContextOptRef processContext() override { return server_.processContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
+  downstreamHttpFilterConfigProviderManager() override {
+    return filter_config_provider_manager_;
+  }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
@@ -221,6 +228,7 @@ public:
 private:
   Instance& server_;
   Stats::ScopeSharedPtr server_scope_;
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_;
 };
 
 /**

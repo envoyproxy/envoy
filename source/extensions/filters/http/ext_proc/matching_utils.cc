@@ -29,7 +29,8 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
         Extensions::Filters::Common::Expr::createExpression(builder_->builder(),
                                                             parse_status.value().expr());
 
-    expressions.emplace(matcher, ExpressionManager::CelExpression{parse_status.value(), std::move(expression)});
+    expressions.emplace(
+        matcher, ExpressionManager::CelExpression{parse_status.value(), std::move(expression)});
   }
 #else
   ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."

@@ -384,7 +384,9 @@ class FormatChecker:
 
     def allow_listed_for_unpack_to(self, file_path):
         return file_path.startswith("./test") or file_path in [
-            "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
+            "./source/common/protobuf/deterministic_hash.cc",
+            "./source/common/protobuf/utility.cc",
+            "./source/common/protobuf/utility.h",
         ]
 
     def allow_listed_for_raw_try(self, file_path):

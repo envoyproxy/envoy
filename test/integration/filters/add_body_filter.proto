@@ -15,4 +15,5 @@ message AddBodyFilterConfig {
   FilterCallback where_to_add_body = 1;
   uint32 body_size = 2;
   FilterCallback where_to_stop_and_buffer = 3;
+  bool add_trailers_in_encode_decode_header = 4;
 }

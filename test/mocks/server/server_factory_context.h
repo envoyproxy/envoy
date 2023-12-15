@@ -74,6 +74,7 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
+  MOCK_METHOD(ProcessContextOptRef, processContext, ());
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
@@ -82,6 +83,10 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
+  downstreamHttpFilterConfigProviderManager() override {
+    return filter_config_provider_manager_;
+  }
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -106,6 +111,8 @@ public:
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   testing::NiceMock<MockOptions> options_;
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_{
+      std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()};
 };
 
 class MockGenericFactoryContext : public GenericFactoryContext {
@@ -115,8 +122,8 @@ public:
 
   MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (const));
-  MOCK_METHOD(Stats::Scope&, scope, (), (const));
-  MOCK_METHOD(Init::Manager&, initManager, (), (const));
+  MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
 
   NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
@@ -127,7 +134,7 @@ public:
 // threads. Global state in the MockServerFactoryContext causes thread safety issues in this case.
 class StatelessMockServerFactoryContext : public virtual ServerFactoryContext {
 public:
-  StatelessMockServerFactoryContext() = default;
+  StatelessMockServerFactoryContext();
   ~StatelessMockServerFactoryContext() override = default;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
@@ -149,6 +156,7 @@ public:
   MOCK_METHOD(Http::Context&, httpContext, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Router::Context&, routerContext, ());
+  MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(envoy::config::bootstrap::v3::Bootstrap&, bootstrap, ());
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
@@ -157,6 +165,11 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
+  downstreamHttpFilterConfigProviderManager() override {
+    return filter_config_provider_manager_;
+  }
+  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_;
 };
 
 } // namespace Configuration

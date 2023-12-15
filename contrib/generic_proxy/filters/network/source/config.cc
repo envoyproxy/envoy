@@ -41,11 +41,11 @@ Factory::routeConfigProviderFromProto(const ProxyConfig& config,
     }
 
     return route_config_provider_manager.createRdsRouteConfigProvider(
-        config.generic_rds(), context.getServerFactoryContext(), config.stat_prefix(),
+        config.generic_rds(), context.serverFactoryContext(), config.stat_prefix(),
         context.initManager());
   } else {
     return route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context.getServerFactoryContext());
+        config.route_config(), context.serverFactoryContext());
   }
 }
 
@@ -86,7 +86,7 @@ std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
 Envoy::Network::FilterFactoryCb
 Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
                                            Envoy::Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   std::shared_ptr<RouteConfigProviderManager> route_config_provider_manager =
       server_context.singletonManager().getTyped<RouteConfigProviderManager>(
@@ -107,7 +107,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       tracer = tracer_manager->getOrCreateTracer(&proto_config.tracing().provider());
     }
     tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
-        context.direction(), proto_config.tracing());
+        context.listenerInfo().direction(), proto_config.tracing());
   }
 
   // Access log configuration.

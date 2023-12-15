@@ -359,6 +359,9 @@ envoy_cc_library(
     deps = [
         "//envoy/server:factory_context_interface",
         "//envoy/server:instance_interface",
+        "//source/common/config:metadata_lib",
+        "//source/common/filter:config_discovery_lib",
+        "//source/common/listener_manager:listener_info_lib",
     ],
 )
 
@@ -384,14 +387,6 @@ envoy_cc_library(
     hdrs = ["resource_monitor_config_impl.h"],
     deps = [
         "//envoy/server:resource_monitor_config_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "factory_context_base_impl_lib",
-    hdrs = ["factory_context_base_impl.h"],
-    deps = [
-        "//envoy/server:factory_context_interface",
     ],
 )
 

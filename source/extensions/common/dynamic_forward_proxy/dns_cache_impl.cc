@@ -17,7 +17,7 @@ namespace Common {
 namespace DynamicForwardProxy {
 
 absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
-    const Server::Configuration::GenericFactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
   const uint32_t max_hosts = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024);
   if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts) {
@@ -30,7 +30,7 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
 }
 
 DnsCacheImpl::DnsCacheImpl(
-    const Server::Configuration::GenericFactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
@@ -84,7 +84,8 @@ DnsCacheImpl::~DnsCacheImpl() {
 
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::FactoryContextBase& context) {
+    Event::Dispatcher& main_thread_dispatcher,
+    Server::Configuration::CommonFactoryContext& context) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Network::DnsResolverFactory& dns_resolver_factory =
       Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
@@ -408,6 +409,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.dns_cache_set_first_resolve_complete")) {
+      primary_host_info->host_info_->setFirstResolveComplete();
+    }
     address_changed = true;
     stats_.host_address_changed_.inc();
   }

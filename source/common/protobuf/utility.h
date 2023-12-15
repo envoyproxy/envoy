@@ -513,6 +513,10 @@ public:
                                                      bool always_print_primitive_fields = false);
 #endif
 
+  static std::string convertToStringForLogs(const Protobuf::Message& message,
+                                            bool pretty_print = false,
+                                            bool always_print_primitive_fields = false);
+
   /**
    * Utility method to create a Struct containing the passed in key/value strings.
    *

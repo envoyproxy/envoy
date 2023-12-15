@@ -11,3 +11,4 @@ Other features
   vcl
   wasm
   wasm_service
+  qatzip

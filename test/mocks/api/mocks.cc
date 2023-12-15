@@ -1,5 +1,7 @@
 #include "mocks.h"
 
+#include <cstring>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 
@@ -66,7 +68,9 @@ SysCallIntResult MockOsSysCalls::setsockopt(os_fd_t sockfd, int level, int optna
   }
 
   if (optlen >= sizeof(int)) {
-    boolsockopts_[SockOptKey(sockfd, level, optname)] = !!*reinterpret_cast<const int*>(optval);
+    int val = 0;
+    memcpy(&val, optval, sizeof(int));
+    boolsockopts_[SockOptKey(sockfd, level, optname)] = (val != 0);
   }
   return SysCallIntResult{0, 0};
 };

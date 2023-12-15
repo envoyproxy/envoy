@@ -168,6 +168,14 @@ The following command operators are supported:
 
   In typed JSON logs, START_TIME is always rendered as a string.
 
+.. _config_access_log_format_emit_time:
+
+%EMIT_TIME%
+  The time when log entry is emitted including milliseconds.
+
+  EMIT_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
 %REQUEST_HEADERS_BYTES%
   HTTP
     Uncompressed bytes of request headers.
@@ -502,6 +510,7 @@ HTTP only
   **UpstreamMaxStreamDurationReached**, **UMSDR**, The upstream request reached max stream duration.
   **OverloadManagerTerminated**, **OM**, Overload Manager terminated the request.
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
+  **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
 
 UDP
   Not implemented ("-").
