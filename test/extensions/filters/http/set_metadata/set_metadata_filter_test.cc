@@ -72,7 +72,7 @@ TEST_F(SetMetadataFilterTest, DeprecatedSimple) {
   envoy::config::core::v3::Metadata metadata;
   runFilter(metadata, yaml_config);
 
-  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 1}}}`
+  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 1}}}`.
   const auto& filter_metadata = metadata.filter_metadata();
   const auto it_namespace = filter_metadata.find("thenamespace");
   ASSERT_NE(it_namespace, filter_metadata.end());
@@ -113,7 +113,7 @@ TEST_F(SetMetadataFilterTest, DeprecatedWithMerge) {
   }
 
   // Verify that `metadata` contains:
-  // ``{"thenamespace": {number: 20, mylist: ["a","b"], "tags": {"mytag0": 1, "mytag1": 1}}}``
+  // ``{"thenamespace": {number: 20, mylist: ["a","b"], "tags": {"mytag0": 1, "mytag1": 1}}}``.
   const auto& filter_metadata = metadata.filter_metadata();
   const auto it_namespace = filter_metadata.find("thenamespace");
   ASSERT_NE(it_namespace, filter_metadata.end());
@@ -155,7 +155,7 @@ TEST_F(SetMetadataFilterTest, UntypedSimple) {
   envoy::config::core::v3::Metadata metadata;
   runFilter(metadata, yaml_config);
 
-  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 1}}}`
+  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 1}}}`.
   const auto& filter_metadata = metadata.filter_metadata();
   const auto it_namespace = filter_metadata.find("thenamespace");
   ASSERT_NE(it_namespace, filter_metadata.end());
@@ -181,7 +181,7 @@ TEST_F(SetMetadataFilterTest, TypedSimple) {
   envoy::config::core::v3::Metadata metadata;
   runFilter(metadata, yaml_config);
 
-  // Verify that `metadata` contains our typed Config
+  // Verify that `metadata` contains our typed Config.
   const auto& typed_metadata = metadata.typed_filter_metadata();
   const auto it_namespace2 = typed_metadata.find("thenamespace");
   ASSERT_NE(typed_metadata.end(), it_namespace2);
@@ -216,7 +216,7 @@ TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
   runFilter(metadata, yaml_config);
 
   // Verify that `metadata` contains:
-  // ``{"thenamespace": {number: 20, mylist: ["a","b"], "tags": {"mytag0": 1, "mytag1": 1}}}``
+  // ``{"thenamespace": {number: 20, mylist: ["a","b"], "tags": {"mytag0": 1, "mytag1": 1}}}``.
   const auto& filter_metadata = metadata.filter_metadata();
   const auto it_namespace = filter_metadata.find("thenamespace");
   ASSERT_NE(it_namespace, filter_metadata.end());
@@ -268,7 +268,7 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   runFilter(metadata, yaml_config);
 
   // Verify that `metadata` contains:
-  // ``{"thenamespace": {number: 10, mylist: ["a"], "tags": {"mytag0": 1}}}``
+  // ``{"thenamespace": {number: 10, mylist: ["a"], "tags": {"mytag0": 1}}}``.
   const auto& filter_metadata = metadata.filter_metadata();
   const auto it_namespace = filter_metadata.find("thenamespace");
   ASSERT_NE(it_namespace, filter_metadata.end());
@@ -313,7 +313,7 @@ TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
   envoy::config::core::v3::Metadata metadata;
   runFilter(metadata, yaml_config);
 
-  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 1}}}`
+  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 1}}}`.
   const auto& filter_metadata = metadata.filter_metadata();
   const auto it_namespace = filter_metadata.find("thenamespace");
   ASSERT_NE(it_namespace, filter_metadata.end());
@@ -343,7 +343,7 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
   envoy::config::core::v3::Metadata metadata;
   runFilter(metadata, yaml_config);
 
-  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 0}}}`
+  // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 0}}}`.
   const auto& untyped_metadata = metadata.filter_metadata();
   const auto it_namespace = untyped_metadata.find("thenamespace");
   ASSERT_NE(untyped_metadata.end(), it_namespace);
@@ -354,7 +354,7 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
   ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 0);
 
-  // Verify that `metadata` contains our typed Config
+  // Verify that `metadata` contains our typed Config.
   const auto& typed_metadata = metadata.typed_filter_metadata();
   const auto it_namespace2 = typed_metadata.find("thenamespace");
   ASSERT_NE(typed_metadata.end(), it_namespace2);

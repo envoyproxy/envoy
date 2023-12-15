@@ -72,7 +72,7 @@ Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMa
     }
   }
 
-  // add configured typed metadata
+  // Add configured typed metadata.
   if (!config_->typed().empty()) {
     auto& mut_typed_metadata =
         *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_typed_filter_metadata();
