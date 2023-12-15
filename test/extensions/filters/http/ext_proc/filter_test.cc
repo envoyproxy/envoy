@@ -28,7 +28,6 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -3231,8 +3230,10 @@ TEST_F(HttpFilterTest, SendDynamicMetadata) {
       data: request
   typed_filter_metadata:
     typed.request.data:
-      '@type': type.googleapis.com/helloworld.HelloRequest
-      name: request_typed
+      # We are using ExtProcOverrides just because we know it is built and imported already.
+      '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcOverrides
+      request_attributes:
+      - request_typed
   )EOF";
 
   const std::string connection_yaml = R"EOF(
@@ -3249,14 +3250,20 @@ TEST_F(HttpFilterTest, SendDynamicMetadata) {
       data: connection_untyped
   typed_filter_metadata:
     untyped.and.typed.connection.data:
-      '@type': type.googleapis.com/helloworld.HelloRequest
-      name: connection_typed
+      # We are using ExtProcOverrides just because we know it is built and imported already.
+      '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcOverrides
+      request_attributes:
+      - connection_typed
     typed.connection.data:
-      '@type': type.googleapis.com/helloworld.HelloRequest
-      name: connection_typed
+      # We are using ExtProcOverrides just because we know it is built and imported already.
+      '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcOverrides
+      request_attributes:
+      - connection_typed
     not.selected.data:
-      '@type': type.googleapis.com/helloworld.HelloRequest
-      name: connection_typed
+      # We are using ExtProcOverrides just because we know it is built and imported already.
+      '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcOverrides
+      request_attributes:
+      - connection_typed
   )EOF";
 
   envoy::config::core::v3::Metadata connection_metadata;
@@ -3307,18 +3314,20 @@ TEST_F(HttpFilterTest, SendDynamicMetadata) {
 
   EXPECT_EQ(0, last_request_.metadata_context().filter_metadata().count("typed.connection.data"));
 
-  helloworld::HelloRequest hello;
+  envoy::extensions::filters::http::ext_proc::v3::ExtProcOverrides typed_any;
   last_request_.metadata_context()
       .typed_filter_metadata()
       .at("typed.connection.data")
-      .UnpackTo(&hello);
-  EXPECT_EQ("connection_typed", hello.name());
+      .UnpackTo(&typed_any);
+  ASSERT_EQ(1, typed_any.request_attributes().size());
+  EXPECT_EQ("connection_typed", typed_any.request_attributes()[0]);
 
   last_request_.metadata_context()
       .typed_filter_metadata()
       .at("untyped.and.typed.connection.data")
-      .UnpackTo(&hello);
-  EXPECT_EQ("connection_typed", hello.name());
+      .UnpackTo(&typed_any);
+  ASSERT_EQ(1, typed_any.request_attributes().size());
+  EXPECT_EQ("connection_typed", typed_any.request_attributes()[0]);
 
   EXPECT_EQ(
       0, last_request_.metadata_context().typed_filter_metadata().count("untyped.connection.data"));

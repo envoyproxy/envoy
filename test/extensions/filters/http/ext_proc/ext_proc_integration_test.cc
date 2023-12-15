@@ -12,7 +12,6 @@
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
-#include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
