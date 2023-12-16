@@ -116,8 +116,8 @@ bool SigV4AKeyDerivation::constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs
     volatile int32_t lhs_digit = lhs_raw_be_bigint[i];
     volatile int32_t rhs_digit = rhs_raw_be_bigint[i];
 
-    gt |= ((rhs_digit - lhs_digit) >> 31) & eq;
-    eq &= (((lhs_digit ^ rhs_digit) - 1) >> 31) & 0x01;
+    gt = gt | (((rhs_digit - lhs_digit) >> 31) & eq);
+    eq = eq & ((((lhs_digit ^ rhs_digit) - 1) >> 31) & 0x01);
   }
   return (gt + gt + eq - 1) <= 0;
 }
