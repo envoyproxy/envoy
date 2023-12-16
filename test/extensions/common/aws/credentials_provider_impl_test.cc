@@ -170,10 +170,11 @@ TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
 TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
   TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
   auto temp = TestEnvironment::temporaryDirectory();
-  auto file_path = TestEnvironment::writeStringToFileForTest(temp+".aws/credentials", CREDENTIALS_FILE_CONTENTS, true, false);
-  TestEnvironment::setEnvVar("HOME",temp,1);
-  TestEnvironment::setEnvVar("AWS_PROFILE","profile1",1);
-  
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      temp + ".aws/credentials", CREDENTIALS_FILE_CONTENTS, true, false);
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
+
   const auto credentials = provider_.getCredentials();
   EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
   EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
