@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <filesystem>
 #include <string>
 
 #include "source/extensions/common/aws/credentials_provider_impl.h"
@@ -90,7 +91,7 @@ MATCHER_P(WithAttribute, expectedCluster, "") {
                             result_listener);
 }
 
-class EvironmentCredentialsProviderTest : public testing::Test{
+class EvironmentCredentialsProviderTest : public testing::Test {
 public:
   ~EvironmentCredentialsProviderTest() override {
     TestEnvironment::unsetEnvVar("AWS_ACCESS_KEY_ID");
@@ -135,7 +136,8 @@ TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-class CredentialsFileCredentialsProviderTest : public testing::Test, public Logger::Loggable<Logger::Id::aws> {
+class CredentialsFileCredentialsProviderTest : public testing::Test,
+                                               public Logger::Loggable<Logger::Id::aws> {
 public:
   CredentialsFileCredentialsProviderTest()
       : api_(Api::createApiForTest(time_system_)), provider_(*api_) {}
@@ -172,12 +174,13 @@ TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
 
   TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
   auto temp = TestEnvironment::temporaryDirectory();
-  std::string credential_file = temp.append("/.aws/credentials");
-  ENVOY_LOG(debug, "credential_file = {}",credential_file);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credential_file(temp + "/.aws/credentials");
+  ENVOY_LOG(debug, "credential_file = {}", credential_file);
 
   auto file_path = TestEnvironment::writeStringToFileForTest(
-      temp + "/.aws/credentials", CREDENTIALS_FILE_CONTENTS, true, false);
-  ENVOY_LOG(debug, "file_path = {}",file_path);
+      credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
+  ENVOY_LOG(debug, "file_path = {}", file_path);
 
   TestEnvironment::setEnvVar("HOME", temp, 1);
   TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
