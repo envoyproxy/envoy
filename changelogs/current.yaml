@@ -135,6 +135,10 @@ bug_fixes:
 - area: docker
   change: |
     Updated base image to ``ubuntu:22.04`` to fix Redis memory issue (https://github.com/envoyproxy/envoy/issues/31248).
+- area: aws_request_signer
+  change: |
+    Default credentials file location was relying on incorrect ~ expansion. This fix now resolves to the correct path
+    by using HOME environment variable, if the credentials file location is not explicitly specified.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
