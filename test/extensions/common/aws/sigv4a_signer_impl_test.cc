@@ -333,7 +333,6 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)EOF";
   EXPECT_EQ(1,
             ECDSA_verify(0, hash.data(), hash.size(), signature.data(), signature.size(), ec_key));
   OPENSSL_free(ec_key);
-
 }
 
 TEST_F(SigV4ASignerImplTest, SignAndVerifyUnsignedPayload) {
@@ -388,7 +387,6 @@ UNSIGNED-PAYLOAD)EOF";
   EXPECT_EQ(1,
             ECDSA_verify(0, hash.data(), hash.size(), signature.data(), signature.size(), ec_key));
   OPENSSL_free(ec_key);
-
 }
 
 TEST_F(SigV4ASignerImplTest, SignAndVerifyUnsignedPayloadMultiRegion) {
@@ -444,7 +442,6 @@ UNSIGNED-PAYLOAD)EOF";
   EXPECT_EQ(1,
             ECDSA_verify(0, hash.data(), hash.size(), signature.data(), signature.size(), ec_key));
   OPENSSL_free(ec_key);
-
 }
 } // namespace
 } // namespace Aws
