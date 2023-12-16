@@ -159,7 +159,6 @@ public:
 };
 
 TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
 
@@ -170,17 +169,14 @@ TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
   auto temp = TestEnvironment::temporaryDirectory();
   std::filesystem::create_directory(temp + "/.aws");
   std::string credential_file(temp + "/.aws/credentials");
-  ENVOY_LOG(debug, "credential_file = {}", credential_file);
 
   auto file_path = TestEnvironment::writeStringToFileForTest(
       credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
-  ENVOY_LOG(debug, "file_path = {}", file_path);
 
   TestEnvironment::setEnvVar("HOME", temp, 1);
   TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
