@@ -13,9 +13,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 
-using Envoy::Extensions::Common::Aws::MetadataFetcher;
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
-using Envoy::Extensions::Common::Aws::MockMetadataFetcher;
 using testing::_;
 using testing::Eq;
 using testing::InSequence;
@@ -92,7 +90,7 @@ MATCHER_P(WithAttribute, expectedCluster, "") {
                             result_listener);
 }
 
-class EvironmentCredentialsProviderTest : public testing::Test {
+class EvironmentCredentialsProviderTest : public testing::Test{
 public:
   ~EvironmentCredentialsProviderTest() override {
     TestEnvironment::unsetEnvVar("AWS_ACCESS_KEY_ID");
@@ -137,7 +135,7 @@ TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-class CredentialsFileCredentialsProviderTest : public testing::Test {
+class CredentialsFileCredentialsProviderTest : public testing::Test, public Logger::Loggable<Logger::Id::aws> {
 public:
   CredentialsFileCredentialsProviderTest()
       : api_(Api::createApiForTest(time_system_)), provider_(*api_) {}
@@ -159,6 +157,8 @@ public:
 };
 
 TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
 
   const auto credentials = provider_.getCredentials();
@@ -168,10 +168,17 @@ TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
   TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
   auto temp = TestEnvironment::temporaryDirectory();
+  std::string credential_file = temp.append("/.aws/credentials");
+  ENVOY_LOG(debug, "credential_file = {}",credential_file);
+
   auto file_path = TestEnvironment::writeStringToFileForTest(
-      temp + ".aws/credentials", CREDENTIALS_FILE_CONTENTS, true, false);
+      temp + "/.aws/credentials", CREDENTIALS_FILE_CONTENTS, true, false);
+  ENVOY_LOG(debug, "file_path = {}",file_path);
+
   TestEnvironment::setEnvVar("HOME", temp, 1);
   TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
 

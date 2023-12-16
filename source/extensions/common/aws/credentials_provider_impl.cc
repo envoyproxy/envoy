@@ -196,10 +196,23 @@ void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
   // Default path plus current home directory. Will fall back to / if HOME does not exist
-  std::string home(getenv("HOME"));
+  std::string credential_path;
+  const char* home = getenv("HOME");
+  if(home)
+  {
+    credential_path = std::string(home).append(DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
+  }
+  else
+  {
+    credential_path = std::string(DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
+  }
+
+  ENVOY_LOG(debug, "credential_path = {}", credential_path);
 
   const auto credentials_file = getEnvironmentVariableOrDefault(
-      AWS_SHARED_CREDENTIALS_FILE, home.append(DEFAULT_AWS_SHARED_CREDENTIALS_FILE));
+      AWS_SHARED_CREDENTIALS_FILE, credential_path);
+  ENVOY_LOG(debug, "credentials_file = {}", credentials_file);
+
   const auto profile = getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
 
   extractCredentials(credentials_file, profile);
