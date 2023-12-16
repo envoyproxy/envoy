@@ -20,7 +20,9 @@ using ProtoConfig =
 class KafkaRequestFrame : public GenericProxy::StreamRequest {
 public:
   KafkaRequestFrame(NetworkFilters::Kafka::AbstractRequestSharedPtr request)
-      : request_(std::move(request)) {}
+      : request_(std::move(request)) {
+    ASSERT(request_ != nullptr);
+  }
 
   FrameFlags frameFlags() const override {
     if (request_ == nullptr) {

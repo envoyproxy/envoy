@@ -5,9 +5,9 @@
 
 #include "contrib/generic_proxy/filters/network/source/codecs/kafka/config.h"
 #include "contrib/generic_proxy/filters/network/test/mocks/codec.h"
-#include "gtest/gtest.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/external/responses.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,11 +20,6 @@ namespace {
 using testing::NiceMock;
 
 TEST(KafkaCodecTest, SimpleFrameTest) {
-  {
-    KafkaRequestFrame frame(nullptr);
-    EXPECT_EQ(frame.protocol(), "kafka");
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 0);
-  }
 
   {
     auto request =
@@ -62,12 +57,7 @@ TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
 
   {
     EXPECT_CALL(callbacks, onDecodingSuccess(_));
-    auto request =
-        std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>();
-    request_callbacks.onMessage(request);
-  }
 
-  {
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
@@ -115,9 +105,14 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
   {
     // Test respond() method.
 
-    KafkaRequestFrame request_frame(nullptr);
+    auto request =
+        std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
+            NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
+                                                 absl::nullopt),
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
-    auto local_response = server_codec.respond(absl::OkStatus(), "", request_frame);
+    KafkaRequestFrame frame(request);
+    auto local_response = server_codec.respond(absl::OkStatus(), "", frame);
 
     EXPECT_NE(local_response, nullptr);
     EXPECT_EQ(dynamic_cast<KafkaResponseFrame*>(local_response.get())->response_, nullptr);
@@ -139,6 +134,9 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     Buffer::OwnedImpl buffer;
+    const uint32_t size = htobe32(request->computeSize());
+    buffer.add(&size, sizeof(size)); // Encode data length.
+
     request->encode(buffer);
     server_codec.decode(buffer, false);
   }
@@ -168,7 +166,8 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     KafkaResponseFrame response_frame(nullptr);
 
     // Expect close connection.
-    EXPECT_CALL(callbacks, connection()).WillOnce(testing::ReturnRef(mock_connection));
+    EXPECT_CALL(callbacks, connection())
+        .WillOnce(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
     EXPECT_CALL(mock_connection, close(Network::ConnectionCloseType::FlushWrite));
 
     server_codec.encode(response_frame, encoding_callbacks);
@@ -188,6 +187,8 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     KafkaResponseFrame response_frame(response);
 
     Envoy::Buffer::OwnedImpl dst_buffer;
+    const uint32_t size = htobe32(response->computeSize());
+    dst_buffer.add(&size, sizeof(size)); // Encode data length.
     response->encode(dst_buffer);
 
     EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
@@ -195,6 +196,80 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
           EXPECT_EQ(buffer.toString(), dst_buffer.toString());
         }));
     server_codec.encode(response_frame, encoding_callbacks);
+  }
+}
+
+TEST(KafkaCodecTest, KafkaClientCodecTest) {
+  NiceMock<GenericProxy::MockClientCodecCallbacks> callbacks;
+
+  KafkaClientCodec client_codec;
+  client_codec.setCodecCallbacks(callbacks);
+
+  {
+    // Test decode() method.
+    EXPECT_CALL(callbacks, onDecodingSuccess(_))
+        .WillOnce(testing::Invoke([](StreamFramePtr response) {
+          EXPECT_EQ(dynamic_cast<KafkaResponseFrame*>(response.get())
+                        ->response_->metadata_.correlation_id_,
+                    3);
+        }));
+
+    auto response =
+        std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
+            NetworkFilters::Kafka::ResponseMetadata(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0,
+                                                    3),
+            NetworkFilters::Kafka::FetchResponse({}, {}));
+
+    Buffer::OwnedImpl buffer;
+    const uint32_t size = htobe32(response->computeSize());
+    buffer.add(&size, sizeof(size)); // Encode data length.
+
+    response->encode(buffer);
+
+    client_codec.response_decoder_->expectResponse(3, 0, 0);
+    client_codec.decode(buffer, false);
+  }
+
+  {
+    // Test encode() method with non-request frame.
+
+    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+
+    auto response =
+        std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
+            NetworkFilters::Kafka::ResponseMetadata(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0,
+                                                    3),
+            NetworkFilters::Kafka::FetchResponse({}, {}));
+    KafkaResponseFrame response_frame(response);
+
+    // Do nothiing.
+    client_codec.encode(response_frame, encoding_callbacks);
+  }
+
+  {
+    // Test encode() method with request.
+
+    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+
+    auto request =
+        std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
+            NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
+                                                 absl::nullopt),
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+
+    KafkaRequestFrame request_frame(request);
+
+    Envoy::Buffer::OwnedImpl dst_buffer;
+    const uint32_t size = htobe32(request->computeSize());
+    dst_buffer.add(&size, sizeof(size)); // Encode data length.
+    request->encode(dst_buffer);
+
+    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
+        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer, bool) {
+          EXPECT_EQ(buffer.toString(), dst_buffer.toString());
+        }));
+
+    client_codec.encode(request_frame, encoding_callbacks);
   }
 }
 
