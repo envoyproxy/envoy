@@ -59,7 +59,7 @@ std::string SigV4ASignerImpl::createSignature(
     const absl::string_view string_to_sign,
     ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
 
-  uint signature_size;
+  unsigned int signature_size;
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
