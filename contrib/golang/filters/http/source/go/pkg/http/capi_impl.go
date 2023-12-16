@@ -128,8 +128,8 @@ func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, responseCode int, bo
 	}()
 	// TODO: use runtime.Pinner after go1.22 release for better performance.
 	for k, h := range headers {
-		keyStr := C.CString(k)
 		for _, v := range h {
+			keyStr := C.CString(k)
 			valueStr := C.CString(v)
 			strs = append(strs, keyStr, valueStr)
 		}
