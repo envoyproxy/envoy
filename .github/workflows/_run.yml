@@ -253,7 +253,7 @@ jobs:
         GITHUB_TOKEN: ${{ steps.checkout.outputs.token && steps.checkout.outputs.token || secrets.GITHUB_TOKEN }}
         ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
         ENVOY_RBE: ${{ inputs.rbe != 'false' && 1 || '' }}
-        GCP_TEST_PROJECT_API_KEY: ${{ inputs.trusted && secrets.gcp-traffic-key || '' }}
+        GCP_TEST_PROJECT_API_KEY: ${{ secrets.gcp-traffic-key }}
         RBE_KEY: ${{ secrets.rbe-key }}
         BAZEL_BUILD_EXTRA_OPTIONS: >-
           --config=remote-ci
