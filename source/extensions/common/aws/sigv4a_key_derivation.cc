@@ -132,7 +132,7 @@ void SigV4AKeyDerivation::constantTimeAddOne(std::vector<uint8_t>* raw_be_bigint
     const size_t index = byte_count - i - 1;
 
     volatile uint32_t current_digit = (*raw_be_bigint)[index];
-    current_digit += carry;
+    current_digit = current_digit + carry;
 
     carry = (current_digit >> 8) & 0x01;
 
