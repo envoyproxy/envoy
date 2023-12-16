@@ -52,6 +52,7 @@ envoy_cc_test(
     deps = [
         ":xds_integration_test_lib",
         "@envoy//test/test_common:environment_lib",
+        "@envoy//test/test_common:test_runtime_lib",
         "@envoy//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
