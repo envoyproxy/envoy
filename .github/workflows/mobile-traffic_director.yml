@@ -19,8 +19,8 @@ jobs:
     if: ${{ fromJSON(needs.load.outputs.request).run.mobile-traffic-director }}
     name: cc-tests
     uses: ./.github/workflows/_mobile_container_ci.yml
-    env:
-      GCP_TEST_PROJECT_API_KEY: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
+    secrets:
+      gcp-traffic-key: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
     permissions:
       actions: read
       contents: read

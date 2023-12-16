@@ -8,6 +8,7 @@ on:
     secrets:
       app-id:
       app-key:
+      gcp-traffic-key:
       rbe-key:
       ssh-key-extra:
     inputs:
@@ -42,7 +43,6 @@ on:
           -e COVERAGE_THRESHOLD
           -e BAZEL_BUILD_OPTION_LIST
           -e MOBILE_DOCS_CHECKOUT_DIR
-          -e GCP_TEST_PROJECT_API_KEY
       diskspace-hack:
         type: boolean
         default: false
@@ -124,6 +124,7 @@ jobs:
       contents: read
       packages: read
     secrets:
+      gcp-traffic-key: ${{ secrets.gcp-traffic-key }}
       ssh-key-extra: ${{ secrets.ssh-key-extra }}
     with:
       args: ${{ inputs.args }}
