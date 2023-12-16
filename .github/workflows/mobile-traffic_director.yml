@@ -7,7 +7,7 @@ on:
   schedule:
   # Once a day at midnight.
   - cron: '0 0 * * *'
-  # Allows manual triggering in the UI. Makes it easier to test and re-run in case of failures.
+  # Allows manual triggering in the UI. Makes it easier to test.
   workflow_dispatch:
 
 concurrency:
