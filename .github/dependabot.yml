@@ -32,16 +32,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/mobile/docs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/mobile/third_party/python"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/base"
   schedule:
     interval: "daily"
@@ -147,7 +137,7 @@ updates:
     interval: daily
 
 - package-ecosystem: "docker"
-  directory: "/examples/skywalking-tracing"
+  directory: "/examples/skywalking"
   schedule:
     interval: daily
 
@@ -172,7 +162,7 @@ updates:
     interval: daily
 
 - package-ecosystem: "docker"
-  directory: "/examples/zipkin-tracing"
+  directory: "/examples/zipkin"
   schedule:
     interval: daily
 

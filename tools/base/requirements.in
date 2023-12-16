@@ -1,9 +1,11 @@
 abstracts>=0.0.12
 aio.api.bazel
-aiohttp>=3.8.1
+aiohttp>=3.9.1
+async-timeout
 cffi>=1.15.0
 colorama
 coloredlogs
+cryptography>=41.0.7
 envoy.base.utils>=0.4.27
 envoy.code.check>=0.3.6
 envoy.dependency.check>=0.1.7
@@ -29,6 +31,7 @@ pyyaml
 setuptools
 slackclient
 thrift
+urllib3>=1.26.18
 verboselogs
 yapf
 yarl>=1.7.2
