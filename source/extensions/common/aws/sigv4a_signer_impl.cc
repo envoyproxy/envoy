@@ -76,7 +76,7 @@ std::string SigV4ASignerImpl::createSignature(
 
   ECDSA_sign(0, hash.data(), hash.size(), signature, &signature_size, ec_key);
 
-  OPENSSL_free(ec_key);
+  EC_KEY_free(ec_key);
 
   return Hex::encode(std::vector<uint8_t>(signature, signature + signature_size));
 }

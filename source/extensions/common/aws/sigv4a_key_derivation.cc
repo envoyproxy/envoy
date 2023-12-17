@@ -99,6 +99,7 @@ bool SigV4AKeyDerivation::derivePublicKey(EC_KEY* ec_key) {
   EC_POINT_mul(group, point, priv_key_num, nullptr, nullptr, nullptr);
 
   EC_KEY_set_public_key(ec_key, point);
+
   EC_POINT_free(point);
   return true;
 }
