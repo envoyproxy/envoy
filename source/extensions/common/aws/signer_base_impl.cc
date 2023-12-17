@@ -22,6 +22,7 @@ namespace Aws {
 
 void SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
                           const absl::string_view override_region) {
+
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
   sign(headers, content_hash, override_region);
@@ -50,6 +51,7 @@ std::string SignerBaseImpl::getRegion() const { return region_; }
 
 void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
                           const absl::string_view override_region) {
+
   headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {

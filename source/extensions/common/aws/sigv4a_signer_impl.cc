@@ -77,8 +77,10 @@ std::string SigV4ASignerImpl::createSignature(
   ECDSA_sign(0, hash.data(), hash.size(), signature, &signature_size, ec_key);
 
   EC_KEY_free(ec_key);
+  std::string encoded_signature(Hex::encode(std::vector<uint8_t>(signature, signature + signature_size)));
+  delete signature;
 
-  return Hex::encode(std::vector<uint8_t>(signature, signature + signature_size));
+  return encoded_signature;
 }
 
 } // namespace Aws
