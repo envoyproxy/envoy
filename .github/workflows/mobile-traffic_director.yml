@@ -32,5 +32,6 @@ jobs:
         --config=ci
         --test_env=ENVOY_IP_TEST_VERSIONS=v4only
         //test/non_hermetic:gcp_traffic_director_integration_test
+      request: ${{ needs.load.outputs.request }}
       target: cc-tests
       timeout-minutes: 90
