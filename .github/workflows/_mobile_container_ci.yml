@@ -76,7 +76,6 @@ on:
         type: string
       request:
         type: string
-        required: true
       runs-on:
         type: string
       skip:
