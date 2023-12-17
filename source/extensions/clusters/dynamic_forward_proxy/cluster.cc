@@ -299,6 +299,15 @@ void Cluster::onDnsHostAddOrUpdate(
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_LOG(debug, "Adding host info for {}", host);
 
+  {
+    Upstream::HostVector hosts_removed;
+    absl::ReaderMutexLock lock{&host_map_lock_};
+    const auto host_map_it = host_map_.find(host);
+    if (host_map_it != host_map_.end() && host_map_it->second.logical_host_->address()) {
+      hosts_removed.emplace_back(host_map_it->second.logical_host_);
+      updatePriorityState({}, hosts_removed);
+    }
+  }
   std::unique_ptr<Upstream::HostVector> hosts_added;
   addOrUpdateHost(host, host_info, hosts_added);
   if (hosts_added != nullptr) {
