@@ -94,7 +94,8 @@ public:
    * exist.
    */
   template <class T> std::shared_ptr<T> getTyped(const std::string& name) {
-    return std::dynamic_pointer_cast<T>(get(name, [] { return nullptr; }));
+    return std::dynamic_pointer_cast<T>(get(
+        name, [] { return nullptr; }, false));
   }
 
   /**
