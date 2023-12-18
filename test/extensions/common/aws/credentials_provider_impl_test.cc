@@ -136,8 +136,7 @@ TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-class CredentialsFileCredentialsProviderTest : public testing::Test,
-                                               public Logger::Loggable<Logger::Id::aws> {
+class CredentialsFileCredentialsProviderTest : public testing::Test {
 public:
   CredentialsFileCredentialsProviderTest()
       : api_(Api::createApiForTest(time_system_)), provider_(*api_) {}
