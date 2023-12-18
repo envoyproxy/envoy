@@ -65,6 +65,35 @@ TEST_F(DrainManagerImplTest, Default) {
   drain_timer->invokeCallback();
 }
 
+TEST_F(DrainManagerImplTest, DrainCloseWithThread) {
+  InSequence s;
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
+
+  // Test parent shutdown.
+  Event::MockTimer* shutdown_timer = new Event::MockTimer(&server_.dispatcher_);
+  EXPECT_CALL(*shutdown_timer, enableTimer(std::chrono::milliseconds(900000), _));
+  drain_manager.startParentShutdownSequence();
+
+  EXPECT_CALL(server_.hot_restart_, sendParentTerminateRequest());
+  shutdown_timer->invokeCallback();
+
+  // Verify basic drain close.
+  EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));
+  EXPECT_FALSE(drain_manager.drainClose());
+  EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_TRUE(drain_manager.drainClose());
+
+  // Test drain sequence.
+  Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
+  const auto expected_delay = std::chrono::milliseconds(DrainTimeSeconds * 1000);
+  EXPECT_CALL(*drain_timer, enableTimer(expected_delay, nullptr));
+  ReadyWatcher drain_complete;
+  drain_manager.startDrainSequence([&drain_complete]() -> void { drain_complete.ready(); });
+  EXPECT_CALL(drain_complete, ready());
+  drain_timer->invokeCallback();
+}
+
 TEST_F(DrainManagerImplTest, ModifyOnly) {
   InSequence s;
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY,

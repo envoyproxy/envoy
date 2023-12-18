@@ -673,6 +673,42 @@ TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, DrainCloseAfterWorkersStarted) {
+  bool workers_started = false;
+  absl::Notification workers_started_fired, workers_started_block, drain_complete;
+  // Expect drainParentListeners not to be called before workers start.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+      workers_started_block.WaitForNotification();
+    });
+    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+
+  EXPECT_CALL(restart_, drainParentListeners);
+  workers_started_block.Notify();
+
+  server_->dispatcher().post([&] {
+    EXPECT_TRUE(server_->drainManager().drainClose());
+    server_->shutdown();
+  });
+  server_->drainManager().startDrainSequence([&drain_complete]() { drain_complete.Notify(); });
+  drain_complete.WaitForNotification();
+  server_thread->join();
+}
+
 // A test target which never signals that it is ready.
 class NeverReadyTarget : public Init::TargetImpl {
 public:

@@ -43,6 +43,8 @@ public:
 
 private:
   void addDrainCompleteCallback(std::function<void()> cb);
+  inline MonotonicTime drainDeadline() const;
+  inline void setDrainDeadline(MonotonicTime drain_deadline);
 
   Instance& server_;
   Event::Dispatcher& dispatcher_;
@@ -50,7 +52,8 @@ private:
 
   std::atomic<bool> draining_{false};
   Event::TimerPtr drain_tick_timer_;
-  MonotonicTime drain_deadline_;
+  MonotonicTime drain_deadline_ ABSL_GUARDED_BY(mutex_);
+  mutable absl::Mutex mutex_;
   mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
   std::vector<std::function<void()>> drain_complete_cbs_{};
 
