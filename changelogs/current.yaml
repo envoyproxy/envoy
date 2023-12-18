@@ -305,5 +305,8 @@ new_features:
 - area: access_log
   change: |
     Added support for node data in ``%CEL%`` formatter.
+- area: redis
+  change: |
+    Added support for the getdel command.
 
 deprecated:
