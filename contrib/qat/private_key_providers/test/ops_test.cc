@@ -44,7 +44,8 @@ public:
 class FakeSingletonManager : public Singleton::Manager {
 public:
   FakeSingletonManager(LibQatCryptoSharedPtr libqat) : libqat_(libqat) {}
-  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb,
+                                   bool) override {
     return std::make_shared<QatManager>(libqat_);
   }
 

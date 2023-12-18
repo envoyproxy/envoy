@@ -66,6 +66,41 @@ TEST(SingletonManagerImplTest, NonConstructingGetTyped) {
   singleton.reset();
 }
 
+TEST(SingletonManagerImplTest, PinnedSingleton) {
+  ManagerImpl manager(Thread::threadFactoryForTest());
+
+  {
+    // Register a singleton and get it.
+    auto singleton = manager.getTyped<TestSingleton>(
+        SINGLETON_MANAGER_REGISTERED_NAME(test),
+        []() -> InstanceSharedPtr { return std::make_shared<TestSingleton>(); });
+    EXPECT_EQ(singleton, manager.getTyped<TestSingleton>(SINGLETON_MANAGER_REGISTERED_NAME(test)));
+
+    // Destroy all copies of the singleton shared pointer.
+    singleton.reset();
+
+    // The singleton should be destroyed now.
+    EXPECT_EQ(nullptr, manager.getTyped<TestSingleton>(SINGLETON_MANAGER_REGISTERED_NAME(test)));
+  }
+
+  {
+    // Register a pinned singleton and get it.
+    auto singleton = manager.getTyped<TestSingleton>(
+        SINGLETON_MANAGER_REGISTERED_NAME(test),
+        []() -> InstanceSharedPtr { return std::make_shared<TestSingleton>(); }, true);
+    EXPECT_EQ(singleton, manager.getTyped<TestSingleton>(SINGLETON_MANAGER_REGISTERED_NAME(test)));
+
+    auto* expected_value = singleton.get();
+
+    // Destroy all copies of the singleton shared pointer.
+    singleton.reset();
+
+    // The singleton should still be available.
+    EXPECT_EQ(expected_value,
+              manager.getTyped<TestSingleton>(SINGLETON_MANAGER_REGISTERED_NAME(test)).get());
+  }
+}
+
 } // namespace
 } // namespace Singleton
 } // namespace Envoy

@@ -265,15 +265,16 @@ class MockSingletonManager : public Singleton::ManagerImpl {
 public:
   MockSingletonManager() : Singleton::ManagerImpl(Thread::threadFactoryForTest()) {
     // By default just act like a real SingletonManager, but allow overrides.
-    ON_CALL(*this, get(_, _))
+    ON_CALL(*this, get(_, _, _))
         .WillByDefault(std::bind(&MockSingletonManager::realGet, this, std::placeholders::_1,
-                                 std::placeholders::_2));
+                                 std::placeholders::_2, std::placeholders::_3));
   }
 
   MOCK_METHOD(Singleton::InstanceSharedPtr, get,
-              (const std::string& name, Singleton::SingletonFactoryCb cb));
-  Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb) {
-    return Singleton::ManagerImpl::get(name, cb);
+              (const std::string& name, Singleton::SingletonFactoryCb cb, bool pin));
+  Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb,
+                                       bool pin) {
+    return Singleton::ManagerImpl::get(name, cb, pin);
   }
 };
 
