@@ -135,7 +135,7 @@ TEST(UtilityTest, TestGetSerialNumber) {
   EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*cert));
 }
 
-TEST(UtilityTest, TestSecondsUntilExpiratioWithExpiredCert) {
+TEST(UtilityTest, TestSecondsSinceEpochOfExpiratioWithExpiredCert) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   // Set a known date (2033-05-18 03:33:20 UTC) so that we get fixed output from this test.
@@ -146,7 +146,7 @@ TEST(UtilityTest, TestSecondsUntilExpiratioWithExpiredCert) {
   EXPECT_EQ(1724226690, Utility::getSecondsSinceEpoch(cert.get()).value());
 }
 
-TEST(UtilityTest, TestSecondsUntilExpiratioWithNotExpiredCert) {
+TEST(UtilityTest, TestSecondsSinceEpochOfWithNotExpiredCert) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   const time_t known_date_time = 0;
@@ -156,7 +156,7 @@ TEST(UtilityTest, TestSecondsUntilExpiratioWithNotExpiredCert) {
   EXPECT_EQ(1724226690, Utility::getSecondsSinceEpoch(cert.get()).value());
 }
 
-TEST(UtilityTest, TestSecondsUntilExpirationWithNullCert) {
+TEST(UtilityTest, TestSecondsSinceEpochOfWithNullCert) {
   Event::SimulatedTimeSystem time_source;
   EXPECT_EQ(absl::nullopt, Utility::getSecondsSinceEpoch(nullptr));
 }

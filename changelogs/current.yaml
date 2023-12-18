@@ -156,7 +156,7 @@ new_features:
     Added support for the getdel command.
 - area: tls
   change: |
-    Added new metric for emitting seconds until expirations of TLS & CA certificates.
+    Added new metric for emitting seconds since UNIX epoch of expirations of TLS & CA certificates.
     They are rooted at cluster.<cluster_name>.ssl.certificate.<cert_name>.
     and at listener.<address>.ssl.certificate.<cert_name>. namespace.
 >>>>>>> e3b2fc9d67 (Emit metric for seconds left until expiration for loaded certs)
