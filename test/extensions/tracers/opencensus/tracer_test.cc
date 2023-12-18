@@ -209,7 +209,7 @@ void testIncomingHeaders(
       {"x-request-id", "foo"},
   };
   for (const auto& kv : headers) {
-    request_headers.setByKey(Http::LowerCaseString(kv.first), kv.second);
+    request_headers.set(Http::LowerCaseString(kv.first), kv.second);
   }
 
   const std::string operation_name{"my_operation_2"};

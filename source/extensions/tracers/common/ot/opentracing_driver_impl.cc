@@ -39,7 +39,7 @@ public:
   opentracing::expected<void> Set(opentracing::string_view key,
                                   opentracing::string_view value) const override {
     Http::LowerCaseString lowercase_key{{key.data(), key.size()}};
-    trace_context_.setByKey(lowercase_key, {value.data(), value.size()});
+    trace_context_.set(lowercase_key, {value.data(), value.size()});
     return {};
   }
 
@@ -62,7 +62,7 @@ public:
   opentracing::expected<opentracing::string_view>
   LookupKey(opentracing::string_view key) const override {
     Http::LowerCaseString lowercase_key{{key.data(), key.size()}};
-    const auto entry = trace_context_.getByKey(lowercase_key);
+    const auto entry = trace_context_.get(lowercase_key);
     if (entry.has_value()) {
       return opentracing::string_view{entry.value().data(), entry.value().length()};
     } else {

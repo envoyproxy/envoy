@@ -182,7 +182,7 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   request_headers.remove(OpenTelemetryConstants::get().TRACE_STATE.key());
   span->injectContext(request_headers, nullptr);
 
-  auto sampled_entry = request_headers.getByKey(OpenTelemetryConstants::get().TRACE_PARENT.key());
+  auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT.key());
   EXPECT_EQ(sampled_entry.has_value(), true);
   EXPECT_EQ(
       sampled_entry.value(),

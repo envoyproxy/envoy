@@ -18,7 +18,7 @@ void TraceContextHandler::set(TraceContext& trace_context, absl::string_view val
   // Will dynamic_cast be better?
   auto header_map = trace_context.requestHeaders();
   if (!header_map.has_value()) {
-    trace_context.setByKey(key_, value);
+    trace_context.set(key_, value);
     return;
   }
 
@@ -32,7 +32,7 @@ void TraceContextHandler::set(TraceContext& trace_context, absl::string_view val
 void TraceContextHandler::setRefKey(TraceContext& trace_context, absl::string_view value) const {
   auto header_map = trace_context.requestHeaders();
   if (!header_map.has_value()) {
-    trace_context.setByKey(key_, value);
+    trace_context.set(key_, value);
     return;
   }
 
@@ -46,7 +46,7 @@ void TraceContextHandler::setRefKey(TraceContext& trace_context, absl::string_vi
 void TraceContextHandler::setRef(TraceContext& trace_context, absl::string_view value) const {
   auto header_map = trace_context.requestHeaders();
   if (!header_map.has_value()) {
-    trace_context.setByKey(key_, value);
+    trace_context.set(key_, value);
     return;
   }
 
@@ -61,7 +61,7 @@ absl::optional<absl::string_view>
 TraceContextHandler::get(const TraceContext& trace_context) const {
   auto header_map = trace_context.requestHeaders();
   if (!header_map.has_value()) {
-    return trace_context.getByKey(key_);
+    return trace_context.get(key_);
   }
 
   if (handle_.has_value()) {
@@ -82,7 +82,7 @@ TraceContextHandler::get(const TraceContext& trace_context) const {
 void TraceContextHandler::remove(TraceContext& trace_context) const {
   auto header_map = trace_context.requestHeaders();
   if (!header_map.has_value()) {
-    trace_context.removeByKey(key_);
+    trace_context.remove(key_);
     return;
   }
 

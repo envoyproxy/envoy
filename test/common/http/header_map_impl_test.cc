@@ -1051,67 +1051,6 @@ TEST(HeaderMapImplTest, ValidHeaderString) {
   EXPECT_FALSE(validHeaderString("abc\n"));
 }
 
-TEST(HeaderMapImplTest, HttpTraceContextTest) {
-  {
-    TestRequestHeaderMapImpl request_headers;
-
-    // Protocol.
-    EXPECT_EQ(request_headers.protocol(), "");
-    request_headers.addCopy(Http::Headers::get().Protocol, "HTTP/x");
-    EXPECT_EQ(request_headers.protocol(), "HTTP/x");
-
-    // Host.
-    EXPECT_EQ(request_headers.host(), "");
-    request_headers.addCopy(Http::Headers::get().Host, "test.com:233");
-    EXPECT_EQ(request_headers.host(), "test.com:233");
-
-    // Path.
-    EXPECT_EQ(request_headers.path(), "");
-    request_headers.addCopy(Http::Headers::get().Path, "/anything");
-    EXPECT_EQ(request_headers.path(), "/anything");
-
-    // Method.
-    EXPECT_EQ(request_headers.method(), "");
-    request_headers.addCopy(Http::Headers::get().Method, Http::Headers::get().MethodValues.Options);
-    EXPECT_EQ(request_headers.method(), Http::Headers::get().MethodValues.Options);
-  }
-
-  {
-    size_t size = 0;
-    TestRequestHeaderMapImpl request_headers{{"host", "foo"}, {"bar", "var"}, {"ok", "no"}};
-    request_headers.forEach([&size](absl::string_view key, absl::string_view val) {
-      size += key.size();
-      size += val.size();
-      return true;
-    });
-    // 'host' will be converted to ':authority'.
-    EXPECT_EQ(23, size);
-    EXPECT_EQ(23, request_headers.byteSize());
-
-    request_headers.removeByKey("non-existent-header");
-    EXPECT_EQ(23, request_headers.byteSize());
-
-    request_headers.removeByKey("ok");
-    EXPECT_EQ(19, request_headers.byteSize());
-    EXPECT_TRUE(request_headers.get(Http::LowerCaseString("ok")).empty());
-
-    // Appending will append to the existing value if it exists using "," as the
-    // delimiter.
-    request_headers.appendCopy(Http::LowerCaseString("bar"), "baz");
-    EXPECT_EQ(23, request_headers.byteSize());
-    EXPECT_EQ(1, request_headers.get(Http::LowerCaseString("bar")).size());
-
-    // Adding will store both key and value.
-    request_headers.addCopy(Http::LowerCaseString("bar"), "qux");
-    EXPECT_EQ(29, request_headers.byteSize());
-    EXPECT_EQ(2, request_headers.get(Http::LowerCaseString("bar")).size());
-
-    request_headers.removeByKey("bar");
-    EXPECT_EQ(13, request_headers.byteSize());
-    EXPECT_TRUE(request_headers.get(Http::LowerCaseString("bar")).empty());
-  }
-}
-
 // Test the header map max limits are setup correctly.
 TEST(HeaderMapImplTest, HeaderMapMaxLimits) {
   auto request_header_default = RequestHeaderMapImpl::create();

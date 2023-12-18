@@ -45,6 +45,7 @@ envoy_cc_library(
     hdrs = ["trace_context.h"],
     deps = [
         "//envoy/common:optref_lib",
+        "//envoy/http:header_map_interface",
     ],
 )
 
