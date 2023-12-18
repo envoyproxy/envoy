@@ -70,11 +70,11 @@ void CredentialInjectorFilter::onSuccess() {
 }
 
 void CredentialInjectorFilter::onFailure(const std::string& reason) {
+  ENVOY_LOG(warn, "Failed to get credential: {}", reason);
+
   // Since onFailure is called by the credential provider in other threads than the event
   // dispatcher, we need to post the handling to the event dispatcher thread.
   decoder_callbacks_->dispatcher().post([this]() {
-    ENVOY_LOG(warn, "Failed to get credential: {}", reason);
-
     config_->stats().failed_.inc();
 
     if (config_->allowRequestWithoutCredential()) {
