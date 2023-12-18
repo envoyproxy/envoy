@@ -49,12 +49,12 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
   request_headers_ = &headers;
   in_flight_credential_request_ = config_->requestCredential(*this);
 
-  // pause while we await the next step from the credential source, for example, an OAuth server
+  // pause while we await the next step from the credential provider, for example, an OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
 }
 
 void CredentialInjectorFilter::onSuccess() {
-  // Since onSuccess is called by the credential source in other threads than the event
+  // Since onSuccess is called by the credential provider in other threads than the event
   // dispatcher, we need to post the injection to the event dispatcher thread.
   decoder_callbacks_->dispatcher().post([this]() {
     bool succeed = config_->injectCredential(*request_headers_);
@@ -70,17 +70,22 @@ void CredentialInjectorFilter::onSuccess() {
 }
 
 void CredentialInjectorFilter::onFailure(const std::string& reason) {
-  ENVOY_LOG(warn, "Failed to get credential: {}", reason);
+  // Since onFailure is called by the credential provider in other threads than the event
+  // dispatcher, we need to post the handling to the event dispatcher thread.
+  decoder_callbacks_->dispatcher().post([this]() {
+    ENVOY_LOG(warn, "Failed to get credential: {}", reason);
 
-  config_->stats().failed_.inc();
+    config_->stats().failed_.inc();
 
-  if (config_->allowRequestWithoutCredential()) {
-    decoder_callbacks_->continueDecoding();
+    if (config_->allowRequestWithoutCredential()) {
+      decoder_callbacks_->continueDecoding();
+      return;
+    }
+
+    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                       nullptr, absl::nullopt, "failed_to_inject_credential");
     return;
-  }
-
-  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                     nullptr, absl::nullopt, "failed_to_inject_credential");
+  });
 }
 
 void CredentialInjectorFilter::setDecoderFilterCallbacks(

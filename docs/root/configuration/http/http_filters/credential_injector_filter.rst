@@ -5,7 +5,7 @@ Credential Injector
 
 The credential injector HTTP filter serves the purpose of injecting credentials into outgoing HTTP requests.
 At present, the filter configuration is used to retrieve the credentials, or they can be requested through
-the OAuth2 client credential grant. Furthermore, it has the potential to support additional credential sources
+the OAuth2 client credential grant. Furthermore, it has the potential to support additional credential providers
 in the future, such as the OAuth2 resource owner password credentials grant, STS, etc. The credentials obtained
 are then injected into the Authorization header of the proxied HTTP requests, utilizing either the Basic or Bearer scheme.
 
