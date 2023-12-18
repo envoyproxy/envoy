@@ -71,15 +71,21 @@ TEST(SingletonManagerImplTest, NonConstructingGetTyped) {
 }
 
 TEST(SingletonManagerImplTest, PinnedSingleton) {
-  ManagerImpl manager(Thread::threadFactoryForTest());
 
   {
+    ManagerImpl manager(Thread::threadFactoryForTest());
+    TestSingleton* singleton_ptr{};
+
     // Register a singleton and get it.
-    auto singleton = manager.getTyped<TestSingleton>(
-        SINGLETON_MANAGER_REGISTERED_NAME(test),
-        []() -> InstanceSharedPtr { return std::make_shared<TestSingleton>(); });
+    auto singleton = manager.getTyped<TestSingleton>(SINGLETON_MANAGER_REGISTERED_NAME(test),
+                                                     [&]() -> InstanceSharedPtr {
+                                                       auto s = std::make_shared<TestSingleton>();
+                                                       singleton_ptr = s.get();
+                                                       return s;
+                                                     });
     EXPECT_EQ(singleton, manager.getTyped<TestSingleton>(SINGLETON_MANAGER_REGISTERED_NAME(test)));
 
+    EXPECT_CALL(*singleton_ptr, onDestroy());
     // Destroy all copies of the singleton shared pointer.
     singleton.reset();
 
@@ -88,10 +94,18 @@ TEST(SingletonManagerImplTest, PinnedSingleton) {
   }
 
   {
+    ManagerImpl manager(Thread::threadFactoryForTest());
+    TestSingleton* singleton_ptr{};
+
     // Register a pinned singleton and get it.
     auto singleton = manager.getTyped<TestSingleton>(
         SINGLETON_MANAGER_REGISTERED_NAME(test),
-        []() -> InstanceSharedPtr { return std::make_shared<TestSingleton>(); }, true);
+        [&]() -> InstanceSharedPtr {
+          auto s = std::make_shared<TestSingleton>();
+          singleton_ptr = s.get();
+          return s;
+        },
+        true);
     EXPECT_EQ(singleton, manager.getTyped<TestSingleton>(SINGLETON_MANAGER_REGISTERED_NAME(test)));
 
     auto* expected_value = singleton.get();
@@ -102,6 +116,9 @@ TEST(SingletonManagerImplTest, PinnedSingleton) {
     // The singleton should still be available.
     EXPECT_EQ(expected_value,
               manager.getTyped<TestSingleton>(SINGLETON_MANAGER_REGISTERED_NAME(test)).get());
+
+    // Destroy the singleton after the manager is destroyed.
+    EXPECT_CALL(*singleton_ptr, onDestroy());
   }
 }
 

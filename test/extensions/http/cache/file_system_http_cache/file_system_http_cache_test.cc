@@ -283,7 +283,7 @@ public:
   FileSystemHttpCacheTestWithMockFiles() {
     ON_CALL(context_.server_factory_context_, singletonManager())
         .WillByDefault(ReturnRef(mock_singleton_manager_));
-    ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _))
+    ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _, _))
         .WillByDefault(Return(mock_async_file_manager_factory_));
     ON_CALL(*mock_async_file_manager_factory_, getAsyncFileManager(_, _))
         .WillByDefault(Return(mock_async_file_manager_));
