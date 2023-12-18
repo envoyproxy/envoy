@@ -33,8 +33,10 @@ ClientSslAuthConfig::ClientSslAuthConfig(
           cm, config.auth_api_cluster(), dispatcher, random,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000)),
           std::chrono::milliseconds(1000)),
-      tls_(tls.allocateSlot()), ip_allowlist_(config.ip_white_list()),
-      stats_(generateStats(scope, config.stat_prefix())) {
+      tls_(tls.allocateSlot()), stats_(generateStats(scope, config.stat_prefix())) {
+  auto list_or_error = Network::Address::IpList::create(config.ip_white_list());
+  THROW_IF_STATUS_NOT_OK(list_or_error, throw);
+  ip_allowlist_ = std::move(list_or_error.value());
 
   if (!cm.clusters().hasCluster(remote_cluster_name_)) {
     throw EnvoyException(

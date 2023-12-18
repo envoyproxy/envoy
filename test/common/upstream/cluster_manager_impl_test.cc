@@ -211,8 +211,9 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
-    cluster_manager_->setPrimaryClustersInitializedCb(
-        [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
+    cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
+      THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
+    });
   }
 
   void createWithBasicStaticCluster() {
@@ -278,7 +279,7 @@ public:
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
         router_context_, server_);
-    cluster_manager_->init(bootstrap);
+    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
   }
 
   void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
@@ -286,7 +287,7 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
-    cluster_manager_->init(bootstrap);
+    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -6358,11 +6359,11 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
       cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(added_via_api_yaml), "v1"));
 
   EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
-  EXPECT_NO_THROW(cluster_manager_->checkActiveStaticCluster("good"));
-  EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("nonexist"), EnvoyException,
-                            "Unknown gRPC client cluster 'nonexist'");
-  EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("added_via_api"),
-                            EnvoyException, "gRPC client cluster 'added_via_api' is not static");
+  EXPECT_TRUE(cluster_manager_->checkActiveStaticCluster("good").ok());
+  EXPECT_EQ(cluster_manager_->checkActiveStaticCluster("nonexist").message(),
+            "Unknown gRPC client cluster 'nonexist'");
+  EXPECT_EQ(cluster_manager_->checkActiveStaticCluster("added_via_api").message(),
+            "gRPC client cluster 'added_via_api' is not static");
 }
 
 #ifdef WIN32

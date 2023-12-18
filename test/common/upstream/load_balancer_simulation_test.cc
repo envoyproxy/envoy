@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -41,27 +42,58 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                    envoy::config::core::v3::UNKNOWN, time_source)};
 }
 
-// Simulate weighted LR load balancer.
-TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
-  const uint64_t num_hosts = 4;
-  const uint64_t weighted_subset_percent = 50;
-  const uint64_t weight = 2;          // weighted_subset_percent of hosts will have this weight.
-  const uint64_t active_requests = 3; // weighted_subset_percent will have this active requests.
+// Defines parameters for LeastRequestLoadBalancerWeightTest cases.
+struct LRLBTestParams {
+  // The total number of hosts.
+  uint64_t num_hosts;
 
-  PrioritySetImpl priority_set;
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  // Number of hosts that are part of the subset.
+  uint64_t num_subset_hosts;
+
+  // The weight assigned to each subset host.
+  uint64_t weight;
+
+  // The number of active requests each subset host will be loaded with.
+  uint64_t active_request_count;
+
+  // An unordered collection of expected selection probabilities for the hosts. The test will simply
+  // sort the expected and observed selection probabilities and verify each element is within some
+  // expected tolerance. Therefore, the vector does not need to be sorted.
+  std::vector<double> expected_selection_probs;
+};
+
+void leastRequestLBWeightTest(LRLBTestParams params) {
+  constexpr uint64_t num_requests = 100000;
+
+  // Observed selection probabilities must be within tolerance_pct of the expected to pass the test.
+  // The expected range is [0,100).
+  constexpr double tolerance_pct = 1.0;
+
+  // Validate params.
+  ASSERT_GT(params.num_hosts, 0);
+  ASSERT_LE(params.num_subset_hosts, params.num_hosts);
+  ASSERT_GT(params.weight, 0);
+  ASSERT_EQ(params.expected_selection_probs.size(), params.num_hosts);
+  ASSERT_LT(tolerance_pct, 100);
+  ASSERT_GE(tolerance_pct, 0);
+
   NiceMock<MockTimeSystem> time_source_;
   HostVector hosts;
-  for (uint64_t i = 0; i < num_hosts; i++) {
-    const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
-    hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
-                                 time_source_, should_weight ? weight : 1));
+  absl::node_hash_map<HostConstSharedPtr, uint64_t> host_hits;
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  for (uint64_t i = 0; i < params.num_hosts; i++) {
+    const bool should_weight = i < params.num_subset_hosts;
+    auto hostPtr = makeTestHost(info, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
+                                time_source_, should_weight ? params.weight : 1);
+    host_hits[hostPtr] = 0;
+    hosts.push_back(hostPtr);
     if (should_weight) {
-      hosts.back()->stats().rq_active_.set(active_requests);
+      hosts.back()->stats().rq_active_.set(params.active_request_count);
     }
   }
   HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
+  PrioritySetImpl priority_set;
   priority_set.updateHosts(
       0,
       updateHostsParams(updated_hosts, updated_locality_hosts,
@@ -81,24 +113,80 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
       priority_set, nullptr, lb_stats, runtime, random, common_config, least_request_lb_config,
       *time_source};
 
-  absl::node_hash_map<HostConstSharedPtr, uint64_t> host_hits;
-  const uint64_t total_requests = 100;
-  for (uint64_t i = 0; i < total_requests; i++) {
+  for (uint64_t i = 0; i < num_requests; i++) {
     host_hits[lb_.chooseHost(nullptr)]++;
   }
 
-  absl::node_hash_map<uint64_t, double> weight_to_percent;
+  std::vector<double> observed_pcts;
   for (const auto& host : host_hits) {
-    std::cout << fmt::format("url:{}, weight:{}, hits:{}, percent_of_total:{}\n",
-                             host.first->address()->asString(), host.first->weight(), host.second,
-                             (static_cast<double>(host.second) / total_requests) * 100);
-    weight_to_percent[host.first->weight()] +=
-        (static_cast<double>(host.second) / total_requests) * 100;
+    observed_pcts.push_back((static_cast<double>(host.second) / num_requests) * 100);
   }
 
-  for (const auto& weight : weight_to_percent) {
-    std::cout << fmt::format("weight:{}, percent:{}\n", weight.first, weight.second);
+  std::sort(observed_pcts.begin(), observed_pcts.end());
+  std::sort(params.expected_selection_probs.begin(), params.expected_selection_probs.end());
+  ASSERT_EQ(observed_pcts.size(), params.expected_selection_probs.size());
+  for (uint64_t i = 0; i < observed_pcts.size(); i++) {
+    EXPECT_NEAR(params.expected_selection_probs[i], observed_pcts[i], tolerance_pct);
   }
+}
+
+// Simulate weighted LR load balancer and verify expected selection probabilities.
+TEST(LeastRequestLoadBalancerWeightTest, Weight) {
+  LRLBTestParams params;
+
+  // No active requests or weight differences. This should look like uniform random LB.
+  params.num_hosts = 3;
+  params.num_subset_hosts = 1;
+  params.active_request_count = 0;
+  params.expected_selection_probs = {33.333, 33.333, 33.333};
+  params.weight = 1;
+  leastRequestLBWeightTest(params);
+
+  // Single host (out of 3) with lots of in-flight requests. Given that P2C will choose 2 hosts and
+  // take the one with higher weight, the only circumstance that the host with many in-flight
+  // requests will be picked is if P2C selects it twice.
+  params.num_hosts = 3;
+  params.num_subset_hosts = 1;
+  params.active_request_count = 10;
+  params.expected_selection_probs = {44.45, 44.45, 11.1};
+  params.weight = 1;
+  leastRequestLBWeightTest(params);
+
+  // Same as above, but with 2 hosts. The busy host will only be chosen if P2C picks it for both
+  // selections.
+  params.num_hosts = 2;
+  params.num_subset_hosts = 1;
+  params.active_request_count = 10;
+  params.expected_selection_probs = {25, 75};
+  params.weight = 1;
+  leastRequestLBWeightTest(params);
+
+  // Heterogeneous weights with no active requests. This should behave identically to weighted
+  // round-robin.
+  params.num_hosts = 2;
+  params.num_subset_hosts = 1;
+  params.active_request_count = 0;
+  params.expected_selection_probs = {66.66, 33.33};
+  params.weight = 2;
+  leastRequestLBWeightTest(params);
+
+  // Same as above, but we'll scale the subset's weight with active requests. With a default
+  // active_request_bias of 1.0, the subset host with a single active request will be cut in half,
+  // making both hosts have an identical weight.
+  params.num_hosts = 2;
+  params.num_subset_hosts = 1;
+  params.active_request_count = 1;
+  params.expected_selection_probs = {50, 50};
+  params.weight = 2;
+  leastRequestLBWeightTest(params);
+
+  // Same as above, but with 3 hosts.
+  params.num_hosts = 3;
+  params.num_subset_hosts = 1;
+  params.active_request_count = 1;
+  params.expected_selection_probs = {33.3, 33.3, 33.3};
+  params.weight = 2;
+  leastRequestLBWeightTest(params);
 }
 
 /**

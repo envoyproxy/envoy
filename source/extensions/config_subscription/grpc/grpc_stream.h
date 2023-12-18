@@ -11,6 +11,7 @@
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/config_subscription/grpc/grpc_stream_interface.h"
 
 namespace Envoy {
 namespace Config {
@@ -21,7 +22,7 @@ template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<Response
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
 template <class RequestProto, class ResponseProto>
-class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
+class GrpcStream : public GrpcStreamInterface<RequestProto, ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
@@ -46,7 +47,7 @@ public:
     }
   }
 
-  void establishNewStream() {
+  void establishNewStream() override {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream to {} for {}", async_client_.destination(),
               service_method_.DebugString());
     if (stream_ != nullptr) {
@@ -66,9 +67,9 @@ public:
     callbacks_->onStreamEstablished();
   }
 
-  bool grpcStreamAvailable() const { return stream_ != nullptr; }
+  bool grpcStreamAvailable() const override { return stream_ != nullptr; }
 
-  void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
+  void sendMessage(const RequestProto& request) override { stream_->sendMessage(request, false); }
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
@@ -104,7 +105,7 @@ public:
     setRetryTimer();
   }
 
-  void maybeUpdateQueueSizeStat(uint64_t size) {
+  void maybeUpdateQueueSizeStat(uint64_t size) override {
     // Although request_queue_.push() happens elsewhere, the only time the queue is non-transiently
     // non-empty is when it remains non-empty after a drain attempt. (The push() doesn't matter
     // because we always attempt this drain immediately after the push). Basically, a change in
@@ -117,7 +118,7 @@ public:
     }
   }
 
-  bool checkRateLimitAllowsDrain() {
+  bool checkRateLimitAllowsDrain() override {
     if (!rate_limiting_enabled_ || limit_request_->consume(1, false)) {
       return true;
     }
@@ -130,7 +131,9 @@ public:
     return false;
   }
 
-  absl::optional<Grpc::Status::GrpcStatus> getCloseStatus() { return last_close_status_; }
+  absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() const override {
+    return last_close_status_;
+  }
 
 private:
   void setRetryTimer() {
