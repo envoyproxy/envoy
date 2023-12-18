@@ -16,7 +16,7 @@ namespace Tracing {
  * The context for the custom tag to obtain the tag value.
  */
 struct CustomTagContext {
-  const TraceContext* trace_context;
+  const TraceContext& trace_context;
   const StreamInfo::StreamInfo& stream_info;
 };
 

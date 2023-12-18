@@ -242,7 +242,7 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
   ReadOnlyHttpTraceContext trace_context{stream_info.getRequestHeaders() != nullptr
                                              ? *stream_info.getRequestHeaders()
                                              : *Http::StaticEmptyHeaders::get().request_headers};
-  CustomTagContext ctx{&trace_context, stream_info};
+  CustomTagContext ctx{trace_context, stream_info};
   if (const CustomTagMap* custom_tag_map = tracing_config.customTags(); custom_tag_map) {
     for (const auto& it : *custom_tag_map) {
       it.second->applySpan(span, ctx);
