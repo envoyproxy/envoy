@@ -18,7 +18,7 @@ InstanceSharedPtr ManagerImpl::get(const std::string& name, SingletonFactoryCb c
 
   if (existing_singleton == nullptr) {
     InstanceSharedPtr singleton = cb();
-    singletons_by_type_index_[index] = singleton;
+    singletons_[name] = singleton;
     if (pin && singleton != nullptr) {
       pinned_singletons_.push_back(singleton);
     }
