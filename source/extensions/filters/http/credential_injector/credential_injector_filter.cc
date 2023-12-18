@@ -15,14 +15,14 @@ FilterConfig::FilterConfig(CredentialInjectorSharedPtr credential_injector, bool
       stats_(generateStats(stats_prefix + "credential_injector.", scope)) {}
 
 // Inject configured credential to the HTTP request header.
-// return should continue processing the request or not
+// return true if successful
 bool FilterConfig::injectCredential(Http::RequestHeaderMap& headers) {
   absl::Status status = injector_->inject(headers, overwrite_);
 
   // credential already exists in the header and overwrite is false
   if (absl::IsAlreadyExists(status)) {
     ASSERT(!overwrite_); // overwrite should be false if AlreadyExists is returned
-    ENVOY_LOG(warn, "Credential already exists in the header");
+    ENVOY_LOG(debug, "Credential already exists in the header");
     stats_.already_exists_.inc();
     // continue processing the request if credential already exists in the header
     return true;
@@ -30,7 +30,7 @@ bool FilterConfig::injectCredential(Http::RequestHeaderMap& headers) {
 
   // failed to inject the credential
   if (!status.ok()) {
-    ENVOY_LOG(warn, "Failed to inject credential: {}", status.message());
+    ENVOY_LOG(debug, "Failed to inject credential: {}", status.message());
     stats_.failed_.inc();
     return allow_request_without_credential_;
   }
