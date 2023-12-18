@@ -172,7 +172,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRoot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/");
+  EXPECT_EQ(headers.getPathValue(), "/");
   EXPECT_TRUE(result.ok());
 }
 
@@ -182,7 +182,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRootPreserveQueryFragment) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root/child?x=1#anchor");
+  EXPECT_EQ(headers.getPathValue(), "/root/child?x=1#anchor");
   EXPECT_TRUE(result.ok());
 }
 
@@ -192,7 +192,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRootPreserveFragment) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root/child#anchor");
+  EXPECT_EQ(headers.getPathValue(), "/root/child#anchor");
   EXPECT_TRUE(result.ok());
 }
 
@@ -202,7 +202,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDotDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir2");
   EXPECT_TRUE(result.ok());
 }
 
@@ -212,7 +212,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2");
   EXPECT_TRUE(result.ok());
 }
 
@@ -222,7 +222,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriTrailingDotDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/");
+  EXPECT_EQ(headers.getPathValue(), "/");
   EXPECT_TRUE(result.ok());
 }
 
@@ -232,7 +232,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriEncodedDotDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir2");
   EXPECT_TRUE(result.ok());
 }
 
@@ -242,7 +242,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriTrailingDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/");
   EXPECT_TRUE(result.ok());
 }
 
@@ -252,7 +252,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDotInSegments) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/.dir2/..dir3/dir.4/dir..5");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/.dir2/..dir3/dir.4/dir..5");
   EXPECT_TRUE(result.ok());
 }
 
@@ -262,7 +262,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriMergeSlashes) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root/child/");
+  EXPECT_EQ(headers.getPathValue(), "/root/child/");
   EXPECT_TRUE(result.ok());
 }
 
@@ -273,7 +273,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriPercentDecodeNormalized) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/%FF");
+  EXPECT_EQ(headers.getPathValue(), "/%FF");
   EXPECT_TRUE(result.ok());
 }
 
@@ -283,7 +283,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriPercentDecoded) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/~/dir1");
+  EXPECT_EQ(headers.getPathValue(), "/~/dir1");
   EXPECT_TRUE(result.ok());
 }
 
@@ -293,7 +293,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashes) {
   auto normalizer = create(skip_merging_slashes_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "//root//child//");
+  EXPECT_EQ(headers.getPathValue(), "//root//child//");
   EXPECT_TRUE(result.ok());
 }
 
@@ -303,7 +303,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashesWithDecodeSlashes) 
   auto normalizer = create(skip_merging_slashes_with_decode_slashes_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root//child//");
+  EXPECT_EQ(headers.getPathValue(), "/root//child//");
   EXPECT_TRUE(result.ok());
 }
 
@@ -314,7 +314,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDecodeSlashes) {
   auto normalizer = create(decode_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/dir2/dir3/dir4");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2/dir3/dir4");
   EXPECT_TRUE(result.ok());
 }
 
@@ -346,7 +346,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRedirectEncodedSlashes) {
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Redirect);
   EXPECT_EQ(result.details(), "uhv.path_normalization_redirect");
-  EXPECT_EQ(headers.path(), "/dir1/dir2/dir3");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2/dir3");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesDefault) {
@@ -358,7 +358,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesDefault) {
 
   EXPECT_TRUE(result.ok());
   // By default slashes are not decoded
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2%5Cdir3");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%2Fdir2%5Cdir3");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesKept) {
@@ -369,7 +369,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesKept) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_TRUE(result.ok());
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2%5Cdir3");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%2Fdir2%5Cdir3");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesImplDefault) {
@@ -380,7 +380,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesImplDefault) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_TRUE(result.ok());
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%2Fdir2");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriInvalidBeyondRoot) {
@@ -424,7 +424,7 @@ TEST_F(PathNormalizerTest, MalformedUrlEncodingAllowed) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "/path%Z0with%xYbad%7Jencoding%A");
+  EXPECT_EQ(headers.getPathValue(), "/path%Z0with%xYbad%7Jencoding%A");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormConnect) {
@@ -435,7 +435,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormConnect) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "");
+  EXPECT_EQ(headers.getPathValue(), "");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormWithPathConnect) {
@@ -468,7 +468,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormOptions) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "*");
+  EXPECT_EQ(headers.getPathValue(), "*");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormNotOptions) {
@@ -491,7 +491,7 @@ TEST_F(PathNormalizerTest, BackslashTranslatedToSlashByDefault) {
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
   // In query backslash is untouched
-  EXPECT_EQ(headers.path(), "/path/with/back/slash%5c?key=val\\ue");
+  EXPECT_EQ(headers.getPathValue(), "/path/with/back/slash%5c?key=val\\ue");
 }
 
 TEST_F(PathNormalizerTest, BackslashPreservedWithOverride) {
@@ -502,7 +502,7 @@ TEST_F(PathNormalizerTest, BackslashPreservedWithOverride) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "/path\\with/back\\/slash%5C");
+  EXPECT_EQ(headers.getPathValue(), "/path\\with/back\\/slash%5C");
 }
 
 TEST_F(PathNormalizerTest, PreservePercentEncodedCaseByDefault) {
@@ -512,7 +512,7 @@ TEST_F(PathNormalizerTest, PreservePercentEncodedCaseByDefault) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "/dir1%Abdir2%3a%fFZ");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%Abdir2%3a%fFZ");
 }
 
 TEST_F(PathNormalizerTest, NormalizePercentEncodedCase) {
@@ -523,7 +523,7 @@ TEST_F(PathNormalizerTest, NormalizePercentEncodedCase) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "/dir1%ABdir2%3A%FFZ");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%ABdir2%3A%FFZ");
 }
 
 } // namespace EnvoyDefault

@@ -14,7 +14,7 @@ TEST(RequestHeadersBuilderTest, ConstructsFromPieces) {
   EXPECT_EQ(RequestMethod::POST, headers.requestMethod());
   EXPECT_EQ("https", headers.scheme());
   EXPECT_EQ("www.example.com", headers.authority());
-  EXPECT_EQ("/", headers.path());
+  EXPECT_EQ("/", headers.getPathValue());
 }
 
 TEST(RequestHeadersBuilderTest, ConstructsFromUrl) {
@@ -23,7 +23,7 @@ TEST(RequestHeadersBuilderTest, ConstructsFromUrl) {
   EXPECT_EQ(RequestMethod::POST, headers.requestMethod());
   EXPECT_EQ("https", headers.scheme());
   EXPECT_EQ("www.example.com", headers.authority());
-  EXPECT_EQ("/", headers.path());
+  EXPECT_EQ("/", headers.getPathValue());
 }
 
 TEST(RequestHeadersBuilderTest, ConstructsFromInvalidUrl) {
@@ -32,7 +32,7 @@ TEST(RequestHeadersBuilderTest, ConstructsFromInvalidUrl) {
   EXPECT_EQ(RequestMethod::POST, headers.requestMethod());
   EXPECT_EQ("", headers.scheme());
   EXPECT_EQ("", headers.authority());
-  EXPECT_EQ("", headers.path());
+  EXPECT_EQ("", headers.getPathValue());
 }
 
 TEST(RequestHeadersBuilderTest, AddHeader) {
