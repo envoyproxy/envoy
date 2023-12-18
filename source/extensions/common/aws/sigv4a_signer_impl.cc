@@ -59,8 +59,6 @@ std::string SigV4ASignerImpl::createSignature(
     const absl::string_view string_to_sign,
     ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
 
-  unsigned int signature_size;
-
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
   EC_KEY* ec_key = SigV4AKeyDerivation::derivePrivateKey(access_key_id, secret_access_key);
@@ -68,8 +66,10 @@ std::string SigV4ASignerImpl::createSignature(
     ENVOY_LOG(debug, "SigV4A key derivation failed");
     return BlankStr;
   }
+
   uint8_t* signature;
   signature = new uint8_t[ECDSA_size(ec_key)];
+  unsigned int signature_size;
 
   // Sign the SHA256 hash of our calculated string_to_sign
   auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
