@@ -14,7 +14,8 @@ namespace {
 static void deathTestWorker() {
   ManagerImpl manager(Thread::threadFactoryForTest());
 
-  manager.get("foo", [] { return nullptr; });
+  manager.get(
+      "foo", [] { return nullptr; }, false);
 }
 
 TEST(SingletonManagerImplDeathTest, NotRegistered) {
