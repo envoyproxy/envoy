@@ -386,7 +386,9 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
         filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
     return CelValue::CreateStringView(filter_chain_name);
   } else if (value == Node) {
-    return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
+    if (local_info_) {
+      return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
+    }
   }
   return {};
 }

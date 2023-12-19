@@ -71,6 +71,7 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
 }
 
 void StreamActivation::resetActivation() const {
+  local_info_ = nullptr;
   activation_info_ = nullptr;
   activation_request_headers_ = nullptr;
   activation_response_headers_ = nullptr;
