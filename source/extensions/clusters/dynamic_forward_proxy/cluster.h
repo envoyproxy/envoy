@@ -161,8 +161,7 @@ private:
 
   void
   addOrUpdateHost(absl::string_view host,
-                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-                  std::unique_ptr<Upstream::HostVector>& hosts_added)
+                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   void updatePriorityState(const Upstream::HostVector& hosts_added,

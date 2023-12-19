@@ -98,14 +98,10 @@ Cluster::~Cluster() {
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
-  std::unique_ptr<Upstream::HostVector> hosts_added;
   dns_cache_->iterateHostMap(
       [&](absl::string_view host, const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
-        addOrUpdateHost(host, info, hosts_added);
+        addOrUpdateHost(host, info);
       });
-  if (hosts_added) {
-    updatePriorityState(*hosts_added, {});
-  }
   onPreInitComplete();
 }
 
@@ -237,9 +233,9 @@ bool Cluster::ClusterInfo::checkIdle() {
 
 void Cluster::addOrUpdateHost(
     absl::string_view host,
-    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-    std::unique_ptr<Upstream::HostVector>& hosts_added) {
+    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   Upstream::LogicalHostSharedPtr emplaced_host;
+  Upstream::HostVector hosts;
   {
     absl::WriterMutexLock lock{&host_map_lock_};
 
@@ -270,9 +266,14 @@ void Cluster::addOrUpdateHost(
       ASSERT(host_info == host_map_it->second.shared_host_info_);
       ASSERT(host_map_it->second.shared_host_info_->address() !=
              host_map_it->second.logical_host_->address());
+      // removing host from priorityState first, with the old address.
+      hosts.emplace_back(host_map_it->second.logical_host_);
+      updatePriorityState({}, hosts);
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
       host_map_it->second.logical_host_->setNewAddresses(
           host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
+      // add host into priorityState again, with the new address.
+      updatePriorityState(hosts, {});
       return;
     }
 
@@ -288,32 +289,15 @@ void Cluster::addOrUpdateHost(
   }
 
   ASSERT(emplaced_host);
-  if (hosts_added == nullptr) {
-    hosts_added = std::make_unique<Upstream::HostVector>();
-  }
-  hosts_added->emplace_back(emplaced_host);
+  hosts.emplace_back(emplaced_host);
+  updatePriorityState(hosts, {});
 }
 
 void Cluster::onDnsHostAddOrUpdate(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_LOG(debug, "Adding host info for {}", host);
-
-  Upstream::HostVector hosts_removed;
-  {
-    absl::ReaderMutexLock lock{&host_map_lock_};
-    const auto host_map_it = host_map_.find(host);
-    if (host_map_it != host_map_.end() && host_map_it->second.logical_host_->address()) {
-      hosts_removed.emplace_back(host_map_it->second.logical_host_);
-    }
-  }
-  updatePriorityState({}, hosts_removed);
-  std::unique_ptr<Upstream::HostVector> hosts_added;
-  addOrUpdateHost(host, host_info, hosts_added);
-  if (hosts_added != nullptr) {
-    ASSERT(!hosts_added->empty());
-    updatePriorityState(*hosts_added, {});
-  }
+  addOrUpdateHost(host, host_info);
 }
 
 void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
