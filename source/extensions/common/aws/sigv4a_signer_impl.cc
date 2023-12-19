@@ -67,19 +67,17 @@ std::string SigV4ASignerImpl::createSignature(
     return BlankStr;
   }
 
-  uint8_t* signature;
-  signature = new uint8_t[ECDSA_size(ec_key)];
+  std::vector<uint8_t> signature(ECDSA_size(ec_key));
   unsigned int signature_size;
 
   // Sign the SHA256 hash of our calculated string_to_sign
   auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
 
-  ECDSA_sign(0, hash.data(), hash.size(), signature, &signature_size, ec_key);
+  ECDSA_sign(0, hash.data(), hash.size(), signature.data(), &signature_size, ec_key);
 
   EC_KEY_free(ec_key);
   std::string encoded_signature(
-      Hex::encode(std::vector<uint8_t>(signature, signature + signature_size)));
-  delete signature;
+      Hex::encode(std::vector<uint8_t>(signature.data(), signature.data() + signature_size)));
 
   return encoded_signature;
 }
