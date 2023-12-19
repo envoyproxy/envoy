@@ -394,6 +394,7 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
     const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
     if (listener_info) {
       return CelValue::CreateInt64(listener_info->direction());
+    }
   } else if (value == Node) {
     if (local_info_) {
       return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
