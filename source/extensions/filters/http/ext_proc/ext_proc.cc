@@ -244,8 +244,9 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     ProtobufWkt::Struct proto;
 
     if (config_->expressionManager().hasRequestExpr()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
-                                                                    &headers, nullptr, nullptr);
+      auto activation_ptr = Filters::Common::Expr::createActivation(
+          &config_->expressionManager().localInfo(), decoding_state_.streamInfo(), &headers,
+          nullptr, nullptr);
       proto = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
     }
 
@@ -531,8 +532,9 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     ProtobufWkt::Struct proto;
 
     if (config_->expressionManager().hasResponseExpr()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
-                                                                    nullptr, &headers, nullptr);
+      auto activation_ptr = Filters::Common::Expr::createActivation(
+          &config_->expressionManager().localInfo(), encoding_state_.streamInfo(), nullptr,
+          &headers, nullptr);
       proto = config_->expressionManager().evaluateResponseAttributes(*activation_ptr);
     }
 

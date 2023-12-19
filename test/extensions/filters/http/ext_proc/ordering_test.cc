@@ -73,7 +73,8 @@ protected:
     config_ = std::make_shared<FilterConfig>(
         proto_config, kMessageTimeout, kMaxMessageTimeoutMs, *stats_store_.rootScope(), "",
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)));
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+        local_info_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -214,6 +215,7 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 // A base class for tests that will check that gRPC streams fail while being created

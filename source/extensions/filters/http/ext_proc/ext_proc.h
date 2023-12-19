@@ -128,7 +128,8 @@ public:
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix,
-               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder)
+               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+               const LocalInfo::LocalInfo& local_info)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
@@ -139,7 +140,8 @@ public:
         disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
         disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
-        expression_manager_(builder, config.request_attributes(), config.response_attributes()) {}
+        expression_manager_(builder, local_info, config.request_attributes(),
+                            config.response_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 

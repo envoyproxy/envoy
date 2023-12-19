@@ -45,7 +45,8 @@ public:
   NiceMock<Http::TestRequestTrailerMapImpl> request_trailers_;
   NiceMock<Http::TestResponseTrailerMapImpl> response_trailers_;
   NiceMock<Buffer::OwnedImpl> buffer_;
-  testing::NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 DEFINE_PROTO_FUZZER(
@@ -84,7 +85,8 @@ DEFINE_PROTO_FUZZER(
     config = std::make_shared<ExternalProcessing::FilterConfig>(
         proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "",
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)));
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+        mocks.local_info_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during ext_proc filter config validation: {}", e.what());
     return;

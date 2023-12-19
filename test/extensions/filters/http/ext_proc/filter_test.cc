@@ -124,7 +124,8 @@ protected:
     config_ = std::make_shared<FilterConfig>(
         proto_config, 200ms, 10000, *stats_store_.rootScope(), "",
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)));
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+        local_info_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -563,6 +564,7 @@ protected:
   std::vector<Event::MockTimer*> timers_;
   TestScopedRuntime scoped_runtime_;
   Envoy::Event::SimulatedTimeSystem* test_time_;
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 // Using the default configuration, test the filter with a processor that

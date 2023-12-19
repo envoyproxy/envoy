@@ -19,7 +19,8 @@ Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromPro
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
       context.scope(), stats_prefix,
-      Envoy::Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()));
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
+      context.serverFactoryContext().localInfo());
 
   return [filter_config, grpc_service = proto_config.grpc_service(),
           &context](Http::FilterChainFactoryCallbacks& callbacks) {
@@ -49,7 +50,8 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
       server_context.scope(), stats_prefix,
-      Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context));
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context),
+      server_context.localInfo());
 
   return [filter_config, grpc_service = proto_config.grpc_service(),
           &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
