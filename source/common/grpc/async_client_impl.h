@@ -94,11 +94,12 @@ private:
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;
   Http::AsyncClient::StreamOptions options_;
-  bool http_reset_{};
   Http::AsyncClient::Stream* stream_{};
   Decoder decoder_;
   // This is a member to avoid reallocation on every onData().
   std::vector<Frame> decoded_frames_;
+  bool http_reset_{};
+  bool service_reachable_{};
 
   friend class AsyncClientImpl;
 };
@@ -118,6 +119,7 @@ public:
 private:
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onServiceReachable() override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override;

@@ -69,6 +69,7 @@ void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& respo
 }
 
 void ExternalProcessorStreamImpl::onCreateInitialMetadata(Http::RequestHeaderMap&) {}
+void ExternalProcessorStreamImpl::onServiceReachable() {}
 void ExternalProcessorStreamImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {}
 void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) {}
 

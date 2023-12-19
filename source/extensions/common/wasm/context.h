@@ -338,6 +338,7 @@ protected:
     void onCreateInitialMetadata(Http::RequestHeaderMap& initial_metadata) override {
       context_->onGrpcCreateInitialMetadata(token_, initial_metadata);
     }
+    void onServiceReachable() override { context_->onGrpcServiceReachable(token_); }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
       context_->onGrpcReceiveInitialMetadataWrapper(token_, std::move(metadata));
     }
@@ -365,6 +366,7 @@ protected:
   void onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason);
 
   void onGrpcCreateInitialMetadata(uint32_t token, Http::RequestHeaderMap& metadata);
+  void onGrpcServiceReachable(uint32_t token);
   void onGrpcReceiveInitialMetadataWrapper(uint32_t token, Http::HeaderMapPtr&& metadata);
   void onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response);
   void onGrpcReceiveTrailingMetadataWrapper(uint32_t token, Http::HeaderMapPtr&& metadata);

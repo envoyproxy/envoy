@@ -43,6 +43,7 @@ public:
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onServiceReachable() override {}
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void onReceiveMessage(std::unique_ptr<ResponseProto>&&) override {}
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}

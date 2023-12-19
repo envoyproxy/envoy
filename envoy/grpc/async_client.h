@@ -117,6 +117,11 @@ public:
   virtual void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) PURE;
 
   /**
+   * Called when the service that this stream needs to connect to is established.
+   */
+  virtual void onServiceReachable() PURE;
+
+  /**
    * Called when initial metadata is received. This will be called with empty metadata on a
    * trailers-only response, followed by onReceiveTrailingMetadata() with the trailing metadata.
    * @param metadata initial metadata reference.

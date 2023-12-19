@@ -142,6 +142,7 @@ public:
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onServiceReachable() override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override;
   void onReceiveMessage(
       std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) override;

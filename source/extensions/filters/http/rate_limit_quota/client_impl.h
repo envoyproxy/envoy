@@ -48,6 +48,7 @@ public:
 
   // RawAsyncStreamCallbacks methods;
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onServiceReachable() override {}
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;

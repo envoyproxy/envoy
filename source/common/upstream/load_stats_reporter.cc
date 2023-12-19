@@ -160,6 +160,8 @@ void LoadStatsReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata
   UNREFERENCED_PARAMETER(metadata);
 }
 
+void LoadStatsReporter::onServiceReachable() {}
+
 void LoadStatsReporter::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }

@@ -59,6 +59,8 @@ public:
 template <class ResponseType>
 class MockAsyncStreamCallbacks : public AsyncStreamCallbacks<ResponseType> {
 public:
+  void onServiceReachable() override { onServiceReachable_(); }
+
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
     onReceiveInitialMetadata_(*metadata);
   }
@@ -72,6 +74,7 @@ public:
   }
 
   MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
+  MOCK_METHOD(void, onServiceReachable_, ());
   MOCK_METHOD(void, onReceiveInitialMetadata_, (const Http::ResponseHeaderMap& metadata));
   MOCK_METHOD(void, onReceiveMessage_, (const ResponseType& message));
   MOCK_METHOD(void, onReceiveTrailingMetadata_, (const Http::ResponseTrailerMap& metadata));

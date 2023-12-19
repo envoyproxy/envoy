@@ -31,6 +31,7 @@ public:
 
     // Grpc::AsyncStreamCallbacks
     void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onServiceReachable() override {}
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
     void onReceiveMessage(
         std::unique_ptr<opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse>&&)

@@ -343,6 +343,7 @@ public:
 private:
   // Grpc::RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onServiceReachable() override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override;

@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
@@ -36,8 +37,8 @@ protected:
             &callbacks_, std::move(async_client_owner_),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-            dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_)) {
-  }
+            dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_,
+            false)) {}
 
   void setUpCustomBackoffRetryTimer(uint32_t retry_initial_delay_ms,
                                     absl::optional<uint32_t> retry_max_delay_ms,
@@ -54,7 +55,22 @@ protected:
         &callbacks_, std::move(async_client_owner_),
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-        dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_);
+        dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_,
+        false);
+  }
+
+  void setUpWithServiceReachableEnabled() {
+    async_client_owner_ = std::make_unique<Grpc::MockAsyncClient>();
+    async_client_ = async_client_owner_.get();
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
+
+    grpc_stream_ = std::make_unique<GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
+                                               envoy::service::discovery::v3::DiscoveryResponse>>(
+        &callbacks_, std::move(async_client_owner_),
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
+        dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_, true);
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -101,6 +117,79 @@ TEST_F(GrpcStreamTest, EstablishStream) {
     grpc_stream_->establishNewStream();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
   }
+}
+
+// Tests that establishNewStream() with service-reachable enabled establishes it,
+// a second call does nothing, a second call to onServiceReachable() does nothing,
+// and a third call after the stream was disconnected re-establishes it.
+TEST_F(GrpcStreamTest, ServiceReachableEstablishStream) {
+  setUpWithServiceReachableEnabled();
+  InSequence s;
+  EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+  // Successful establishment.
+  {
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
+    grpc_stream_->establishNewStream();
+    EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+    // Invoke the onServiceReachable callback.
+    EXPECT_CALL(callbacks_, onStreamEstablished());
+    grpc_stream_->onServiceReachable();
+    EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
+  }
+  // Idempotent establishNewStream.
+  {
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).Times(0);
+    EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
+    grpc_stream_->establishNewStream();
+    EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
+  }
+  // Idempotent onServiceReachable.
+  {
+    EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
+    grpc_stream_->onServiceReachable();
+    EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
+  }
+
+  // Disconnect, and re-establish the stream.
+  grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "");
+  EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+  // Successful re-establishment
+  {
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
+    grpc_stream_->establishNewStream();
+    EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+    // Invoke the onServiceReachable callback.
+    EXPECT_CALL(callbacks_, onStreamEstablished());
+    grpc_stream_->onServiceReachable();
+    EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
+  }
+}
+
+// Tests that closure of the stream while establishing a stream with service-enabled, and
+// then restablishing it works.
+TEST_F(GrpcStreamTest, ServiceReachableCloseDuringEstablishStream) {
+  setUpWithServiceReachableEnabled();
+  InSequence s;
+  EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+  // Start stream establishment.
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
+  grpc_stream_->establishNewStream();
+  EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+  // Close stream during establishment.
+  grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "");
+  EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+  // Reconnect again.
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
+  grpc_stream_->establishNewStream();
+  EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+  // Invoke the onServiceReachable callback.
+  EXPECT_CALL(callbacks_, onStreamEstablished());
+  grpc_stream_->onServiceReachable();
+  EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
 }
 
 // Tests reducing log level depending on remote close status.

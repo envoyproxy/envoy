@@ -1239,6 +1239,10 @@ std::pair<uint32_t, std::string_view> Context::getStatus() {
   return std::make_pair(status_code_, toStdStringView(status_message_));
 }
 
+void Context::onGrpcServiceReachable(uint32_t) {
+  // Currently this is not support by the WASM SDK.
+}
+
 void Context::onGrpcReceiveInitialMetadataWrapper(uint32_t token, Http::HeaderMapPtr&& metadata) {
   grpc_receive_initial_metadata_ = std::move(metadata);
   onGrpcReceiveInitialMetadata(token, headerSize(grpc_receive_initial_metadata_));

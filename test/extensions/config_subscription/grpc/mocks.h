@@ -19,6 +19,7 @@ public:
   MOCK_METHOD(void, maybeUpdateQueueSizeStat, (uint64_t size));
   MOCK_METHOD(bool, checkRateLimitAllowsDrain, ());
   MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
+  MOCK_METHOD(void, onServiceReachable, ());
   MOCK_METHOD(void, onReceiveInitialMetadata, (Http::ResponseHeaderMapPtr && metadata));
   MOCK_METHOD(void, onReceiveMessage, (ResponseProtoPtr<ResponseProto> && message));
   MOCK_METHOD(void, onReceiveTrailingMetadata, (Http::ResponseTrailerMapPtr && metadata));

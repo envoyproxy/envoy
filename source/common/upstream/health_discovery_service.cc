@@ -142,6 +142,8 @@ void HdsDelegate::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
+void HdsDelegate::onServiceReachable() {}
+
 void HdsDelegate::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }

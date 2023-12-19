@@ -113,7 +113,8 @@ struct RequestArgs {
 // Stream related test utilities.
 class HelloworldStream : public MockAsyncStreamCallbacks<helloworld::HelloReply> {
 public:
-  HelloworldStream(DispatcherHelper& dispatcher_helper) : dispatcher_helper_(dispatcher_helper) {}
+  HelloworldStream(DispatcherHelper& dispatcher_helper, bool envoy_grpc)
+      : dispatcher_helper_(dispatcher_helper), envoy_grpc_(envoy_grpc) {}
 
   void sendRequest(RequestArgs request_args = {}) {
     helloworld::HelloRequest request_msg;
@@ -131,6 +132,14 @@ public:
         fake_stream_->waitForGrpcMessage(dispatcher_helper_.dispatcher_, received_msg);
     RELEASE_ASSERT(result, result.message());
     EXPECT_THAT(*request_args.request, ProtoEq(received_msg));
+  }
+
+  void expectServiceReachable() {
+    // TODO(adisuissa): This is currently supported only by EnvoyGrpc.
+    // When it will be supported by GoogleGrpc remove the if statement.
+    if (envoy_grpc_) {
+      EXPECT_CALL(*this, onServiceReachable_());
+    }
   }
 
   void expectInitialMetadata(const TestMetadata& metadata) {
@@ -162,6 +171,7 @@ public:
     for (auto& value : metadata) {
       reply_headers->addReference(value.first, value.second);
     }
+    expectServiceReachable();
     expectInitialMetadata(metadata);
     fake_stream_->startGrpcStream(false);
     fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
@@ -220,6 +230,9 @@ public:
       reply_trailers.addCopy(value.first, value.second);
     }
     if (trailers_only) {
+      if (grpc_status == Status::WellKnownGrpcStatus::Ok) {
+        expectServiceReachable();
+      }
       expectInitialMetadata(empty_metadata_);
     }
     expectTrailingMetadata(metadata);
@@ -241,6 +254,7 @@ public:
   FakeStream* fake_stream_{};
   AsyncStream<helloworld::HelloRequest> grpc_stream_{};
   const TestMetadata empty_metadata_;
+  const bool envoy_grpc_;
 };
 
 using HelloworldStreamPtr = std::unique_ptr<HelloworldStream>;
@@ -444,7 +458,8 @@ public:
   }
 
   HelloworldStreamPtr createStream(const TestMetadata& initial_metadata) {
-    auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
+    auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_,
+                                                     clientType() == ClientType::EnvoyGrpc);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
           for (const auto& value : initial_metadata) {

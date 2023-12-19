@@ -111,6 +111,14 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
+  // If the HTTP status is OK and there is no gRPC status (will be part of
+  // the trailers) or there is one with an OK gRPC status, notify that the
+  // upstream is available.
+  if ((http_response_status == enumToInt(Http::Code::OK)) &&
+      (!grpc_status.has_value() ||
+       (grpc_status.value() == Grpc::Status::WellKnownGrpcStatus::Ok))) {
+    callbacks_.onServiceReachable();
+  }
   callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
                                                  : std::move(headers));
   if (http_response_status != enumToInt(Http::Code::OK)) {
@@ -259,6 +267,8 @@ void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata)
   current_span_->injectContext(trace_context, nullptr);
   callbacks_.onCreateInitialMetadata(metadata);
 }
+
+void AsyncRequestImpl::onServiceReachable() {}
 
 void AsyncRequestImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {}
 

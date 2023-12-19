@@ -39,7 +39,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
     : grpc_stream_(this, std::move(grpc_mux_context.async_client_),
                    grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
                    grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
-                   grpc_mux_context.rate_limit_settings_),
+                   grpc_mux_context.rate_limit_settings_, false),
       local_info_(grpc_mux_context.local_info_),
       config_validators_(std::move(grpc_mux_context.config_validators_)),
       dynamic_update_callback_handle_(

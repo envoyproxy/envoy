@@ -43,7 +43,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
     : grpc_stream_(this, std::move(grpc_mux_content.async_client_),
                    grpc_mux_content.service_method_, grpc_mux_content.dispatcher_,
                    grpc_mux_content.scope_, std::move(grpc_mux_content.backoff_strategy_),
-                   grpc_mux_content.rate_limit_settings_),
+                   grpc_mux_content.rate_limit_settings_, false),
       subscription_state_factory_(std::move(subscription_state_factory)),
       skip_subsequent_node_(skip_subsequent_node), local_info_(grpc_mux_content.local_info_),
       dynamic_update_callback_handle_(

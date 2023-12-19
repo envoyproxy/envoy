@@ -59,6 +59,106 @@ TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
   thread->join();
 }
 
+// Validate that a successful connection invokes onServiceReachable.
+TEST_F(EnvoyAsyncClientImplTest, OnServiceReachableSuccess) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "test_cluster";
+              })));
+  EXPECT_CALL(grpc_callbacks, onServiceReachable_());
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) {
+        Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+            {":status", "200"},
+            {"grpc-status", std::to_string(enumToInt(Status::WellKnownGrpcStatus::Ok))}});
+        // This will invoke the onServiceReachable callback.
+        http_callbacks->onHeaders(std::move(response_headers), false);
+      }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_NE(grpc_stream, nullptr);
+  // Close the client.
+  http_callbacks->onReset();
+}
+
+// Validate that an unsuccessful connection does not invoke onServiceReachable.
+TEST_F(EnvoyAsyncClientImplTest, OnServiceReachableGrpcErrorFailure) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "test_cluster";
+              })));
+  // No call to onServiceReachable due to grpc-status error.
+  EXPECT_CALL(grpc_callbacks, onServiceReachable_()).Times(0);
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) {
+        Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+            {":status", "200"},
+            {"grpc-status", std::to_string(enumToInt(Status::WellKnownGrpcStatus::Internal))}});
+        http_callbacks->onHeaders(std::move(response_headers), false);
+      }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_NE(grpc_stream, nullptr);
+  // Close the client.
+  http_callbacks->onReset();
+}
+
+// Validate that an unsuccessful connection does not invoke onServiceReachable.
+TEST_F(EnvoyAsyncClientImplTest, OnServiceReachableHttpErrorFailure) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "test_cluster";
+              })));
+  // No call to onServiceReachable due to grpc-status error.
+  EXPECT_CALL(grpc_callbacks, onServiceReachable_()).Times(0);
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) {
+        Http::ResponseHeaderMapPtr response_headers(
+            new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+        http_callbacks->onHeaders(std::move(response_headers), true);
+      }));
+  EXPECT_CALL(http_stream, reset());
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validate that the host header is the cluster name in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;

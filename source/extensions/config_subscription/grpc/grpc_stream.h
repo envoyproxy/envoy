@@ -28,12 +28,13 @@ public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
              const Protobuf::MethodDescriptor& service_method, Event::Dispatcher& dispatcher,
              Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
-             const RateLimitSettings& rate_limit_settings)
+             const RateLimitSettings& rate_limit_settings, bool enable_service_reachable)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
         service_method_(service_method),
         control_plane_stats_(Utility::generateControlPlaneStats(scope)),
         time_source_(dispatcher.timeSource()), backoff_strategy_(std::move(backoff_strategy)),
-        rate_limiting_enabled_(rate_limit_settings.enabled_) {
+        rate_limiting_enabled_(rate_limit_settings.enabled_),
+        enable_service_reachable_(enable_service_reachable), service_reachable_(false) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
@@ -63,11 +64,33 @@ public:
       setRetryTimer();
       return;
     }
-    control_plane_stats_.connected_state_.set(1);
-    callbacks_->onStreamEstablished();
+    if (!enable_service_reachable_) {
+      // The following callback will be executed before the actual stream is established
+      // and reachable, as the `async_client_->start()` call above is non-blocking.
+      control_plane_stats_.connected_state_.set(1);
+      callbacks_->onStreamEstablished();
+    }
   }
 
-  bool grpcStreamAvailable() const override { return stream_ != nullptr; }
+  bool grpcStreamAvailable() const override {
+    if (enable_service_reachable_) {
+      return (stream_ != nullptr) && (service_reachable_);
+    } else {
+      return stream_ != nullptr;
+    }
+  }
+
+  void onServiceReachable() override {
+    // Only invoke service-reachable callback if it is enabled.
+    if (!enable_service_reachable_) {
+      return;
+    }
+    if (!service_reachable_) {
+      service_reachable_ = true;
+      ENVOY_LOG_MISC(trace, "xDS gRPC stream is reachable and is now established");
+      callbacks_->onStreamEstablished();
+    }
+  }
 
   void sendMessage(const RequestProto& request) override { stream_->sendMessage(request, false); }
 
@@ -98,6 +121,9 @@ public:
   }
 
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
+    if (enable_service_reachable_) {
+      service_reachable_ = false;
+    }
     logClose(status, message);
     stream_ = nullptr;
     control_plane_stats_.connected_state_.set(0);
@@ -243,6 +269,10 @@ private:
   absl::optional<Grpc::Status::GrpcStatus> last_close_status_;
   std::string last_close_message_;
   MonotonicTime last_close_time_;
+
+  // Whether the xDS service is reachable or not.
+  const bool enable_service_reachable_;
+  bool service_reachable_;
 };
 
 } // namespace Config

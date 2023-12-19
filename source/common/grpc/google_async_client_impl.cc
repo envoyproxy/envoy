@@ -468,6 +468,9 @@ void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& met
   callbacks_.onCreateInitialMetadata(metadata);
 }
 
+// Only relevant to the xDS stream reachability.
+void GoogleAsyncRequestImpl::onServiceReachable() {}
+
 void GoogleAsyncRequestImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {}
 
 bool GoogleAsyncRequestImpl::onReceiveMessageRaw(Buffer::InstancePtr&& response) {
