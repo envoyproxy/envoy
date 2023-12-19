@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Server {
@@ -52,6 +53,8 @@ bool DrainManagerImpl::drainClose() const {
     return true;
   }
 
+  Thread::ThreadSynchronizer& sync = const_cast<Thread::ThreadSynchronizer&>(thread_synchronizer_);
+  sync.syncPoint("check_draining");
   if (!draining_) {
     return false;
   }
@@ -64,6 +67,7 @@ bool DrainManagerImpl::drainClose() const {
   // P(return true) = elapsed time / drain timeout
   // If the drain deadline is exceeded, skip the probability calculation.
   const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
+  sync.syncPoint("check_deadline");
   if (current_time >= drain_deadline_) {
     return true;
   }
@@ -100,6 +104,7 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) c
 }
 
 void DrainManagerImpl::addDrainCompleteCallback(std::function<void()> cb) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(draining_);
 
   // If the drain-tick-timer is active, add the callback to the queue. If not defined
@@ -112,6 +117,7 @@ void DrainManagerImpl::addDrainCompleteCallback(std::function<void()> cb) {
 }
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(drain_complete_cb);
 
   // If we've already started draining (either through direct invocation or through
@@ -123,6 +129,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
 
   ASSERT(!drain_tick_timer_);
   draining_ = true;
+  thread_synchronizer_.syncPoint("post_set_draining");
 
   // Signal to child drain-managers to start their drain sequence
   children_->runCallbacks();
@@ -138,7 +145,9 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   addDrainCompleteCallback(drain_complete_cb);
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
+  thread_synchronizer_.syncPoint("pre_set_deadline");
   drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
+  thread_synchronizer_.syncPoint("post_set_deadline");
 
   // Call registered on-drain callbacks - with gradual delays
   // Note: This will distribute drain events in the first 1/4th of the drain window

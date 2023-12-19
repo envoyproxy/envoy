@@ -673,6 +673,67 @@ TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, DrainCloseAfterWorkersStarted) {
+  bool workers_started = false;
+  absl::Notification workers_started_fired, workers_started_block, drain_closes_started,
+      drain_complete;
+  // Expect drainParentListeners not to be called before workers start.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+      workers_started_block.WaitForNotification();
+    });
+    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+
+  EXPECT_CALL(restart_, drainParentListeners);
+  workers_started_block.Notify();
+
+  DrainManager& drain_manager = server_->drainManager();
+  Thread::ThreadSynchronizer& sync = *drain_manager.threadSynchronizer();
+  sync.enable();
+
+  sync.waitOn("check_draining");
+  sync.waitOn("check_deadline");
+  sync.waitOn("post_set_draining");
+  sync.waitOn("pre_set_deadline");
+  sync.waitOn("post_set_deadline");
+
+  auto drain_thread =
+      Thread::threadFactoryForTest().createThread([&] { drain_manager.drainClose(); });
+  server_->dispatcher().post([&] {
+    // drain_closes_started.WaitForNotification();
+    drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); });
+  });
+  sync.barrierOn("check_draining");
+  sync.signal("post_set_draining");
+  sync.signal("check_draining");
+
+  sync.barrierOn("check_deadline");
+  sync.signal("pre_set_deadline");
+  sync.signal("check_deadline");
+  sync.signal("post_set_deadline");
+
+  drain_complete.WaitForNotification();
+  drain_thread->join();
+  ENVOY_LOG_MISC(debug, "cleanup");
+
+  server_->shutdown();
+  server_thread->join();
+}
+
 // A test target which never signals that it is ready.
 class NeverReadyTarget : public Init::TargetImpl {
 public:
