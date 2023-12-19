@@ -13,6 +13,7 @@
 
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/thread_synchronizer.h"
 
 namespace Envoy {
@@ -52,7 +53,8 @@ private:
 
   std::atomic<bool> draining_{false};
   Event::TimerPtr drain_tick_timer_;
-  MonotonicTime drain_deadline_;
+  MonotonicTime drain_deadline_; // ABSL_GUARDED_BY(mutex_);
+  //absl::Mutex mutex_;
   mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
   std::vector<std::function<void()>> drain_complete_cbs_{};
 

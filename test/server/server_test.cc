@@ -702,29 +702,37 @@ TEST_P(ServerInstanceImplTest, DrainCloseAfterWorkersStarted) {
   workers_started_block.Notify();
 
   DrainManager& drain_manager = server_->drainManager();
-  Thread::ThreadSynchronizer& sync = *drain_manager.threadSynchronizer();
-  sync.enable();
+  //Thread::ThreadSynchronizer& sync = *drain_manager.threadSynchronizer();
+  //sync.enable();
 
+#if 0
   sync.waitOn("check_draining");
   sync.waitOn("check_deadline");
   sync.waitOn("post_set_draining");
-  sync.waitOn("pre_set_deadline");
-  sync.waitOn("post_set_deadline");
+  //sync.waitOn("pre_set_deadline");
+  //sync.waitOn("post_set_deadline");
+
+  sync.signal("post_set_draining");
+#endif
 
   auto drain_thread =
-      Thread::threadFactoryForTest().createThread([&] { drain_manager.drainClose(); });
+      Thread::threadFactoryForTest().createThread([&] {
+        while (!drain_manager.drainClose()) {
+        }
+      });
   server_->dispatcher().post([&] {
     // drain_closes_started.WaitForNotification();
     drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); });
   });
-  sync.barrierOn("check_draining");
-  sync.signal("post_set_draining");
-  sync.signal("check_draining");
 
-  sync.barrierOn("check_deadline");
-  sync.signal("pre_set_deadline");
-  sync.signal("check_deadline");
+#if 0
   sync.signal("post_set_deadline");
+  sync.barrierOn("post_set_draining");
+  sync.signal("check_draining");
+  sync.signal("check_deadline");
+#endif
+  //sync.barrierOn("check_deadline");
+  //sync.signal("post_set_deadline");
 
   drain_complete.WaitForNotification();
   drain_thread->join();

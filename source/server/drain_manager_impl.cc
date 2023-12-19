@@ -10,7 +10,6 @@
 #include "envoy/event/timer.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Server {
@@ -29,7 +28,7 @@ DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
   // Wire up the child so that when the parent starts draining, the child also sees the
   // state-change
   auto child_cb = children_->add(dispatcher, [child = child.get()] {
-    if (!child->draining_) {
+    if (!child->draining()) {
       child->startDrainSequence([] {});
     }
   });
@@ -69,18 +68,26 @@ bool DrainManagerImpl::drainClose() const {
   const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
   sync.syncPoint("check_deadline");
   if (current_time >= drain_deadline_) {
+    ENVOY_LOG(debug, "current time exceeded deadline");
     return true;
   }
 
   const auto remaining_time =
       std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
+  const auto drain_time = server_.options().drainTime();
   ASSERT(server_.options().drainTime() >= remaining_time);
-  const auto elapsed_time = server_.options().drainTime() - remaining_time;
-  return static_cast<uint64_t>(elapsed_time.count()) >
-         (server_.api().randomGenerator().random() % server_.options().drainTime().count());
+  const auto drain_time_count = drain_time.count();
+  if (drain_time_count == 0) {
+    return true;
+  }
+  const auto elapsed_time = drain_time - remaining_time;
+  const bool ret =  static_cast<uint64_t>(elapsed_time.count()) >
+                    (server_.api().randomGenerator().random() % drain_time_count);
+  return ret;
 }
 
 Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(dispatcher_.isThreadSafe());
 
   if (draining_) {
@@ -128,6 +135,11 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   }
 
   ASSERT(!drain_tick_timer_);
+  const std::chrono::seconds drain_delay(server_.options().drainTime());
+  {
+    //absl::MutexLock lock(mutex_);
+    drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
+  }
   draining_ = true;
   thread_synchronizer_.syncPoint("post_set_draining");
 
@@ -143,11 +155,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
     drain_tick_timer_.reset();
   });
   addDrainCompleteCallback(drain_complete_cb);
-  const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
-  thread_synchronizer_.syncPoint("pre_set_deadline");
-  drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
-  thread_synchronizer_.syncPoint("post_set_deadline");
 
   // Call registered on-drain callbacks - with gradual delays
   // Note: This will distribute drain events in the first 1/4th of the drain window
