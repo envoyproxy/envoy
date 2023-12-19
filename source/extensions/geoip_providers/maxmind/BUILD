@@ -16,6 +16,7 @@ envoy_cc_extension(
     name = "config",
     srcs = select({
         "//bazel:linux": ["config.cc"],
+        "//bazel:apple": ["config.cc"],
         "//conditions:default": [],
     }),
     hdrs = ["config.h"],
@@ -34,6 +35,7 @@ envoy_cc_library(
     name = "provider_impl",
     srcs = select({
         "//bazel:linux": ["geoip_provider.cc"],
+        "//bazel:apple": ["geoip_provider.cc"],
         "//conditions:default": [],
     }),
     hdrs = ["geoip_provider.h"],
