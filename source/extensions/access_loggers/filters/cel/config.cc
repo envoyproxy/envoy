@@ -33,6 +33,7 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
   }
 
   return std::make_unique<CELAccessLogExtensionFilter>(
+      context.serverFactoryContext().localInfo(),
       Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
       parse_status.value().expr());
 #else

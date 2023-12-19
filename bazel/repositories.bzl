@@ -1413,7 +1413,7 @@ filegroup(
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
     external_http_archive(
-        name = "edenhill_librdkafka",
+        name = "confluentinc_librdkafka",
         build_file_content = BUILD_ALL_CONTENT,
         # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
