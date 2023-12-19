@@ -67,6 +67,7 @@ public:
   void remove(absl::string_view key) override {
     request_headers_.remove(Http::LowerCaseString(std::string(key)));
   }
+  OptRef<const Http::RequestHeaderMap> requestHeaders() const override { return request_headers_; };
   OptRef<Http::RequestHeaderMap> requestHeaders() override { return request_headers_; };
 };
 
