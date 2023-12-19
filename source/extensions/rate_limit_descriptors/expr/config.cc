@@ -36,7 +36,7 @@ public:
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
     ProtobufWkt::Arena arena;
-    const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, info,
+    const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, nullptr, info,
                                                         &headers, nullptr, nullptr);
     if (!result.has_value() || result.value().IsError()) {
       // If result is an error and if skip_if_error is true skip this descriptor,

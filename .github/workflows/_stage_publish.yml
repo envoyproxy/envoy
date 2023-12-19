@@ -63,7 +63,7 @@ jobs:
             export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
           steps-pre: |
             - id: url
-              uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.17
+              uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.18
               with:
                 options: -Rr
                 input: >-
@@ -80,7 +80,7 @@ jobs:
                     end
                   | . as $bucket
                   | "https://storage.googleapis.com/\($bucket)/\($sha)/\($path)"
-            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.2.17
+            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.2.18
               with:
                 url: %{{ steps.url.outputs.value }}
                 path: %{{ runner.temp }}/release.signed
@@ -98,12 +98,12 @@ jobs:
     needs:
     - publish
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.17
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.18
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.17
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.18
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}

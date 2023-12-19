@@ -19,13 +19,15 @@ namespace CEL {
 
 class CELAccessLogExtensionFilter : public AccessLog::Filter {
 public:
-  CELAccessLogExtensionFilter(Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr,
+  CELAccessLogExtensionFilter(const ::Envoy::LocalInfo::LocalInfo& local_info,
+                              Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr,
                               const google::api::expr::v1alpha1::Expr&);
 
   bool evaluate(const Formatter::HttpFormatterContext& log_context,
                 const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
+  const ::Envoy::LocalInfo::LocalInfo& local_info_;
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
   const google::api::expr::v1alpha1::Expr parsed_expr_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
