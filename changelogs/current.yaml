@@ -304,6 +304,12 @@ new_features:
     Added new access log command operator ``%EMIT_TIME%`` to get the time when the log entry is emitted.
 - area: access_log
   change: |
+    Added support for listener metadata in ``%METADATA%`` formatter.
+- area: attributes
+  change: |
+    Added support for listener metadata and listener direction in XDS attributes.
+- area: attributes
+  change: |
     Added support for node data in ``%CEL%`` formatter.
 - area: set_metadata
   change: |
@@ -313,6 +319,9 @@ new_features:
     may now be used to configure the ``set_metadata`` filter.
 
 deprecated:
+- area: wasm
+  change: |
+    Wasm-specific configuration attributes are deprecated in favor of ``xds`` attributes.
 - area: set_metadata
   change: |
     :ref:`metadata_namespace <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata_namespace>`

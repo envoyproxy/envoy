@@ -389,8 +389,8 @@ private:
     Stats::Scope& listenerScope() override { return scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    const Network::ListenerInfo& listenerInfo() const override {
-      return parent_.factoryContext().listenerInfo();
+    const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+      return parent_.listener_info_;
     }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
@@ -449,6 +449,7 @@ private:
   };
 
   Server::Instance& server_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
   AdminFactoryContext factory_context_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
