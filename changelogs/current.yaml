@@ -308,6 +308,9 @@ new_features:
 - area: attributes
   change: |
     Added support for listener metadata and listener direction in XDS attributes.
+- area: attributes
+  change: |
+    Added support for node data in ``%CEL%`` formatter.
 
 deprecated:
 - area: wasm

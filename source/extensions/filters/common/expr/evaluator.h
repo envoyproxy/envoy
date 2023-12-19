@@ -26,11 +26,13 @@ using ExpressionPtr = std::unique_ptr<Expression>;
 // Base class for the context used by the CEL evaluator to look up attributes.
 class StreamActivation : public google::api::expr::runtime::BaseActivation {
 public:
-  StreamActivation(const StreamInfo::StreamInfo& info,
+  StreamActivation(const ::Envoy::LocalInfo::LocalInfo* local_info,
+                   const StreamInfo::StreamInfo& info,
                    const ::Envoy::Http::RequestHeaderMap* request_headers,
                    const ::Envoy::Http::ResponseHeaderMap* response_headers,
                    const ::Envoy::Http::ResponseTrailerMap* response_trailers)
-      : activation_info_(&info), activation_request_headers_(request_headers),
+      : local_info_(local_info), activation_info_(&info),
+        activation_request_headers_(request_headers),
         activation_response_headers_(response_headers),
         activation_response_trailers_(response_trailers) {}
 
@@ -44,6 +46,7 @@ public:
 
 protected:
   void resetActivation() const;
+  mutable const ::Envoy::LocalInfo::LocalInfo* local_info_{nullptr};
   mutable const StreamInfo::StreamInfo* activation_info_{nullptr};
   mutable const ::Envoy::Http::RequestHeaderMap* activation_request_headers_{nullptr};
   mutable const ::Envoy::Http::ResponseHeaderMap* activation_response_headers_{nullptr};
@@ -52,7 +55,8 @@ protected:
 
 // Creates an activation providing the common context attributes.
 // The activation lazily creates wrappers during an evaluation using the evaluation arena.
-ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
+ActivationPtr createActivation(const ::Envoy::LocalInfo::LocalInfo* local_info,
+                               const StreamInfo::StreamInfo& info,
                                const ::Envoy::Http::RequestHeaderMap* request_headers,
                                const ::Envoy::Http::ResponseHeaderMap* response_headers,
                                const ::Envoy::Http::ResponseTrailerMap* response_trailers);
@@ -84,6 +88,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 // Evaluates an expression for a request. The arena is used to hold intermediate computational
 // results and potentially the final value.
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
+                                  const ::Envoy::LocalInfo::LocalInfo* local_info,
                                   const StreamInfo::StreamInfo& info,
                                   const ::Envoy::Http::RequestHeaderMap* request_headers,
                                   const ::Envoy::Http::ResponseHeaderMap* response_headers,
