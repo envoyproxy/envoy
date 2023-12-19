@@ -271,7 +271,8 @@ public:
                                    ? std::make_shared<Network::NopConnectionBalancerImpl>()
                                    : connection_balancer),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
-          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit) {
+          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit),
+          listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
       socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
@@ -323,7 +324,9 @@ public:
         return *internal_listener_config_;
       }
     }
-    const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
+    const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+      return listener_info_;
+    }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return *connection_balancer_;
     }
@@ -359,7 +362,7 @@ public:
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
-    testing::NiceMock<Network::MockListenerInfo> listener_info_;
+    const Network::ListenerInfoConstSharedPtr listener_info_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;
