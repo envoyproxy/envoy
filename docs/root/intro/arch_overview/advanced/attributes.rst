@@ -177,14 +177,15 @@ following attributes:
    :header: Attribute, Type, Description
    :widths: 1, 1, 4
 
+   xds.node, :ref:`Node<envoy_v3_api_msg_config.core.v3.node>`, Local node description
    xds.cluster_name, string, Upstream cluster name
    xds.cluster_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream cluster metadata
+   xds.listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`
+   xds.listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata
    xds.route_name, string, Route name
    xds.route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata
    xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
    xds.filter_chain_name, string, Listener filter chain name
-   xds.listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata
-   xds.listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`
 
 
 Wasm attributes

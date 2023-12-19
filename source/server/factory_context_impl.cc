@@ -8,7 +8,9 @@ FactoryContextImplBase::FactoryContextImplBase(
     Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope,
     const Network::ListenerInfoConstSharedPtr& listener_info)
     : server_(server), validation_visitor_(validation_visitor), scope_(std::move(scope)),
-      listener_scope_(std::move(listener_scope)), listener_info_(listener_info) {}
+      listener_scope_(std::move(listener_scope)), listener_info_(listener_info) {
+  ASSERT(listener_info_ != nullptr);
+}
 
 Configuration::ServerFactoryContext& FactoryContextImplBase::serverFactoryContext() const {
   return server_.serverFactoryContext();
