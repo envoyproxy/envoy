@@ -15,8 +15,8 @@ class ExecuteFilterAction
     : public Matcher::ActionBase<
           envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
 public:
-  explicit ExecuteFilterAction(Http::FilterFactoryCb cb, std::string name)
-      : cb_(std::move(cb)), name_(std::move(name)) {}
+  explicit ExecuteFilterAction(Http::FilterFactoryCb cb, const std::string& name)
+      : cb_(std::move(cb)), name_(name) {}
 
   void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
 

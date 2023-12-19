@@ -12,13 +12,13 @@
 
 #include "gtest/gtest.h"
 
-using Envoy::Protobuf::util::MessageDifferencer;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 namespace {
+
+using Envoy::Protobuf::util::MessageDifferencer;
 
 class FilterTest : public ::testing::Test {
 public:
@@ -337,6 +337,58 @@ TEST(ConfigTest, TestConfig) {
       EnvoyException, "Error: Only one of `dynamic_config` or `typed_config` can be set.");
 }
 
+TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {
+  const std::string yaml_string = R"EOF(
+      dynamic_config:
+        name: actionName
+        config_discovery:
+          config_source:
+              resource_api_version: V3
+              path_config_source:
+                path: "{{ test_tmpdir }}/set_response_code.yaml"
+          type_urls:
+          - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+)EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
+                                                                server_factory_context};
+  ExecuteFilterActionFactory factory;
+  auto action = factory.createActionFactoryCb(config, action_context,
+                                              ProtobufMessage::getStrictValidationVisitor())();
+
+  EXPECT_EQ("actionName", action->getTyped<ExecuteFilterAction>().actionName());
+}
+
+TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForTypedConfig) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: actionName
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+            percentage:
+              numerator: 0
+              denominator: HUNDRED
+)EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
+                                                                server_factory_context};
+  ExecuteFilterActionFactory factory;
+  auto action = factory.createActionFactoryCb(config, action_context,
+                                              ProtobufMessage::getStrictValidationVisitor())();
+
+  EXPECT_EQ("actionName", action->getTyped<ExecuteFilterAction>().actionName());
+}
+
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
   auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
   StreamInfo::FilterStateSharedPtr filter_state =
@@ -345,9 +397,8 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
   ON_CALL(encoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  auto filter_state_object = std::make_shared<MatchedActionInfoType>();
-  filter_state_object->setFilterAction("rootFilterName", "oldActionName");
-  filter_state->setData(MatchedActionsFilterStateKey, filter_state_object,
+  filter_state->setData(MatchedActionsFilterStateKey,
+                        std::make_shared<MatchedActionInfoType>("rootFilterName", "oldActionName"),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
@@ -376,11 +427,10 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
   ON_CALL(encoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  auto filter_state_object = std::make_shared<MatchedActionInfoType>();
-  filter_state_object->setFilterAction("otherRootFilterName", "anyActionName");
-  filter_state->setData(MatchedActionsFilterStateKey, filter_state_object,
-                        StreamInfo::FilterState::StateType::Mutable,
-                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData(
+      MatchedActionsFilterStateKey,
+      std::make_shared<MatchedActionInfoType>("otherRootFilterName", "anyActionName"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::FilterChain);
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);

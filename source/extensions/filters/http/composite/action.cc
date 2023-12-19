@@ -15,8 +15,6 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
 
-  std::string name = composite_action.typed_config().name();
-
   if (composite_action.has_dynamic_config() && composite_action.has_typed_config()) {
     throw EnvoyException(
         fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
@@ -26,6 +24,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
       throw EnvoyException(fmt::format("Failed to get factory context or server factory context."));
     }
+    std::string name = composite_action.dynamic_config().name();
     // Create a dynamic filter config provider and register it with the server factory context.
     auto config_discovery = composite_action.dynamic_config().config_discovery();
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
@@ -74,6 +73,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   if (callback == nullptr) {
     throw EnvoyException("Failed to get filter factory creation function");
   }
+  std::string name = composite_action.typed_config().name();
 
   return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
     return std::make_unique<ExecuteFilterAction>(cb, n);

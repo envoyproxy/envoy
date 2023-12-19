@@ -4,10 +4,12 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/json/json_loader.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/composite/action.h"
 #include "source/extensions/filters/http/composite/factory_wrapper.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -30,18 +32,24 @@ struct FilterStats {
 
 class MatchedActionInfoType : public StreamInfo::FilterState::Object {
 public:
-  MatchedActionInfoType() {}
+  MatchedActionInfoType(const std::string& filter, const std::string& action) {
+    actions_[filter] = action;
+  }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
 
-  absl::optional<std::string> serializeAsString() const override;
+  absl::optional<std::string> serializeAsString() const override {
+    return Json::Factory::loadFromProtobufStruct(*buildProtoStruct().get())->asJsonString();
+  }
 
-  void setFilterAction(const std::string& filter, const std::string& action);
+  void setFilterAction(const std::string& filter, const std::string& action) {
+    actions_[filter] = action;
+  }
 
 private:
   std::unique_ptr<ProtobufWkt::Struct> buildProtoStruct() const;
 
-  std::map<std::string, std::string> actions;
+  absl::flat_hash_map<std::string, std::string> actions_;
 };
 
 class Filter : public Http::StreamFilter,

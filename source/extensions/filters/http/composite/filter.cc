@@ -1,11 +1,8 @@
 #include "source/extensions/filters/http/composite/filter.h"
 
-#include <map>
-
 #include "envoy/http/filter.h"
 
 #include "source/common/common/stl_helpers.h"
-#include "source/common/json/json_loader.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,18 +31,10 @@ template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 std::unique_ptr<ProtobufWkt::Struct> MatchedActionInfoType::buildProtoStruct() const {
   auto message = std::make_unique<ProtobufWkt::Struct>();
   auto& fields = *message->mutable_fields();
-  for (const auto& p : actions) {
+  for (const auto& p : actions_) {
     fields[p.first] = ValueUtil::stringValue(p.second);
   }
   return message;
-}
-
-absl::optional<std::string> MatchedActionInfoType::serializeAsString() const {
-  return Json::Factory::loadFromProtobufStruct(*buildProtoStruct().get())->asJsonString();
-}
-
-void MatchedActionInfoType::setFilterAction(const std::string& filter, const std::string& action) {
-  actions[filter] = action;
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
@@ -158,12 +147,11 @@ void Filter::updateFilterState(Http::StreamFilterCallbacks* callback,
   if (info != nullptr) {
     info->setFilterAction(filter_name, action_name);
   } else {
-    auto info = std::make_shared<MatchedActionInfoType>();
-    info->setFilterAction(filter_name, action_name);
-
-    callback->streamInfo().filterState()->setData(MatchedActionsFilterStateKey, info,
-                                                  StreamInfo::FilterState::StateType::Mutable,
-                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
+    callback->streamInfo().filterState()->setData(
+        MatchedActionsFilterStateKey,
+        std::make_shared<MatchedActionInfoType>(filter_name, action_name),
+        StreamInfo::FilterState::StateType::Mutable,
+        StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 }
 
