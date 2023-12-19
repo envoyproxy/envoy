@@ -6,24 +6,39 @@
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/dependency_manager.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Http {
 
-using DownstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
-                                        Server::Configuration::FactoryContext>;
 using UpstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
+
+// Allows graceful handling of missing configuration for ECDS.
+class MissingConfigFilter : public Http::PassThroughDecoderFilter {
+public:
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
+                                       absl::nullopt, EMPTY_STRING);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+};
+
+static Http::FilterFactoryCb MissingConfigFilterFactory =
+    [](Http::FilterChainFactoryCallbacks& cb) {
+      cb.addStreamDecoderFilter(std::make_shared<MissingConfigFilter>());
+    };
 
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:
   struct FilterFactoryProvider {
-    Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb> provider;
+    Filter::FilterConfigProviderPtr<Http::NamedHttpFilterFactoryCb> provider;
     // If true, this filter is disabled by default and must be explicitly enabled by
     // route configuration.
     bool disabled{};
@@ -37,10 +52,6 @@ public:
                                             const FilterChainOptions& options,
                                             const FilterFactoriesList& filter_factories);
 
-  static std::shared_ptr<DownstreamFilterConfigProviderManager>
-  createSingletonDownstreamFilterConfigProviderManager(
-      Server::Configuration::ServerFactoryContext& context);
-
   static std::shared_ptr<UpstreamFilterConfigProviderManager>
   createSingletonUpstreamFilterConfigProviderManager(
       Server::Configuration::ServerFactoryContext& context);
@@ -51,7 +62,7 @@ class FilterChainHelper : Logger::Loggable<Logger::Id::config> {
 public:
   using FilterFactoriesList = FilterChainUtility::FilterFactoriesList;
   using FilterConfigProviderManager =
-      Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb, FilterCtx>;
+      Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb, FilterCtx>;
 
   FilterChainHelper(FilterConfigProviderManager& filter_config_provider_manager,
                     Server::Configuration::ServerFactoryContext& server_context,

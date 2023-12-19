@@ -7,6 +7,7 @@
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/context.h"
 
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -829,6 +830,7 @@ TEST(Context, FilterStateAttributes) {
 }
 
 TEST(Context, XDSAttributes) {
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
       new NiceMock<Upstream::MockClusterInfo>());
@@ -847,7 +849,7 @@ TEST(Context, XDSAttributes) {
   info.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
 
   Protobuf::Arena arena;
-  XDSWrapper wrapper(arena, info);
+  XDSWrapper wrapper(arena, info, &local_info);
 
   {
     const auto value = wrapper[CelValue::CreateStringView(ClusterName)];
@@ -892,6 +894,11 @@ TEST(Context, XDSAttributes) {
   {
     const auto value = wrapper[CelValue::CreateInt64(5)];
     EXPECT_FALSE(value.has_value());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(Node)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
   }
 }
 

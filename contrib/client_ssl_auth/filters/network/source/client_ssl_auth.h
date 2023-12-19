@@ -81,7 +81,7 @@ public:
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Random::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
-  const Network::Address::IpList& ipAllowlist() { return ip_allowlist_; }
+  const Network::Address::IpList& ipAllowlist() { return *ip_allowlist_; }
   GlobalStats& stats() { return stats_; }
 
 private:
@@ -99,7 +99,7 @@ private:
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   ThreadLocal::SlotPtr tls_;
-  Network::Address::IpList ip_allowlist_;
+  std::unique_ptr<Network::Address::IpList> ip_allowlist_;
   GlobalStats stats_;
 };
 
