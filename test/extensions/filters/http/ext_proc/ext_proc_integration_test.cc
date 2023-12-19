@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iostream>
 
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
@@ -136,6 +137,12 @@ protected:
         set_metadata_filter.mutable_typed_config()->PackFrom(set_metadata_config);
         config_helper_.prependFilter(
             MessageUtil::getJsonStringFromMessageOrError(set_metadata_filter));
+
+        // Add filter that dumps streamInfo into headers so we can check our receiving
+        // namespaces
+        config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+        )EOF"));
       }
 
       // Add logging test filter only in Envoy gRPC mode.
@@ -3327,8 +3334,9 @@ TEST_P(ExtProcIntegrationTest, SendBodyBufferedPartialWithTrailer) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, SendDynamicMetadata) {
+TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   auto* md_opts = proto_config_.mutable_metadata_options();
   md_opts->mutable_forwarding_namespaces()->add_untyped("forwarding_ns_untyped");
@@ -3357,6 +3365,8 @@ TEST_P(ExtProcIntegrationTest, SendDynamicMetadata) {
         EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
         EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
 
+        HeadersResponse headers_resp;
+        (*resp.mutable_request_headers()) = headers_resp;
         auto mut_md_fields = resp.mutable_dynamic_metadata()->mutable_fields();
         (*mut_md_fields).emplace("receiving_ns_untyped", md_val);
 
@@ -3365,7 +3375,14 @@ TEST_P(ExtProcIntegrationTest, SendDynamicMetadata) {
 
   handleUpstreamRequest();
 
-  // TODO(jbohanon) figure out how to check the streamInfo() after processing on encode path
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  ASSERT_FALSE((*response).headers().empty());
+  auto md_header_result =
+      (*response).headers().get(Http::LowerCaseString("receiving_ns_untyped.foo"));
+  ASSERT_EQ(1, md_header_result.size());
+  EXPECT_EQ("value from ext_proc", md_header_result[0]->value().getStringView());
 
   verifyDownstreamResponse(*response, 200);
 }

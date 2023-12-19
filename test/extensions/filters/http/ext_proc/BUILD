@@ -133,6 +133,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/set_metadata:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
