@@ -235,7 +235,7 @@ void Cluster::addOrUpdateHost(
     absl::string_view host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   Upstream::LogicalHostSharedPtr emplaced_host;
-  Upstream::HostVector hosts;
+  bool founded = false;
   {
     absl::WriterMutexLock lock{&host_map_lock_};
 
@@ -266,30 +266,34 @@ void Cluster::addOrUpdateHost(
       ASSERT(host_info == host_map_it->second.shared_host_info_);
       ASSERT(host_map_it->second.shared_host_info_->address() !=
              host_map_it->second.logical_host_->address());
-      // removing host from priorityState first, with the old address.
-      hosts.emplace_back(host_map_it->second.logical_host_);
-      updatePriorityState({}, hosts);
-      ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
-      host_map_it->second.logical_host_->setNewAddresses(
-          host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
-      // add host into priorityState again, with the new address.
-      updatePriorityState(hosts, {});
-      return;
+
+      ENVOY_LOG(debug, "found existing dfproxy cluster host '{}'", host);
+      emplaced_host = host_map_it->second.logical_host_;
+      founded = true;
+    } else {
+      ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
+      emplaced_host = host_map_
+                          .try_emplace(host, host_info,
+                                       std::make_shared<Upstream::LogicalHost>(
+                                           info(), std::string{host}, host_info->address(),
+                                           host_info->addressList(), dummy_locality_lb_endpoint_,
+                                           dummy_lb_endpoint_, nullptr, time_source_))
+                          .first->second.logical_host_;
     }
-
-    ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
-
-    emplaced_host = host_map_
-                        .try_emplace(host, host_info,
-                                     std::make_shared<Upstream::LogicalHost>(
-                                         info(), std::string{host}, host_info->address(),
-                                         host_info->addressList(), dummy_locality_lb_endpoint_,
-                                         dummy_lb_endpoint_, nullptr, time_source_))
-                        .first->second.logical_host_;
   }
 
   ASSERT(emplaced_host);
+  Upstream::HostVector hosts;
   hosts.emplace_back(emplaced_host);
+
+  if (founded) {
+    // removing host from priorityState first, with the old address.
+    updatePriorityState({}, hosts);
+    ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
+    emplaced_host->setNewAddresses(host_info->address(), host_info->addressList(),
+                                   dummy_lb_endpoint_);
+    // will add host into priorityState again, with the new address.
+  }
   updatePriorityState(hosts, {});
 }
 
