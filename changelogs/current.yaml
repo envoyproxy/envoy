@@ -302,5 +302,8 @@ new_features:
 - area: access_log
   change: |
     Added new access log command operator ``%EMIT_TIME%`` to get the time when the log entry is emitted.
+- area: access_log
+  change: |
+    Added support for node data in ``%CEL%`` formatter.
 
 deprecated:
