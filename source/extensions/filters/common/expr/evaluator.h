@@ -46,7 +46,7 @@ public:
 
 protected:
   void resetActivation() const;
-  const ::Envoy::LocalInfo::LocalInfo* local_info_{nullptr};
+  mutable const ::Envoy::LocalInfo::LocalInfo* local_info_{nullptr};
   mutable const StreamInfo::StreamInfo* activation_info_{nullptr};
   mutable const ::Envoy::Http::RequestHeaderMap* activation_request_headers_{nullptr};
   mutable const ::Envoy::Http::ResponseHeaderMap* activation_response_headers_{nullptr};
