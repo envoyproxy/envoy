@@ -47,44 +47,16 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", tcmalloc::MallocExtension::GetStats());
 }
 
-Allocator::~Allocator() {
-  {
-    absl::MutexLock guard(&mutex_);
-    terminating_ = true;
-  }
-  if (tcmalloc_thread_) {
-    tcmalloc_thread_->join();
-  }
-}
-
-void Allocator::configureBackgroundMemoryRelease() {
-  RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc thread has not beein initialised");
-  if (background_release_rate_ > 0) {
-    tcmalloc::MallocExtension::SetBackgroundReleaseRate(
-        tcmalloc::MallocExtension::BytesPerSecond{background_release_rate_});
-    ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second",
-                   background_release_rate_);
-    // `ProcessBackgroundActions` routine needs to be invoked for background memory release to be
-    // operative. https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h#L635
-    tcmalloc_thread_ = thread_factory_.createThread(
-        [this]() -> void { tcmallocProcessBackgroundActionsThreadRoutine(); },
-        Thread::Options{"TcmallocProcessBackgroundActions"});
-  }
-}
-
-void Allocator::tcmallocProcessBackgroundActionsThreadRoutine() {
+void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine() {
   ENVOY_LOG_MISC(debug, "Started tcmallocProcessBackgroundActionsThreadRoutine");
   while (true) {
-    absl::MutexLock guard(&mutex_);
+    Thread::ReleasableLockGuard guard(mutex_);
     if (terminating_) {
+      guard.release();
       return;
-    } else {
-      if (tcmalloc::MallocExtension::NeedsProcessBackgroundActions()) {
-        tcmalloc::MallocExtension::ProcessBackgroundActions();
-      } else {
-        ENVOY_LOG_MISC(info, "Current platform does not suport tcmalloc background actions");
-      }
     }
+    memory_release_event_.wait(mutex_);
+    tcmalloc::MallocExtension::ReleaseMemoryToSystem(bytes_to_release_);
   }
 }
 
@@ -142,36 +114,16 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", buffer.get());
 }
 
-Allocator::~Allocator() {
-  MallocExtension::instance()->SetBackgroundProcessActionsEnabled(false);
-  if (tcmalloc_thread_) {
-    tcmalloc_thread_->join();
-  }
-}
-
-void Allocator::configureBackgroundMemoryRelease() {
-  RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc thread has not beein initialised");
-  if (background_release_rate_ > 0) {
-    MallocExtension::instance()->SetBackgroundReleaseRate(
-        MallocExtension::instance()->BytesPerSecond{background_release_rate_});
-    ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second",
-                   background_release_rate_);
-    // `ProcessBackgroundActions` routine needs to be invoked for background memory release to be
-    // operative. https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h#L635
-    tcmalloc_thread_ = thread_factory_.createThread(
-        [this]() -> void { tcmallocProcessBackgroundActionsThreadRoutine(); },
-        Thread::Options{"TcmallocProcessBackgroundActions"});
-  }
-}
-
-void Allocator::tcmallocProcessBackgroundActionsThreadRoutine() {
+void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine() {
   ENVOY_LOG_MISC(debug, "Started tcmallocProcessBackgroundActionsThreadRoutine");
-  if (MallocExtension::instance()->NeedsProcessBackgroundActions()) {
-    // When linked against TCMalloc, this method does not return.
-    // https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h#L619
-    MallocExtension::instance()->ProcessBackgroundActions();
-  } else {
-    ENVOY_LOG_MISC(info, "Current platform does not suport tcmalloc background actions");
+  while (true) {
+    Thread::LockGuard guard(mutex_);
+    memory_release_event_.wait(mutex_);
+    if (terminating_) {
+      return;
+    } else {
+      MallocExtension::instance()->ReleaseToSystem(bytes_to_release_);
+    }
   }
 }
 
@@ -190,8 +142,8 @@ uint64_t Stats::totalPageHeapUnmapped() { return 0; }
 uint64_t Stats::totalPageHeapFree() { return 0; }
 uint64_t Stats::totalPhysicalBytes() { return 0; }
 void Stats::dumpStatsToLog() {}
-void Allocator::configureBackgroundMemoryRelease() {}
-void Allocator::tcmallocProcessBackgroundActionsThreadRoutine() {}
+void AllocatorManager::configureBackgroundMemoryRelease() {}
+void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine() {}
 
 } // namespace Memory
 } // namespace Envoy

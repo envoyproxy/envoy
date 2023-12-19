@@ -103,12 +103,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false),
-      memory_allocator_(
-          api_->threadFactory(),
-          bootstrap_.has_memory_allocator_manager()
-              ? bootstrap_.memory_allocator_manager().background_release_rate_bytes_per_second()
-              : 0) {}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
 
 InstanceBase::~InstanceBase() {
   terminate();
@@ -523,6 +518,10 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   validation_context_.setCounters(server_stats_->static_unknown_fields_,
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
+
+  memory_allocator_ = std::make_unique<Memory::AllocatorManager>(
+      *dispatcher_, api_->threadFactory(), *stats_store_.rootScope(),
+      bootstrap_.memory_allocator_manager());
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
