@@ -5,6 +5,7 @@
 #include "test/extensions/filters/http/ext_proc/unit_test_fuzz/mocks.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 
 using testing::Return;

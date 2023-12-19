@@ -7,6 +7,7 @@
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
