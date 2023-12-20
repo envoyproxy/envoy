@@ -27,7 +27,9 @@ jobs:
     - uses: actions/checkout@v4
     - name: Run Traffic Director integration test
       env:
-        GCP_TEST_PROJECT_API_KEY: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GCP_TEST_PROJECT_PROD_API_KEY: ${{ secrets.GCP_TEST_PROJECT_PROD_API_KEY }}
+        ENVOY_IP_TEST_VERSIONS: v4only
       run: |
         cd mobile
         ./bazelw run \
