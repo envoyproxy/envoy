@@ -42,7 +42,7 @@ platform(
         "@bazel_tools//tools/cpp:clang",
     ],
     exec_properties = {
-        "container-image": "docker://envoyproxy/envoy-build-ubuntu:mobile-6eba113ee1a0ef8e4f71830e90b6aedbbeb7360c@sha256:82a79f368aa7da9a3ed904352deb24e6e52c5eae156fdc5ca2fb3fca6650ed6d",
+        "container-image": "docker://envoyproxy/envoy-build-ubuntu:mobile-7467652575122d8d54e767a68f141598bd855383@sha256:292273a428ebb093cc69c2f225c7c4218ff2ea84e0cb6ee80e7a6771a09e026f",
         "OSFamily": "Linux",
         "Pool": "linux",
     },
@@ -57,7 +57,7 @@ platform(
         "@bazel_tools//tools/cpp:clang",
     ],
     exec_properties = {
-        "container-image": "docker://envoyproxy/envoy-build-ubuntu:mobile-6eba113ee1a0ef8e4f71830e90b6aedbbeb7360c@sha256:82a79f368aa7da9a3ed904352deb24e6e52c5eae156fdc5ca2fb3fca6650ed6d",
+        "container-image": "docker://envoyproxy/envoy-build-ubuntu:mobile-7467652575122d8d54e767a68f141598bd855383@sha256:292273a428ebb093cc69c2f225c7c4218ff2ea84e0cb6ee80e7a6771a09e026f",
         "OSFamily": "Linux",
         "Pool": "linux",
         # Necessary to workaround https://github.com/google/sanitizers/issues/916, otherwise, dangling threads in the

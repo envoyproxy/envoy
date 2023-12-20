@@ -216,7 +216,7 @@ ValidationResult Http1HeaderValidator::validateRequestHeaders(const RequestHeade
   // parse the :path form and compare the authority component of the path against the :authority
   // header.
   auto is_connect_method = ::Envoy::Http::HeaderUtility::isConnect(header_map);
-  auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+  auto is_options_method = header_map.getMethodValue() == header_values_.MethodValues.Options;
 
   if (!is_connect_method && path.empty()) {
     // The :path is required for non-CONNECT requests.

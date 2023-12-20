@@ -275,7 +275,7 @@ public:
 // HTTP filter test
 class HttpFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          Http::NamedHttpFilterFactoryCb, Server::Configuration::FactoryContext,
+          NamedHttpFilterFactoryCb, Server::Configuration::FactoryContext,
           HttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
           Server::Configuration::NamedHttpFilterConfigFactory,
           Server::Configuration::MockFactoryContext> {
@@ -292,7 +292,7 @@ public:
 // Upstream HTTP filter test
 class HttpUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          Http::NamedHttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
+          NamedHttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
           UpstreamHttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
           Server::Configuration::UpstreamHttpFilterConfigFactory,
           Server::Configuration::MockUpstreamFactoryContext> {
