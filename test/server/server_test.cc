@@ -699,13 +699,10 @@ TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
   // infinite drainClose spin-loop (mimicing high traffic) is running before we
   // initiate the drain sequence.
   auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
-    bool cont = true, notified = false;
-    while (cont) {
-      cont = !drain_manager.drainClose();
-      if (!notified) {
-        drain_closes_started.Notify();
-        notified = true;
-      }
+    bool closed = drain_manager.drainClose();
+    drain_closes_started.Notify();
+    while (!closed) {
+      closed = drain_manager.drainClose();
     }
   });
   drain_closes_started.WaitForNotification();
