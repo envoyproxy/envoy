@@ -131,22 +131,25 @@ FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
 }
 
 absl::optional<ProcessingMode>
-FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& dst,
-                                          const FilterConfigPerRoute& src) {
-  if (src.disabled()) {
+FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                                          const FilterConfigPerRoute& more_specific) {
+  if (more_specific.disabled()) {
     return absl::nullopt;
   }
-  return src.processingMode().has_value() ? src.processingMode() : dst.processingMode();
+  return more_specific.processingMode().has_value() ? more_specific.processingMode()
+                                                    : less_specific.processingMode();
 }
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)) {}
 
-FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& dst,
-                                           const FilterConfigPerRoute& src)
-    : disabled_(src.disabled()), processing_mode_(mergeProcessingMode(dst, src)),
-      grpc_service_(src.grpcService().has_value() ? src.grpcService() : dst.grpcService()) {}
+FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                                           const FilterConfigPerRoute& more_specific)
+    : disabled_(more_specific.disabled()),
+      processing_mode_(mergeProcessingMode(less_specific, more_specific)),
+      grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
+                                                            : less_specific.grpcService()) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -872,17 +875,17 @@ void Filter::mergePerRouteConfig() {
 
   absl::optional<FilterConfigPerRoute> merged_config;
 
-  decoder_callbacks_->traversePerFilterConfig([&merged](
+  decoder_callbacks_->traversePerFilterConfig([&merged_config](
                                                   const Router::RouteSpecificFilterConfig& cfg) {
     const FilterConfigPerRoute* typed_cfg = dynamic_cast<const FilterConfigPerRoute*>(&cfg);
     if (typed_cfg == nullptr) {
       ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
       return;
     }
-    if (!merged) {
-      merged.emplace(*typed_cfg);
+    if (!merged_config) {
+      merged_config.emplace(*typed_cfg);
     } else {
-      merged.emplace(FilterConfigPerRoute(merged.value(), *typed_cfg));
+      merged_config.emplace(FilterConfigPerRoute(merged_config.value(), *typed_cfg));
     }
   });
 

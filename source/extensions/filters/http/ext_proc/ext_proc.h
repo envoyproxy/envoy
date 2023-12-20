@@ -210,7 +210,11 @@ public:
   explicit FilterConfigPerRoute(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  FilterConfigPerRoute(const FilterConfigPerRoute& dst, const FilterConfigPerRoute& src);
+  // This constructor is used as a way to merge more-specific config into less-specific config in a
+  // clearly defined way (e.g. route config into vh config). All fields on this class must be const
+  // and thus must be initialized in the ctor initialization list.
+  FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                       const FilterConfigPerRoute& more_specific);
 
   bool disabled() const { return disabled_; }
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
@@ -229,7 +233,8 @@ private:
   initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  mergeProcessingMode(const FilterConfigPerRoute& dst, const FilterConfigPerRoute& src);
+  mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                      const FilterConfigPerRoute& more_specific);
 
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
