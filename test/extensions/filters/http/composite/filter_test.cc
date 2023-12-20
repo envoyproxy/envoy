@@ -77,7 +77,7 @@ public:
   }
 
   void expectFilterStateInfo(std::shared_ptr<StreamInfo::FilterState> filter_state) {
-    auto* info = filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey);
+    auto* info = filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey);
     EXPECT_NE(nullptr, info);
     ProtobufWkt::Struct expected;
     auto& fields = *expected.mutable_fields();
@@ -203,8 +203,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
-  EXPECT_EQ(nullptr,
-            filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey));
+  EXPECT_EQ(nullptr, filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -229,8 +228,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
-  EXPECT_EQ(nullptr,
-            filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey));
+  EXPECT_EQ(nullptr, filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -255,8 +253,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
-  EXPECT_EQ(nullptr,
-            filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey));
+  EXPECT_EQ(nullptr, filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey));
 
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
@@ -398,7 +395,7 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
       .WillByDefault(testing::ReturnRef(filter_state));
 
   filter_state->setData(MatchedActionsFilterStateKey,
-                        std::make_shared<MatchedActionInfoType>("rootFilterName", "oldActionName"),
+                        std::make_shared<MatchedActionInfo>("rootFilterName", "oldActionName"),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
@@ -427,10 +424,10 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
   ON_CALL(encoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  filter_state->setData(
-      MatchedActionsFilterStateKey,
-      std::make_shared<MatchedActionInfoType>("otherRootFilterName", "anyActionName"),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData(MatchedActionsFilterStateKey,
+                        std::make_shared<MatchedActionInfo>("otherRootFilterName", "anyActionName"),
+                        StreamInfo::FilterState::StateType::Mutable,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
 
   auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);
@@ -441,7 +438,7 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
-  auto* info = filter_state->getDataMutable<MatchedActionInfoType>(MatchedActionsFilterStateKey);
+  auto* info = filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey);
   EXPECT_NE(nullptr, info);
   ProtobufWkt::Struct expected;
   auto& fields = *expected.mutable_fields();

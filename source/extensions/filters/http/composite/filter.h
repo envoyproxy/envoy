@@ -30,9 +30,9 @@ struct FilterStats {
   ALL_COMPOSITE_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class MatchedActionInfoType : public StreamInfo::FilterState::Object {
+class MatchedActionInfo : public StreamInfo::FilterState::Object {
 public:
-  MatchedActionInfoType(const std::string& filter, const std::string& action) {
+  MatchedActionInfo(const std::string& filter, const std::string& action) {
     actions_[filter] = action;
   }
 

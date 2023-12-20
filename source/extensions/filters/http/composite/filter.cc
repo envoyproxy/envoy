@@ -28,7 +28,7 @@ template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
 } // namespace
 
-std::unique_ptr<ProtobufWkt::Struct> MatchedActionInfoType::buildProtoStruct() const {
+std::unique_ptr<ProtobufWkt::Struct> MatchedActionInfo::buildProtoStruct() const {
   auto message = std::make_unique<ProtobufWkt::Struct>();
   auto& fields = *message->mutable_fields();
   for (const auto& p : actions_) {
@@ -142,14 +142,13 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 
 void Filter::updateFilterState(Http::StreamFilterCallbacks* callback,
                                const std::string& filter_name, const std::string& action_name) {
-  auto* info = callback->streamInfo().filterState()->getDataMutable<MatchedActionInfoType>(
+  auto* info = callback->streamInfo().filterState()->getDataMutable<MatchedActionInfo>(
       MatchedActionsFilterStateKey);
   if (info != nullptr) {
     info->setFilterAction(filter_name, action_name);
   } else {
     callback->streamInfo().filterState()->setData(
-        MatchedActionsFilterStateKey,
-        std::make_shared<MatchedActionInfoType>(filter_name, action_name),
+        MatchedActionsFilterStateKey, std::make_shared<MatchedActionInfo>(filter_name, action_name),
         StreamInfo::FilterState::StateType::Mutable,
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
