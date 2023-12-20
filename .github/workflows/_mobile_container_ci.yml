@@ -8,7 +8,6 @@ on:
     secrets:
       app-id:
       app-key:
-      gcp-traffic-key:
       rbe-key:
       ssh-key-extra:
     inputs:
@@ -128,7 +127,6 @@ jobs:
       contents: read
       packages: read
     secrets:
-      gcp-traffic-key: ${{ secrets.gcp-traffic-key }}
       ssh-key-extra: ${{ secrets.ssh-key-extra }}
     with:
       args: ${{ inputs.args }}
