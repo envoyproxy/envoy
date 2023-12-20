@@ -29,3 +29,15 @@ index 5d94d5e..d53370c 100644
    static_assert(std::is_trivially_destructible_v<value_class>,   \
                  #value_class " must be trivially destructible"); \
                                                                   \
+diff --git a/tools/flatbuffers_backed_impl.cc b/tools/flatbuffers_backed_impl.cc
+index 10c0b1c..45ba72f 100644
+--- a/tools/flatbuffers_backed_impl.cc
++++ b/tools/flatbuffers_backed_impl.cc
+@@ -130,6 +130,7 @@ class ObjectStringIndexedMapImpl : public CelMap {
+     return absl::nullopt;
+   }
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override { return &keys_; }
+ 
+  private:
