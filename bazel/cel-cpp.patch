@@ -59,3 +59,15 @@ index b965411..94750f6 100644
      static_assert(!std::is_pointer_v<T>);
      static_assert(std::is_same_v<T, std::decay_t<T>>);
      static_assert(!std::is_same_v<NativeTypeId, std::decay_t<T>>);
+diff --git a/tools/flatbuffers_backed_impl.h b/tools/flatbuffers_backed_impl.h
+index e9ea9f2..d75129d 100644
+--- a/tools/flatbuffers_backed_impl.h
++++ b/tools/flatbuffers_backed_impl.h
+@@ -24,6 +24,7 @@ class FlatBuffersMapImpl : public CelMap {
+ 
+   absl::optional<CelValue> operator[](CelValue cel_key) const override;
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override { return &keys_; }
+ 
+  private:
