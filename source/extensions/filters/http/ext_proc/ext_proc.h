@@ -222,13 +222,13 @@ public:
   }
 
 private:
-  absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
   initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  absl::optional<const envoy::config::core::v3::GrpcService>
+  absl::optional<envoy::config::core::v3::GrpcService>
   initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
   mergeProcessingMode(const FilterConfigPerRoute& dst, const FilterConfigPerRoute& src);
 
   const bool disabled_;
@@ -340,10 +340,8 @@ private:
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
 
-  // Set a value when the mergePerRouteConfig() method has been called.
-  // This binds the constructed config to the life of the filter to extend the
-  // lifetimes of objects created during the merge.
-  absl::optional<FilterConfigPerRoute> route_config_merged_;
+  // Set to true when the mergePerRouteConfig() method has been called.
+  bool route_config_merged_ = false;
 };
 
 extern std::string responseCaseToString(

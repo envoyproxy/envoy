@@ -115,14 +115,14 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
-absl::optional<const ProcessingMode>
+absl::optional<ProcessingMode>
 FilterConfigPerRoute::initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
     return config.overrides().processing_mode();
   }
   return absl::nullopt;
 }
-absl::optional<const envoy::config::core::v3::GrpcService>
+absl::optional<envoy::config::core::v3::GrpcService>
 FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
   if (config.has_overrides() && config.overrides().has_grpc_service()) {
     return config.overrides().grpc_service();
@@ -130,7 +130,7 @@ FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
   return absl::nullopt;
 }
 
-absl::optional<const ProcessingMode>
+absl::optional<ProcessingMode>
 FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& dst,
                                           const FilterConfigPerRoute& src) {
   if (src.disabled()) {
@@ -867,7 +867,10 @@ void Filter::mergePerRouteConfig() {
   if (route_config_merged_) {
     return;
   }
-  absl::optional<FilterConfigPerRoute> merged;
+
+  route_config_merged_ = true;
+
+  absl::optional<FilterConfigPerRoute> merged_config;
 
   decoder_callbacks_->traversePerFilterConfig([&merged](
                                                   const Router::RouteSpecificFilterConfig& cfg) {
@@ -883,13 +886,11 @@ void Filter::mergePerRouteConfig() {
     }
   });
 
-  if (merged.has_value()) {
-    route_config_merged_.emplace(merged.value());
-  } else {
+  if (!merged_config.has_value()) {
     return;
   }
 
-  if (route_config_merged_->disabled()) {
+  if (merged_config->disabled()) {
     // Rather than introduce yet another flag, use the processing mode
     // structure to disable all the callbacks.
     ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
@@ -898,15 +899,15 @@ void Filter::mergePerRouteConfig() {
     encoding_state_.setProcessingMode(all_disabled);
     return;
   }
-  if (route_config_merged_->processingMode()) {
+  if (merged_config->processingMode().has_value()) {
     ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
-    decoding_state_.setProcessingMode(*(route_config_merged_->processingMode()));
-    encoding_state_.setProcessingMode(*(route_config_merged_->processingMode()));
+    decoding_state_.setProcessingMode(*(merged_config->processingMode()));
+    encoding_state_.setProcessingMode(*(merged_config->processingMode()));
   }
-  if (route_config_merged_->grpcService()) {
+  if (merged_config->grpcService().has_value()) {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
-    grpc_service_ = *route_config_merged_->grpcService();
-    config_with_hash_key_.setConfig(*route_config_merged_->grpcService());
+    grpc_service_ = *merged_config->grpcService();
+    config_with_hash_key_.setConfig(*merged_config->grpcService());
   }
 }
 
