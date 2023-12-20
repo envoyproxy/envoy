@@ -66,12 +66,14 @@ jobs:
         input: |
           dependency: ${{ inputs.dependency }}
           task: ${{ inputs.task }}
-          version: ${{ inputs.version }}
+          version: "${{ inputs.version }}"
         input-format: yaml
         filter: |
-          .version[:7] as $version
+          .version as $version
           | .dependency as $dependency
           | .task as $task
+          | (try ($version | validate::sha(40) | .[:7])
+             catch $version) as $version_short
           | {}
           | if $task == "bazel" then
               .
@@ -85,9 +87,9 @@ jobs:
           | .task as $task
           | .target as $target
           | ("
-          echo \"Updating(\($task)): \($dependency) -> \($version)\"
+          echo \"Updating(\($task)): \($dependency) -> \($version_short)\"
           bazel run --config=ci //bazel:\($target) \($dependency) \($version)
-          OUTPUT=\($version)
+          OUTPUT=\($version_short)
           " | bash::output)
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
