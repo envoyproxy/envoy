@@ -473,7 +473,7 @@ void HeaderValidator::encodeAdditionalCharactersInPath(
       0b11111111111111111111111111111111,
   };
 
-  absl::string_view path = header_map.path();
+  absl::string_view path = header_map.getPathValue();
   // Check if URL path contains any characters in the kCharactersToEncode set
   auto char_to_encode = path.begin();
   for (; char_to_encode != path.end() && !testCharInTable(kCharactersToEncode, *char_to_encode);
