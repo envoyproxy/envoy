@@ -97,12 +97,13 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) c
     std::chrono::milliseconds drain_delay{0};
     if (server_.options().drainStrategy() != Server::DrainStrategy::Immediate) {
       if (current_time < drain_deadline_) {
-        auto ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(drain_deadline_ - current_time)
-                .count();
-        // Note; current_time may be less than drain_deadline_ by a microsecond, and
-        // when we round to milliseconds that might be 0, which would throw an arithmetic
-        // exception if used as a modulus.
+        const auto delta = drain_deadline_ - current_time;
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+
+        // Note; current_time may be less than drain_deadline_ by only a
+        // microsecond (delta will be 1000 nanoseconds), in which case when we
+        // convert to milliseconds that will be 0, which will throw a SIGFPE
+        // if used as a modulus unguarded.
         if (ms > 0) {
           drain_delay = std::chrono::milliseconds(server_.api().randomGenerator().random() % ms);
         }
@@ -155,7 +156,9 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   // C++ will not re-order an assign to an atomic. See
   // https://stackoverflow.com/questions/40320254/reordering-atomic-operations-in-c .
   drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
-  draining_ = true; // Atomic assign must come after the assign to drain_deadline_.
+
+  // Atomic assign must come after the assign to drain_deadline_.
+  draining_.store(true, std::memory_order_seq_cst);
 
   // Signal to child drain-managers to start their drain sequence
   children_->runCallbacks();
