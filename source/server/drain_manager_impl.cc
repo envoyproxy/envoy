@@ -28,7 +28,7 @@ DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
   // Wire up the child so that when the parent starts draining, the child also sees the
   // state-change
   auto child_cb = children_->add(dispatcher, [child = child.get()] {
-    if (!child->draining()) {
+    if (!child->draining_) {
       child->startDrainSequence([] {});
     }
   });
@@ -52,8 +52,6 @@ bool DrainManagerImpl::drainClose() const {
     return true;
   }
 
-  Thread::ThreadSynchronizer& sync = const_cast<Thread::ThreadSynchronizer&>(thread_synchronizer_);
-  sync.syncPoint("check_draining");
   if (!draining_) {
     return false;
   }
@@ -66,9 +64,7 @@ bool DrainManagerImpl::drainClose() const {
   // P(return true) = elapsed time / drain timeout
   // If the drain deadline is exceeded, skip the probability calculation.
   const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
-  sync.syncPoint("check_deadline");
   if (current_time >= drain_deadline_) {
-    ENVOY_LOG(debug, "current time exceeded deadline");
     return true;
   }
 
@@ -81,9 +77,8 @@ bool DrainManagerImpl::drainClose() const {
     return true;
   }
   const auto elapsed_time = drain_time - remaining_time;
-  const bool ret =  static_cast<uint64_t>(elapsed_time.count()) >
-                    (server_.api().randomGenerator().random() % drain_time_count);
-  return ret;
+  return static_cast<uint64_t>(elapsed_time.count()) >
+      (server_.api().randomGenerator().random() % drain_time_count);
 }
 
 Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
@@ -136,12 +131,21 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
 
   ASSERT(!drain_tick_timer_);
   const std::chrono::seconds drain_delay(server_.options().drainTime());
-  {
-    //absl::MutexLock lock(mutex_);
-    drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
-  }
-  draining_ = true;
-  thread_synchronizer_.syncPoint("post_set_draining");
+
+  // Note https://github.com/envoyproxy/envoy/issues/31457, previous to which,
+  // drain_deadline_ was set *after* draining_ resulting in a read/write race between
+  // the main thread running this function from admin, and the worker thread calling
+  // drainClose. Note that drain_deadline_ is default-constructed which guarantees
+  // to set the time-since epoch to a count of 0
+  // (https://en.cppreference.com/w/cpp/chrono/time_point/time_point).
+  ASSERT(drain_deadline_.time_since_epoch().count() == 0, "drain_deadline_ cannot be set twice.");
+
+  // Since draining_ is atomic, it is safet to set drain_deadline_ without a mutex
+  // as drain_close() only reads from drain_deadline_ if draining_ is true, and
+  // C++ will not re-order an assign to an atomic. See
+  // https://stackoverflow.com/questions/40320254/reordering-atomic-operations-in-c .
+  drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
+  draining_ = true; // Atomic assign must come after the assign to drain_deadline_.
 
   // Signal to child drain-managers to start their drain sequence
   children_->runCallbacks();

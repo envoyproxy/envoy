@@ -9,11 +9,6 @@
 #include "envoy/thread_local/thread_local_object.h"
 
 namespace Envoy {
-
-namespace Thread {
-class ThreadSynchronizer;
-};
-
 namespace Server {
 
 class DrainManager;
@@ -62,8 +57,6 @@ public:
    * of the sequence the previous primary process will be terminated.
    */
   virtual void startParentShutdownSequence() PURE;
-
-  virtual OptRef<Thread::ThreadSynchronizer> threadSynchronizer() PURE;
 };
 
 using DrainManagerPtr = std::unique_ptr<DrainManager>;

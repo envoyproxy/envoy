@@ -642,32 +642,46 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   server_thread->join();
 }
 
-TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
-  bool workers_started = false;
-  absl::Notification workers_started_fired, workers_started_block;
-  // Expect drainParentListeners not to be called before workers start.
-  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+class ServerInstanceImplWorkersTest : public ServerInstanceImplTest {
+ protected:
+  Thread::ThreadPtr startServerAndWaitForWorkersToStart() {
+    bool workers_started = false;
 
-  // Run the server in a separate thread so we can test different lifecycle stages.
-  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
-    auto hooks = CustomListenerHooks([&]() {
-      workers_started = true;
-      workers_started_fired.Notify();
-      workers_started_block.WaitForNotification();
+    // Expect drainParentListeners not to be called before workers start.
+    EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+    // Run the server in a separate thread so we can test different lifecycle stages.
+    auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+      auto hooks = CustomListenerHooks([&]() {
+        workers_started = true;
+        workers_started_fired_.Notify();
+        workers_started_block_.WaitForNotification();
+      });
+      initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+      server_->run();
+      server_ = nullptr;
+      thread_local_ = nullptr;
     });
-    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
-    server_->run();
-    server_ = nullptr;
-    thread_local_ = nullptr;
-  });
 
-  workers_started_fired.WaitForNotification();
-  EXPECT_TRUE(workers_started);
+    workers_started_fired_.WaitForNotification();
+    EXPECT_TRUE(workers_started);
+    EXPECT_CALL(restart_, drainParentListeners);
+    return server_thread;
+  }
+
+  absl::Notification workers_started_fired_;
+  absl::Notification workers_started_block_;
+};
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplWorkersTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ServerInstanceImplWorkersTest, DrainParentListenerAfterWorkersStarted) {
+  auto server_thread = startServerAndWaitForWorkersToStart();
   EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 
-  EXPECT_CALL(restart_, drainParentListeners);
-  workers_started_block.Notify();
+  workers_started_block_.Notify();
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
@@ -695,50 +709,32 @@ TEST_P(ServerInstanceImplTest, DrainCloseAfterWorkersStarted) {
 
   workers_started_fired.WaitForNotification();
   EXPECT_TRUE(workers_started);
-  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
-  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
-
   EXPECT_CALL(restart_, drainParentListeners);
   workers_started_block.Notify();
 
   DrainManager& drain_manager = server_->drainManager();
-  //Thread::ThreadSynchronizer& sync = *drain_manager.threadSynchronizer();
-  //sync.enable();
-
-#if 0
-  sync.waitOn("check_draining");
-  sync.waitOn("check_deadline");
-  sync.waitOn("post_set_draining");
-  //sync.waitOn("pre_set_deadline");
-  //sync.waitOn("post_set_deadline");
-
-  sync.signal("post_set_draining");
-#endif
-
   auto drain_thread =
       Thread::threadFactoryForTest().createThread([&] {
-        while (!drain_manager.drainClose()) {
+        bool cont = true, notified = false;
+        while (cont) {
+          cont = !drain_manager.drainClose();
+          if (!notified) {
+            drain_closes_started.Notify();
+            notified = true;
+          }
         }
       });
+
   server_->dispatcher().post([&] {
-    // drain_closes_started.WaitForNotification();
     drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); });
   });
 
-#if 0
-  sync.signal("post_set_deadline");
-  sync.barrierOn("post_set_draining");
-  sync.signal("check_draining");
-  sync.signal("check_deadline");
-#endif
-  //sync.barrierOn("check_deadline");
-  //sync.signal("post_set_deadline");
-
+  drain_closes_started.WaitForNotification();
   drain_complete.WaitForNotification();
   drain_thread->join();
-  ENVOY_LOG_MISC(debug, "cleanup");
 
-  server_->shutdown();
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  //server_->shutdown();
   server_thread->join();
 }
 

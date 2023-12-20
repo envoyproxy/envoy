@@ -30,7 +30,6 @@ public:
   // Network::DrainDecision
   MOCK_METHOD(bool, drainClose, (), (const));
   MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
-  MOCK_METHOD(OptRef<Thread::ThreadSynchronizer>, threadSynchronizer, (), (override));
 
   std::function<void()> drain_sequence_completion_;
 };

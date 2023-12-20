@@ -72,26 +72,13 @@ private:
       ASSERT(!signaled_);
     }
 
-    bool signaled() const {
-      absl::MutexLock lock(&mutex_);
-      return signaled_;
-    }
-
-    mutable absl::Mutex mutex_;
+    absl::Mutex mutex_;
     bool wait_on_ ABSL_GUARDED_BY(mutex_){};
     bool signaled_ ABSL_GUARDED_BY(mutex_){};
     bool at_barrier_ ABSL_GUARDED_BY(mutex_){};
   };
 
   struct SynchronizerData {
-#ifndef NDEBUG
-    ~SynchronizerData() {
-      for (const auto& iter : entries_) {
-        ASSERT(!iter.second->signaled(), iter.first);
-      }
-    }
-#endif
-
     absl::Mutex mutex_;
     absl::flat_hash_map<std::string, std::unique_ptr<SynchronizerEntry>>
         entries_ ABSL_GUARDED_BY(mutex_);

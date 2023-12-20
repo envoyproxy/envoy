@@ -13,8 +13,6 @@
 
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/common/thread.h"
-#include "source/common/common/thread_synchronizer.h"
 
 namespace Envoy {
 namespace Server {
@@ -42,7 +40,6 @@ public:
   createChildManager(Event::Dispatcher& dispatcher,
                      envoy::config::listener::v3::Listener::DrainType drain_type) override;
   DrainManagerPtr createChildManager(Event::Dispatcher& dispatcher) override;
-  OptRef<Thread::ThreadSynchronizer> threadSynchronizer() override { return thread_synchronizer_; }
 
 private:
   void addDrainCompleteCallback(std::function<void()> cb);
@@ -53,8 +50,7 @@ private:
 
   std::atomic<bool> draining_{false};
   Event::TimerPtr drain_tick_timer_;
-  MonotonicTime drain_deadline_; // ABSL_GUARDED_BY(mutex_);
-  //absl::Mutex mutex_;
+  MonotonicTime drain_deadline_;
   mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
   std::vector<std::function<void()>> drain_complete_cbs_{};
 
@@ -66,7 +62,6 @@ private:
   Common::CallbackHandlePtr parent_callback_handle_;
 
   Event::TimerPtr parent_shutdown_timer_;
-  Thread::ThreadSynchronizer thread_synchronizer_;
 };
 
 } // namespace Server
