@@ -75,7 +75,7 @@ minor_behavior_changes:
     Switch no admin ``warning`` -> ``info``.
 - area: generic_proxy
   change: |
-    Optimize generic proxy stats prefix to ``generic_proxy.{stats_prefix}``
+    Optimize generic proxy stats_prefix to ``generic_proxy.stats_prefix``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
