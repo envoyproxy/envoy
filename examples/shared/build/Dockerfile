@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-build-ubuntu:6eba113ee1a0ef8e4f71830e90b6aedbbeb7360c@sha256:d117d6139f3af1eede6bb1606ad05ffccb766eef3262b336dd31bcf02a81a669
+FROM envoyproxy/envoy-build-ubuntu:7467652575122d8d54e767a68f141598bd855383@sha256:8781bc7e431b754c142edbfc937905fdf343db91f3fe19bbf54c362828db9849
 ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
