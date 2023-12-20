@@ -993,7 +993,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
   stop_listeners_type_ = stop_listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     if (stop_listeners_type != StopListenersType::InboundOnly ||
-        listener.listenerInfo().direction() == envoy::config::core::v3::INBOUND) {
+        listener.listenerInfo()->direction() == envoy::config::core::v3::INBOUND) {
       ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
       auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
       // Destroy a warming listener directly.

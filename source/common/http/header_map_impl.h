@@ -491,18 +491,6 @@ public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
-  // Tracing::TraceContext
-  absl::string_view protocol() const override;
-  absl::string_view host() const override;
-  absl::string_view path() const override;
-  absl::string_view method() const override;
-  void forEach(Tracing::TraceContext::IterateCallback callback) const override;
-  absl::optional<absl::string_view> getByKey(absl::string_view key) const override;
-  void setByKey(absl::string_view key, absl::string_view val) override;
-  void setByReferenceKey(absl::string_view key, absl::string_view val) override;
-  void setByReference(absl::string_view key, absl::string_view val) override;
-  void removeByKey(absl::string_view key) override;
-
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the
   // most derived class. This forces the definition of the following three functions to also be

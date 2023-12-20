@@ -341,6 +341,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
+        "//source/common/listener_manager:listener_info_lib",
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/http_connection_manager:config",

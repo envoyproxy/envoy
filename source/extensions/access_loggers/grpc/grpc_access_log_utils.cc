@@ -8,6 +8,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/custom_tag_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -310,7 +311,8 @@ void Utility::extractCommonAccessLogProperties(
     }
   }
 
-  Tracing::CustomTagContext ctx{&request_header, stream_info};
+  Tracing::ReadOnlyHttpTraceContext trace_context(request_header);
+  Tracing::CustomTagContext ctx{trace_context, stream_info};
   for (const auto& custom_tag : config.custom_tags()) {
     const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
     tag_applier->applyLog(common_access_log, ctx);

@@ -209,7 +209,7 @@ void testIncomingHeaders(
       {"x-request-id", "foo"},
   };
   for (const auto& kv : headers) {
-    request_headers.setByKey(Http::LowerCaseString(kv.first), kv.second);
+    request_headers.set(Http::LowerCaseString(kv.first), kv.second);
   }
 
   const std::string operation_name{"my_operation_2"};
@@ -314,6 +314,13 @@ TEST(OpenCensusTracerTest, ConstantSamplerAlwaysOn) {
   oc_config.mutable_trace_config()->mutable_constant_sampler()->set_decision(
       ::opencensus::proto::trace::v1::ConstantSampler::ALWAYS_ON);
   EXPECT_EQ(1, samplerTestHelper(oc_config));
+}
+
+// Test no sampler set.
+TEST(OpenCensusTracerTest, NoSamplerSet) {
+  OpenCensusConfig oc_config;
+  oc_config.mutable_trace_config();
+  samplerTestHelper(oc_config);
 }
 
 // Test constant_sampler that's always off.
