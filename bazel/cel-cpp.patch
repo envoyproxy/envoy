@@ -29,6 +29,56 @@ index 5d94d5e..d53370c 100644
    static_assert(std::is_trivially_destructible_v<value_class>,   \
                  #value_class " must be trivially destructible"); \
                                                                   \
+diff --git a/internal/strings.cc b/internal/strings.cc
+index dc5a118..24457ab 100644
+--- a/internal/strings.cc
++++ b/internal/strings.cc
+@@ -53,12 +53,12 @@ bool CheckForClosingString(absl::string_view source,
+   if (closing_str.empty()) return true;
+ 
+   const char* p = source.data();
+-  const char* end = source.end();
++  const char* end = p + source.size();
+ 
+   bool is_closed = false;
+   while (p + closing_str.length() <= end) {
+     if (*p != '\\') {
+-      size_t cur_pos = p - source.begin();
++      size_t cur_pos = p - source.data();
+       bool is_closing =
+           absl::StartsWith(absl::ClippedSubstr(source, cur_pos), closing_str);
+       if (is_closing && p + closing_str.length() < end) {
+@@ -132,7 +132,7 @@ bool UnescapeInternal(absl::string_view source, absl::string_view closing_str,
+   dest->reserve(source.size());
+ 
+   const char* p = source.data();
+-  const char* end = source.end();
++  const char* end = p + source.size();
+   const char* last_byte = end - 1;
+ 
+   while (p < end) {
+@@ -446,7 +446,9 @@ std::string EscapeInternal(absl::string_view src, bool escape_all_bytes,
+   // byte.
+   dest.reserve(src.size() * 4);
+   bool last_hex_escape = false;  // true if last output char was \xNN.
+-  for (const char* p = src.begin(); p < src.end(); ++p) {
++  const char* p = src.data();
++  const char* end = p + src.size();
++  for (; p < end; ++p) {
+     unsigned char c = static_cast<unsigned char>(*p);
+     bool is_hex_escape = false;
+     switch (c) {
+@@ -552,7 +554,9 @@ std::string EscapeString(absl::string_view str) {
+ std::string EscapeBytes(absl::string_view str, bool escape_all_bytes,
+                         char escape_quote_char) {
+   std::string escaped_bytes;
+-  for (const char* p = str.begin(); p < str.end(); ++p) {
++  const char* p = str.data();
++  const char* end = p + str.size();
++  for (; p < end; ++p) {
+     unsigned char c = *p;
+     if (escape_all_bytes || !absl::ascii_isprint(c)) {
+       escaped_bytes += "\\x";
 diff --git a/tools/flatbuffers_backed_impl.cc b/tools/flatbuffers_backed_impl.cc
 index 10c0b1c..45ba72f 100644
 --- a/tools/flatbuffers_backed_impl.cc
