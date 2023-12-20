@@ -16,6 +16,20 @@ index fb3e845..a08a5f7 100644
  static_assert(std::is_trivially_destructible_v<absl::Time>,
                "absl::Time must be trivially destructible.");
  
+diff --git a/base/memory.h b/base/memory.h
+index 3552e19..bd2bd9b 100644
+--- a/base/memory.h
++++ b/base/memory.h
+@@ -164,7 +164,8 @@ std::enable_if_t<IsDerivedHeapDataV<F>, Handle<T>> HandleFactory<T>::Make(
+     MemoryManagerRef memory_manager, Args&&... args) {
+   static_assert(std::is_base_of_v<T, F>, "F is not derived from T");
+ #if defined(__cpp_lib_is_pointer_interconvertible) && \
+-    __cpp_lib_is_pointer_interconvertible >= 201907L
++    __cpp_lib_is_pointer_interconvertible >= 201907L && \
++    !defined(WIN32)
+   // Only available in C++20.
+   static_assert(std::is_pointer_interconvertible_base_of_v<Data, F>,
+                 "F must be pointer interconvertible to Data");
 diff --git a/base/value.h b/base/value.h
 index 5d94d5e..d53370c 100644
 --- a/base/value.h
