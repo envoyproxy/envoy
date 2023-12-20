@@ -73,6 +73,10 @@ bool DrainManagerImpl::drainClose() const {
   const auto drain_time = server_.options().drainTime();
   ASSERT(server_.options().drainTime() >= remaining_time);
   const auto drain_time_count = drain_time.count();
+
+  // If the user hasn't specified a drain timeout it will be zero, so we'll go
+  // and and close immediately. Otherwise we'll use the drain timeout as a modulus
+  // to a random number to salt the drain timing.
   if (drain_time_count == 0) {
     return true;
   }
@@ -90,14 +94,20 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) c
 
     // Calculate the delay. If using an immediate drain-strategy or past our deadline, use
     // a zero millisecond delay. Otherwise, pick a random value within the remaining time-span.
-    std::chrono::milliseconds drain_delay =
-        (server_.options().drainStrategy() != Server::DrainStrategy::Immediate &&
-         current_time < drain_deadline_)
-            ? std::chrono::milliseconds(server_.api().randomGenerator().random() %
-                                        std::chrono::duration_cast<std::chrono::milliseconds>(
-                                            drain_deadline_ - current_time)
-                                            .count())
-            : std::chrono::milliseconds{0};
+    std::chrono::milliseconds drain_delay{0};
+    if (server_.options().drainStrategy() != Server::DrainStrategy::Immediate) {
+      if (current_time < drain_deadline_) {
+        auto ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(drain_deadline_ - current_time)
+                .count();
+        // Note; current_time may be less than drain_deadline_ by a microsecond, and
+        // when we round to milliseconds that might be 0, which would throw an arithmetic
+        // exception if used as a modulus.
+        if (ms > 0) {
+          drain_delay = std::chrono::milliseconds(server_.api().randomGenerator().random() % ms);
+        }
+      }
+    }
     cb(drain_delay);
     return nullptr;
   }
