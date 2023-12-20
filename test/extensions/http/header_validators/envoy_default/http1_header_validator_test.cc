@@ -610,7 +610,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
   EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
   // The transform method should normalize path
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir2");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
@@ -781,7 +781,7 @@ TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInPathAllowed) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Note that \ is translated to / and [] remain unencoded
-  EXPECT_EQ(headers.path(), "/path/with%22%3C%3E[]%5E%60%7B%7D/%7C");
+  EXPECT_EQ(headers.getPathValue(), "/path/with%22%3C%3E[]%5E%60%7B%7D/%7C");
 }
 
 // Validate that without path normalization additional characters remain untouched
@@ -796,7 +796,7 @@ TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInPathAllowedWithoutPathNor
       {":path", absl::StrCat("/path/with", AdditionallyAllowedCharacters)}};
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), R"str(/path/with"<>[]^`{}\|)str");
+  EXPECT_EQ(headers.getPathValue(), R"str(/path/with"<>[]^`{}\|)str");
 }
 
 TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInQueryAllowed) {
@@ -814,7 +814,7 @@ TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInQueryAllowed) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Additional characters in query always remain untouched
-  EXPECT_EQ(headers.path(), R"str(/path/with?value="<>[]^`{}\|)str");
+  EXPECT_EQ(headers.getPathValue(), R"str(/path/with?value="<>[]^`{}\|)str");
 }
 
 TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInFragmentAllowed) {
@@ -832,7 +832,7 @@ TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInFragmentAllowed) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // UHV strips fragment from URL path
-  EXPECT_EQ(headers.path(), "/path/with?value=aaa");
+  EXPECT_EQ(headers.getPathValue(), "/path/with?value=aaa");
 }
 
 } // namespace

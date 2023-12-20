@@ -13,7 +13,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/union_string.h"
 #include "envoy/http/header_formatter.h"
-#include "envoy/tracing/trace_context.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
@@ -728,8 +727,7 @@ public:
 // Request headers.
 class RequestHeaderMap
     : public RequestOrResponseHeaderMap,
-      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders>,
-      public Tracing::TraceContext {
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders> {
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)

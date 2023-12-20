@@ -90,6 +90,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
+        "//source/common/listener_manager:listener_info_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_stat_names_lib",

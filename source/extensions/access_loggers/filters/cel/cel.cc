@@ -9,17 +9,18 @@ namespace CEL {
 namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
 CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
-    Expr::BuilderInstanceSharedPtr builder, const google::api::expr::v1alpha1::Expr& input_expr)
-    : builder_(builder), parsed_expr_(input_expr) {
+    const ::Envoy::LocalInfo::LocalInfo& local_info, Expr::BuilderInstanceSharedPtr builder,
+    const google::api::expr::v1alpha1::Expr& input_expr)
+    : local_info_(local_info), builder_(builder), parsed_expr_(input_expr) {
   compiled_expr_ = Expr::createExpression(builder_->builder(), parsed_expr_);
 }
 
 bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext& log_context,
                                            const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
-  auto eval_status =
-      Expr::evaluate(*compiled_expr_, arena, stream_info, &log_context.requestHeaders(),
-                     &log_context.responseHeaders(), &log_context.responseTrailers());
+  auto eval_status = Expr::evaluate(*compiled_expr_, arena, &local_info_, stream_info,
+                                    &log_context.requestHeaders(), &log_context.responseHeaders(),
+                                    &log_context.responseTrailers());
   if (!eval_status.has_value() || eval_status.value().IsError()) {
     return false;
   }

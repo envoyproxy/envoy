@@ -138,8 +138,8 @@ genHeaders(const std::string& host, const std::string& path, const std::string& 
   }
 
   if (random_value_pair.has_value()) {
-    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair.value().first),
-                  random_value_pair.value().second);
+    hdrs.setCopy(Envoy::Http::LowerCaseString(random_value_pair.value().first),
+                 random_value_pair.value().second);
   }
   return hdrs;
 }
