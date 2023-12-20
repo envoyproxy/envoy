@@ -856,7 +856,8 @@ private:
     };
 
     FakeListener(FakeUpstream& parent, bool is_quic = false)
-        : parent_(parent), name_("fake_upstream"), init_manager_(nullptr) {
+        : parent_(parent), name_("fake_upstream"), init_manager_(nullptr),
+          listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
@@ -898,7 +899,9 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
-    const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
+    const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+      return listener_info_;
+    }
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
     uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
@@ -918,7 +921,7 @@ private:
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
-    testing::NiceMock<Network::MockListenerInfo> listener_info_;
+    const Network::ListenerInfoConstSharedPtr listener_info_;
   };
 
   void threadRoutine();

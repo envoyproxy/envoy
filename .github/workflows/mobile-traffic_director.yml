@@ -4,9 +4,9 @@ permissions:
   contents: read
 
 on:
-  schedule:
-  # Once a day at midnight.
-  - cron: '0 0 * * *'
+  # Disabled scheduled runs until https://github.com/envoyproxy/envoy/issues/31416 is resolved.
+  # schedule:
+  # - cron: '0 0 * * *'
   # Allows manual triggering in the UI. Makes it easier to test.
   workflow_dispatch:
 

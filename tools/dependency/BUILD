@@ -32,7 +32,7 @@ envoy_genjson(
     srcs = ["//bazel:all_repository_locations"],
     filter = """
     .[0]
-    | del(.edenhill_librdkafka)
+    | del(.confluentinc_librdkafka)
     """,
 )
 

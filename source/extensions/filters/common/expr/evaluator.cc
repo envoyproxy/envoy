@@ -64,23 +64,26 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
     return CelValue::CreateMap(
         Protobuf::Arena::Create<FilterStateWrapper>(arena, *arena, info.filterState()));
   case ActivationToken::XDS:
-    return CelValue::CreateMap(Protobuf::Arena::Create<XDSWrapper>(arena, *arena, info));
-  };
+    return CelValue::CreateMap(
+        Protobuf::Arena::Create<XDSWrapper>(arena, *arena, info, local_info_));
+  }
   return {};
 }
 
 void StreamActivation::resetActivation() const {
+  local_info_ = nullptr;
   activation_info_ = nullptr;
   activation_request_headers_ = nullptr;
   activation_response_headers_ = nullptr;
   activation_response_trailers_ = nullptr;
 }
 
-ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
+ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
+                               const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers) {
-  return std::make_unique<StreamActivation>(info, request_headers, response_headers,
+  return std::make_unique<StreamActivation>(local_info, info, request_headers, response_headers,
                                             response_trailers);
 }
 
@@ -131,11 +134,13 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 }
 
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
+                                  const LocalInfo::LocalInfo* local_info,
                                   const StreamInfo::StreamInfo& info,
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers) {
-  auto activation = createActivation(info, request_headers, response_headers, response_trailers);
+  auto activation =
+      createActivation(local_info, info, request_headers, response_headers, response_trailers);
   auto eval_status = expr.Evaluate(*activation, &arena);
   if (!eval_status.ok()) {
     return {};
@@ -147,7 +152,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers) {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr);
+  auto eval_status = Expr::evaluate(expr, arena, nullptr, info, &headers, nullptr, nullptr);
   if (!eval_status.has_value()) {
     return false;
   }
