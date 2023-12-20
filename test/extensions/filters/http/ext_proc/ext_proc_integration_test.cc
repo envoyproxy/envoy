@@ -126,13 +126,21 @@ protected:
         envoy::config::listener::v3::Filter set_metadata_filter;
         std::string set_metadata_filter_name = "envoy.filters.http.set_metadata";
         set_metadata_filter.set_name(set_metadata_filter_name);
-        envoy::extensions::filters::http::set_metadata::v3::Config set_metadata_config;
-        set_metadata_config.set_metadata_namespace("forwarding_ns_untyped");
 
+        envoy::extensions::filters::http::set_metadata::v3::Config set_metadata_config;
+        auto* untyped_md = set_metadata_config.add_metadata();
+        untyped_md->set_metadata_namespace("forwarding_ns_untyped");
+        untyped_md->set_allow_overwrite(true);
         ProtobufWkt::Struct test_md_val;
         (*test_md_val.mutable_fields())["foo"].set_string_value("value from set_metadata");
-        auto mut_val = set_metadata_config.mutable_value();
-        *mut_val = test_md_val;
+        (*untyped_md->mutable_value()) = test_md_val;
+
+        auto* typed_md = set_metadata_config.add_metadata();
+        typed_md->set_metadata_namespace("forwarding_ns_typed");
+        typed_md->set_allow_overwrite(true);
+        envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
+        typed_md_to_stuff.set_metadata_namespace("typed_value from set_metadata");
+        typed_md->mutable_typed_value()->PackFrom(typed_md_to_stuff);
 
         set_metadata_filter.mutable_typed_config()->PackFrom(set_metadata_config);
         config_helper_.prependFilter(
@@ -3364,6 +3372,15 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
         EXPECT_EQ(1, fwd_metadata.fields_size());
         EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
         EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
+
+        EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
+        const ProtobufWkt::Any& fwd_typed_metadata =
+            req.metadata_context().typed_filter_metadata().at("forwarding_ns_untyped");
+        EXPECT_EQ("type.googleapis.com/envoy.filters.http.ext_proc.v3.Metadata",
+                  fwd_typed_metadata.type_url());
+        envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
+        fwd_typed_metadata.UnpackTo(&typed_md_from_req);
+        EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
 
         HeadersResponse headers_resp;
         (*resp.mutable_request_headers()) = headers_resp;
