@@ -24,7 +24,6 @@ DatadogTracerFactory::makeConfig(const envoy::config::trace::v3::DatadogConfig& 
   datadog::tracing::TracerConfig config;
   config.defaults.version = "envoy " + Envoy::VersionInfo::version();
   config.defaults.name = "envoy.proxy";
-  config.runtime_id = datadog::tracing::RuntimeID::generate();
   if (proto_config.service_name().empty()) {
     config.defaults.service = "envoy";
   } else {
