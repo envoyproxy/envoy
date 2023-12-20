@@ -4,34 +4,43 @@ permissions:
   contents: read
 
 on:
-  # Disabled scheduled runs until https://github.com/envoyproxy/envoy/issues/31416 is resolved.
-  # schedule:
-  # - cron: '0 0 * * *'
+  schedule:
+  # Once a day at midnight.
+  - cron: '0 0 * * *'
   # Allows manual triggering in the UI. Makes it easier to test.
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.head_ref || github.run_id }}-github.workflow
-  cancel-in-progress: true
-
 jobs:
   cc-tests:
-    name: cc-tests
-    uses: ./.github/workflows/_mobile_container_ci.yml
-    secrets:
-      gcp-traffic-key: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
     permissions:
-      actions: read
       contents: read
-      packages: read
-      pull-requests: read
-    with:
-      args: >-
-        run
-        --config=mobile-remote-ci
-        --config=ci
-        --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-        //test/non_hermetic:gcp_traffic_director_integration_test
-      request: ${{ needs.load.outputs.request }}
-      target: cc-tests
-      timeout-minutes: 90
+      statuses: read
+    name: Traffic Director
+    runs-on: ubuntu-22.04
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run Traffic Director integration test
+      env:
+        GCP_TEST_PROJECT_API_KEY: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
+      run: |
+        cd mobile
+        ./bazelw run \
+            --config=mobile-remote-ci \
+            --config=ci \
+            //test/non_hermetic:gcp_traffic_director_integration_test
+    # with:
+    #   args: >-
+    #     run
+    #     --config=mobile-remote-ci
+    #     --config=ci
+    #     --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+    #     //test/non_hermetic:gcp_traffic_director_integration_test
+    #   request: ${{ needs.load.outputs.request }}
+    #   target: cc-tests
+    #   timeout-minutes: 90
