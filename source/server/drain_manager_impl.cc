@@ -74,9 +74,9 @@ bool DrainManagerImpl::drainClose() const {
   ASSERT(server_.options().drainTime() >= remaining_time);
   const auto drain_time_count = drain_time.count();
 
-  // If the user hasn't specified a drain timeout it will be zero, so we'll go
-  // and and close immediately. Otherwise we'll use the drain timeout as a modulus
-  // to a random number to salt the drain timing.
+  // If the user hasn't specified a drain timeout it will be zero, so we'll
+  // confirm the drainClose immediately. Otherwise we'll use the drain timeout
+  // as a modulus to a random number to salt the drain timing.
   if (drain_time_count == 0) {
     return true;
   }
