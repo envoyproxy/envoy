@@ -16,6 +16,19 @@ index fb3e845..a08a5f7 100644
  static_assert(std::is_trivially_destructible_v<absl::Time>,
                "absl::Time must be trivially destructible.");
  
+diff --git a/base/value.h b/base/value.h
+index 5d94d5e..d53370c 100644
+--- a/base/value.h
++++ b/base/value.h
+@@ -336,8 +336,6 @@ CEL_INTERNAL_VALUE_DECL(Value);
+ }  // namespace cel
+ 
+ #define CEL_INTERNAL_SIMPLE_VALUE_STANDALONES(value_class)       \
+-  static_assert(std::is_trivially_copyable_v<value_class>,       \
+-                #value_class " must be trivially copyable");     \
+   static_assert(std::is_trivially_destructible_v<value_class>,   \
+                 #value_class " must be trivially destructible"); \
+                                                                  \
 diff --git a/common/memory.h b/common/memory.h
 index 35a766b..c32e039 100644
 --- a/common/memory.h
