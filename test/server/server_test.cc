@@ -643,15 +643,15 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
 }
 
 class ServerInstanceImplWorkersTest : public ServerInstanceImplTest {
- protected:
-  Thread::ThreadPtr startServerAndWaitForWorkersToStart() {
+protected:
+  ServerInstanceImplWorkersTest() {
     bool workers_started = false;
 
     // Expect drainParentListeners not to be called before workers start.
     EXPECT_CALL(restart_, drainParentListeners).Times(0);
 
     // Run the server in a separate thread so we can test different lifecycle stages.
-    auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    server_thread_ = Thread::threadFactoryForTest().createThread([&] {
       auto hooks = CustomListenerHooks([&]() {
         workers_started = true;
         workers_started_fired_.Notify();
@@ -666,76 +666,57 @@ class ServerInstanceImplWorkersTest : public ServerInstanceImplTest {
     workers_started_fired_.WaitForNotification();
     EXPECT_TRUE(workers_started);
     EXPECT_CALL(restart_, drainParentListeners);
-    return server_thread;
+  }
+
+  ~ServerInstanceImplWorkersTest() {
+    server_->dispatcher().post([&] { server_->shutdown(); });
+    server_thread_->join();
   }
 
   absl::Notification workers_started_fired_;
   absl::Notification workers_started_block_;
+  Thread::ThreadPtr server_thread_;
 };
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplWorkersTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ServerInstanceImplWorkersTest, DrainParentListenerAfterWorkersStarted) {
-  auto server_thread = startServerAndWaitForWorkersToStart();
   EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
-
   workers_started_block_.Notify();
-
-  server_->dispatcher().post([&] { server_->shutdown(); });
-  server_thread->join();
 }
 
-TEST_P(ServerInstanceImplTest, DrainCloseAfterWorkersStarted) {
-  bool workers_started = false;
-  absl::Notification workers_started_fired, workers_started_block, drain_closes_started,
-      drain_complete;
-  // Expect drainParentListeners not to be called before workers start.
-  EXPECT_CALL(restart_, drainParentListeners).Times(0);
-
-  // Run the server in a separate thread so we can test different lifecycle stages.
-  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
-    auto hooks = CustomListenerHooks([&]() {
-      workers_started = true;
-      workers_started_fired.Notify();
-      workers_started_block.WaitForNotification();
-    });
-    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
-    server_->run();
-    server_ = nullptr;
-    thread_local_ = nullptr;
-  });
-
-  workers_started_fired.WaitForNotification();
-  EXPECT_TRUE(workers_started);
-  EXPECT_CALL(restart_, drainParentListeners);
-  workers_started_block.Notify();
+TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
+  absl::Notification drain_closes_started, drain_complete;
+  workers_started_block_.Notify();
 
   DrainManager& drain_manager = server_->drainManager();
-  auto drain_thread =
-      Thread::threadFactoryForTest().createThread([&] {
-        bool cont = true, notified = false;
-        while (cont) {
-          cont = !drain_manager.drainClose();
-          if (!notified) {
-            drain_closes_started.Notify();
-            notified = true;
-          }
-        }
-      });
 
-  server_->dispatcher().post([&] {
-    drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); });
+  // To reproduce the race condition from
+  // https://github.com/envoyproxy/envoy/issues/31457 we make sure that the
+  // infinite drainClose spin-loop (mimicing high traffic) is running before we
+  // initiate the drain sequence.
+  auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
+    bool cont = true, notified = false;
+    while (cont) {
+      cont = !drain_manager.drainClose();
+      if (!notified) {
+        drain_closes_started.Notify();
+        notified = true;
+      }
+    }
   });
-
   drain_closes_started.WaitForNotification();
+
+  // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
+  // wait for that to complete.
+  server_->dispatcher().post(
+      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+
   drain_complete.WaitForNotification();
   drain_thread->join();
-
-  server_->dispatcher().post([&] { server_->shutdown(); });
-  //server_->shutdown();
-  server_thread->join();
 }
 
 // A test target which never signals that it is ready.

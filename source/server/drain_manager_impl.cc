@@ -78,7 +78,7 @@ bool DrainManagerImpl::drainClose() const {
   }
   const auto elapsed_time = drain_time - remaining_time;
   return static_cast<uint64_t>(elapsed_time.count()) >
-      (server_.api().randomGenerator().random() % drain_time_count);
+         (server_.api().randomGenerator().random() % drain_time_count);
 }
 
 Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
@@ -140,7 +140,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   // (https://en.cppreference.com/w/cpp/chrono/time_point/time_point).
   ASSERT(drain_deadline_.time_since_epoch().count() == 0, "drain_deadline_ cannot be set twice.");
 
-  // Since draining_ is atomic, it is safet to set drain_deadline_ without a mutex
+  // Since draining_ is atomic, it is safe to set drain_deadline_ without a mutex
   // as drain_close() only reads from drain_deadline_ if draining_ is true, and
   // C++ will not re-order an assign to an atomic. See
   // https://stackoverflow.com/questions/40320254/reordering-atomic-operations-in-c .
