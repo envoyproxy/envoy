@@ -412,6 +412,12 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsAfterComplete) {
   explicitFlowControlWithCancels(100);
 }
 
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsAfterCompleteEngineCancel) {
+  explicit_flow_control_ = true;
+  initialize();
+  explicitFlowControlWithCancels(100);
+}
+
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   if (getCodecType() != Http::CodecType::HTTP1) {
     return;
