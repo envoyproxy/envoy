@@ -4,6 +4,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
+
+using HttpExtensionConfigProviderSharedPtr = std::shared_ptr<
+    Config::DynamicExtensionConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>;
+
 void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
   cb_(callbacks);
 }
@@ -32,9 +36,10 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     auto provider_manager =
         Envoy::Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
             server_factory_context);
-    auto provider = provider_manager->createDynamicFilterConfigProvider(
-        config_discovery, composite_action.dynamic_config().name(), server_factory_context,
-        factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
+    HttpExtensionConfigProviderSharedPtr provider =
+        provider_manager->createDynamicFilterConfigProvider(
+            config_discovery, composite_action.dynamic_config().name(), server_factory_context,
+            factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
     return [provider = std::move(provider)]() -> Matcher::ActionPtr {
       auto config_value = provider->config();
       if (config_value.has_value()) {
