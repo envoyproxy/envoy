@@ -177,8 +177,11 @@ following attributes:
    :header: Attribute, Type, Description
    :widths: 1, 1, 4
 
+   xds.node, :ref:`Node<envoy_v3_api_msg_config.core.v3.node>`, Local node description
    xds.cluster_name, string, Upstream cluster name
    xds.cluster_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream cluster metadata
+   xds.listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`
+   xds.listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata
    xds.route_name, string, Route name
    xds.route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata
    xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
@@ -197,14 +200,14 @@ In addition to all above, the following extra attributes are available to Wasm e
    plugin_name, string, Plugin name
    plugin_root_id, string, Plugin root ID
    plugin_vm_id, string, Plugin VM ID
-   node, :ref:`Node<envoy_v3_api_msg_config.core.v3.node>`, Local node description
-   cluster_name, string, Upstream cluster name
-   cluster_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream cluster metadata
-   listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`
-   listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata
-   route_name, string, Route name
-   route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata
-   upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
+   node, :ref:`Node<envoy_v3_api_msg_config.core.v3.node>`, Local node description. DEPRECATED: please use `xds` attributes.
+   cluster_name, string, Upstream cluster name. DEPRECATED: please use `xds` attributes.
+   cluster_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream cluster metadata. DEPRECATED: please use `xds` attributes.
+   listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`. DEPRECATED: please use `xds` attributes.
+   listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata. DEPRECATED: please use `xds` attributes.
+   route_name, string, Route name. DEPRECATED: please use `xds` attributes.
+   route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata. DEPRECATED: please use `xds` attributes.
+   upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata. DEPRECATED: please use `xds` attributes.
 
 Path expressions
 ----------------

@@ -85,7 +85,7 @@ configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
     configure_options = ["--disable-ssl --disable-gssapi --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
-    lib_source = "@edenhill_librdkafka//:all",
+    lib_source = "@confluentinc_librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
         "librdkafka++.a",

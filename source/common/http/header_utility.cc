@@ -650,12 +650,12 @@ std::string HeaderUtility::addEncodingToAcceptEncoding(absl::string_view accept_
 }
 
 bool HeaderUtility::isStandardConnectRequest(const Http::RequestHeaderMap& headers) {
-  return headers.method() == Http::Headers::get().MethodValues.Connect &&
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
          headers.getProtocolValue().empty();
 }
 
 bool HeaderUtility::isExtendedH2ConnectRequest(const Http::RequestHeaderMap& headers) {
-  return headers.method() == Http::Headers::get().MethodValues.Connect &&
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
          !headers.getProtocolValue().empty();
 }
 
