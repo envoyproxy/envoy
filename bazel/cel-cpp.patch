@@ -1,3 +1,21 @@
+diff --git a/base/internal/value.h b/base/internal/value.h
+index fb3e845..a08a5f7 100644
+--- a/base/internal/value.h
++++ b/base/internal/value.h
+@@ -55,13 +55,9 @@ NativeTypeId GetListValueTypeId(const ListValue& list_value);
+ 
+ NativeTypeId GetMapValueTypeId(const MapValue& map_value);
+ 
+-static_assert(std::is_trivially_copyable_v<absl::Duration>,
+-              "absl::Duration must be trivially copyable.");
+ static_assert(std::is_trivially_destructible_v<absl::Duration>,
+               "absl::Duration must be trivially destructible.");
+ 
+-static_assert(std::is_trivially_copyable_v<absl::Time>,
+-              "absl::Time must be trivially copyable.");
+ static_assert(std::is_trivially_destructible_v<absl::Time>,
+               "absl::Time must be trivially destructible.");
+ 
 diff --git a/common/memory.h b/common/memory.h
 index 35a766b..c32e039 100644
 --- a/common/memory.h
