@@ -21,7 +21,8 @@ typed_config:
   default_language: {}
   supported_languages: {}
 )EOF";
-    config_helper_.prependFilter(fmt::format(yaml, default_language, supported_languages));
+    config_helper_.prependFilter(
+        fmt::format(fmt::runtime(yaml), default_language, supported_languages));
   }
 };
 
