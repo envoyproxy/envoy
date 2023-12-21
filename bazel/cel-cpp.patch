@@ -57,6 +57,19 @@ index 5d94d5e..d53370c 100644
    static_assert(std::is_trivially_destructible_v<value_class>,   \
                  #value_class " must be trivially destructible"); \
                                                                   \
+diff --git a/eval/public/cel_value.cc b/eval/public/cel_value.cc
+index 6aeff6d..c43864c 100644
+--- a/eval/public/cel_value.cc
++++ b/eval/public/cel_value.cc
+@@ -107,7 +107,7 @@ struct DebugStringVisitor {
+ 
+ }  // namespace
+ 
+-const absl::string_view kPayloadUrlMissingAttributePath =
++ABSL_CONST_INIT const absl::string_view kPayloadUrlMissingAttributePath =
+     cel::runtime_internal::kPayloadUrlMissingAttributePath;
+ 
+ CelValue CelValue::CreateDuration(absl::Duration value) {
 diff --git a/internal/strings.cc b/internal/strings.cc
 index dc5a118..24457ab 100644
 --- a/internal/strings.cc
