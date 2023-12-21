@@ -10,12 +10,13 @@ namespace Lua {
 PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
     : lua_state_(lua_code, tls) {
   lua_state_.registerType<HeaderMapWrapper>();
+  lua_state_.registerType<RouteHandleWrapper>();
 
   const Filters::Common::Lua::InitializerList initializers;
 
-  cluster_function_slot_ = lua_state_.registerGlobal("envoy_on_cluster", initializers);
+  cluster_function_slot_ = lua_state_.registerGlobal("envoy_on_route", initializers);
   if (lua_state_.getGlobalRef(cluster_function_slot_) == LUA_REFNIL) {
-    ENVOY_LOG(info, "envoy_on_cluster() function not found. Lua will not hook cluster specifier.");
+    ENVOY_LOG(info, "envoy_on_route() function not found. Lua will not hook cluster specifier.");
   }
 }
 
@@ -30,6 +31,15 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   } else {
     return 0;
   }
+}
+
+int RouteHandleWrapper::luaHeaders(lua_State* state) {
+  if (headers_wrapper_.get() != nullptr) {
+    headers_wrapper_.pushStack();
+  } else {
+    headers_wrapper_.reset(HeaderMapWrapper::create(state, headers_), true);
+  }
+  return 1;
 }
 
 LuaClusterSpecifierConfig::LuaClusterSpecifierConfig(
@@ -51,8 +61,8 @@ std::string LuaClusterSpecifierPlugin::startLua(const Http::HeaderMap& headers) 
   }
   Filters::Common::Lua::CoroutinePtr coroutine = config_->perLuaCodeSetup()->createCoroutine();
 
-  HeaderHandleRef handle;
-  handle.reset(HeaderMapWrapper::create(coroutine->luaState(), headers), true);
+  RouteHandleRef handle;
+  handle.reset(RouteHandleWrapper::create(coroutine->luaState(), headers), true);
 
   TRY_NEEDS_AUDIT {
     coroutine->start(function_ref_, 1, []() {});

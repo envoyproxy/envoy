@@ -21,8 +21,8 @@ TEST(LuaClusterSpecifierPluginConfigTest, NormalConfig) {
   const std::string normal_lua_config_yaml = R"EOF(
   source_code:
     inline_string: |
-      function envoy_on_cluster(header_handle)
-        local header_value = header_handle:get("header_key")
+      function envoy_on_route(route_handle)
+        local header_value = route_handle:headers():get("header_key")
         if header_value == "fake" then
           return "fake_service"
         end

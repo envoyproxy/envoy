@@ -49,7 +49,25 @@ private:
   const Http::HeaderMap& headers_;
 };
 
-using HeaderHandleRef = Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper>;
+using HeaderMapRef = Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper>;
+
+class RouteHandleWrapper : public Filters::Common::Lua::BaseLuaObject<RouteHandleWrapper> {
+public:
+  RouteHandleWrapper(const Http::HeaderMap& headers) : headers_(headers) {}
+
+  static ExportedFunctions exportedFunctions() { return {{"headers", static_luaHeaders}}; }
+
+private:
+  /**
+   * @return a handle to the headers.
+   */
+  DECLARE_LUA_FUNCTION(RouteHandleWrapper, luaHeaders);
+
+  const Http::HeaderMap& headers_;
+  HeaderMapRef headers_wrapper_;
+};
+
+using RouteHandleRef = Filters::Common::Lua::LuaDeathRef<RouteHandleWrapper>;
 
 class LuaClusterSpecifierConfig : Logger::Loggable<Logger::Id::lua> {
 public:

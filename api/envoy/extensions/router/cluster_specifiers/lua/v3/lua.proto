@@ -22,6 +22,6 @@ message LuaConfig {
   // The lua code that Envoy will execute to select cluster.
   config.core.v3.DataSource source_code = 1 [(validate.rules).message = {required: true}];
 
-  // Default cluster. It will be used when the lua code has no envoy_on_cluster function or execute failure.
+  // Default cluster. It will be used when the lua code has no envoy_on_route function or execute failure.
   string default_cluster = 2;
 }

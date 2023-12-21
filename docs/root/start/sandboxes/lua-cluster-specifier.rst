@@ -15,7 +15,7 @@ Envoy proxy.
 
 The example Envoy proxy configuration includes a Lua cluster specifier plugin that contains a function:
 
-- ``envoy_on_cluster(header_handle)``
+- ``envoy_on_route(route_handle)``
 
 :ref:`See here <config_http_cluster_specifier_lua>` for an overview of Envoy's Lua cluster specifier
 and documentation regarding the function.
