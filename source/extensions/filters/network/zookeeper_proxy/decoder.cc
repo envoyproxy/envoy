@@ -853,22 +853,29 @@ absl::Status DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeTy
   bool has_full_packets = false;
 
   while (offset < data_len) {
-    // Peek packet length.
-    len = helper_.peekInt32(data, offset);
-    EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
-        len, fmt::format("peekInt32 for len: {}", len.status().message()));
+    TRY_NEEDS_AUDIT {
+      // Peek packet length.
+      len = helper_.peekInt32(data, offset);
+      EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
+          len, fmt::format("peekInt32 for len: {}", len.status().message()));
 
-    status = ensureMinLength(len.value(), dtype == DecodeType::READ
-                                              ? XID_LENGTH + INT_LENGTH
-                                              : XID_LENGTH + ZXID_LENGTH + INT_LENGTH);
-    EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
+      status = ensureMinLength(len.value(), dtype == DecodeType::READ
+                                                ? XID_LENGTH + INT_LENGTH
+                                                : XID_LENGTH + ZXID_LENGTH + INT_LENGTH);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
-    status = ensureMaxLength(len.value());
-    EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
+      status = ensureMaxLength(len.value());
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status);
 
-    offset += len.value();
-    if (offset <= data_len) {
-      has_full_packets = true;
+      offset += len.value();
+      if (offset <= data_len) {
+        has_full_packets = true;
+      }
+    }
+    END_TRY catch (const EnvoyException& e) {
+      IS_ENVOY_BUG(fmt::format("zookeeper_proxy: decodeAndBufferHelper exception {}", e.what()));
+      callbacks_.onDecodeError();
+      return;
     }
   }
 
@@ -905,36 +912,42 @@ absl::Status DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeTy
 void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full_packets_len) {
   uint64_t offset = 0;
 
-  while (offset < full_packets_len) {
-    // Reset the helper's cursor, to ensure the current message stays within the
-    // allowed max length, even when it's different than the declared length
-    // by the message.
-    //
-    // Note: we need to keep two cursors — offset and helper_'s internal one — because
-    //       a buffer may contain multiple messages, so offset is global while helper_'s
-    //       internal cursor gets reset for each individual message.
-    helper_.reset();
+  TRY_NEEDS_AUDIT {
+    while (offset < full_packets_len) {
+      // Reset the helper's cursor, to ensure the current message stays within the
+      // allowed max length, even when it's different than the declared length
+      // by the message.
+      //
+      // Note: we need to keep two cursors — offset and helper_'s internal one — because
+      //       a buffer may contain multiple messages, so offset is global while helper_'s
+      //       internal cursor gets reset for each individual message.
+      helper_.reset();
 
-    const uint64_t current = offset;
-    absl::StatusOr<absl::optional<OpCodes>> opcode;
-    switch (dtype) {
-    case DecodeType::READ:
-      opcode = decodeOnData(data, offset);
-      if (opcode.ok()) {
-        callbacks_.onRequestBytes(opcode.value(), offset - current);
-        break;
+      const uint64_t current = offset;
+      absl::StatusOr<absl::optional<OpCodes>> opcode;
+      switch (dtype) {
+      case DecodeType::READ:
+        opcode = decodeOnData(data, offset);
+        if (opcode.ok()) {
+          callbacks_.onRequestBytes(opcode.value(), offset - current);
+          break;
+        }
+        ENVOY_LOG(debug, "zookeeper_proxy: decodeOnData exception: {}", opcode.status().message());
+        return;
+      case DecodeType::WRITE:
+        opcode = decodeOnWrite(data, offset);
+        if (opcode.ok()) {
+          callbacks_.onResponseBytes(opcode.value(), offset - current);
+          break;
+        }
+        ENVOY_LOG(debug, "zookeeper_proxy: decodeOnWrite exception: {}", opcode.status().message());
+        return;
       }
-      ENVOY_LOG(debug, "zookeeper_proxy: decodeOnData exception: {}", opcode.status().message());
-      return;
-    case DecodeType::WRITE:
-      opcode = decodeOnWrite(data, offset);
-      if (opcode.ok()) {
-        callbacks_.onResponseBytes(opcode.value(), offset - current);
-        break;
-      }
-      ENVOY_LOG(debug, "zookeeper_proxy: decodeOnWrite exception: {}", opcode.status().message());
-      return;
     }
+  }
+  END_TRY catch (const EnvoyException& e) {
+    IS_ENVOY_BUG(fmt::format("zookeeper_proxy: decode exception {}", e.what()));
+    callbacks_.onDecodeError();
   }
 }
 
