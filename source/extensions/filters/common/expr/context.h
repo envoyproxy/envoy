@@ -125,6 +125,7 @@ public:
   }
   int size() const override { return ListKeys().value()->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     if (value_ == nullptr) {
       return &WrapperFields::get().Empty;
