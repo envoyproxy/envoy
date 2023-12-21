@@ -85,6 +85,14 @@ public:
   joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
 
   /**
+   * Get the Security Token Service endpoint for a given region: sts.<region>.amazonaws.com
+   * See: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region
+   * @param region An AWS region.
+   * @return an sts endpoint url.
+   */
+  static std::string getSTSEndpoint(absl::string_view region);
+
+  /**
    * Fetch AWS instance or task metadata.
    *
    * @param message An HTTP request.

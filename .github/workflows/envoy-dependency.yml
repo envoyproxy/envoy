@@ -48,36 +48,59 @@ jobs:
       (${{ inputs.pr && 'PR/' || '' }}${{ inputs.task == 'bazel' && 'bazel' || 'bazel/api' }}/${{ inputs.dependency }}/${{ inputs.version }})
     runs-on: ubuntu-22.04
     steps:
-    - id: checkout
-      name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
+    - id: appauth
+      name: Appauth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.19
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
-        app_key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - id: version
-      name: Shorten (possible) SHA
-      uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.8
+        key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.19
       with:
-        string: ${{ inputs.version }}
-        length: 7
-        min: 40
-    - run: |
-        echo "Updating(${TASK}): ${DEPENDENCY} -> ${VERSION}"
-        bazel run --config=ci //bazel:${TARGET} $DEPENDENCY $VERSION
-      name: Update dependency
+        token: ${{ steps.appauth.outputs.token }}
+    - uses: envoyproxy/toolshed/gh-actions/bson@actions-v0.2.19
+      id: update
+      name: Update dependency (${{ inputs.dependency }})
+      with:
+        input: |
+          dependency: ${{ inputs.dependency }}
+          task: ${{ inputs.task }}
+          version: "${{ inputs.version }}"
+        input-format: yaml
+        filter: |
+          .version as $version
+          | .dependency as $dependency
+          | .task as $task
+          | (try ($version | validate::sha(40) | .[:7])
+             catch $version) as $version_short
+          | {}
+          | if $task == "bazel" then
+              .
+              | .task = "bazel"
+              | .target = "update"
+            else
+              .
+              | .task = "api/bazel"
+              | .target = "api-update"
+            end
+          | .task as $task
+          | .target as $target
+          | ("
+          echo \"Updating(\($task)): \($dependency) -> \($version_short)\"
+          bazel run --config=ci //bazel:\($target) \($dependency) \($version)
+          OUTPUT=\($version_short)
+          " | bash::output)
       env:
-        DEPENDENCY: ${{ inputs.dependency }}
-        VERSION: ${{ inputs.version }}
-        TARGET: ${{ inputs.task == 'bazel' && 'update' || 'api-update' }}
-        TASK: ${{ inputs.task == 'bazel' && 'bazel' || 'api/bazel' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.1.8
+
+    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.2.19
       name: Upload diff
       with:
-        name: ${{ inputs.dependency }}-${{ steps.version.outputs.string }}
+        name: ${{ inputs.dependency }}-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr }}
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.8
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.19
       with:
         base: main
         body: |
@@ -85,17 +108,17 @@ jobs:
 
           ${{ inputs.pr-message }}
         branch: >-
-          dependency/${{ inputs.task }}/${{ inputs.dependency }}/${{ steps.version.outputs.string }}
+          dependency/${{ inputs.task }}/${{ inputs.dependency }}/${{ steps.update.outputs.output }}
         commit-message: |
-          ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}` -> ${{ steps.version.outputs.string }}
+          ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}` -> ${{ steps.update.outputs.output }}
 
           Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         title: >-
           ${{ inputs.task == 'bazel' && 'deps' || 'deps/api' }}: Bump `${{ inputs.dependency }}`
-          -> ${{ steps.version.outputs.string }}
-        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+          -> ${{ steps.update.outputs.output }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   update-build-image:
     if: >-
@@ -106,15 +129,20 @@ jobs:
     name: Update build image (PR)
     runs-on: ubuntu-22.04
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.1.8
+    - id: appauth
+      name: Appauth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.19
+      with:
+        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.19
       id: checkout
       name: Checkout Envoy repository
       with:
         config: |
           path: envoy
           fetch-depth: 0
-        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
-        app_key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+        token: ${{ steps.appauth.outputs.token }}
     - uses: actions/checkout@v4
       name: Checkout Envoy build tools repository
       with:
@@ -125,39 +153,43 @@ jobs:
         shas=(
             tag
             sha
-            mobile_sha
-            gcr_sha)
+            mobile-sha
+            gcr-sha)
         for sha in "${shas[@]}"; do
-            current_sha=$(bazel run //tools/dependency:build-image-sha "$sha")
+            current_sha=$(bazel run --config=ci //tools/dependency:build-image-sha "$sha")
             echo "${sha}=${current_sha}" >> "$GITHUB_OUTPUT"
         done
       id: current
       name: Current SHAs
       working-directory: envoy
     - run: |
-        # get current build image version
-        CONTAINER_TAG=$(git log -1 --pretty=format:"%H" "./docker")
+        if [[ -z "$CONTAINER_TAG" ]]; then
+            # get current build image version
+            CONTAINER_TAG=$(git log -1 --pretty=format:"%H" "./docker")
+        fi
         echo "tag=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
         echo "tag_short=${CONTAINER_TAG::7}" >> "$GITHUB_OUTPUT"
+      env:
+        CONTAINER_TAG: ${{ inputs.version }}
       id: build-tools
       name: Build image SHA
       working-directory: build-tools
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.1.8
+      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.2.19
       with:
         images: |
            sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
-           mobile_sha: envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
-           gcr_sha: gcr.io/envoy-ci/envoy-build:${{ steps.build-tools.outputs.tag }}
+           mobile-sha: envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
+           gcr-sha: gcr.io/envoy-ci/envoy-build:${{ steps.build-tools.outputs.tag }}
 
     - run: |
         SHA_REPLACE=(
             "$CURRENT_ENVOY_TAG:$ENVOY_TAG"
-            "$CURRENT_ENVOY_SHA:${OUTPUT_sha}"
-            "$CURRENT_ENVOY_MOBILE_SHA:${OUTPUT_mobile_sha}"
-            "$CURRENT_ENVOY_GCR_SHA:${OUTPUT_gcr_sha}")
+            "$CURRENT_ENVOY_SHA:${{ fromJSON(steps.build-images.outputs.shas).sha }}"
+            "$CURRENT_ENVOY_MOBILE_SHA:${{ fromJSON(steps.build-images.outputs.shas).mobile-sha }}"
+            "$CURRENT_ENVOY_GCR_SHA:${{ fromJSON(steps.build-images.outputs.shas).gcr-sha }}")
         echo "replace=${SHA_REPLACE[*]}" >> "$GITHUB_OUTPUT"
       name: Find SHAs to replace
       id: shas
@@ -165,16 +197,16 @@ jobs:
         ENVOY_TAG: ${{ steps.build-tools.outputs.tag }}
         CURRENT_ENVOY_TAG: ${{ steps.current.outputs.tag }}
         CURRENT_ENVOY_SHA: ${{ steps.current.outputs.sha }}
-        CURRENT_ENVOY_MOBILE_SHA: ${{ steps.current.outputs.mobile_sha }}
-        CURRENT_ENVOY_GCR_SHA: ${{ steps.current.outputs.gcr_sha }}
+        CURRENT_ENVOY_MOBILE_SHA: ${{ steps.current.outputs.mobile-sha }}
+        CURRENT_ENVOY_GCR_SHA: ${{ steps.current.outputs.gcr-sha }}
     - run: |
-        echo "${SHA_REPLACE}" | xargs bazel run @envoy_toolshed//sha:replace "${PWD}"
+        echo "${SHA_REPLACE}" | xargs bazel run --config=ci @envoy_toolshed//sha:replace "${PWD}"
       env:
         SHA_REPLACE: ${{ steps.shas.outputs.replace }}
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.1.8
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.19
       with:
         base: main
         body: Created by Envoy dependency bot
@@ -186,7 +218,7 @@ jobs:
 
           Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
         title: 'deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`'
-        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
         working-directory: envoy
 
   scheduled:
@@ -208,7 +240,7 @@ jobs:
       run: |
         TODAY_DATE=$(date -u -I"date")
         export TODAY_DATE
-        bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
-        bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
+        bazel run --config=ci //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
+        bazel run --config=ci //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

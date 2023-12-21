@@ -11,107 +11,79 @@ permissions:
 
 on:
   workflow_call:
-    inputs:
-      trusted:
-        type: boolean
-        default: false
-      build_image_ubuntu:
-        type: string
-        default: ''
-      version-dev:
-        type: string
-        default: ''
-      head_ref:
-        type: string
-        default: ''
-      repo-ref:
-        type: string
-      sha:
-        type: string
     secrets:
       ENVOY_CI_SYNC_APP_ID:
       ENVOY_CI_SYNC_APP_KEY:
       ENVOY_CI_PUBLISH_APP_ID:
       ENVOY_CI_PUBLISH_APP_KEY:
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
+  group: >-
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.event.workflow.id }}-publish
   cancel-in-progress: true
 
-jobs:
-  publish_ci:
-    if: ${{ ! inputs.trusted }}
-    name: ${{ matrix.name || matrix.target }}
-    uses: ./.github/workflows/_ci.yml
-    with:
-      target: ${{ matrix.target }}
-      rbe: false
-      cache-build-image: ${{ inputs.build_image_ubuntu }}
-      source: ${{ matrix.source }}
-      trusted: false
-      repo-ref: ${{ inputs.repo-ref }}
-      steps-pre: ${{ matrix.steps-pre }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - target: publish
-          name: github
-          steps-pre: |
-            - id: short_name
-              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.7
-              with:
-                length: 7
-                string: ${{ inputs.repo-ref }}
-            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.7
-              with:
-                url: https://storage.googleapis.com/envoy-pr/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
-                path: %{{ runner.temp }}/release.signed
-          source: |
-            export ENVOY_PUBLISH_DRY_RUN=1
-            export ENVOY_COMMIT=${{ inputs.sha }}
-            export ENVOY_REPO=${{ github.repository }}
 
+jobs:
   publish:
-    if: ${{ inputs.trusted }}
-    name: ${{ matrix.name || matrix.target }}
-    uses: ./.github/workflows/_ci.yml
-    with:
-      target: ${{ matrix.target }}
-      rbe: false
-      cache-build-image: ${{ inputs.build_image_ubuntu }}
-      source: ${{ matrix.source }}
-      trusted: true
-      repo-ref: ${{ inputs.repo-ref }}
-      steps-pre: ${{ matrix.steps-pre }}
     secrets:
-      app-id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-      app-key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+      app-id: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
+      app-key: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
     permissions:
       contents: read
       packages: read
+    name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_run.yml
+    with:
+      target: ${{ matrix.target }}
+      rbe: false
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      source: ${{ matrix.source }}
+      request: ${{ inputs.request }}
+      steps-pre: ${{ matrix.steps-pre }}
+      trusted: ${{ inputs.trusted }}
     strategy:
       fail-fast: false
       matrix:
         include:
         - target: publish
           name: github
-          steps-pre: |
-            - id: short_name
-              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.7
-              with:
-                length: 7
-                string: ${{ inputs.repo-ref }}
-            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.1.7
-              with:
-                url: https://storage.googleapis.com/envoy-postsubmit/%{{ steps.short_name.outputs.string }}/release/release.signed.tar.zst
-                path: %{{ runner.temp }}/release.signed
           source: |
-            export ENVOY_COMMIT=${{ inputs.sha }}
+            export ENVOY_COMMIT=${{ fromJSON(inputs.request).request.sha }}
             export ENVOY_REPO=${{ github.repository }}
-            if [[ '${{ inputs.version-dev }}' == 'dev' ]]; then
-                export ENVOY_PUBLISH_DRY_RUN=1
-            fi
+            export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
+          steps-pre: |
+            - id: url
+              uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.19
+              with:
+                options: -Rr
+                input: >-
+                  ${{ inputs.trusted
+                      && fromJSON(inputs.request).request.sha
+                      || fromJSON(inputs.request).request.ref }}
+                filter: |
+                  .[:7] as $sha
+                  | "release/release.signed.tar.zst" as $path
+                  | if ${{ inputs.trusted }} then
+                      "envoy-postsubmit"
+                    else
+                      "envoy-pr"
+                    end
+                  | . as $bucket
+                  | "https://storage.googleapis.com/\($bucket)/\($sha)/\($path)"
+            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.2.19
+              with:
+                url: %{{ steps.url.outputs.value }}
+                path: %{{ runner.temp }}/release.signed
 
   publish_docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
@@ -126,12 +98,16 @@ jobs:
     needs:
     - publish
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.1.8
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.19
+      id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
-        key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
+        key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.19
+      with:
         ref: main
-        repository: ${{ inputs.version-dev == 'dev' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
+        repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
+        token: ${{ steps.appauth.outputs.token }}
         workflow: envoy-sync.yaml
         inputs: |
-          commit_sha: ${{ inputs.version-dev == 'dev' && github.sha || '' }}
+          commit_sha: ${{ fromJSON(inputs.request).request.version.dev && github.sha || '' }}

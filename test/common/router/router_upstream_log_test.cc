@@ -104,7 +104,7 @@ public:
       upstream_log_options->mutable_upstream_log_flush_interval()->set_seconds(1);
     }
     if (upstream_log) {
-      ON_CALL(*context_.access_log_manager_.file_, write(_))
+      ON_CALL(*context_.server_factory_context_.access_log_manager_.file_, write(_))
           .WillByDefault(
               Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
 

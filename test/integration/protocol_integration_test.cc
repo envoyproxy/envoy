@@ -784,6 +784,29 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesC
                                        BytesCountExpectation(7, 10, 7, 8));
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, TeSanitization) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  autonomous_upstream_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
+
+  default_request_headers_.setTE("gzip");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ("", upstream_headers->getTEValue());
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
 TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
   // Header with at least 20kb of spaces surrounded by non-whitespace characters to ensure that
@@ -1095,6 +1118,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("507", response->headers().getStatusValue());
   test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
+  cleanupUpstreamAndDownstream();
 }
 
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
@@ -2963,6 +2987,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_TRUE(response->complete());
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
@@ -3444,6 +3472,7 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeData) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
 }
 
 // Verify that when a filter decodeData callback overflows request buffer in filter manager the

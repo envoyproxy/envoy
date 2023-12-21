@@ -102,9 +102,9 @@ public:
         Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig<FormatterContext>(
             sff_config, factory_context_);
 
-    return std::make_shared<FileAccessLog>(Filesystem::FilePathAndType{}, nullptr,
-                                           std::move(formatter),
-                                           factory_context_.accessLogManager());
+    return std::make_shared<FileAccessLog>(
+        Filesystem::FilePathAndType{}, nullptr, std::move(formatter),
+        factory_context_.server_factory_context_.accessLogManager());
   }
 
   std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_;
@@ -188,8 +188,9 @@ public:
         .WillOnce(
             Invoke([this](ServerCodecCallbacks& callback) { decoder_callback_ = &callback; }));
 
-    filter_ = std::make_shared<Filter>(filter_config_, factory_context_.time_system_,
-                                       factory_context_.runtime_loader_);
+    filter_ = std::make_shared<Filter>(filter_config_,
+                                       factory_context_.server_factory_context_.time_system_,
+                                       factory_context_.server_factory_context_.runtime_loader_);
 
     EXPECT_EQ(filter_.get(), decoder_callback_);
 
@@ -708,7 +709,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
       }));
 
   EXPECT_CALL(
-      *factory_context_.access_log_manager_.file_,
+      *factory_context_.server_factory_context_.access_log_manager_.file_,
       write("host-value /path-value method-value protocol-value request-value response-value -"));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
@@ -767,7 +768,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
   EXPECT_CALL(
-      *factory_context_.access_log_manager_.file_,
+      *factory_context_.server_factory_context_.access_log_manager_.file_,
       write("host-value /path-value method-value protocol-value request-value response-value -"));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));

@@ -1,0 +1,132 @@
+name: Workflow start
+# This workflow is only required for externally triggered jobs that need to manually
+# set the check status for a commit/PR
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+        required: true
+      app-key:
+        required: true
+    inputs:
+      details-url:
+        type: string
+        default: >-
+          https://github.com/envoyproxy/envoy/tree/main/.github/workflows
+      env:
+        type: string
+        required: true
+      run-summary:
+        type: string
+        default: >-
+          The check will start once any required jobs have completed and a VM becomes available
+      run-title:
+        type: string
+        default: >-
+          Waiting for check ...
+      skipped-summary:
+        type: string
+        default: >-
+          This check was not triggered in this CI run
+      skipped-title:
+        type: string
+        default: >-
+          Check was skipped
+      template-run-text:
+        type: string
+        default: |
+          ## \($icon) Check run pending
+
+          ## Details of the check run will be provided here once it has started.
+
+          ### Check started by
+
+
+env:
+  CI_DEBUG: ${{ (vars.CI_DEBUG || vars.RUNNER_DEBUG) && true || false }}
+
+
+jobs:
+  start:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.19
+      id: check-config
+      name: Prepare check data
+      with:
+        print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
+        input: ${{ inputs.env }}
+        filter: |
+          . as $env
+          | .config.envoy.icon as $icon
+          | {}
+          | .["head_sha"] = $env.request.sha
+          | .details_url = "${{ inputs.details-url }}"
+          | {run: ., skipped: ., request: $env.summary.summary}
+          | .run.output.title = "${{ inputs.run-title }}"
+          | .run.output.summary = "${{ inputs.run-summary }}"
+          | .run.output.text = "${{ inputs.template-run-text }}"
+          | .run.status = "queued"
+          | .skipped.status = "completed"
+          | .skipped.conclusion = "skipped"
+          | .skipped.output.title = "${{ inputs.skipped-title }}"
+          | .skipped.output.summary = "${{ inputs.skipped-summary }}"
+          | .skipped.output.text = ""
+
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.19
+      name: Appauth
+      id: appauth
+      with:
+        app_id: ${{ secrets.app-id }}
+        key: ${{ secrets.app-key }}
+    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.2.19
+      name: Start checks
+      id: checks
+      with:
+        checks: ${{ toJSON(fromJSON(inputs.env).checks) }}
+        config: ${{ steps.check-config.outputs.value }}
+        text-extra: |
+          ## ${{ fromJSON(inputs.env).summary.linked-title }}
+
+          ${{ fromJSON(inputs.env).summary.summary }}
+        token: ${{ steps.appauth.outputs.token }}
+    - uses: envoyproxy/toolshed/gh-actions/json/table@actions-v0.2.19
+      name: Summary
+      with:
+        collapse-open: true
+        json: |
+          {"checks": ${{ steps.checks.outputs.checks }},
+           "config": ${{ toJSON(fromJSON(inputs.env).checks) }}}
+        filter: |
+          .checks
+        heading: >-
+          ${{ fromJSON(inputs.env).config.envoy.icon }} Checks
+        mutate-cells: |
+          .cell as $cell
+          | .row as $row
+          | .table as $table
+          | $cell
+          | if ($row | index($cell) == 0) then
+              $table.data.config[$cell].name
+            elif ($table.data.config[$row[0]].action != "SKIP") then
+              "[started](http://github.com/${{ github.repository }}/runs/\($cell))"
+            else "skipped" end
+        output-path: GITHUB_STEP_SUMMARY
+        title: Checks started/skipped
+
+    - uses: envoyproxy/toolshed/gh-actions/github/env/save@actions-v0.2.19
+      name: Save env
+      id: data
+      with:
+        env: ${{ inputs.env }}
+        env-filter: |
+          ${{ steps.checks.outputs.checks }} as $checksStarted
+          | .checks
+          |= with_entries(
+               if $checksStarted[.key] != "skipped" then
+                 .value["check-id"] = $checksStarted[.key]
+               else . end)

@@ -18,6 +18,7 @@ envoy_cc_extension(
     ],
     extra_visibility = [
         "//source/server:__subpackages__",
+        "//source/common/listener_manager:__subpackages__",
     ],
     deps = [
         "//envoy/config:typed_config_interface",

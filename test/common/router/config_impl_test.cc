@@ -63,10 +63,9 @@ class TestConfigImpl : public ConfigImpl {
 public:
   TestConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                  Server::Configuration::ServerFactoryContext& factory_context,
-                 bool validate_clusters_default,
-                 const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters())
-      : ConfigImpl(config, optional_http_filters, factory_context,
-                   ProtobufMessage::getNullValidationVisitor(), validate_clusters_default),
+                 bool validate_clusters_default)
+      : ConfigImpl(config, factory_context, ProtobufMessage::getNullValidationVisitor(),
+                   validate_clusters_default),
         config_(config) {}
 
   void setupRouteConfig(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
@@ -139,8 +138,8 @@ genHeaders(const std::string& host, const std::string& path, const std::string& 
   }
 
   if (random_value_pair.has_value()) {
-    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair.value().first),
-                  random_value_pair.value().second);
+    hdrs.setCopy(Envoy::Http::LowerCaseString(random_value_pair.value().first),
+                 random_value_pair.value().second);
   }
   return hdrs;
 }
@@ -10221,6 +10220,7 @@ virtual_hosts:
   EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
   EXPECT_TRUE(internal_redirect_policy.predicates().empty());
   EXPECT_FALSE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
+  EXPECT_TRUE(internal_redirect_policy.responseHeadersToCopy().empty());
 }
 
 TEST_F(RouteConfigurationV2, InternalRedirectPolicyDropsInvalidRedirectCode) {
@@ -10286,6 +10286,31 @@ virtual_hosts:
       internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(304)));
   EXPECT_FALSE(
       internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirectPolicyAcceptsResponseHeadersToPrserve) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            response_headers_to_copy: ["x-foo", "x-bar"]
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_EQ(2, internal_redirect_policy.responseHeadersToCopy().size());
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {
@@ -10360,11 +10385,8 @@ public:
         << "config value does not match expected for source: " << source;
   }
 
-  void
-  checkNoPerFilterConfig(const std::string& yaml, const std::string& route_config_name,
-                         const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters()) {
-    const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                                optional_http_filters);
+  void checkNoPerFilterConfig(const std::string& yaml, const std::string& route_config_name) {
+    const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
@@ -10426,31 +10448,6 @@ virtual_hosts:
       "configurations");
 }
 
-TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    typed_per_filter_config:
-      test.default.filter:
-        "@type": type.googleapis.com/google.protobuf.Struct
-        value:
-          seconds: 123
-)EOF";
-
-  OptionalHttpFilters optional_http_filters = {"test.default.filter"};
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml, "test.default.filter", optional_http_filters);
-}
-
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerRoute) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -10473,31 +10470,6 @@ virtual_hosts:
       "configurations");
 }
 
-TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        typed_per_filter_config:
-          test.default.filter:
-            "@type": type.googleapis.com/google.protobuf.Struct
-            value:
-              seconds: 123
-)EOF";
-
-  OptionalHttpFilters optional_http_filters = {"test.default.filter"};
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml, "test.default.filter", optional_http_filters);
-}
-
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithUnknownFilter) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -10515,30 +10487,6 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.BoolValue'");
-}
-
-TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    typed_per_filter_config:
-      filter.unknown:
-        "@type": type.googleapis.com/google.protobuf.BoolValue
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  OptionalHttpFilters optional_http_filters;
-  optional_http_filters.insert("filter.unknown");
-  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
 }
 
 TEST_F(PerFilterConfigsTest, PerRouteWithUnknownFilter) {
@@ -10560,30 +10508,6 @@ virtual_hosts:
       "'google.protobuf.BoolValue'");
 }
 
-TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilterLegacy) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        typed_per_filter_config:
-          filter.unknown:
-            "@type": type.googleapis.com/google.protobuf.BoolValue
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  OptionalHttpFilters optional_http_filters;
-  optional_http_filters.insert("filter.unknown");
-  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
-}
-
 TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilter) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -10598,13 +10522,9 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  OptionalHttpFilters optional_http_filters;
-  optional_http_filters.insert("filter.unknown");
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     optional_http_filters),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.BoolValue'");
 }

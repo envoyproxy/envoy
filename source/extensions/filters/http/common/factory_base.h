@@ -141,7 +141,7 @@ public:
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
                                              stats_prefix, DualInfo(context),
-                                             context.getServerFactoryContext());
+                                             context.serverFactoryContext());
   }
 
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
@@ -150,8 +150,8 @@ public:
                                Server::Configuration::UpstreamFactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(
-            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
-        stats_prefix, DualInfo(context), context.getServerFactoryContext());
+            proto_config, context.serverFactoryContext().messageValidationVisitor()),
+        stats_prefix, DualInfo(context), context.serverFactoryContext());
   }
 
   virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>

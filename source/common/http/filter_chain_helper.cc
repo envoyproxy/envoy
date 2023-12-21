@@ -10,26 +10,9 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Http {
-
-// Allows graceful handling of missing configuration for ECDS.
-class MissingConfigFilter : public Http::PassThroughDecoderFilter {
-public:
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
-    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
-                                       absl::nullopt, EMPTY_STRING);
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-};
-
-static Http::FilterFactoryCb MissingConfigFilterFactory =
-    [](Http::FilterChainFactoryCallbacks& cb) {
-      cb.addStreamDecoderFilter(std::make_shared<MissingConfigFilter>());
-    };
 
 void FilterChainUtility::createFilterChainForFactories(
     Http::FilterChainManager& manager, const FilterChainOptions& options,
@@ -83,7 +66,7 @@ FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
       downstream_filter_config_provider_manager =
           context.singletonManager().getTyped<Http::DownstreamFilterConfigProviderManager>(
               SINGLETON_MANAGER_REGISTERED_NAME(downstream_filter_config_provider_manager),
-              [] { return std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>(); });
+              [] { return std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>(); }, true);
   return downstream_filter_config_provider_manager;
 }
 

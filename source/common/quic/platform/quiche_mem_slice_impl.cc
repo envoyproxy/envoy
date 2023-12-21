@@ -52,6 +52,18 @@ QuicheMemSliceImpl::QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t le
   ASSERT(this->length() == length);
 }
 
+QuicheMemSliceImpl::QuicheMemSliceImpl(char buffer[], size_t length,
+                                       SingleUseCallback<void(const char*)> deleter)
+    : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
+          buffer, length,
+          [deleter = std::move(deleter)](const void* p, size_t,
+                                         const Envoy::Buffer::BufferFragmentImpl*) mutable {
+            std::move(deleter)(reinterpret_cast<const char*>(p));
+          })) {
+  single_slice_buffer_.addBufferFragment(*fragment_);
+  ASSERT(this->length() == length);
+}
+
 QuicheMemSliceImpl::~QuicheMemSliceImpl() {
   ASSERT(fragment_ == nullptr || (firstSliceLength(single_slice_buffer_) == fragment_->size() &&
                                   data() == fragment_->data()));

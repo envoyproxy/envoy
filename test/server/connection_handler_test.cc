@@ -13,6 +13,8 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/listener_manager/active_raw_udp_listener_config.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -20,8 +22,6 @@
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/listener_managers/listener_manager/active_raw_udp_listener_config.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -94,7 +94,8 @@ public:
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
-          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit) {
+          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit),
+          listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
       for (int i = 0; i < num_of_socket_factories; i++) {
         socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
         sockets_.emplace_back(std::make_shared<NiceMock<Network::MockListenSocket>>());
@@ -105,6 +106,10 @@ public:
       udp_listener_config_->listener_factory_ =
           std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
       udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
+      ON_CALL(*static_cast<Network::MockListenerInfo*>(
+                  const_cast<Network::ListenerInfo*>(listener_info_.get())),
+              direction())
+          .WillByDefault(Return(direction_));
     }
 
     struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
@@ -159,7 +164,9 @@ public:
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-    envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
+    const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+      return listener_info_;
+    }
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
     }
@@ -196,6 +203,7 @@ public:
     const bool ignore_global_conn_limit_;
     envoy::config::core::v3::TrafficDirection direction_;
     absl::flat_hash_map<std::string, Network::UdpListenerCallbacks*> udp_listener_callback_map_{};
+    Network::ListenerInfoConstSharedPtr listener_info_;
   };
 
   class TestListener : public TestListenerBase {

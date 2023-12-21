@@ -57,9 +57,10 @@ private:
   friend class ClusterTest;
 
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+          Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cacahe,
           const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context,
-          Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
+          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager);
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();

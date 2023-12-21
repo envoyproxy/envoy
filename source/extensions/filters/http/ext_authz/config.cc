@@ -23,7 +23,7 @@ namespace ExtAuthz {
 Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, context.scope(), server_context.runtime(), server_context.httpContext(),
@@ -56,7 +56,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     callback = [&context, filter_config, timeout_ms,
                 config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          context.getServerFactoryContext()
+          context.serverFactoryContext()
               .clusterManager()
               .grpcAsyncClientManager()
               .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true),

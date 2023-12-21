@@ -17,7 +17,7 @@ namespace Common {
 namespace DynamicForwardProxy {
 
 absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
-    Server::Configuration::FactoryContextBase& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
   const uint32_t max_hosts = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024);
   if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts) {
@@ -30,21 +30,21 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
 }
 
 DnsCacheImpl::DnsCacheImpl(
-    Server::Configuration::FactoryContextBase& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
-    : main_thread_dispatcher_(context.mainThreadDispatcher()), config_(config),
-      random_generator_(context.api().randomGenerator()),
+    : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
+      config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(selectDnsResolver(config, main_thread_dispatcher_, context)),
-      tls_slot_(context.threadLocal()),
+      resolver_(selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext())),
+      tls_slot_(context.serverFactoryContext().threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
-      resource_manager_(*scope_, context.runtime(), config.name(),
+      resource_manager_(*scope_, context.serverFactoryContext().runtime(), config.name(),
                         config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       min_refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_min_refresh_rate, 5000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
-      file_system_(context.api().fileSystem()),
+      file_system_(context.serverFactoryContext().api().fileSystem()),
       validation_visitor_(context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
@@ -84,7 +84,8 @@ DnsCacheImpl::~DnsCacheImpl() {
 
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::FactoryContextBase& context) {
+    Event::Dispatcher& main_thread_dispatcher,
+    Server::Configuration::CommonFactoryContext& context) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Network::DnsResolverFactory& dns_resolver_factory =
       Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
@@ -305,8 +306,8 @@ void DnsCacheImpl::forceRefreshHosts() {
 }
 
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
-  ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
-            host_info.host_info_->resolvedHost(), host_info.port_);
+  ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}' timeout='{}'",
+            host, host_info.host_info_->resolvedHost(), host_info.port_, timeout_interval_.count());
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
@@ -408,6 +409,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.dns_cache_set_first_resolve_complete")) {
+      primary_host_info->host_info_->setFirstResolveComplete();
+    }
     address_changed = true;
     stats_.host_address_changed_.inc();
   }

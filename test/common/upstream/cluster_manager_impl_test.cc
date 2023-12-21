@@ -211,8 +211,9 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
-    cluster_manager_->setPrimaryClustersInitializedCb(
-        [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
+    cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
+      THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
+    });
   }
 
   void createWithBasicStaticCluster() {
@@ -278,7 +279,7 @@ public:
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
         router_context_, server_);
-    cluster_manager_->init(bootstrap);
+    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
   }
 
   void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
@@ -286,7 +287,7 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
-    cluster_manager_->init(bootstrap);
+    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -4519,7 +4520,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
-  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(context, overrideHostToSelect()).Times(2).WillRepeatedly(Return(absl::nullopt));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
   EXPECT_CALL(*to_create, addIdleCallback(_));
@@ -4536,7 +4537,8 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:11001")));
+      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
+          std::make_pair("127.0.0.1:11001", false))));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -4556,6 +4558,49 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
   auto opt_cp_3 = cluster_manager_->getThreadLocalCluster("cluster_1")
                       ->tcpConnPool(ResourcePriority::Default, &context);
   EXPECT_TRUE(opt_cp_3.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHost) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
+          // Return non-existing host. Let the LB choose the host.
+          std::make_pair("127.0.0.2:12345", false))));
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
+        EXPECT_THAT(host->address()->asStringView(),
+                    testing::AnyOf("127.0.0.1:11001", "127.0.0.1:11002"));
+        return to_create;
+      }));
+  EXPECT_CALL(*to_create, addIdleCallback(_));
+
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
+          // Return non-existing host and indicate strict mode.
+          // LB should not be allowed to choose host.
+          std::make_pair("127.0.0.2:12345", true))));
+
+  // Requested upstream host 127.0.0.2:12345 is not part of the cluster.
+  // Connection pool should not be created.
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).Times(0);
+
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_FALSE(opt_cp.has_value());
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
@@ -6314,11 +6359,11 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
       cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(added_via_api_yaml), "v1"));
 
   EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
-  EXPECT_NO_THROW(cluster_manager_->checkActiveStaticCluster("good"));
-  EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("nonexist"), EnvoyException,
-                            "Unknown gRPC client cluster 'nonexist'");
-  EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("added_via_api"),
-                            EnvoyException, "gRPC client cluster 'added_via_api' is not static");
+  EXPECT_TRUE(cluster_manager_->checkActiveStaticCluster("good").ok());
+  EXPECT_EQ(cluster_manager_->checkActiveStaticCluster("nonexist").message(),
+            "Unknown gRPC client cluster 'nonexist'");
+  EXPECT_EQ(cluster_manager_->checkActiveStaticCluster("added_via_api").message(),
+            "gRPC client cluster 'added_via_api' is not static");
 }
 
 #ifdef WIN32
@@ -6457,7 +6502,8 @@ TEST_F(PreconnectTest, PreconnectOnWithOverrideHost) {
 
   NiceMock<MockLoadBalancerContext> context;
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:80")));
+      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
+          std::make_pair("127.0.0.1:80", false))));
 
   // Only allocate connection pool once.
   EXPECT_CALL(factory_, allocateTcpConnPool_)

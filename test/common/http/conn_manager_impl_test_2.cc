@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/common/http/custom_header_extension.h"
 #include "test/test_common/logging.h"
@@ -32,6 +34,57 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
       }));
   EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+}
+
+TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10) {
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http10));
+  setup(false, "envoy-server-test");
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  startRequest();
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_NE(nullptr, headers.Server());
+        EXPECT_EQ("envoy-server-test", headers.getServerValue());
+      }));
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  // When framing by connection close, by default Envoy will FlushWrite, no delay.
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+}
+
+TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10NoOptimize) {
+  EXPECT_CALL(runtime_.snapshot_, getBoolean(_, _)).WillRepeatedly(Return(false));
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http10));
+  setup(false, "envoy-server-test");
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  startRequest();
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_NE(nullptr, headers.Server());
+        EXPECT_EQ("envoy-server-test", headers.getServerValue());
+      }));
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  // When framing by connection close, by default Envoy will FlushWrite, no delay but with a runtime
+  // override, it will still flush close.
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
 
@@ -3947,6 +4000,38 @@ TEST_F(HttpConnectionManagerImplTest, StreamDeferralPreservesOrder) {
   EXPECT_EQ(TotalRequests, listener_stats_.downstream_rq_2xx_.value());
   EXPECT_EQ(TotalRequests, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(TotalRequests, listener_stats_.downstream_rq_completed_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, DownstreamTimingsRecordWhenRequestHeaderProcessingIsDone) {
+  setup(/*ssl=*/true, /*server_name=*/"", /*tracing=*/false);
+
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    // Set time to 5ms before creating the stream
+    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(5)));
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    // Advanced time to 20ms before decoding headers.
+    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(20)));
+    decoder_->decodeHeaders(std::move(headers), /*end_stream=*/false);
+    return Http::okStatus();
+  }));
+
+  conn_manager_->onData(fake_input, /*end_stream=*/false);
+
+  auto request_headers_done =
+      decoder_->streamInfo().downstreamTiming().lastDownstreamHeaderRxByteReceived();
+  auto request_headers_done_millis = std::chrono::duration_cast<std::chrono::milliseconds>(
+      request_headers_done.value() - decoder_->streamInfo().startTimeMonotonic());
+  // Expect time to be 20ms-5ms = 15ms.
+  EXPECT_EQ(request_headers_done_millis, std::chrono::milliseconds(15));
+
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 } // namespace Http

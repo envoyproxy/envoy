@@ -1,0 +1,115 @@
+name: Workflow/complete
+
+permissions:
+  contents: read
+
+
+on:
+  # Do not run untrusted code here
+  workflow_call:
+    secrets:
+      app-id:
+        required: true
+      app-key:
+        required: true
+    inputs:
+      needs:
+        type: string
+        required: true
+      template-check-text:
+        type: string
+        default: |
+          ## \($icon) Check run finished (\($outcome.name) \($outcome.icon))
+
+          ## The check run can be viewed here:
+
+          # \($icon) \($run_link)
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
+
+
+jobs:
+  complete:
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: read
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.19
+      name: Incoming data
+      id: needs
+      with:
+        input: |
+          check_name: ${{ fromJSON(inputs.needs).load.outputs.check-name }}
+          repo: ${{ github.repository }}
+          run_id: ${{ github.run_id }}
+          outcomes: ${{ toJSON(fromJSON(inputs.needs).*.result) }}
+          load: ${{ toJSON(fromJSON(inputs.needs).load.outputs) }}
+        input-format: yaml
+        print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
+        filter: |
+          .repo as $repo
+          | .run_id as $run_id
+          | .needs as $result
+          | .check_name as $check_name
+          | .load as $load
+          | $load["check-id"] as $check_id
+          | $load["run-id"] as $workflow_id
+          | (.load.request | fromjson) as $request
+          | $request.config.envoy.icon as $icon
+          | .outcomes
+          | if any(. == "failure") then
+              {name: "failure", icon: ":x:"}
+            elif any(. == "cancelled") then
+              {name: "cancelled", icon: ""}
+            elif all(. == "skipped") then
+              {name: "skipped", icon: ""}
+            else
+              {name: "success", icon: ":heavy_check_mark:"}
+            end
+          | . as $outcome
+          | "\($request.check.name) (\($request.summary.title))" as $run_link_text
+          | "[\($run_link_text)](https://github.com/\($repo)/actions/runs/\($run_id))" as $run_link
+          | "${{ inputs.template-check-text }}" as $text
+          | {"summary-title": "\($icon) \($request.check.name) complete (\($outcome.name))",
+             "check-id": $check_id,
+             conclusion: $outcome.name,
+             checks: {
+               ($check_name): {
+                 name: $request.check.name,
+                 head_sha: $request.request.sha,
+                 status: "completed",
+                 conclusion: $outcome.name,
+                 external_id: "\($run_id)",
+                 output: {
+                   title: "\($request.check.name) (\($outcome.name))",
+                   summary: "Check has finished",
+                   text: $text}}}}
+
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.19
+      name: Print summary
+      with:
+        input: ${{ toJSON(steps.needs.outputs.value).summary-title }}
+        filter: |
+          "## \(.)"
+        options: -Rr
+        output-path: GITHUB_STEP_SUMMARY
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.19
+      name: Appauth
+      id: appauth
+      with:
+        app_id: ${{ secrets.app-id }}
+        key: ${{ secrets.app-key }}
+    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.2.19
+      name: Update check
+      with:
+        action: update
+        checks: ${{ toJSON(fromJSON(steps.needs.outputs.value).checks) }}
+        token: ${{ steps.appauth.outputs.token }}
+
+    # This is necessary to ensure that any retests have their checks updated
+    - name: Fail the job
+      if: ${{ fromJSON(steps.needs.outputs.value).conclusion != 'success' }}
+      run: |
+        exit 1

@@ -18,7 +18,8 @@ namespace {
 class HttpCapsuleFilterTest : public testing::Test {
 public:
   void setup() {
-    filter_ = std::make_unique<HttpCapsuleFilter>(server_context_.timeSource());
+    filter_ =
+        std::make_unique<HttpCapsuleFilter>(server_context_.server_factory_context_.timeSource());
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }

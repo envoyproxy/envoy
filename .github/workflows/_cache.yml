@@ -1,0 +1,69 @@
+name: Cache prime (docker)
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+        required: true
+      app-key:
+        required: true
+    inputs:
+      image-tag:
+        type: string
+        required: true
+      request:
+        type: string
+        required: true
+      lock-repository:
+        type: string
+        default: envoyproxy/ci-mutex
+
+## Docker cache
+#
+# This workflow will only prime the cache, and should be done separately first, prior
+# to any jobs that require it.
+#
+# For a job that does, you can restore with something like:
+#
+#    steps:
+#    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.5
+#      with:
+#        key: "${{ needs.env.outputs.build-image }}"
+#
+
+
+jobs:
+  docker:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.19
+      id: appauth
+      name: Appauth (mutex lock)
+      with:
+        app_id: ${{ secrets.app-id }}
+        key: ${{ secrets.app-key }}
+    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.2.19
+      id: docker
+      name: Prime Docker cache (${{ inputs.image-tag }})
+      with:
+        image-tag: ${{ inputs.image-tag }}
+        lock-token: ${{ steps.appauth.outputs.token }}
+        lock-repository: ${{ inputs.lock-repository }}
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.19
+      id: data
+      name: Cache data
+      with:
+        input-format: yaml
+        input: |
+          cached: ${{ steps.docker.outputs.cached }}
+          key: ${{ inputs.image-tag }}
+    - uses: envoyproxy/toolshed/gh-actions/json/table@actions-v0.2.19
+      name: Summary
+      with:
+        json: ${{ steps.data.outputs.value }}
+        output-path: GITHUB_STEP_SUMMARY
+        title: >-
+          Cache (Docker x64)

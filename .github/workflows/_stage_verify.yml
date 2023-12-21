@@ -6,32 +6,39 @@ permissions:
 on:
   workflow_call:
     inputs:
+      request:
+        type: string
+        required: true
       trusted:
         type: boolean
-        default: false
-      repo-ref:
-        type: string
-      given_ref:
-        type: string
+        required: true
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-verify
+  group: >-
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.event.workflow.id }}-verify
   cancel-in-progress: true
+
 
 jobs:
   verify:
+    permissions:
+      contents: read
+      packages: read
     name: ${{ matrix.name || matrix.target }}
-    uses: ./.github/workflows/_ci.yml
+    uses: ./.github/workflows/_run.yml
     with:
-      target: ${{ matrix.target }}
-      rbe: ${{ matrix.rbe }}
       cache-build-image:
-      command-prefix:
-      source: ${{ matrix.source }}
-      trusted: ${{ inputs.trusted }}
-      repo-ref: ${{ inputs.repo-ref }}
+      container-command:
+      rbe: ${{ matrix.rbe }}
+      request: ${{ inputs.request }}
       runs-on: envoy-x64-small
       steps-pre: ${{ matrix.steps-pre }}
+      source: ${{ matrix.source }}
+      target: ${{ matrix.target }}
+      trusted: ${{ inputs.trusted }}
     strategy:
       fail-fast: false
       matrix:
@@ -42,33 +49,39 @@ jobs:
             export NO_BUILD_SETUP=1
           rbe: false
           steps-pre: |
-            - id: short_name
-              uses: envoyproxy/toolshed/gh-actions/str/sub@actions-v0.1.7
+            - id: url
+              uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.19
               with:
-                length: 7
-                string: ${{ inputs.repo-ref }}
-            - id: gcp
-              run: |
-                PREFIX=https://storage.googleapis.com/envoy-
-                BUCKET=${{ inputs.trusted && 'postsubmit' || 'pr' }}
-                NAME=%{{ steps.short_name.outputs.string }}
-                echo "url=${PREFIX}${BUCKET}/${NAME}" >> $GITHUB_OUTPUT
-              shell: bash
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
+                options: -Rr
+                input: >-
+                  ${{ inputs.trusted
+                      && fromJSON(inputs.request).request.sha
+                      || fromJSON(inputs.request).request.ref }}
+                filter: |
+                  .[:7] as $sha
+                  | if ${{ inputs.trusted }} then
+                      "envoy-postsubmit"
+                    else
+                      "envoy-pr"
+                    end
+                  | . as $bucket
+                  | "https://storage.googleapis.com/\($bucket)/\($sha)"
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.19
               with:
-                url: %{{ steps.gcp.outputs.url }}/docker/envoy.tar
+                url: %{{ steps.url.outputs.value }}/docker/envoy.tar
                 variant: dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.19
               with:
-                url: %{{ steps.gcp.outputs.url }}/docker/envoy-contrib.tar
+                url: %{{ steps.url.outputs.value }}/docker/envoy-contrib.tar
                 variant: contrib-dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.1.7
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.19
               with:
-                url: %{{ steps.gcp.outputs.url }}/docker/envoy-google-vrp.tar
+                url: %{{ steps.url.outputs.value }}/docker/envoy-google-vrp.tar
                 variant: google-vrp-dev
             - run: docker images | grep envoy
               shell: bash
             - run: |
+                # Install expected host packages
                 export DEBIAN_FRONTEND=noninteractive
                 sudo apt-get -qq update -y
                 sudo apt-get -qq install -y --no-install-recommends expect

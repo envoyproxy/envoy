@@ -1,0 +1,57 @@
+name: Command
+
+# NB: **ALL** commands should be permissionless and only use an app token or relevant secrets
+#   specific to their requirements!
+permissions:
+  contents: read
+
+on:
+  issue_comment:
+    types:
+    - created
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG }}
+
+
+jobs:
+  # For speed and _security_ only a single command (first matching) will be parsed/run from a comment
+  command:
+    name: Parse and run command
+    runs-on: ubuntu-22.04
+    if: >-
+      ${{
+         github.event.issue.pull_request
+         && (vars.ENVOY_CI
+             || github.repository == 'envoyproxy/envoy')
+         && github.actor != 'repokitteh-read-only[bot]'
+         && github.actor != 'dependabot[bot]'
+      }}
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/github/command@actions-v0.2.19
+      name: Parse command from comment
+      id: command
+      with:
+        text: ${{ github.event.comment.body }}
+        matching: >-
+          ^/(retest)
+
+    # /retest
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.19
+      if: ${{ steps.command.outputs.command == 'retest' }}
+      id: appauth-retest
+      name: Appauth (retest)
+      with:
+        key: ${{ secrets.ENVOY_CI_APP_KEY }}
+        app_id: ${{ secrets.ENVOY_CI_APP_ID }}
+    - uses: envoyproxy/toolshed/gh-actions/retest@actions-v0.2.19
+      if: ${{ steps.command.outputs.command == 'retest' }}
+      name: Retest
+      with:
+        token: ${{ steps.appauth-retest.outputs.token }}
+        azp_org: cncf
+        azp_token: ${{ secrets.AZP_TOKEN }}
+        comment-id: ${{ github.event.comment.id }}
+        pr-url: ${{ github.event.issue.pull_request.url }}
+        args: ${{ steps.command.outputs.args }}
+        app-owner: ci-envoy
