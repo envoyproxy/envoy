@@ -873,9 +873,9 @@ absl::Status DecoderImpl::decodeAndBufferHelper(Buffer::Instance& data, DecodeTy
       }
     }
     END_TRY catch (const EnvoyException& e) {
-      IS_ENVOY_BUG(fmt::format("zookeeper_proxy: decodeAndBufferHelper exception {}", e.what()));
+      IS_ENVOY_BUG(fmt::format("zookeeper_proxy: decodeAndBufferHelper exception: {}", e.what()));
       callbacks_.onDecodeError();
-      return;
+      return absl::OkStatus();
     }
   }
 
@@ -946,7 +946,7 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype, uint64_t full
     }
   }
   END_TRY catch (const EnvoyException& e) {
-    IS_ENVOY_BUG(fmt::format("zookeeper_proxy: decode exception {}", e.what()));
+    IS_ENVOY_BUG(fmt::format("zookeeper_proxy: decode exception: {}", e.what()));
     callbacks_.onDecodeError();
   }
 }
