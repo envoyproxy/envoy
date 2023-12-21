@@ -68,14 +68,14 @@ index 5d94d5e..d53370c 100644
                  #value_class " must be trivially destructible"); \
                                                                   \
 diff --git a/eval/internal/interop.cc b/eval/internal/interop.cc
-index 3acde6c..62e8c68 100644
+index 3acde6c..2124f98 100644
 --- a/eval/internal/interop.cc
 +++ b/eval/internal/interop.cc
 @@ -729,6 +729,7 @@ absl::StatusOr<CelValue> ToLegacyValue(google::protobuf::Arena* arena,
          return CelValue::CreateMessageWrapper(
              MessageWrapperAccess::Make(message, type_info));
        }
-+#ifndef _MSC_VER
++#if ABSL_HAVE_ATTRIBUTE_WEAK
        if (ProtoStructValueToMessageWrapper) {
          auto maybe_message_wrapper = ProtoStructValueToMessageWrapper(*value);
          if (maybe_message_wrapper.has_value()) {
