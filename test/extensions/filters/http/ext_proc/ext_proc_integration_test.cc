@@ -3366,6 +3366,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 
   processGenericMessage(
       *grpc_upstreams_[0], true, [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Verify the processing request contains the untyped metadata we injected.
         EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
         const ProtobufWkt::Struct& fwd_metadata =
             req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
@@ -3373,15 +3374,17 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
         EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
         EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
 
+        // Verify the processing request contains the typed metadata we injected.
         EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
         const ProtobufWkt::Any& fwd_typed_metadata =
-            req.metadata_context().typed_filter_metadata().at("forwarding_ns_untyped");
-        EXPECT_EQ("type.googleapis.com/envoy.filters.http.ext_proc.v3.Metadata",
+            req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
+        EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
                   fwd_typed_metadata.type_url());
         envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
         fwd_typed_metadata.UnpackTo(&typed_md_from_req);
         EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
 
+        // Spoof the response to contain receiving metadata.
         HeadersResponse headers_resp;
         (*resp.mutable_request_headers()) = headers_resp;
         auto mut_md_fields = resp.mutable_dynamic_metadata()->mutable_fields();
@@ -3395,6 +3398,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
+  // Verify the response received contains the headers from dynamic metadata we expect.
   ASSERT_FALSE((*response).headers().empty());
   auto md_header_result =
       (*response).headers().get(Http::LowerCaseString("receiving_ns_untyped.foo"));
