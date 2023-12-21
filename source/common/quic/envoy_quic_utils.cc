@@ -12,6 +12,10 @@
 namespace Envoy {
 namespace Quic {
 
+// XXX: Remove once this builds.
+struct A { int x; int y; int z; };
+A b{.x = 1, .z = 2}; // ok, b.y initialized to 0
+
 // TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
 // the heap allocation is too expensive.
 Network::Address::InstanceConstSharedPtr

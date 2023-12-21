@@ -106,7 +106,7 @@ diff --git a/build_config/build_config.bzl b/build_config/build_config.bzl
 index 5960d2a..08295ff 100644
 --- a/build_config/build_config.bzl
 +++ b/build_config/build_config.bzl
-@@ -7,6 +7,7 @@ _default_copts = select({
+@@ -7,5 +7,6 @@ _default_copts = select({
      "//conditions:default": [
          "-std=c++17",
          "-fno-strict-aliasing",
