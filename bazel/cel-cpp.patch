@@ -1,5 +1,5 @@
 diff --git a/base/internal/value.h b/base/internal/value.h
-index fb3e845..a08a5f7 100644
+index fb3e845..62962c7 100644
 --- a/base/internal/value.h
 +++ b/base/internal/value.h
 @@ -55,13 +55,9 @@ NativeTypeId GetListValueTypeId(const ListValue& list_value);
@@ -16,6 +16,18 @@ index fb3e845..a08a5f7 100644
  static_assert(std::is_trivially_destructible_v<absl::Time>,
                "absl::Time must be trivially destructible.");
  
+@@ -102,7 +98,11 @@ static_assert(kValueInlineSize <= 32,
+ static_assert(kValueInlineAlign <= alignof(std::max_align_t),
+               "Alignment of an inline value should not be overaligned.");
+ 
++#ifdef WIN32
++using AnyValue = AnyData<64, kValueInlineAlign>;
++#else
+ using AnyValue = AnyData<kValueInlineSize, kValueInlineAlign>;
++#endif
+ 
+ // Metaprogramming utility for interacting with Value.
+ //
 diff --git a/base/memory.h b/base/memory.h
 index 3552e19..bd2bd9b 100644
 --- a/base/memory.h
