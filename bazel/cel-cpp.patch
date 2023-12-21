@@ -29,19 +29,21 @@ index fb3e845..62962c7 100644
  // Metaprogramming utility for interacting with Value.
  //
 diff --git a/base/memory.h b/base/memory.h
-index 3552e19..bd2bd9b 100644
+index 3552e19..492966d 100644
 --- a/base/memory.h
 +++ b/base/memory.h
-@@ -164,7 +164,8 @@ std::enable_if_t<IsDerivedHeapDataV<F>, Handle<T>> HandleFactory<T>::Make(
-     MemoryManagerRef memory_manager, Args&&... args) {
+@@ -165,9 +165,11 @@ std::enable_if_t<IsDerivedHeapDataV<F>, Handle<T>> HandleFactory<T>::Make(
    static_assert(std::is_base_of_v<T, F>, "F is not derived from T");
  #if defined(__cpp_lib_is_pointer_interconvertible) && \
--    __cpp_lib_is_pointer_interconvertible >= 201907L
-+    __cpp_lib_is_pointer_interconvertible >= 201907L && \
-+    !defined(WIN32)
+     __cpp_lib_is_pointer_interconvertible >= 201907L
++#ifndef WIN32
    // Only available in C++20.
    static_assert(std::is_pointer_interconvertible_base_of_v<Data, F>,
                  "F must be pointer interconvertible to Data");
++#endif
+ #endif
+   if (memory_manager.memory_management() == MemoryManagement::kPooling) {
+     void* addr;
 diff --git a/base/value.h b/base/value.h
 index 5d94d5e..d53370c 100644
 --- a/base/value.h

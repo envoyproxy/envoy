@@ -158,6 +158,7 @@ class BaseWrapper : public google::api::expr::runtime::CelMap {
 public:
   BaseWrapper(Protobuf::Arena& arena) : arena_(arena) {}
   int size() const override { return 0; }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     return absl::UnimplementedError("ListKeys() is not implemented");
   }
