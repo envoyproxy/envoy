@@ -1,5 +1,5 @@
 diff --git a/base/internal/value.h b/base/internal/value.h
-index fb3e845..62962c7 100644
+index fb3e845..b527e98 100644
 --- a/base/internal/value.h
 +++ b/base/internal/value.h
 @@ -55,13 +55,9 @@ NativeTypeId GetListValueTypeId(const ListValue& list_value);
@@ -20,7 +20,7 @@ index fb3e845..62962c7 100644
  static_assert(kValueInlineAlign <= alignof(std::max_align_t),
                "Alignment of an inline value should not be overaligned.");
  
-+#ifdef WIN32
++#ifdef _MSC_VER
 +using AnyValue = AnyData<64, kValueInlineAlign>;
 +#else
  using AnyValue = AnyData<kValueInlineSize, kValueInlineAlign>;
@@ -29,14 +29,14 @@ index fb3e845..62962c7 100644
  // Metaprogramming utility for interacting with Value.
  //
 diff --git a/base/memory.h b/base/memory.h
-index 3552e19..492966d 100644
+index 3552e19..47ca57e 100644
 --- a/base/memory.h
 +++ b/base/memory.h
 @@ -165,9 +165,11 @@ std::enable_if_t<IsDerivedHeapDataV<F>, Handle<T>> HandleFactory<T>::Make(
    static_assert(std::is_base_of_v<T, F>, "F is not derived from T");
  #if defined(__cpp_lib_is_pointer_interconvertible) && \
      __cpp_lib_is_pointer_interconvertible >= 201907L
-+#ifndef WIN32
++#ifndef _MSC_VER
    // Only available in C++20.
    static_assert(std::is_pointer_interconvertible_base_of_v<Data, F>,
                  "F must be pointer interconvertible to Data");
