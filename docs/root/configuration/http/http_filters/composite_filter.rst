@@ -20,7 +20,7 @@ incremented.
 
 This filter adds in filter state the delegated filter name that match the condition as a pair
 with the root config filter name in ``envoy.extensions.filters.http.composite.matched_actions``
-  
+
 Contains a map of pairs `FILTER_CONFIG_NAME:ACTION_NAME`:
 
   * ``FILTER_CONFIG_NAME``: root filter config name;
