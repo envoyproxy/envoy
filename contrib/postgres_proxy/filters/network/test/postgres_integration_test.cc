@@ -34,8 +34,8 @@ public:
   std::string postgresConfig(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config,
                              std::string additional_filters) {
     std::string main_config = fmt::format(
-        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template")),
+        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template"))),
         Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getLoopbackAddressString(GetParam()),
         std::get<1>(upstream_ssl_config), // upstream SSL transport socket
