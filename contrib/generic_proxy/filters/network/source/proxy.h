@@ -57,7 +57,7 @@ public:
                    Tracing::ConnectionManagerTracingConfigPtr tracing_config,
                    std::vector<AccessLogInstanceSharedPtr>&& access_logs,
                    Envoy::Server::Configuration::FactoryContext& context)
-      : stat_prefix_(stat_prefix),
+      : stat_prefix_(fmt::format("generic_proxy.{}.", stat_prefix)),
         stats_(GenericFilterStats::generateStats(stat_prefix_, context.scope())),
         codec_factory_(std::move(codec)), route_config_provider_(std::move(route_config_provider)),
         factories_(std::move(factories)), drain_decision_(context.drainDecision()),
