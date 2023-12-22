@@ -121,119 +121,135 @@ void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
   cb(std::move(lookup_result));
 }
 
-void GeoipProvider::lookupInCityDb(
+bool GeoipProvider::isLookupEnabledForDbType(const std::string& db_type) const {
+  if (db_type == "city") {
+    return (config_->isLookupEnabledForHeader(config_->cityHeader()) ||
+            config_->isLookupEnabledForHeader(config_->regionHeader()) ||
+            config_->isLookupEnabledForHeader(config_->countryHeader()));
+  } else if (db_type == "isp") {
+    return config_->isLookupEnabledForHeader(config_->asnHeader());
+  } else if (db_type == "anon") {
+    return (config_->isLookupEnabledForHeader(config_->anonHeader()) ||
+            config_->isLookupEnabledForHeader(config_->anonVpnHeader()) ||
+            config_->isLookupEnabledForHeader(config_->anonHostingHeader()) ||
+            config_->isLookupEnabledForHeader(config_->anonTorHeader()) ||
+            config_->isLookupEnabledForHeader(config_->anonProxyHeader()));
+  }
+  return false;
+}
+
+void GeoipProvider::populateGeoLookupResultForCityDb(
+    MMDB_lookup_result_s& mmdb_lookup_result,
+    absl::flat_hash_map<std::string, std::string>& lookup_result) const {
+  if (config_->isLookupEnabledForHeader(config_->cityHeader())) {
+    populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->cityHeader().value(),
+                            MMDB_CITY_LOOKUP_ARGS[0], MMDB_CITY_LOOKUP_ARGS[1],
+                            MMDB_CITY_LOOKUP_ARGS[2]);
+  }
+  if (config_->isLookupEnabledForHeader(config_->regionHeader())) {
+    populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->regionHeader().value(),
+                            MMDB_REGION_LOOKUP_ARGS[0], MMDB_REGION_LOOKUP_ARGS[1],
+                            MMDB_REGION_LOOKUP_ARGS[2]);
+  }
+  if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
+    populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->countryHeader().value(),
+                            MMDB_COUNTRY_LOOKUP_ARGS[0], MMDB_COUNTRY_LOOKUP_ARGS[1]);
+  }
+}
+
+void GeoipProvider::populateGeoLookupResultForIspDb(
+    MMDB_lookup_result_s& mmdb_lookup_result,
+    absl::flat_hash_map<std::string, std::string>& lookup_result) const {
+  populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
+                          MMDB_ASN_LOOKUP_ARGS[0]);
+}
+
+void GeoipProvider::populateGeoLookupResultForAnonDb(
+    MMDB_lookup_result_s& mmdb_lookup_result,
+    absl::flat_hash_map<std::string, std::string>& lookup_result) const {
+  if (config_->isLookupEnabledForHeader(config_->anonHeader())) {
+    populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->anonHeader().value(),
+                            MMDB_ANON_LOOKUP_ARGS[0]);
+  }
+  if (config_->isLookupEnabledForHeader(config_->anonVpnHeader())) {
+    populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->anonVpnHeader().value(),
+                            MMDB_ANON_LOOKUP_ARGS[1]);
+  }
+  if (config_->isLookupEnabledForHeader(config_->anonHostingHeader())) {
+    populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->anonHostingHeader().value(),
+                            MMDB_ANON_LOOKUP_ARGS[2]);
+  }
+  if (config_->isLookupEnabledForHeader(config_->anonTorHeader())) {
+    populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->anonTorHeader().value(),
+                            MMDB_ANON_LOOKUP_ARGS[3]);
+  }
+  if (config_->isLookupEnabledForHeader(config_->anonProxyHeader())) {
+    populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->anonProxyHeader().value(),
+                            MMDB_ANON_LOOKUP_ARGS[4]);
+  }
+}
+
+void GeoipProvider::populateGeoLookupResultForDbType(
+    const std::string& db_type, MMDB_lookup_result_s& mmdb_lookup_result,
+    absl::flat_hash_map<std::string, std::string>& lookup_result) const {
+  if (db_type == "city") {
+    populateGeoLookupResultForCityDb(mmdb_lookup_result, lookup_result);
+  } else if (db_type == "isp") {
+    populateGeoLookupResultForIspDb(mmdb_lookup_result, lookup_result);
+  } else if (db_type == "anon") {
+    populateGeoLookupResultForAnonDb(mmdb_lookup_result, lookup_result);
+  }
+}
+
+void GeoipProvider::lookupInMaxmindDb(
+    const std::string& db_type, const std::string& stat_prefix,
+    const MaxmindDbPtr&
+        maxmind_db /* could we guarantee city_db_/isp_db_ exists during function call */,
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  if (config_->isLookupEnabledForHeader(config_->cityHeader()) ||
-      config_->isLookupEnabledForHeader(config_->regionHeader()) ||
-      config_->isLookupEnabledForHeader(config_->countryHeader())) {
-    ASSERT(city_db_, "Maxmind city database is not initialised for performing lookups");
+  if (isLookupEnabledForDbType(db_type)) {
+    RELEASE_ASSERT(
+        maxmind_db,
+        fmt::format("Maxmind {} database is not initialized for performing lookups", stat_prefix));
     int mmdb_error;
     const uint32_t n_prev_hits = lookup_result.size();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        city_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
+        maxmind_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
+        &mmdb_error);
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
       if (status == MMDB_SUCCESS) {
-        if (config_->isLookupEnabledForHeader(config_->cityHeader())) {
-          populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->cityHeader().value(),
-                                  MMDB_CITY_LOOKUP_ARGS[0], MMDB_CITY_LOOKUP_ARGS[1],
-                                  MMDB_CITY_LOOKUP_ARGS[2]);
-        }
-        if (config_->isLookupEnabledForHeader(config_->regionHeader())) {
-          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->regionHeader().value(), MMDB_REGION_LOOKUP_ARGS[0],
-                                  MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2]);
-        }
-        if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
-          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
-                                  MMDB_COUNTRY_LOOKUP_ARGS[1]);
-        }
+        // populate headers
+        populateGeoLookupResultForDbType(db_type, mmdb_lookup_result, lookup_result);
         if (lookup_result.size() > n_prev_hits) {
-          config_->incHit("city_db");
+          config_->incHit(fmt::format("{}_db", stat_prefix));
         }
         MMDB_free_entry_data_list(entry_data_list);
       }
-
     } else {
-      config_->incLookupError("city_db");
+      config_->incLookupError(fmt::format("{}_db", stat_prefix));
     }
-    config_->incTotal("city_db");
+    config_->incTotal(fmt::format("{}_db", stat_prefix));
   }
+}
+
+void GeoipProvider::lookupInCityDb(
+    const Network::Address::InstanceConstSharedPtr& remote_address,
+    absl::flat_hash_map<std::string, std::string>& lookup_result) const {
+  lookupInMaxmindDb("city", "city", city_db_, remote_address, lookup_result);
 }
 
 void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
-    RELEASE_ASSERT(isp_db_, "Maxmind asn database is not initialized for performing lookups");
-    int mmdb_error;
-    const uint32_t n_prev_hits = lookup_result.size();
-    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        isp_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
-    if (!mmdb_error) {
-      MMDB_entry_data_list_s* entry_data_list;
-      int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
-      if (status == MMDB_SUCCESS && entry_data_list) {
-        populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
-                                MMDB_ASN_LOOKUP_ARGS[0]);
-        MMDB_free_entry_data_list(entry_data_list);
-        if (lookup_result.size() > n_prev_hits) {
-          config_->incHit("isp_db");
-        }
-      } else {
-        config_->incLookupError("isp_db");
-      }
-    }
-    config_->incTotal("isp_db");
-  }
+  lookupInMaxmindDb("isp", "isp", isp_db_, remote_address, lookup_result);
 }
 
 void GeoipProvider::lookupInAnonDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  if (config_->isLookupEnabledForHeader(config_->anonHeader()) || config_->anonVpnHeader()) {
-    ASSERT(anon_db_, "Maxmind city database is not initialised for performing lookups");
-    int mmdb_error;
-    const uint32_t n_prev_hits = lookup_result.size();
-    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        anon_db_.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
-    if (!mmdb_error) {
-      MMDB_entry_data_list_s* entry_data_list;
-      int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
-      if (status == MMDB_SUCCESS) {
-        if (config_->isLookupEnabledForHeader(config_->anonHeader())) {
-          populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->anonHeader().value(),
-                                  MMDB_ANON_LOOKUP_ARGS[0]);
-        }
-        if (config_->isLookupEnabledForHeader(config_->anonVpnHeader())) {
-          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->anonVpnHeader().value(), MMDB_ANON_LOOKUP_ARGS[1]);
-        }
-        if (config_->isLookupEnabledForHeader(config_->anonHostingHeader())) {
-          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->anonHostingHeader().value(), MMDB_ANON_LOOKUP_ARGS[2]);
-        }
-        if (config_->isLookupEnabledForHeader(config_->anonTorHeader())) {
-          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->anonTorHeader().value(), MMDB_ANON_LOOKUP_ARGS[3]);
-        }
-        if (config_->isLookupEnabledForHeader(config_->anonProxyHeader())) {
-          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->anonProxyHeader().value(), MMDB_ANON_LOOKUP_ARGS[4]);
-        }
-        if (lookup_result.size() > n_prev_hits) {
-          config_->incHit("anon_db");
-        }
-        MMDB_free_entry_data_list(entry_data_list);
-      } else {
-        config_->incLookupError("anon_db");
-      }
-    }
-    config_->incTotal("anon_db");
-  }
+  lookupInMaxmindDb("anon", "anon", anon_db_, remote_address, lookup_result);
 }
 
 template <class... Params>

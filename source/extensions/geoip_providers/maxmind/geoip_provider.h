@@ -4,6 +4,7 @@
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
 #include "envoy/geoip/geoip_provider_driver.h"
 
+#include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 
 #include "maxminddb.h"
@@ -101,12 +102,33 @@ private:
   MaxmindDbPtr isp_db_;
   MaxmindDbPtr anon_db_;
   MaxmindDbPtr initMaxMindDb(const absl::optional<std::string>& db_path);
+
+  bool isLookupEnabledForDbType(const std::string& db_type) const;
+
+  void lookupInMaxmindDb(const std::string& db_type, const std::string& stat_prefix,
+                         const MaxmindDbPtr& maxmind_db,
+                         const Network::Address::InstanceConstSharedPtr& remote_address,
+                         absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInCityDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAsnDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAnonDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
+
+  void populateGeoLookupResultForCityDb(
+      MMDB_lookup_result_s& mmdb_lookup_result,
+      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
+  void populateGeoLookupResultForIspDb(
+      MMDB_lookup_result_s& mmdb_lookup_result,
+      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
+  void populateGeoLookupResultForAnonDb(
+      MMDB_lookup_result_s& mmdb_lookup_result,
+      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
+  void populateGeoLookupResultForDbType(
+      const std::string& db_type, MMDB_lookup_result_s& mmdb_lookup_result,
+      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
+
   template <typename... Params>
   void populateGeoLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
                                absl::flat_hash_map<std::string, std::string>& lookup_result,
