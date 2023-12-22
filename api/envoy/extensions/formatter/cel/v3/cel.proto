@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // truncation up to Z characters long.
 //
 // Examples:
-// 
+//
 // * ``%CEL(response.code)%``
 // * ``%CEL(connection.mtls)%``
 // * ``%CEL(request.headers['x-envoy-original-path']):10%``
