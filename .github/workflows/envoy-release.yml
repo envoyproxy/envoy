@@ -55,7 +55,7 @@ jobs:
     steps:
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.19
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.20
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
@@ -77,10 +77,10 @@ jobs:
       name: Check changelog summary
     - if: ${{ inputs.author }}
       name: Validate signoff email
-      uses: envoyproxy/toolshed/gh-actions/email/validate@actions-v0.2.19
+      uses: envoyproxy/toolshed/gh-actions/email/validate@actions-v0.2.20
       with:
         email: ${{ inputs.author }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.19
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.20
       name: Create release
       with:
         source: |
@@ -105,7 +105,7 @@ jobs:
       name: Release version
       id: release
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.19
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.20
       with:
         base: ${{ github.ref_name }}
         commit: false
@@ -130,13 +130,13 @@ jobs:
     steps:
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.19
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.20
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.19
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.20
       name: Sync version histories
       with:
         command: >-
@@ -146,7 +146,7 @@ jobs:
           --
           --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.19
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.20
       with:
         append-commit-message: true
         base: ${{ github.ref_name }}
@@ -176,7 +176,7 @@ jobs:
     name: Create release branch
     steps:
     - name: Checkout repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.19
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.20
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
