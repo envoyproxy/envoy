@@ -80,9 +80,12 @@ public:
    * same for all frames of the same stream.
    * @param stream_flags StreamFlags of the stream.
    * @param end_stream whether the current frame is the last frame of the request or response.
+   * @param frame_tags frame tags of the current frame. The meaning of the frame tags is
+   * application protocol specific.
    */
-  FrameFlags(StreamFlags stream_flags = StreamFlags(), bool end_stream = true)
-      : stream_flags_(stream_flags), end_stream_(end_stream) {}
+  FrameFlags(StreamFlags stream_flags = StreamFlags(), bool end_stream = true,
+             uint32_t frame_tags = 0)
+      : stream_flags_(stream_flags), end_stream_(end_stream), frame_tags_(frame_tags) {}
 
   /**
    * Get flags of stream that the frame belongs to. The flags MUST be same for all frames of the
@@ -96,11 +99,22 @@ public:
    */
   bool endStream() const { return end_stream_; }
 
+  /**
+   * @return frame tags of the current frame. The meaning of the frame tags is application
+   * protocol specific. This allows the creator of the frame to attach additional information to the
+   * frame and get it by the receiver of the frame without parsing the frame payload or dynamic
+   * cast.
+   * For example, the frame tags could be used to indicate the type of the frame by the server
+   * codec. Then the client codec could get the frame type without dynamic cast.
+   */
+  uint32_t frameTags() const { return frame_tags_; }
+
 private:
   StreamFlags stream_flags_{};
 
   // Default to true for backward compatibility.
   bool end_stream_{true};
+  uint32_t frame_tags_{};
 };
 
 /**
@@ -218,8 +232,35 @@ enum class Event {
   ConnectionFailure,
 };
 
+/**
+ * The Status type is used by the generic proxy to indicate statuses or error types
+ * to the application protocol codec. This is application protocol independent.
+ */
 using Status = absl::Status;
 using StatusCode = absl::StatusCode;
+
+/**
+ * Generic stream status. The Status is used by the application protocol codec to
+ * indicate the status of the response. The meaning of status code is application
+ * protocol specific.
+ */
+struct StreamStatus {
+public:
+  StreamStatus() = default;
+  StreamStatus(uint32_t code, bool ok) : code_(code), ok_(ok) {}
+
+  // Returns true if the status indicates success. This will be used for tracing, logging
+  // or stats purposes.
+  ABSL_MUST_USE_RESULT bool ok() const { return ok_; }
+
+  // Returns the status code value. The code will be used for tracing, logging or stats
+  // purposes. The specific code value is application protocol specific.
+  ABSL_MUST_USE_RESULT uint32_t code() const { return code_; }
+
+private:
+  uint32_t code_{};
+  bool ok_{true};
+};
 
 /**
  * Interface of generic response. This is derived from StreamFrame that contains the response
@@ -232,7 +273,7 @@ public:
    *
    * @return generic response status.
    */
-  virtual Status status() const { return {}; }
+  virtual StreamStatus status() const { return {}; }
 };
 
 using StreamResponsePtr = std::unique_ptr<StreamResponse>;
