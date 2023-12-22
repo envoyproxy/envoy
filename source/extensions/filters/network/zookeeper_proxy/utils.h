@@ -38,7 +38,8 @@ public:
 
 private:
   absl::Status ensureMaxLen(const uint32_t size);
-  absl::Status ensureMinLen(Buffer::Instance& buffer, uint64_t& offset, const uint32_t size);
+  absl::Status ensureMinLen(const Buffer::Instance& buffer, const uint64_t offset,
+                            const uint32_t size);
 
   const uint32_t max_len_;
   uint32_t current_{};

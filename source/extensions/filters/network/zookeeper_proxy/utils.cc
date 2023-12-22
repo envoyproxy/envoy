@@ -83,7 +83,7 @@ absl::Status BufferHelper::ensureMaxLen(const uint32_t size) {
   return absl::OkStatus();
 }
 
-absl::Status BufferHelper::ensureMinLen(Buffer::Instance& buffer, uint64_t& offset,
+absl::Status BufferHelper::ensureMinLen(const Buffer::Instance& buffer, const uint64_t offset,
                                         const uint32_t size) {
   if (buffer.length() < (offset + size)) {
     return absl::InvalidArgumentError("read beyond buffer size");
