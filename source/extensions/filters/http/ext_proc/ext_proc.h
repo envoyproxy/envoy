@@ -224,6 +224,7 @@ public:
   const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
+  const std::vector<envoy::config::core::v3::HeaderValue>& metadata() const { return metadata_; }
 
 private:
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
@@ -240,6 +241,7 @@ private:
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  std::vector<envoy::config::core::v3::HeaderValue> metadata_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,

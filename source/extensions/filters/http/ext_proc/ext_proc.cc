@@ -129,6 +129,14 @@ FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
   }
   return absl::nullopt;
 }
+static std::vector<envoy::config::core::v3::HeaderValue>
+initMetadata(const ExtProcPerRoute& config) {
+  std::vector<envoy::config::core::v3::HeaderValue> metadata;
+  for (const auto& header : config.overrides().metadata()) {
+    metadata.emplace_back(header);
+  }
+  return metadata;
+}
 
 absl::optional<ProcessingMode>
 FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_specific,
@@ -140,16 +148,44 @@ FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_speci
                                                     : less_specific.processingMode();
 }
 
+// replace all entries with the same name or append one.
+static void mergeHeaderValue(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
+                             const envoy::config::core::v3::HeaderValue& header) {
+  size_t count = 0;
+  for (auto& dest : metadata) {
+    if (dest.key() == header.key()) {
+      dest.CopyFrom(header);
+      count++;
+    }
+  }
+  if (!count) {
+    metadata.emplace_back(header);
+  }
+}
+
+static std::vector<envoy::config::core::v3::HeaderValue>
+mergeMetadata(const FilterConfigPerRoute& less_specific,
+              const FilterConfigPerRoute& more_specific) {
+  std::vector<envoy::config::core::v3::HeaderValue> metadata(less_specific.metadata());
+
+  for (const auto& header : more_specific.metadata()) {
+    mergeHeaderValue(metadata, header);
+  }
+
+  return metadata;
+}
+
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
-      grpc_service_(initGrpcService(config)) {}
+      grpc_service_(initGrpcService(config)), metadata_(initMetadata(config)) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
     : disabled_(more_specific.disabled()),
       processing_mode_(mergeProcessingMode(less_specific, more_specific)),
       grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
-                                                            : less_specific.grpcService()) {}
+                                                            : less_specific.grpcService()),
+      metadata_(mergeMetadata(less_specific, more_specific)) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -866,6 +902,22 @@ static ProcessingMode allDisabledMode() {
   return pm;
 }
 
+// replace all entries with the same name or append one.
+static void
+mergeHeaderValue(Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
+                 const envoy::config::core::v3::HeaderValue& header) {
+  size_t count = 0;
+  for (auto& dest : metadata) {
+    if (dest.key() == header.key()) {
+      dest.CopyFrom(header);
+      count++;
+    }
+  }
+  if (!count) {
+    metadata.Add()->CopyFrom(header);
+  }
+}
+
 void Filter::mergePerRouteConfig() {
   if (route_config_merged_) {
     return;
@@ -911,6 +963,16 @@ void Filter::mergePerRouteConfig() {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *merged_config->grpcService();
     config_with_hash_key_.setConfig(*merged_config->grpcService());
+  }
+  if (!merged_config->metadata().empty()) {
+    ENVOY_LOG(trace, "Overriding metadata from per-route configuration");
+    envoy::config::core::v3::GrpcService config = config_with_hash_key_.config();
+    auto ptr = config.mutable_initial_metadata();
+    for (const auto& header : merged_config->metadata()) {
+      ENVOY_LOG(trace, "Setting metadata {} = {}", header.key(), header.value());
+      mergeHeaderValue(*ptr, header);
+    }
+    config_with_hash_key_.setConfig(config);
   }
 }
 
