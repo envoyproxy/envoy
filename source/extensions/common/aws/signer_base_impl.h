@@ -116,7 +116,7 @@ protected:
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
-  const std::string BlankStr = std::string();
+  const std::string blank_str_;
 };
 
 } // namespace Aws

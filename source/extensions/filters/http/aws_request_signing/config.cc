@@ -23,11 +23,11 @@ SigningAlgorithm getSigningAlgorithm(
 
   switch (config.signing_algorithm()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case AwsRequestSigning_SigningAlgorithm_AWS_SigV4:
+  case AwsRequestSigning_SigningAlgorithm_AWS_SIGV4:
     ENVOY_LOG_TO_LOGGER(logger, debug, "Signing Algorithm is SigV4");
 
     return SigningAlgorithm::SigV4;
-  case AwsRequestSigning_SigningAlgorithm_AWS_SigV4A:
+  case AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A:
     ENVOY_LOG_TO_LOGGER(logger, debug, "Signing Algorithm is SigV4A");
     return SigningAlgorithm::SigV4A;
   }
@@ -51,7 +51,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
   if (getSigningAlgorithm(config) == SigningAlgorithm::SigV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-        config.service_name(), config.region(), credentials_provider,
+        config.service_name(), config.region_set(), credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
@@ -84,7 +84,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   if (getSigningAlgorithm(per_route_config.aws_request_signing()) == SigningAlgorithm::SigV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         per_route_config.aws_request_signing().service_name(),
-        per_route_config.aws_request_signing().region(), credentials_provider,
+        per_route_config.aws_request_signing().region_set(), credentials_provider,
         context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(

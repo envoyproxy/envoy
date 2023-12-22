@@ -45,8 +45,9 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
     fixed_input.insert(fixed_input.end(), external_counter);
     fixed_input.insert(fixed_input.end(), {0x00, 0x00, 0x01, 0x00});
 
-    auto k0 = crypto_util.getSha256Hmac(std::vector<uint8_t>(secret_key.begin(), secret_key.end()),
-                                        fixed_input);
+    auto k0 = crypto_util.getSha256Hmac(
+        std::vector<uint8_t>(secret_key.begin(), secret_key.end()),
+        absl::string_view(reinterpret_cast<char*>(fixed_input.data()), fixed_input.size()));
 
     // ECDSA q - 2
     std::vector<uint8_t> s_n_minus_2 = {

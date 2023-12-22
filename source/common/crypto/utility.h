@@ -48,15 +48,6 @@ public:
                                              absl::string_view message) PURE;
 
   /**
-   * Computes the SHA-256 HMAC for a given key and message.
-   * @param key the HMAC function key.
-   * @param message uint8_t* message data for the HMAC function.
-   * @return a vector of bytes for the computed HMAC.
-   */
-  virtual std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key,
-                                             const std::vector<uint8_t>& message) PURE;
-
-  /**
    * Verify cryptographic signatures.
    * @param hash hash function(including SHA1, SHA224, SHA256, SHA384, SHA512)
    * @param key pointer to EVP_PKEY public key

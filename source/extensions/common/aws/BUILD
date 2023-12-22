@@ -65,16 +65,10 @@ envoy_cc_library(
     ],
     deps = [
         ":credentials_provider_interface",
-        ":signer_interface",
         ":signer_base_impl",
+        ":signer_interface",
         ":sigv4a_key_derivation_lib",
         ":utility_lib",
-        # "//source/common/buffer:buffer_lib",
-        # "//source/common/common:hex_lib",
-        # "//source/common/common:logger_lib",
-        # "//source/common/common:utility_lib",
-        # "//source/common/crypto:utility_lib",
-        # "//source/common/http:message_lib",
         "//source/common/singleton:const_singleton",
     ],
 )

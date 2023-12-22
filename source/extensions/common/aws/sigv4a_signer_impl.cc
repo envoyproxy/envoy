@@ -64,7 +64,7 @@ std::string SigV4ASignerImpl::createSignature(
   EC_KEY* ec_key = SigV4AKeyDerivation::derivePrivateKey(access_key_id, secret_access_key);
   if (!ec_key) {
     ENVOY_LOG(debug, "SigV4A key derivation failed");
-    return BlankStr;
+    return blank_str_;
   }
 
   std::vector<uint8_t> signature(ECDSA_size(ec_key));
