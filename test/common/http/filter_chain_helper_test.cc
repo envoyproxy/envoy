@@ -28,8 +28,9 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
 
   for (const auto& name : {"filter_0", "filter_1", "filter_2"}) {
     auto provider =
-        std::make_unique<Filter::StaticFilterConfigProviderImpl<Http::NamedHttpFilterFactoryCb>>(
-            Http::NamedHttpFilterFactoryCb{"filter_type_name", [](FilterChainFactoryCallbacks&) {}},
+        std::make_unique<Filter::StaticFilterConfigProviderImpl<Filter::NamedHttpFilterFactoryCb>>(
+            Filter::NamedHttpFilterFactoryCb{"filter_type_name",
+                                             [](FilterChainFactoryCallbacks&) {}},
             name);
     filter_factories.push_back({std::move(provider), false});
   }
@@ -60,8 +61,9 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabledAndDe
 
   for (const auto& name : {"filter_0", "filter_1", "filter_2"}) {
     auto provider =
-        std::make_unique<Filter::StaticFilterConfigProviderImpl<Http::NamedHttpFilterFactoryCb>>(
-            Http::NamedHttpFilterFactoryCb{"filter_type_name", [](FilterChainFactoryCallbacks&) {}},
+        std::make_unique<Filter::StaticFilterConfigProviderImpl<Filter::NamedHttpFilterFactoryCb>>(
+            Filter::NamedHttpFilterFactoryCb{"filter_type_name",
+                                             [](FilterChainFactoryCallbacks&) {}},
             name);
     filter_factories.push_back({std::move(provider), true});
   }

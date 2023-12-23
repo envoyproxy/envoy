@@ -46,7 +46,8 @@ public:
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr) {
+        init_manager_(nullptr),
+        listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -85,7 +86,9 @@ public:
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
   ResourceLimit& openConnections() override { return open_connections_; }
-  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
+  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+    return listener_info_;
+  }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
@@ -192,7 +195,7 @@ public:
   std::unique_ptr<Init::Manager> init_manager_;
   NiceMock<Runtime::MockLoader> runtime_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
-  testing::NiceMock<Network::MockListenerInfo> listener_info_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
 };
 
 // Parameterize the listener socket address version.
