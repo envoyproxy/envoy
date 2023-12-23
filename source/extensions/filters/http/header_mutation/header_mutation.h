@@ -56,8 +56,11 @@ public:
 
   const Mutations& mutations() const { return mutations_; }
 
+  bool mostSpecificHeaderMutationsWins() const { return most_specific_header_mutations_wins_; }
+
 private:
   Mutations mutations_;
+  const bool most_specific_header_mutations_wins_;
 };
 using HeaderMutationConfigSharedPtr = std::shared_ptr<HeaderMutationConfig>;
 

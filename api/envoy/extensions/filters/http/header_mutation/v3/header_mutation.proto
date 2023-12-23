@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.header_mutation.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 
 import "udpa/annotations/status.proto";
+import "google/protobuf/wrappers.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_mutation.v3";
 option java_outer_classname = "HeaderMutationProto";
@@ -23,8 +24,7 @@ message Mutations {
   repeated config.common.mutation_rules.v3.HeaderMutation response_mutations = 2;
 }
 
-// Per route configuration for the header mutation filter. If this is configured at multiple levels
-// (route level, virtual host level, and route table level), only the most specific one will be used.
+// Per route configuration for the header mutation filter.
 message HeaderMutationPerRoute {
   Mutations mutations = 1;
 }
@@ -33,4 +33,17 @@ message HeaderMutationPerRoute {
 // always be applied first and then the per-route mutation rules, if both are specified.
 message HeaderMutation {
   Mutations mutations = 1;
+
+  // If per route configuration is configured at multiple levels (route, virtual host, and route table),
+  // all levels' mutations are applied but most specific level wins (i.e., most specific level could
+  // override least specific level mutation).
+  // In other words, by default header mutations are evaluated from least to most specific:
+  //
+  // * route table level
+  // * virtual host level
+  // * route level
+  //
+  // Defaults to true. This order can be reversed by setting this option to false.
+  //
+  google.protobuf.BoolValue most_specific_header_mutations_wins = 2;
 }

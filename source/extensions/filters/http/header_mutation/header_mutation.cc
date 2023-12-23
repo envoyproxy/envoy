@@ -28,14 +28,24 @@ PerRouteHeaderMutation::PerRouteHeaderMutation(const PerRouteProtoConfig& config
     : mutations_(config.mutations()) {}
 
 HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config)
-    : mutations_(config.mutations()) {}
+    : mutations_(config.mutations()),
+      most_specific_header_mutations_wins_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, most_specific_header_mutations_wins, true)) {}
 
 Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   Formatter::HttpFormatterContext ctx{&headers};
   config_->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
 
   // Traverse through all route configs to retrieve all available header mutations.
+  // getAllPerFilterConfig will return in the order of specificity. i.e., route table first, then
+  // virtual table, then route.
   route_configs_ = Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
+  if (!config_->mostSpecificHeaderMutationsWins()) {
+    // most_specific_wins means that we need to put route in the end so that the mutation is applied
+    // lastly.
+    std::reverse(route_configs_.begin(), route_configs_.end());
+  }
+  std::cout << "tyxia_route_configs_size: " << route_configs_.size() << std::endl;
 
   for (const auto* route_config : route_configs_) {
     ASSERT(route_config != nullptr);
@@ -53,8 +63,12 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
   if (route_configs_.empty()) {
     route_configs_ =
         Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(encoder_callbacks_);
-  }
 
+    if (!config_->mostSpecificHeaderMutationsWins()) {
+      std::reverse(route_configs_.begin(), route_configs_.end());
+    }
+  }
+  std::cout << "tyxia_route_configs_size: " << route_configs_.size() << std::endl;
   for (const auto* route_config : route_configs_) {
     ASSERT(route_config != nullptr);
     route_config->mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());

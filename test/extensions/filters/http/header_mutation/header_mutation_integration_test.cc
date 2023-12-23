@@ -31,6 +31,101 @@ public:
   HeaderMutationIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
+  void initializeFilterForSpecifityTest(bool most_specific_header_mutations_wins) {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    envoy::extensions::filters::http::header_mutation::v3::HeaderMutation header_mutation;
+    std::string header_mutation_config = R"EOF(
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "downstream-request-global-flag-header"
+          value: "downstream-request-global-flag-header-value"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    response_mutations:
+    - append:
+        header:
+          key: "downstream-global-flag-header"
+          value: "downstream-global-flag-header-value"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+)EOF";
+    TestUtility::loadFromYaml(header_mutation_config, header_mutation);
+    envoy::config::listener::v3::Filter http_mutation_filter;
+    http_mutation_filter.set_name("donwstream-header-mutation");
+    if (!most_specific_header_mutations_wins) {
+      header_mutation.mutable_most_specific_header_mutations_wins()->set_value(false);
+    }
+    http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
+    config_helper_.prependFilter(
+        MessageUtil::getJsonStringFromMessageOrError(http_mutation_filter));
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+
+          // Another route that disables downstream header mutation.
+          auto* another_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+          *another_route = *route;
+
+          route->mutable_match()->set_path("/default/route");
+          another_route->mutable_match()->set_path("/disable/filter/route");
+
+          // Set response mutations on all route levels with same key `downstream-flag-header`.
+          // Per route header mutation for downstream.
+          PerRouteProtoConfig header_mutation;
+          auto response_mutation =
+              header_mutation.mutable_mutations()->mutable_response_mutations()->Add();
+          response_mutation->mutable_append()->mutable_header()->set_key("downstream-flag-header");
+          response_mutation->mutable_append()->mutable_header()->set_value(
+              "downstream-per-route-flag-header-value");
+          response_mutation->mutable_append()->set_append_action(
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+
+          ProtobufWkt::Any per_route_config;
+          per_route_config.PackFrom(header_mutation);
+          route->mutable_typed_per_filter_config()->insert(
+              {"donwstream-header-mutation", per_route_config});
+
+          // Per virtual host header mutation for downstream.
+          PerRouteProtoConfig header_mutation_vhost;
+          auto response_mutation_vhost =
+              header_mutation_vhost.mutable_mutations()->mutable_response_mutations()->Add();
+          response_mutation_vhost->mutable_append()->mutable_header()->set_key(
+              "downstream-flag-header");
+          response_mutation_vhost->mutable_append()->mutable_header()->set_value(
+              "downstream-per-vHost-flag-header-value");
+          response_mutation_vhost->mutable_append()->set_append_action(
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+
+          ProtobufWkt::Any per_route_config_vhost;
+          per_route_config_vhost.PackFrom(header_mutation_vhost);
+
+          auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          vhost->mutable_typed_per_filter_config()->insert(
+              {"donwstream-header-mutation", per_route_config_vhost});
+
+          // Per route table header mutation for downstream.
+          PerRouteProtoConfig header_mutation_rt;
+          auto response_mutation_rt =
+              header_mutation_rt.mutable_mutations()->mutable_response_mutations()->Add();
+          response_mutation_rt->mutable_append()->mutable_header()->set_key(
+              "downstream-flag-header");
+          response_mutation_rt->mutable_append()->mutable_header()->set_value(
+              "downstream-route-table-flag-header-value");
+          response_mutation_rt->mutable_append()->set_append_action(
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+
+          ProtobufWkt::Any per_route_config_rt;
+          per_route_config_rt.PackFrom(header_mutation_rt);
+
+          auto* route_table = hcm.mutable_route_config();
+          route_table->mutable_typed_per_filter_config()->insert(
+              {"donwstream-header-mutation", per_route_config_rt});
+        });
+    HttpIntegrationTest::initialize();
+  }
+
   void initializeFilter(RouteLevelFlag route_level) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
 
@@ -185,77 +280,85 @@ typed_config:
           }
 
           if (route_level.test(RouteLevel::VirtualHost)) {
-            // Per virtual host header mutation for downstream.
-            PerRouteProtoConfig header_mutation_vhost_1;
-            auto response_mutation_vhost =
-                header_mutation_vhost_1.mutable_mutations()->mutable_response_mutations()->Add();
-            response_mutation_vhost->mutable_append()->mutable_header()->set_key(
-                "downstream-per-vHost-flag-header");
-            response_mutation_vhost->mutable_append()->mutable_header()->set_value(
-                "downstream-per-vHost-flag-header-value");
-            response_mutation_vhost->mutable_append()->set_append_action(
-                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+            {
+              // Per virtual host header mutation for downstream.
+              PerRouteProtoConfig header_mutation_vhost;
+              auto response_mutation_vhost =
+                  header_mutation_vhost.mutable_mutations()->mutable_response_mutations()->Add();
+              response_mutation_vhost->mutable_append()->mutable_header()->set_key(
+                  "downstream-per-vHost-flag-header");
+              response_mutation_vhost->mutable_append()->mutable_header()->set_value(
+                  "downstream-per-vHost-flag-header-value");
+              response_mutation_vhost->mutable_append()->set_append_action(
+                  envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-            ProtobufWkt::Any per_route_config_vhost_1;
-            per_route_config_vhost_1.PackFrom(header_mutation_vhost_1);
+              ProtobufWkt::Any per_route_config_vhost;
+              per_route_config_vhost.PackFrom(header_mutation_vhost);
 
-            auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
-            vhost->mutable_typed_per_filter_config()->insert(
-                {"donwstream-header-mutation", per_route_config_vhost_1});
+              auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+              vhost->mutable_typed_per_filter_config()->insert(
+                  {"donwstream-header-mutation", per_route_config_vhost});
+            }
+            {
+              // Per virtual host header mutation for upstream.
+              PerRouteProtoConfig header_mutation_vhost;
+              auto response_mutation_vhost =
+                  header_mutation_vhost.mutable_mutations()->mutable_response_mutations()->Add();
+              response_mutation_vhost->mutable_append()->mutable_header()->set_key(
+                  "upstream-per-vHost-flag-header");
+              response_mutation_vhost->mutable_append()->mutable_header()->set_value(
+                  "upstream-per-vHost-flag-header-value");
+              response_mutation_vhost->mutable_append()->set_append_action(
+                  envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-            // Per virtual host header mutation for upstream.
-            PerRouteProtoConfig header_mutation_vhost_2;
-            auto response_mutation_vhost_2 =
-                header_mutation_vhost_2.mutable_mutations()->mutable_response_mutations()->Add();
-            response_mutation_vhost_2->mutable_append()->mutable_header()->set_key(
-                "upstream-per-vHost-flag-header");
-            response_mutation_vhost_2->mutable_append()->mutable_header()->set_value(
-                "upstream-per-vHost-flag-header-value");
-            response_mutation_vhost_2->mutable_append()->set_append_action(
-                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+              ProtobufWkt::Any per_route_config_vhost;
+              per_route_config_vhost.PackFrom(header_mutation_vhost);
 
-            ProtobufWkt::Any per_route_config_vhost_2;
-            per_route_config_vhost_2.PackFrom(header_mutation_vhost_2);
-
-            vhost->mutable_typed_per_filter_config()->insert(
-                {"upstream-header-mutation", per_route_config_vhost_2});
+              auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+              vhost->mutable_typed_per_filter_config()->insert(
+                  {"upstream-header-mutation", per_route_config_vhost});
+            }
           }
 
           if (route_level.test(RouteLevel::RouteTable)) {
-            // Per route table header mutation for downstream.
-            PerRouteProtoConfig header_mutation_rt;
-            auto response_mutation_rt =
-                header_mutation_rt.mutable_mutations()->mutable_response_mutations()->Add();
-            response_mutation_rt->mutable_append()->mutable_header()->set_key(
-                "downstream-route-table-flag-header");
-            response_mutation_rt->mutable_append()->mutable_header()->set_value(
-                "downstream-route-table-flag-header-value");
-            response_mutation_rt->mutable_append()->set_append_action(
-                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+            {
+              // Per route table header mutation for downstream.
+              PerRouteProtoConfig header_mutation_rt;
+              auto response_mutation_rt =
+                  header_mutation_rt.mutable_mutations()->mutable_response_mutations()->Add();
+              response_mutation_rt->mutable_append()->mutable_header()->set_key(
+                  "downstream-route-table-flag-header");
+              response_mutation_rt->mutable_append()->mutable_header()->set_value(
+                  "downstream-route-table-flag-header-value");
+              response_mutation_rt->mutable_append()->set_append_action(
+                  envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-            ProtobufWkt::Any per_route_config_rt;
-            per_route_config_rt.PackFrom(header_mutation_rt);
+              ProtobufWkt::Any per_route_config_rt;
+              per_route_config_rt.PackFrom(header_mutation_rt);
 
-            auto* route_table = hcm.mutable_route_config();
-            route_table->mutable_typed_per_filter_config()->insert(
-                {"donwstream-header-mutation", per_route_config_rt});
+              auto* route_table = hcm.mutable_route_config();
+              route_table->mutable_typed_per_filter_config()->insert(
+                  {"donwstream-header-mutation", per_route_config_rt});
+            }
+            {
+              // Per route table header mutation for upstream.
+              PerRouteProtoConfig header_mutation_rt;
+              auto response_mutation_rt =
+                  header_mutation_rt.mutable_mutations()->mutable_response_mutations()->Add();
+              response_mutation_rt->mutable_append()->mutable_header()->set_key(
+                  "upstream-route-table-flag-header");
+              response_mutation_rt->mutable_append()->mutable_header()->set_value(
+                  "upstream-route-table-flag-header-value");
+              response_mutation_rt->mutable_append()->set_append_action(
+                  envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-            // Per route table header mutation for upstream.
-            PerRouteProtoConfig header_mutation_rt_2;
-            auto response_mutation_rt_2 =
-                header_mutation_rt_2.mutable_mutations()->mutable_response_mutations()->Add();
-            response_mutation_rt_2->mutable_append()->mutable_header()->set_key(
-                "upstream-route-table-flag-header");
-            response_mutation_rt_2->mutable_append()->mutable_header()->set_value(
-                "upstream-route-table-flag-header-value");
-            response_mutation_rt_2->mutable_append()->set_append_action(
-                envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+              ProtobufWkt::Any per_route_config_rt;
+              per_route_config_rt.PackFrom(header_mutation_rt);
 
-            ProtobufWkt::Any per_route_config_rt_2;
-            per_route_config_rt_2.PackFrom(header_mutation_rt_2);
-
-            route_table->mutable_typed_per_filter_config()->insert(
-                {"upstream-header-mutation", per_route_config_rt_2});
+              auto* route_table = hcm.mutable_route_config();
+              route_table->mutable_typed_per_filter_config()->insert(
+                  {"upstream-header-mutation", per_route_config_rt});
+            }
           }
 
           {
@@ -339,7 +442,7 @@ void TestResponseHeaderMutation(IntegrationStreamDecoder* response, RouteLevelFl
   }
 }
 
-TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
+TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationAllLevels) {
   initializeFilter(AllRoutesLevel);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -401,6 +504,62 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
                        .get(Http::LowerCaseString("request-method-in-upstream-filter"))[0]
                        ->value()
                        .getStringView());
+  codec_client_->close();
+}
+
+TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationMostSpecificWins) {
+  initializeFilterForSpecifityTest(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setPath("/default/route");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("downstream-global-flag-header-value",
+            response->headers()
+                .get(Http::LowerCaseString("downstream-global-flag-header"))[0]
+                ->value()
+                .getStringView());
+
+  // Expect the most specific level (route level) header mutation is set.
+  EXPECT_EQ("downstream-per-route-flag-header-value",
+            response->headers()
+                .get(Http::LowerCaseString("downstream-flag-header"))[0]
+                ->value()
+                .getStringView());
+  codec_client_->close();
+}
+
+TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationLeastSpecificWins) {
+  initializeFilterForSpecifityTest(false);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setPath("/default/route");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("downstream-global-flag-header-value",
+            response->headers()
+                .get(Http::LowerCaseString("downstream-global-flag-header"))[0]
+                ->value()
+                .getStringView());
+
+  // Expect the least specific level (route table level) header mutation is set.
+  EXPECT_EQ("downstream-route-table-flag-header-value",
+            response->headers()
+                .get(Http::LowerCaseString("downstream-flag-header"))[0]
+                ->value()
+                .getStringView());
   codec_client_->close();
 }
 
