@@ -85,8 +85,8 @@ void initializeUpstreamTlsContextConfig(
     tls_context.set_sni(options.sni_);
   }
   if (options.custom_validator_config_) {
-    common_context->mutable_validation_context()->set_allocated_custom_validator_config(
-        options.custom_validator_config_);
+    *common_context->mutable_validation_context()->mutable_custom_validator_config() =
+        *options.custom_validator_config_;
   }
 
   common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
