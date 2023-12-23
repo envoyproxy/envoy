@@ -464,8 +464,6 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
   // Config client to use an async cert validator which defer the actual validation by 5ms.
-  // envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
-  //     new envoy::config::core::v3::TypedExtensionConfig();
   auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
       envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
