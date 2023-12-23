@@ -2974,7 +2974,7 @@ TEST_P(HttpFilterTestParam, NoCluster) {
 
 // Check that config validation for per-route filter works as expected.
 TEST_F(HttpFilterTest, PerRouteCheckSettingsConfigCheck) {
-  // Set allow_partial_message to true and max_request_bytes to 10 on the per-route filter.
+  // Set allow_partial_message to true and max_request_bytes to 5 on the per-route filter.
   envoy::extensions::filters::http::ext_authz::v3::BufferSettings buffer_settings;
   buffer_settings.set_max_request_bytes(5);        // Set the max_request_bytes value
   buffer_settings.set_allow_partial_message(true); // Set the allow_partial_message value
