@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
+#include <iterator>
+
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
@@ -25,11 +27,11 @@ SigningAlgorithm getSigningAlgorithm(
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case AwsRequestSigning_SigningAlgorithm_AWS_SIGV4:
     ENVOY_LOG_TO_LOGGER(logger, debug, "Signing Algorithm is SigV4");
+    return SigningAlgorithm::SIGV4;
 
-    return SigningAlgorithm::SigV4;
   case AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A:
     ENVOY_LOG_TO_LOGGER(logger, debug, "Signing Algorithm is SigV4A");
-    return SigningAlgorithm::SigV4A;
+    return SigningAlgorithm::SIGV4A;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
@@ -48,8 +50,23 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
 
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
-  if (getSigningAlgorithm(config) == SigningAlgorithm::SigV4A) {
+  ENVOY_LOG_TO_LOGGER(
+      Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn, "sigv4 {} length {} ",
+      (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4), config.region_set().length());
+
+  if ((getSigningAlgorithm(config) == SigningAlgorithm::SIGV4) && (config.region_set().length())) {
+    ProtoExceptionUtil::throwProtoValidationException(
+        "Specifying region_set requires signing_algorithm: aws_sigv4a", config);
+  }
+
+  if ((getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) && (config.region().length())) {
+    ProtoExceptionUtil::throwProtoValidationException(
+        "Specifying region requires signing_algorithm: aws_sigv4", config);
+  }
+
+  if (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         config.service_name(), config.region_set(), credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
@@ -81,7 +98,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
       per_route_config.aws_request_signing().match_excluded_headers().end());
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
 
-  if (getSigningAlgorithm(per_route_config.aws_request_signing()) == SigningAlgorithm::SigV4A) {
+  if (getSigningAlgorithm(per_route_config.aws_request_signing()) == SigningAlgorithm::SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         per_route_config.aws_request_signing().service_name(),
         per_route_config.aws_request_signing().region_set(), credentials_provider,
