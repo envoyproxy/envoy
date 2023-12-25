@@ -10,6 +10,7 @@
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/test_common/test_random_generator.h"
 
 #include "extension_registry.h"
 #include "library/common/data/utility.h"
@@ -142,7 +143,7 @@ public:
 
   void basicTest();
   void trickleTest();
-  void explicitFlowControlWithCancels(uint32_t body_size = 1000);
+  void explicitFlowControlWithCancels(uint32_t body_size = 1000, bool terminate_engine = false);
 
   static std::string protocolToString(Http::CodecType type) {
     if (type == Http::CodecType::HTTP3) {
@@ -344,13 +345,21 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   ASSERT_EQ(num_requests, cc_.on_complete_calls);
 }
 
-void ClientIntegrationTest::explicitFlowControlWithCancels(uint32_t body_size) {
+void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_size,
+                                                           const bool terminate_engine) {
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES,
                                    std::to_string(body_size));
 
   uint32_t num_requests = 100;
   std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
   std::vector<Platform::StreamSharedPtr> streams;
+
+  // Randomly select which request number to terminate the engine on.
+  uint32_t request_for_engine_termination = 0;
+  if (terminate_engine) {
+    TestRandomGenerator rand;
+    request_for_engine_termination = rand.random() % (num_requests / 2);
+  }
 
   for (uint32_t i = 0; i < num_requests; ++i) {
     Platform::StreamPrototypeSharedPtr stream_prototype;
@@ -391,13 +400,27 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(uint32_t body_size) {
     } else {
       stream->readData(100);
     }
-  }
-  ASSERT(streams.size() == num_requests);
-  ASSERT(prototype_streams.size() == num_requests);
 
-  terminal_callback_.waitReady();
-  ASSERT_EQ(num_requests / 2, cc_.on_complete_calls);
-  ASSERT_EQ(num_requests / 2, cc_.on_cancel_calls);
+    if (terminate_engine && request_for_engine_termination == i) {
+      {
+        absl::MutexLock l(&engine_lock_);
+        ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
+        engine_.reset();
+      }
+      break;
+    }
+  }
+
+  if (terminate_engine) {
+    // Only the cancel calls are guaranteed to have completed when engine->terminate() is called.
+    EXPECT_GE(cc_.on_cancel_calls, request_for_engine_termination / 2);
+  } else {
+    ASSERT(streams.size() == num_requests);
+    ASSERT(prototype_streams.size() == num_requests);
+    terminal_callback_.waitReady();
+    EXPECT_EQ(num_requests / 2, cc_.on_complete_calls);
+    EXPECT_EQ(num_requests / 2, cc_.on_cancel_calls);
+  }
 }
 
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
@@ -409,7 +432,13 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsAfterComplete) {
   explicit_flow_control_ = true;
   initialize();
-  explicitFlowControlWithCancels(100);
+  explicitFlowControlWithCancels(/*body_size=*/100);
+}
+
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsAfterCompleteEngineTermination) {
+  explicit_flow_control_ = true;
+  initialize();
+  explicitFlowControlWithCancels(/*body_size=*/100, /*terminate_engine=*/true);
 }
 
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
