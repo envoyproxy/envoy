@@ -16,9 +16,9 @@ Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
 
-  FilterConfigConstSharedPtr filter_config(
-      new FilterConfig{proto_config, server_context.threadLocal(), server_context.clusterManager(),
-                       server_context.api(), context.scope(), stat_prefix});
+  FilterConfigConstSharedPtr filter_config(new FilterConfig{
+      proto_config, server_context.threadLocal(), server_context.clusterManager(),
+      server_context.api(), context.scope(), stat_prefix, server_context.bootstrap()});
   auto& time_source = server_context.mainThreadDispatcher().timeSource();
   return [filter_config, &time_source](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, time_source));

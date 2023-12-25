@@ -91,9 +91,15 @@ public:
 
   void setupConfig(envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                    envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
+    ProtobufWkt::Struct node_metadata;
+    ProtobufWkt::Value test_value;
+    test_value.set_string_value("bar");
+    (*node_metadata.mutable_fields())["foo"] = test_value;
+    *bootstrap_.mutable_node()->mutable_metadata() = node_metadata;
+
     // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
-                                             *stats_store_.rootScope(), "test.");
+                                             *stats_store_.rootScope(), "test.", bootstrap_);
     // Setup per route config for Lua filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -135,6 +141,7 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   Tracing::MockSpan child_span_;
   Stats::TestUtil::TestStore stats_store_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -244,10 +251,12 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua"),
-      Filters::Common::Lua::LuaException,
-      "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+
+  EXPECT_THROW_WITH_MESSAGE(FilterConfig(proto_config, tls, cluster_manager, api,
+                                         *stats_store.rootScope(), "lua", bootstrap),
+                            Filters::Common::Lua::LuaException,
+                            "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
 
 // Script touching headers only, request that is headers only.
@@ -2043,6 +2052,23 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("ok")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// script touch nodeMetadata():get("key")
+TEST_F(LuaHttpFilterTest, GetNodeMetadataFromHandle) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:nodeMetadata():get("foo"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }

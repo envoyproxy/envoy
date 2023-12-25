@@ -185,7 +185,8 @@ public:
             {"verifySignature", static_luaVerifySignature},
             {"base64Escape", static_luaBase64Escape},
             {"timestamp", static_luaTimestamp},
-            {"timestampString", static_luaTimestampString}};
+            {"timestampString", static_luaTimestampString},
+            {"nodeMetadata", static_luaNodeMetadata}};
   }
 
 private:
@@ -311,6 +312,11 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestampString);
 
+  /**
+   * @return a handle to the node metadata.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaNodeMetadata);
+
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
@@ -333,6 +339,7 @@ private:
     stream_info_wrapper_.reset();
     connection_wrapper_.reset();
     public_key_wrapper_.reset();
+    node_metadata_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -359,6 +366,8 @@ private:
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>
+      node_metadata_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
@@ -386,7 +395,8 @@ class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
   FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-               Api::Api& api, Stats::Scope& scope, const std::string& stat_prefix);
+               Api::Api& api, Stats::Scope& scope, const std::string& stat_prefix,
+               envoy::config::bootstrap::v3::Bootstrap&);
 
   PerLuaCodeSetup* perLuaCodeSetup(absl::optional<absl::string_view> name = absl::nullopt) const {
     if (!name.has_value()) {
@@ -401,6 +411,7 @@ public:
   }
 
   const LuaFilterStats& stats() const { return stats_; }
+  const ProtobufWkt::Struct& nodeMetadata() const { return node_metadata_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -414,6 +425,7 @@ private:
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
+  const ProtobufWkt::Struct& node_metadata_;
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
@@ -489,6 +501,7 @@ public:
       : config_(config), time_source_(time_source), stats_(config->stats()) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
+  const ProtobufWkt::Struct& nodeMetadata() const { return config_->nodeMetadata(); }
   void scriptError(const Filters::Common::Lua::LuaException& e);
   virtual void scriptLog(spdlog::level::level_enum level, absl::string_view message);
 

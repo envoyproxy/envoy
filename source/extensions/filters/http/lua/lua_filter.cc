@@ -779,6 +779,17 @@ int StreamHandleWrapper::luaTimestampString(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaNodeMetadata(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (node_metadata_wrapper_.get() != nullptr) {
+    node_metadata_wrapper_.pushStack();
+  } else {
+    node_metadata_wrapper_.reset(
+        Filters::Common::Lua::MetadataMapWrapper::create(state, filter_.nodeMetadata()), true);
+  }
+  return 1;
+}
+
 enum Timestamp::Resolution
 StreamHandleWrapper::getTimestampResolution(absl::string_view unit_parameter) {
   auto resolution = Timestamp::Resolution::Undefined;
@@ -799,9 +810,11 @@ StreamHandleWrapper::getTimestampResolution(absl::string_view unit_parameter) {
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
-                           Stats::Scope& scope, const std::string& stats_prefix)
+                           Stats::Scope& scope, const std::string& stats_prefix,
+                           envoy::config::bootstrap::v3::Bootstrap& bootstrap)
     : cluster_manager_(cluster_manager),
-      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
+      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
+      node_metadata_(bootstrap.node().metadata()) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
       throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
