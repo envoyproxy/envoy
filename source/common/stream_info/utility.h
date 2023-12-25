@@ -26,6 +26,8 @@ public:
 
   using FlagStringsAndEnum = std::pair<const FlagStrings, ResponseFlag>;
 
+  // When adding a new flag, it's required to update the access log docs and the string
+  // mapping below - ``ALL_RESPONSE_STRINGS_FLAGS``.
   constexpr static absl::string_view NONE = "-";
   constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION = "DC";
   constexpr static absl::string_view FAILED_LOCAL_HEALTH_CHECK = "LH";

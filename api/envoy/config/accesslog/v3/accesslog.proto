@@ -253,7 +253,9 @@ message ResponseFlagFilter {
         in: "DT"
         in: "UPE"
         in: "NC"
-        in: "OM"
+        in: "OM",
+        in: "DF",
+        in: "DO",
       }
     }
   }];
