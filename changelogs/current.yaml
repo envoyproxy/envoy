@@ -101,5 +101,10 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a sampler for the OpenTelemetry tracer.
+- area: http
+  change: |
+    added a :ref:`retain_keepalive_response_header
+    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.retain_keepalive_response_header>` configuration option to retain
+    keep-alive settings from upstream to client for HTTP/1.1.
 
 deprecated:

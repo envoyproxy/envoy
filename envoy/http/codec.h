@@ -531,6 +531,9 @@ struct Http1Settings {
   // If false, only methods from a hard-coded list of known methods are accepted.
   // Only implemented in BalsaParser. http-parser only accepts known methods.
   bool allow_custom_methods_{false};
+
+  // If true, envoy will retain keep-alive response headers from upstream
+  bool retain_keepalive_response_header_{false};
 };
 
 /**

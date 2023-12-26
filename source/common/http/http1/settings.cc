@@ -30,6 +30,7 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
         factory);
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::StatefulFormatter;
     ret.stateful_header_key_formatter_ = factory.createFromProto(*header_formatter_config);
+    ret.retain_keepalive_response_header_ = config.retain_keepalive_response_header();
   }
 
   if (config.has_use_balsa_parser()) {

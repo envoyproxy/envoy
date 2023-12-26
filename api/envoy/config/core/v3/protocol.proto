@@ -270,7 +270,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -382,6 +382,10 @@ message Http1ProtocolOptions {
   // <envoy_v3_api_field_extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.restrict_http_methods>`
   // to reject custom methods.
   bool allow_custom_methods = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Retain keep-alive response headers for http/1. By default keep-alive response headers are discarded.
+  // This is off by default.
+  bool retain_keepalive_response_header = 11;
 }
 
 message KeepaliveSettings {
