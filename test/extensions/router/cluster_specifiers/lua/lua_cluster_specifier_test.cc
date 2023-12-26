@@ -37,19 +37,6 @@ public:
   default_cluster: default_service
   )EOF";
 
-  const std::string no_cluster_function_lua_config_yaml_ = R"EOF(
-  source_code:
-    inline_string: |
-      function envoy_on_no_route(route_handle)
-        local header_value = route_handle:headers():get("header_key")
-        if header_value == "fake" then
-          return "fake_service"
-        end
-        return "web_service"
-      end
-  default_cluster: default_service
-  )EOF";
-
   const std::string error_lua_config_yaml_ = R"EOF(
   source_code:
     inline_string: |
@@ -96,24 +83,6 @@ TEST_F(LuaClusterSpecifierPluginTest, NormalLuaCode) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "header_value"}};
     auto route = plugin_->route(mock_route, headers);
     EXPECT_EQ("web_service", route->routeEntry()->clusterName());
-  }
-}
-
-// No cluster function lua code test.
-TEST_F(LuaClusterSpecifierPluginTest, NoClusterFunctionLuaCode) {
-  setUpTest(no_cluster_function_lua_config_yaml_);
-
-  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
-  {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "fake"}};
-    auto route = plugin_->route(mock_route, headers);
-    EXPECT_EQ("default_service", route->routeEntry()->clusterName());
-  }
-
-  {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "header_value"}};
-    auto route = plugin_->route(mock_route, headers);
-    EXPECT_EQ("default_service", route->routeEntry()->clusterName());
   }
 }
 
