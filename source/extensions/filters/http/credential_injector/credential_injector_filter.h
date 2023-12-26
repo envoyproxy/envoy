@@ -88,6 +88,11 @@ private:
   // Tracks any outstanding in-flight credential requests, allowing us to cancel the request
   // if the filter ends before the request completes.
   CredentialInjector::RequestPtr in_flight_credential_request_;
+
+  // Tracks whether we have initialized the credential provider.
+  bool credential_init_ = false;
+  // Tracks whether the credential provider has succeeded.
+  bool credential_success_ = false;
 };
 
 } // namespace CredentialInjector
