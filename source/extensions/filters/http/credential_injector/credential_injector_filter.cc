@@ -126,7 +126,11 @@ void CredentialInjectorFilter::onFailure(const std::string& reason) {
     return;
   }
 
-  decoder_callbacks_->continueDecoding();
+  // Only continue decoding if the callback is called from anthor thread.
+  if (stop_iteration_) {
+    stop_iteration_ = false;
+    decoder_callbacks_->continueDecoding();
+  }
 }
 
 void CredentialInjectorFilter::setDecoderFilterCallbacks(
