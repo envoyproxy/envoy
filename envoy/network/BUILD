@@ -61,6 +61,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "parent_drained_callback_registrar_interface",
     hdrs = ["parent_drained_callback_registrar.h"],
+    deps = [":address_interface"],
 )
 
 envoy_cc_library(

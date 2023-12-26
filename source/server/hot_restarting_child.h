@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/server/instance.h"
 #include "envoy/network/parent_drained_callback_registrar.h"
+#include "envoy/server/instance.h"
 
 #include "source/common/stats/stat_merger.h"
 #include "source/server/hot_restarting_base.h"
@@ -53,7 +53,8 @@ public:
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
                                      std::shared_ptr<Network::UdpListenerConfig> listener_config);
   // From Network::ParentDrainedCallbackRegistrar.
-  void registerParentDrainedCallback(std::string addr, absl::AnyInvocable<void()> action) override;
+  void registerParentDrainedCallback(const Network::Address::InstanceConstSharedPtr& addr,
+                                     absl::AnyInvocable<void()> action) override;
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();

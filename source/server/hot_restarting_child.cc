@@ -154,12 +154,12 @@ void HotRestartingChild::registerUdpForwardingListener(
   udp_forwarding_context_.registerListener(address, listener_config);
 }
 
-void HotRestartingChild::registerParentDrainedCallback(std::string address,
-                                                       absl::AnyInvocable<void()> callback) {
+void HotRestartingChild::registerParentDrainedCallback(
+    const Network::Address::InstanceConstSharedPtr& address, absl::AnyInvocable<void()> callback) {
   if (restart_epoch_ == 0 || parent_terminated_) {
     callback();
   } else {
-    on_drained_actions_.try_emplace(address, std::move(callback));
+    on_drained_actions_.try_emplace(address->asString(), std::move(callback));
   }
 }
 

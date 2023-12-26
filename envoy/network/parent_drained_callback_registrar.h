@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/network/address.h"
+
 #include "absl/functional/any_invocable.h"
 
 namespace Envoy {
@@ -20,7 +22,7 @@ public:
    * @param callback the function to call when the listener matching address is
    *                 drained on the parent instance.
    */
-  virtual void registerParentDrainedCallback(std::string address,
+  virtual void registerParentDrainedCallback(const Address::InstanceConstSharedPtr& address,
                                              absl::AnyInvocable<void()> callback) PURE;
 
 protected:

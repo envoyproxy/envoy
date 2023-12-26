@@ -41,7 +41,7 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
       Event::PlatformDefaultTriggerType, paused() ? 0 : events_when_unpaused_);
   if (paused()) {
     parent_drained_callback_registrar_->registerParentDrainedCallback(
-        socket_->connectionInfoProvider().localAddress()->asString(),
+        socket_->connectionInfoProvider().localAddress(),
         [this, &dispatcher, alive = std::weak_ptr<void>(destruction_checker_)]() {
           dispatcher.post([this, alive = std::move(alive)]() {
             if (alive.lock()) {
