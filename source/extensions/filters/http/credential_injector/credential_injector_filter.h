@@ -89,6 +89,9 @@ private:
   // if the filter ends before the request completes.
   CredentialInjector::RequestPtr in_flight_credential_request_;
 
+  // Tracks whether we have stopped iteration to wait for the credential provider.
+  bool stop_iteration_ = false;
+
   // Tracks whether we have initialized the credential provider.
   bool credential_init_ = false;
   // Tracks whether the credential provider has succeeded.

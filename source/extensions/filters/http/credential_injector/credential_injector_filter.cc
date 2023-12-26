@@ -53,8 +53,17 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
     request_headers_ = &headers;
 
     in_flight_credential_request_ = config_->requestCredential(*this);
+
+    // If the callback is called immediately, continue decoding.
+    // We don't need to inject credential here because the credential has been injected in the
+    // onSuccess callback.
+    if (credential_init_) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+
     // pause while we await the credential provider to retrieve the credential, for example, an
     // oauth2 credential provider may need to make a remote call to retrieve the credential.
+    stop_iteration_ = true;
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
 
@@ -95,7 +104,11 @@ void CredentialInjectorFilter::onSuccess() {
     return;
   }
 
-  decoder_callbacks_->continueDecoding();
+  // Only continue decoding if the callback is called from anthor thread.
+  if (stop_iteration_) {
+    stop_iteration_ = false;
+    decoder_callbacks_->continueDecoding();
+  }
 }
 
 void CredentialInjectorFilter::onFailure(const std::string& reason) {
