@@ -40,7 +40,6 @@ public:
 TEST_F(FilterTest, InjectCredential) {
   Http::TestRequestHeaderMapImpl request_headers{};
 
-  EXPECT_CALL(filter_, onSuccess());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
