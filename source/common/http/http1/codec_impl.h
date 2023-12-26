@@ -256,7 +256,6 @@ public:
   virtual bool sendFullyQualifiedUrl() const { return codec_settings_.send_fully_qualified_url_; }
   HeaderKeyFormatterOptConstRef formatter() const {
     return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
-  virtual bool retainKeepAliveResponseHeader() const { return codec_settings_.retain_keepalive_response_header_; }
   }
 
   // Http::Connection
@@ -274,6 +273,9 @@ public:
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
+
+  // Http1::keepAlive
+  virtual bool retainKeepAliveResponseHeader() const { return codec_settings_.retain_keepalive_response_header_; }
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,

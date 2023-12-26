@@ -94,8 +94,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     if (protocol == Protocol::Http11 && request_headers.Connection() &&
         Envoy::StringUtil::caseFindToken(request_headers.Connection()->value().getStringView(), ",",
                                          Http::Headers::get().ConnectionValues.KeepAlive)) {
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.retain_keepalive_header_http11")) {
+      const Http::Http1Settings& http1_settings = config.http1Settings();
+      if (!http1_settings.retain_keepalive_response_header_) {
         request_headers.removeConnection();
       }
     } else {
@@ -518,8 +518,8 @@ void ConnectionManagerUtility::mutateResponseHeaders(
   if (clear_hop_by_hop) {
     response_headers.removeTransferEncoding();
     if (protocol == Protocol::Http11) {
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.retain_keepalive_header_http11")) {
+      const Http::Http1Settings& http1_settings = config.http1Settings();
+      if (!http1_settings.retain_keepalive_response_header_) {
         response_headers.removeKeepAlive();
       }
     } else {
