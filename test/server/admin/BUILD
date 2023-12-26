@@ -25,6 +25,7 @@ envoy_cc_test(
     name = "admin_factory_context_test",
     srcs = ["admin_factory_context_test.cc"],
     deps = [
+        "//source/common/listener_manager:listener_info_lib",
         "//source/server/admin:admin_factory_context",
         "//test/mocks/server:instance_mocks",
     ],
