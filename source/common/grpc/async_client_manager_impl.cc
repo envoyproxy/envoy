@@ -50,7 +50,7 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   if (skip_cluster_check) {
     return;
   }
-  cm_.checkActiveStaticCluster(config.envoy_grpc().cluster_name());
+  THROW_IF_NOT_OK(cm_.checkActiveStaticCluster(config.envoy_grpc().cluster_name()));
 }
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(

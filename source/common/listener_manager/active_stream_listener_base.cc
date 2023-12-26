@@ -51,6 +51,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     return;
   }
 
+  socket->connectionInfoProvider().setListenerInfo(config_->listenerInfo());
   socket->connectionInfoProvider().setFilterChainInfo(
       std::make_shared<FilterChainInfoImpl>(filter_chain->name()));
 

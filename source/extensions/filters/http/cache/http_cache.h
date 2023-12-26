@@ -69,8 +69,6 @@ using LookupResultPtr = std::unique_ptr<LookupResult>;
 //
 // When providing a cached response, Caches must ensure that the keys (and not
 // just their hashes) match.
-//
-// TODO(toddmgreer): Ensure that stability guarantees above are accurate.
 size_t stableHashKey(const Key& key);
 
 // LookupRequest holds everything about a request that's needed to look for a

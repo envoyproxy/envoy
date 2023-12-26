@@ -84,3 +84,14 @@ envoy_cc_test(
         "//source/common/tracing:tracer_config_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "trace_context_impl_test",
+    srcs = [
+        "trace_context_impl_test.cc",
+    ],
+    deps = [
+        "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:trace_context_lib",
+    ],
+)

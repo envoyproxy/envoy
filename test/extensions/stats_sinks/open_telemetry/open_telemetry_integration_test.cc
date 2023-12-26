@@ -136,7 +136,7 @@ public:
           known_histogram_exists = true;
           EXPECT_EQ(1, metric.histogram().data_points().size());
           EXPECT_EQ(metric.histogram().data_points()[0].bucket_counts().size(),
-                    Stats::HistogramSettingsImpl::defaultBuckets().size());
+                    Stats::HistogramSettingsImpl::defaultBuckets().size() + 1);
           EXPECT_TRUE(metric.histogram().data_points()[0].time_unix_nano() > 0);
 
           if (previous_time_stamp > 0) {

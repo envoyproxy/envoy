@@ -6,12 +6,10 @@ namespace Server {
 FactoryContextImplBase::FactoryContextImplBase(
     Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope,
-    ListenerInfoConstSharedPtr listener_info)
+    const Network::ListenerInfoConstSharedPtr& listener_info)
     : server_(server), validation_visitor_(validation_visitor), scope_(std::move(scope)),
-      listener_scope_(std::move(listener_scope)), listener_info_(std::move(listener_info)) {
-  if (listener_info_ == nullptr) {
-    listener_info_ = std::make_shared<ListenerInfoImpl>();
-  }
+      listener_scope_(std::move(listener_scope)), listener_info_(listener_info) {
+  ASSERT(listener_info_ != nullptr);
 }
 
 Configuration::ServerFactoryContext& FactoryContextImplBase::serverFactoryContext() const {
@@ -39,9 +37,9 @@ FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        Network::DrainDecision& drain_decision,
                                        Stats::ScopeSharedPtr scope,
                                        Stats::ScopeSharedPtr listener_scope,
-                                       ListenerInfoConstSharedPtr listener_info)
+                                       const Network::ListenerInfoConstSharedPtr& listener_info)
     : FactoryContextImplBase(server, server.messageValidationContext().staticValidationVisitor(),
-                             std::move(scope), std::move(listener_scope), std::move(listener_info)),
+                             std::move(scope), std::move(listener_scope), listener_info),
       drain_decision_(drain_decision) {}
 
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }

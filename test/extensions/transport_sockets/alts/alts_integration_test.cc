@@ -368,10 +368,15 @@ public:
     // state, this is done by the test server instead.
     class FakeSingletonManager : public Singleton::Manager {
     public:
-      Singleton::InstanceSharedPtr get(const std::string&,
-                                       Singleton::SingletonFactoryCb cb) override {
-        return cb();
+      Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb cb,
+                                       bool pin) override {
+        auto singleton = cb();
+        if (pin) {
+          pinned_singletons_.push_back(singleton);
+        }
+        return singleton;
       }
+      std::vector<Singleton::InstanceSharedPtr> pinned_singletons_;
     };
     FakeSingletonManager fsm;
     ON_CALL(mock_factory_ctx.server_context_, singletonManager()).WillByDefault(ReturnRef(fsm));

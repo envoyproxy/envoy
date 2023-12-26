@@ -2,9 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.composite.v3;
 
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.composite.v3";
 option java_outer_classname = "CompositeProto";
@@ -29,8 +32,30 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Composite {
 }
 
+// Configuration for an extension configuration discovery service with name.
+message DynamicConfig {
+  // The name of the extension configuration. It also serves as a resource name in ExtensionConfigDS.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Configuration source specifier for an extension configuration discovery
+  // service. In case of a failure and without the default configuration,
+  // 500(Internal Server Error) will be returned.
+  config.core.v3.ExtensionConfigSource config_discovery = 2;
+}
+
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
 // This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
 message ExecuteFilterAction {
-  config.core.v3.TypedExtensionConfig typed_config = 1;
+  // Filter specific configuration which depends on the filter being
+  // instantiated. See the supported filters for further documentation.
+  // Only one of ``typed_config`` or ``dynamic_config`` can be set.
+  // [#extension-category: envoy.filters.http]
+  config.core.v3.TypedExtensionConfig typed_config = 1
+      [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
+
+  // Dynamic configuration of filter obtained via extension configuration discovery
+  // service.
+  // Only one of ``typed_config`` or ``dynamic_config`` can be set.
+  DynamicConfig dynamic_config = 2
+      [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 }

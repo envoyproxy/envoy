@@ -503,12 +503,12 @@ public:
     return empty_access_logs_;
   }
 
-  const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
+  const ListenerInfoConstSharedPtr& listenerInfo() const override { return listener_info_; }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   std::vector<ListenSocketFactoryPtr> socket_factories_;
   SocketSharedPtr socket_;
-  testing::NiceMock<MockListenerInfo> listener_info_;
+  ListenerInfoConstSharedPtr listener_info_;
   Stats::IsolatedStoreImpl store_;
   std::string name_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;

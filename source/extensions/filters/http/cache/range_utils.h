@@ -88,6 +88,8 @@ inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rh
   return lhs.begin() == rhs.begin() && lhs.end() == rhs.end();
 }
 
+std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range);
+
 // Contains details about whether the ranges requested can be satisfied and, if
 // so, what those ranges are after being adjusted to fit the content.
 struct RangeDetails {

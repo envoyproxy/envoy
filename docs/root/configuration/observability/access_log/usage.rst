@@ -168,6 +168,14 @@ The following command operators are supported:
 
   In typed JSON logs, START_TIME is always rendered as a string.
 
+.. _config_access_log_format_emit_time:
+
+%EMIT_TIME%
+  The time when log entry is emitted including milliseconds.
+
+  EMIT_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
 %REQUEST_HEADERS_BYTES%
   HTTP
     Uncompressed bytes of request headers.
