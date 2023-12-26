@@ -11,7 +11,9 @@ namespace Extensions {
 namespace Router {
 namespace Lua {
 
-using ::testing::NiceMock;
+using testing::InSequence;
+using testing::NiceMock;
+using testing::Return;
 
 class LuaClusterSpecifierPluginTest : public testing::Test {
 public:
@@ -120,6 +122,20 @@ TEST_F(LuaClusterSpecifierPluginTest, ReturnTypeNotStringLuaCode) {
     auto route = plugin_->route(mock_route, headers);
     EXPECT_EQ("default_service", route->routeEntry()->clusterName());
   }
+}
+
+TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfig) {
+  setUpTest(normal_lua_config_yaml_);
+  InSequence s;
+  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(false));
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
+  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
+
+  LuaClusterSpecifierConfigProto proto_config{};
+  TestUtility::loadFromYaml(normal_lua_config_yaml_, proto_config);
+  config_ = std::make_shared<LuaClusterSpecifierConfig>(proto_config, server_factory_context_);
+  config_.reset();
 }
 
 } // namespace Lua
