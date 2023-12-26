@@ -268,6 +268,9 @@ public:
         encoding_state_(*this, config->processingMode()) {}
 
   const FilterConfig& config() const { return *config_; }
+  const envoy::config::core::v3::GrpcService& grpc_service_config() const {
+    return config_with_hash_key_.config();
+  }
 
   ExtProcFilterStats& stats() { return stats_; }
   ExtProcLoggingInfo* loggingInfo() { return logging_info_; }

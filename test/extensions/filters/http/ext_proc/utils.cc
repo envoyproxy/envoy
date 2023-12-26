@@ -29,6 +29,14 @@ bool ExtProcTestUtility::headerProtosEqualIgnoreOrder(
   return TestUtility::headerMapEqualIgnoreOrder(expected, actual_headers);
 }
 
+envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
+                                                     const std::string& value) {
+  envoy::config::core::v3::HeaderValue v;
+  v.set_key(key);
+  v.set_value(value);
+  return v;
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
