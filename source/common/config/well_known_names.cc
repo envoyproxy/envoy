@@ -201,6 +201,9 @@ TagNameValues::TagNameValues() {
 
   // dns_filter.(<stat_prefix>.).**
   addTokenized(DNS_FILTER_PREFIX, "dns_filter.$.**");
+
+  // connection_limit.(<stat_prefix>.)*
+  addTokenized(CONNECTION_LIMIT_PREFIX, "connection_limit.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
