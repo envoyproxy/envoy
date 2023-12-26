@@ -35,15 +35,15 @@ message HeaderMutation {
   Mutations mutations = 1;
 
   // If per route configuration is configured at multiple levels (route, virtual host, and route table),
-  // all levels' mutations are applied but most specific level wins (i.e., most specific level could
-  // override least specific level mutation).
-  // In other words, by default header mutations are evaluated from least to most specific:
+  // all specified levels' mutations are applied. By default, header mutations are evaluated from least
+  // to most specific level:
   //
   // * route table level
   // * virtual host level
   // * route level
   //
-  // Defaults to true. This order can be reversed by setting this option to false.
+  // Thus, most specific level could override least specific level mutation. (i.e., most specific level wins)
+  // Defaults to true. This evaluation order can be reversed by setting this option to false.
   //
   google.protobuf.BoolValue most_specific_header_mutations_wins = 2;
 }

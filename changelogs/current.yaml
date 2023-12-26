@@ -50,6 +50,10 @@ minor_behavior_changes:
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
     This feature improves flow control within the proxy by deferring work on the receiving end if the other
     end is backed up.
+- area: header_mutation
+  change: |
+    If per route configuration is configured at multiple levels (route, virtual host, and route table), all specified
+    levels' mutations are applied. Default order is from least to most specific level (i.e. most specific level wins).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

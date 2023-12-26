@@ -442,7 +442,7 @@ void TestResponseHeaderMutation(IntegrationStreamDecoder* response, RouteLevelFl
   }
 }
 
-TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationAllLevels) {
+TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationAllLevelsApplied) {
   initializeFilter(AllRoutesLevel);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
