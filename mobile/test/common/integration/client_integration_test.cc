@@ -402,11 +402,9 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
     }
 
     if (terminate_engine && request_for_engine_termination == i) {
-      {
-        absl::MutexLock l(&engine_lock_);
-        ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
-        engine_.reset();
-      }
+      absl::MutexLock l(&engine_lock_);
+      ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
+      engine_.reset();
       break;
     }
   }
