@@ -4,8 +4,9 @@ package envoy.extensions.filters.http.header_mutation.v3;
 
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 
-import "udpa/annotations/status.proto";
 import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_mutation.v3";
 option java_outer_classname = "HeaderMutationProto";
