@@ -40,9 +40,8 @@ public:
 TEST_F(FilterTest, InjectCredential) {
   Http::TestRequestHeaderMapImpl request_headers{};
 
-  EXPECT_CALL(decoder_filter_callbacks_, dispatcher());
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
-            filter_->decodeHeaders(request_headers, true));
+  EXPECT_CALL(filter_, onSuccess());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 } // namespace CredentialInjector
