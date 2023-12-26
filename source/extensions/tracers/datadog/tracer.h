@@ -51,8 +51,8 @@ public:
    * cluster is retrieved in order to send HTTP request containing traces
    * @param scope statistics scope from which \c TracerStats can be created
    * @param thread_local_slot_allocator slot allocator for installing a
-   * thread-local instance of the tracer.
-   * @param time_source supplies the time source.
+   * thread-local instance of the tracer
+   * @param time_source clocks used for calculating HTTP request timeouts
    */
   explicit Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                   const datadog::tracing::TracerConfig& config,

@@ -45,7 +45,7 @@ public:
    * @param reference_host the value to use for the "Host" HTTP request header
    * @param stats a collection of counters used to keep track of events, such as
    * when a request fails
-   * @param time_source supplies the time source
+   * @param time_source clocks used for calculating request timeouts
    */
   AgentHTTPClient(Upstream::ClusterManager& cluster_manager, const std::string& cluster,
                   const std::string& reference_host, TracerStats& stats, TimeSource& time_source);
@@ -67,10 +67,10 @@ public:
    * @param body data to send as POST request body
    * @param on_response callback to invoke when a complete response is received
    * @param on_error callback to invoke when an error occurs before a complete
-   * response is received.
-   * @param deadline a timepoint that a request must be completed by.
+   * response is received
+   * @param deadline time after which a response is not expected
    * @return \c datadog::tracing::Error if an error occurs, or
-   * \c datadog::tracing::nullopt otherwise.
+   * \c datadog::tracing::nullopt otherwise
    */
   datadog::tracing::Expected<void> post(const URL& url, HeadersSetter set_headers, std::string body,
                                         ResponseHandler on_response, ErrorHandler on_error,
