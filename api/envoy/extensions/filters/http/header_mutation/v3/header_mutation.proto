@@ -42,7 +42,7 @@ message HeaderMutation {
   // * virtual host level
   // * route level
   //
-  // Thus, most specific level could override least specific level mutation. (i.e., most specific level wins)
+  // Thus, more specific level could override less specific level mutation. (i.e., most specific level wins)
   // Defaults to true. This evaluation order can be reversed by setting this option to false.
   //
   google.protobuf.BoolValue most_specific_header_mutations_wins = 2;

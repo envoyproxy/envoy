@@ -37,8 +37,8 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
   config_->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
 
   // Traverse through all route configs to retrieve all available header mutations.
-  // getAllPerFilterConfig will return return in ascending order of specificity (i.e., route table
-  // first, then virtual table, then per route).
+  // getAllPerFilterConfig will return in ascending order of specificity (i.e., route table
+  // first, then virtual host, then per route).
   route_configs_ = Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
   if (!config_->mostSpecificHeaderMutationsWins()) {
     // most_specific_wins means that most specific level is evaluated last. In other words, header

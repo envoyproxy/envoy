@@ -627,7 +627,7 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
 }
 
 /**
- * Return all the available per route filter configs
+ * Return all the available per route filter configs.
  *
  * @param callbacks The stream filter callbacks to check for route configs.
  *
