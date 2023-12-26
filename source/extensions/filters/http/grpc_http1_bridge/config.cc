@@ -14,7 +14,7 @@ Http::FilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactoryFromProtoT
     const std::string&, Server::Configuration::FactoryContext& factory_context) {
   return [&factory_context, proto_config](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<Http1BridgeFilter>(
-        factory_context.getServerFactoryContext().grpcContext(), proto_config));
+        factory_context.serverFactoryContext().grpcContext(), proto_config));
   };
 }
 

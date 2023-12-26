@@ -34,8 +34,16 @@ public:
 };
 
 #ifdef USE_CEL_PARSER
+TEST_F(CELFormatterTest, TestNodeId) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "xds.node.id", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("node_name")));
+}
+
 TEST_F(CELFormatterTest, TestFormatValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_);
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "request.headers[':method']", max_length);
   EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
@@ -43,14 +51,14 @@ TEST_F(CELFormatterTest, TestFormatValue) {
 }
 
 TEST_F(CELFormatterTest, TestParseFail) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_);
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   EXPECT_EQ(nullptr,
             cel_parser->parse("INVALID_CMD", "requests.headers['missing_headers']", max_length));
 }
 
 TEST_F(CELFormatterTest, TestNullFormatValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_);
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "requests.headers['missing_headers']", max_length);
   EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),

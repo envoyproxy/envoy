@@ -544,7 +544,7 @@ message RouteMatch {
     google.protobuf.BoolValue validated = 2;
   }
 
-  // An extensible message for matching CONNECT requests.
+  // An extensible message for matching CONNECT or CONNECT-UDP requests.
   message ConnectMatcher {
   }
 
@@ -577,11 +577,10 @@ message RouteMatch {
     // stripping. This needs more thought.]
     type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
 
-    // If this is used as the matcher, the matcher will only match CONNECT requests.
-    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
-    // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
-    // upgrades.
-    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
+    // If this is used as the matcher, the matcher will only match CONNECT or CONNECT-UDP requests.
+    // Note that this will not match other Extended CONNECT requests (WebSocket and the like) as
+    // they are normalized in Envoy as HTTP/1.1 style upgrades.
+    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2 and HTTP/3,
     // where Extended CONNECT requests may have a path, the path matchers will work if
     // there is a path present.
     // Note that CONNECT support is currently considered alpha in Envoy.
@@ -2366,6 +2365,7 @@ message QueryParameterMatcher {
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
+// [#next-free-field: 6]
 message InternalRedirectPolicy {
   // An internal redirect is not handled, unless the number of previous internal redirects that a
   // downstream request has encountered is lower than this value.
@@ -2391,6 +2391,14 @@ message InternalRedirectPolicy {
   // Allow internal redirect to follow a target URI with a different scheme than the value of
   // x-forwarded-proto. The default is false.
   bool allow_cross_scheme_redirect = 4;
+
+  // Specifies a list of headers, by name, to copy from the internal redirect into the subsequent
+  // request. If a header is specified here but not present in the redirect, it will be cleared in
+  // the subsequent request.
+  repeated string response_headers_to_copy = 5 [(validate.rules).repeated = {
+    unique: true
+    items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 }
 
 // A simple wrapper for an HTTP filter config. This is intended to be used as a wrapper for the
@@ -2409,6 +2417,8 @@ message FilterConfig {
   bool is_optional = 2;
 
   // If true, the filter is disabled in the route or virtual host and the ``config`` field is ignored.
+  // See :ref:`route based filter chain <arch_overview_http_filters_route_based_filter_chain>`
+  // for more details.
   //
   // .. note::
   //

@@ -66,6 +66,7 @@ constexpr absl::string_view URISanPeerCertificate = "uri_san_peer_certificate";
 constexpr absl::string_view DNSSanLocalCertificate = "dns_san_local_certificate";
 constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
 constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certificate_digest";
+constexpr absl::string_view DownstreamTransportFailureReason = "transport_failure_reason";
 
 // Source properties
 constexpr absl::string_view Source = "source";
@@ -88,6 +89,9 @@ constexpr absl::string_view RouteName = "route_name";
 constexpr absl::string_view RouteMetadata = "route_metadata";
 constexpr absl::string_view UpstreamHostMetadata = "upstream_host_metadata";
 constexpr absl::string_view FilterChainName = "filter_chain_name";
+constexpr absl::string_view ListenerMetadata = "listener_metadata";
+constexpr absl::string_view ListenerDirection = "listener_direction";
+constexpr absl::string_view Node = "node";
 
 class WrapperFieldValues {
 public:
@@ -231,12 +235,14 @@ private:
 
 class XDSWrapper : public BaseWrapper {
 public:
-  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
-      : BaseWrapper(arena), info_(info) {}
+  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
+             const LocalInfo::LocalInfo* local_info)
+      : BaseWrapper(arena), info_(info), local_info_(local_info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
   const StreamInfo::StreamInfo& info_;
+  const LocalInfo::LocalInfo* local_info_;
 };
 
 } // namespace Expr

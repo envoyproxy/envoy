@@ -80,8 +80,6 @@ public:
   virtual bool supportsPathlessHeaders() const { return false; }
 };
 
-using OptionalHttpFilters = absl::flat_hash_set<std::string>;
-
 class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   struct FilterConfig {
@@ -90,7 +88,6 @@ public:
   };
 
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-                   const OptionalHttpFilters& optional_http_filters,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator);
 
@@ -238,7 +235,6 @@ using CommonConfigSharedPtr = std::shared_ptr<CommonConfigImpl>;
 class CommonVirtualHostImpl : public VirtualHost, Logger::Loggable<Logger::Id::router> {
 public:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
-                        const OptionalHttpFilters& optional_http_filters,
                         const CommonConfigSharedPtr& global_route_config,
                         Server::Configuration::ServerFactoryContext& factory_context,
                         Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator);
@@ -366,7 +362,6 @@ class VirtualHostImpl : Logger::Loggable<Logger::Id::router> {
 public:
   VirtualHostImpl(
       const envoy::config::route::v3::VirtualHost& virtual_host,
-      const OptionalHttpFilters& optional_http_filters,
       const CommonConfigSharedPtr& global_route_config,
       Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
       ProtobufMessage::ValidationVisitor& validator,
@@ -578,6 +573,7 @@ public:
   }
 
   std::vector<InternalRedirectPredicateSharedPtr> predicates() const override;
+  const std::vector<Http::LowerCaseString>& responseHeadersToCopy() const override;
 
   uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 
@@ -591,6 +587,10 @@ private:
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
   std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
       predicate_factories_;
+  // Vector of header names (as a lower case string to simplify use
+  // later on), to copy from the response that triggers the redirect
+  // into the following request.
+  std::vector<Http::LowerCaseString> response_headers_to_copy_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_internal_redirects_{1};
   const bool enabled_{false};
@@ -613,7 +613,6 @@ public:
    */
   RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
-                     const OptionalHttpFilters& optional_http_filters,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator);
 
@@ -955,8 +954,7 @@ public:
     WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
                          Server::Configuration::ServerFactoryContext& factory_context,
                          ProtobufMessage::ValidationVisitor& validator,
-                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
-                         const OptionalHttpFilters& optional_http_filters);
+                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
 
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
@@ -1230,7 +1228,6 @@ class UriTemplateMatcherRouteEntryImpl : public RouteEntryImplBase {
 public:
   UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                    const envoy::config::route::v3::Route& route,
-                                   const OptionalHttpFilters& optional_http_filters,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ProtobufMessage::ValidationVisitor& validator);
 
@@ -1262,7 +1259,6 @@ class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                        const envoy::config::route::v3::Route& route,
-                       const OptionalHttpFilters& optional_http_filters,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator);
 
@@ -1296,7 +1292,6 @@ class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
   PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
-                     const OptionalHttpFilters& optional_http_filters,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator);
 
@@ -1330,7 +1325,6 @@ class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                       const envoy::config::route::v3::Route& route,
-                      const OptionalHttpFilters& optional_http_filters,
                       Server::Configuration::ServerFactoryContext& factory_context,
                       ProtobufMessage::ValidationVisitor& validator);
 
@@ -1365,7 +1359,6 @@ class ConnectRouteEntryImpl : public RouteEntryImplBase {
 public:
   ConnectRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                         const envoy::config::route::v3::Route& route,
-                        const OptionalHttpFilters& optional_http_filters,
                         Server::Configuration::ServerFactoryContext& factory_context,
                         ProtobufMessage::ValidationVisitor& validator);
 
@@ -1395,7 +1388,6 @@ class PathSeparatedPrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   PathSeparatedPrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                     const envoy::config::route::v3::Route& route,
-                                    const OptionalHttpFilters& optional_http_filters,
                                     Server::Configuration::ServerFactoryContext& factory_context,
                                     ProtobufMessage::ValidationVisitor& validator);
 
@@ -1425,7 +1417,6 @@ private:
 // Contextual information used to construct the route actions for a match tree.
 struct RouteActionContext {
   const CommonVirtualHostSharedPtr& vhost;
-  const OptionalHttpFilters& optional_http_filters;
   Server::Configuration::ServerFactoryContext& factory_context;
 };
 
@@ -1487,7 +1478,6 @@ DECLARE_FACTORY(RouteListMatchActionFactory);
 class RouteMatcher {
 public:
   RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
-               const OptionalHttpFilters& optional_http_filters,
                const CommonConfigSharedPtr& global_route_config,
                Server::Configuration::ServerFactoryContext& factory_context,
                ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
@@ -1530,7 +1520,6 @@ private:
 class CommonConfigImpl : public CommonConfig {
 public:
   CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
-                   const OptionalHttpFilters& optional_http_filters,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator);
 
@@ -1598,7 +1587,6 @@ private:
 class ConfigImpl : public Config {
 public:
   ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
-             const OptionalHttpFilters& optional_http_filters,
              Server::Configuration::ServerFactoryContext& factory_context,
              ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default);
 

@@ -7,8 +7,17 @@
 //  TestScopedRuntime scoped_runtime;
 //  scoped_runtime.mergeValues(
 //      {{"envoy.reloadable_features.test_feature_true", "false"}});
-
-#pragma once
+//
+// TestScopedRuntime depends on the admin interface being compiled into the binary.
+// For build options where the admin interface is not available (particularly, Envoy Mobile), use
+// TestScopedStaticReloadableFeaturesRuntime. As the name suggests, it only works with reloadable
+// features:
+//
+//  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+//    {{"dfp_mixed_cache", false}, {"always_use_v6", true}});
+//
+// This will translate to envoy.reloadable_features.dfp_mixed_cache being set to false and
+// envoy.reloadable_features.always_use_v6 being set to true in the static runtime layer.
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
@@ -44,6 +53,42 @@ public:
 
   void mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
     loader().mergeValues(values);
+  }
+
+protected:
+  absl::FlagSaver saver_;
+  Event::MockDispatcher dispatcher_;
+  testing::NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::TestUtil::TestStore store_;
+  Random::MockRandomGenerator generator_;
+  Api::ApiPtr api_;
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  std::unique_ptr<Runtime::Loader> runtime_;
+};
+
+class TestScopedStaticReloadableFeaturesRuntime {
+public:
+  TestScopedStaticReloadableFeaturesRuntime(const std::vector<std::pair<std::string, bool>>& values)
+      : api_(Api::createApiForTest()) {
+    envoy::config::bootstrap::v3::LayeredRuntime config;
+    // Set up runtime.
+    auto* runtime = config.add_layers();
+    runtime->set_name("test_static_layer_test_runtime");
+    ProtobufWkt::Struct envoy_layer;
+    ProtobufWkt::Struct& runtime_values =
+        *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
+    ProtobufWkt::Struct& flags =
+        *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
+    for (const auto& [key, value] : values) {
+      (*flags.mutable_fields())[key].set_bool_value(value);
+    }
+    runtime->mutable_static_layer()->MergeFrom(envoy_layer);
+
+    Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
+        dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
+    // This will ignore values set in test, but just use flag defaults!
+    runtime_ = std::move(runtime_ptr);
   }
 
 protected:

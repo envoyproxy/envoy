@@ -265,8 +265,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
   Buffer::BufferMemoryAccountSharedPtr account() const override;
-  void setUpstreamOverrideHost(absl::string_view host) override;
-  absl::optional<absl::string_view> upstreamOverrideHost() const override;
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -616,6 +616,9 @@ public:
   }
   OptRef<const Network::FilterChainInfo> filterChainInfo() const override {
     return StreamInfoImpl::downstreamAddressProvider().filterChainInfo();
+  }
+  OptRef<const Network::ListenerInfo> listenerInfo() const override {
+    return StreamInfoImpl::downstreamAddressProvider().listenerInfo();
   }
 
 private:
@@ -1029,7 +1032,7 @@ private:
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
-  absl::optional<absl::string_view> upstream_override_host_;
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
 
   const FilterChainFactory& filter_chain_factory_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
@@ -1056,9 +1059,11 @@ private:
       // to verify we do not encode1xx headers more than once per
       // filter.
       static constexpr uint32_t Encode1xxHeaders  = 0x100;
-      // Used to indicate that we're processing the final [En|De]codeData frame,
-      // i.e. end_stream = true
-      static constexpr uint32_t LastDataFrame = 0x200;
+      // Used to indicate that one of the following conditions is true:
+      // 1. The filter manager is processing the final [En|De]codeData frame.
+      // 2. The filter manager is in [En|De]codeHeaders and is processing a
+      //    header-only request or response.
+      static constexpr uint32_t EndOfStream = 0x200;
 
       // Masks for filter call state.
       static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeMetadata | DecodeTrailers;

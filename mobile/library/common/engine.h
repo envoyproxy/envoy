@@ -36,7 +36,7 @@ public:
    * @param log_level, the log level.
    */
   envoy_status_t run(std::string config, std::string log_level);
-  envoy_status_t run(std::unique_ptr<Envoy::OptionsImpl>&& options);
+  envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
 
   /**
    * Immediately terminate the engine, if running.
@@ -87,7 +87,7 @@ public:
   Stats::Store& getStatsStore();
 
 private:
-  envoy_status_t main(std::unique_ptr<Envoy::OptionsImpl>&& options);
+  envoy_status_t main(std::unique_ptr<Envoy::OptionsImplBase>&& options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
 

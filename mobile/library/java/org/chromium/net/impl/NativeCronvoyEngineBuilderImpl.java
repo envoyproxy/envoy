@@ -132,9 +132,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         keyValueStores, runtimeGuards, mEnablePlatformCertificatesValidation,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
-        /*xdsSslRootCerts=*/"",
-        /*xdsSni=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, Struct.getDefaultInstance(),
-        /*cdsResourcesLocator=*/"",
-        /*cdsTimeoutSeconds=*/0, /*enableCds=*/false);
+        /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,
+        Struct.getDefaultInstance(), /*cdsResourcesLocator=*/"", /*cdsTimeoutSeconds=*/0,
+        /*enableCds=*/false);
   }
 }

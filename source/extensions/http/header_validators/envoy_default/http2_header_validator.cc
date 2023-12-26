@@ -232,7 +232,7 @@ Http2HeaderValidator::validateRequestHeaders(const ::Envoy::Http::RequestHeaderM
   // HTTP/2 requests.
   const bool is_standard_connect_request = HeaderUtility::isStandardConnectRequest(header_map);
   const bool is_extended_connect_request = HeaderUtility::isExtendedH2ConnectRequest(header_map);
-  auto is_options_request = header_map.method() == header_values_.MethodValues.Options;
+  auto is_options_request = header_map.getMethodValue() == header_values_.MethodValues.Options;
   bool path_is_empty = path.empty();
   bool path_is_asterisk = path == "*";
   bool path_is_absolute = !path_is_empty && path.at(0) == '/';

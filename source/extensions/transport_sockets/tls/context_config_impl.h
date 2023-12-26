@@ -42,8 +42,8 @@ public:
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
-  const Network::Address::IpList& tlsKeyLogLocal() const override { return tls_keylog_local_; };
-  const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
+  const Network::Address::IpList& tlsKeyLogLocal() const override { return *tls_keylog_local_; };
+  const Network::Address::IpList& tlsKeyLogRemote() const override { return *tls_keylog_remote_; };
   const std::string& tlsKeyLogPath() const override { return tls_keylog_path_; };
   AccessLog::AccessLogManager& accessLogManager() const override {
     return factory_context_.serverFactoryContext().accessLogManager();
@@ -111,8 +111,8 @@ private:
   Ssl::SslCtxCb sslctx_cb_;
   Server::Configuration::TransportSocketFactoryContext& factory_context_;
   const std::string tls_keylog_path_;
-  const Network::Address::IpList tls_keylog_local_;
-  const Network::Address::IpList tls_keylog_remote_;
+  std::unique_ptr<Network::Address::IpList> tls_keylog_local_;
+  std::unique_ptr<Network::Address::IpList> tls_keylog_remote_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

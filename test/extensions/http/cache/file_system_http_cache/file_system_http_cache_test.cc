@@ -12,7 +12,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 #include "test/extensions/common/async_files/mocks.h"
-#include "test/extensions/filters/http/cache/common.h"
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
@@ -265,15 +264,16 @@ class MockSingletonManager : public Singleton::ManagerImpl {
 public:
   MockSingletonManager() : Singleton::ManagerImpl(Thread::threadFactoryForTest()) {
     // By default just act like a real SingletonManager, but allow overrides.
-    ON_CALL(*this, get(_, _))
+    ON_CALL(*this, get(_, _, _))
         .WillByDefault(std::bind(&MockSingletonManager::realGet, this, std::placeholders::_1,
-                                 std::placeholders::_2));
+                                 std::placeholders::_2, std::placeholders::_3));
   }
 
   MOCK_METHOD(Singleton::InstanceSharedPtr, get,
-              (const std::string& name, Singleton::SingletonFactoryCb cb));
-  Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb) {
-    return Singleton::ManagerImpl::get(name, cb);
+              (const std::string& name, Singleton::SingletonFactoryCb cb, bool pin));
+  Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb,
+                                       bool pin) {
+    return Singleton::ManagerImpl::get(name, cb, pin);
   }
 };
 
@@ -282,7 +282,7 @@ public:
   FileSystemHttpCacheTestWithMockFiles() {
     ON_CALL(context_.server_factory_context_, singletonManager())
         .WillByDefault(ReturnRef(mock_singleton_manager_));
-    ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _))
+    ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _, _))
         .WillByDefault(Return(mock_async_file_manager_factory_));
     ON_CALL(*mock_async_file_manager_factory_, getAsyncFileManager(_, _))
         .WillByDefault(Return(mock_async_file_manager_));

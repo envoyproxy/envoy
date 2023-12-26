@@ -26,11 +26,6 @@ constexpr absl::string_view DelimiterForInlineHeaders{","};
 constexpr absl::string_view DelimiterForInlineCookies{"; "};
 const static int kMinHeadersForLazyMap = 3; // Optimal hard-coded value based on benchmarks.
 
-bool validatedLowerCaseString(absl::string_view str) {
-  auto lower_case_str = LowerCaseString(str);
-  return lower_case_str == str;
-}
-
 absl::string_view delimiterByHeader(const LowerCaseString& key) {
   if (key == Http::Headers::get().Cookie) {
     return DelimiterForInlineCookies;
@@ -529,67 +524,6 @@ HeaderMapImplUtility::getAllHeaderMapImplInfo() {
   ret.push_back(makeHeaderMapImplInfo<ResponseHeaderMapImpl>("response header map"));
   ret.push_back(makeHeaderMapImplInfo<ResponseTrailerMapImpl>("response trailer map"));
   return ret;
-}
-
-absl::string_view RequestHeaderMapImpl::protocol() const { return getProtocolValue(); }
-
-absl::string_view RequestHeaderMapImpl::host() const { return getHostValue(); }
-
-absl::string_view RequestHeaderMapImpl::path() const { return getPathValue(); }
-
-absl::string_view RequestHeaderMapImpl::method() const { return getMethodValue(); }
-
-void RequestHeaderMapImpl::forEach(Tracing::TraceContext::IterateCallback callback) const {
-  HeaderMapImpl::iterate([cb = std::move(callback)](const HeaderEntry& entry) {
-    if (cb(entry.key().getStringView(), entry.value().getStringView())) {
-      return HeaderMap::Iterate::Continue;
-    }
-    return HeaderMap::Iterate::Break;
-  });
-}
-
-absl::optional<absl::string_view> RequestHeaderMapImpl::getByKey(absl::string_view key) const {
-  ASSERT(validatedLowerCaseString(key));
-  auto result = const_cast<RequestHeaderMapImpl*>(this)->getExisting(key);
-
-  if (result.empty()) {
-    return absl::nullopt;
-  }
-  return result[0]->value().getStringView();
-}
-
-void RequestHeaderMapImpl::setByKey(absl::string_view key, absl::string_view val) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
-
-  HeaderString new_key;
-  new_key.setCopy(key);
-  HeaderString new_val;
-  new_val.setCopy(val);
-
-  HeaderMapImpl::insertByKey(std::move(new_key), std::move(new_val));
-}
-
-void RequestHeaderMapImpl::setByReferenceKey(absl::string_view key, absl::string_view val) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
-
-  HeaderString new_val;
-  new_val.setCopy(val);
-
-  HeaderMapImpl::insertByKey(HeaderString(key), std::move(new_val));
-}
-
-void RequestHeaderMapImpl::setByReference(absl::string_view key, absl::string_view val) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
-
-  HeaderMapImpl::insertByKey(HeaderString(key), HeaderString(val));
-}
-
-void RequestHeaderMapImpl::removeByKey(absl::string_view key) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
 }
 
 } // namespace Http

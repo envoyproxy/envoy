@@ -20,6 +20,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admin_factory_context",
+    hdrs = ["admin_factory_context.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:instance_interface",
+        "//source/common/listener_manager:listener_info_lib",
+        "//source/server:factory_context_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "admin_lib_internal",
     srcs = ["admin.cc"] + envoy_select_admin_html([
         "admin_html.cc",
@@ -28,6 +40,7 @@ envoy_cc_library(
     ]),
     hdrs = ["admin.h"],
     deps = [
+        ":admin_factory_context",
         ":admin_filter_lib",
         ":clusters_handler_lib",
         ":config_dump_handler_lib",
@@ -66,6 +79,8 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/listener_manager:listener_info_lib",
+        "//source/common/listener_manager:listener_manager_lib",
         "//source/common/memory:utils_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
@@ -76,7 +91,6 @@ envoy_cc_library(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/http/header_validators/envoy_default:config",
-        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/extensions/request_id/uuid:config",
         "//source/server:null_overload_manager_lib",
     ] + envoy_select_admin_html([

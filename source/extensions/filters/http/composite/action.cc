@@ -4,6 +4,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
+
+using HttpExtensionConfigProviderSharedPtr = std::shared_ptr<
+    Config::DynamicExtensionConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>;
+
 void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
   cb_(callbacks);
 }
@@ -14,6 +18,39 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   const auto& composite_action = MessageUtil::downcastAndValidate<
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
+
+  if (composite_action.has_dynamic_config() && composite_action.has_typed_config()) {
+    throw EnvoyException(
+        fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
+  }
+
+  if (composite_action.has_dynamic_config()) {
+    if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
+      throw EnvoyException(fmt::format("Failed to get factory context or server factory context."));
+    }
+    // Create a dynamic filter config provider and register it with the server factory context.
+    auto config_discovery = composite_action.dynamic_config().config_discovery();
+    Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
+    Server::Configuration::ServerFactoryContext& server_factory_context =
+        context.server_factory_context_.value();
+    auto provider_manager =
+        Envoy::Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
+            server_factory_context);
+    HttpExtensionConfigProviderSharedPtr provider =
+        provider_manager->createDynamicFilterConfigProvider(
+            config_discovery, composite_action.dynamic_config().name(), server_factory_context,
+            factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
+    return [provider = std::move(provider)]() -> Matcher::ActionPtr {
+      auto config_value = provider->config();
+      if (config_value.has_value()) {
+        auto factory_cb = config_value.value().get().factory_cb;
+        return std::make_unique<ExecuteFilterAction>(factory_cb);
+      }
+      // There is no dynamic config available. Apply missing config filter.
+      auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
+      return std::make_unique<ExecuteFilterAction>(factory_cb);
+    };
+  }
 
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
@@ -39,7 +76,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   }
 
   if (callback == nullptr) {
-    throwEnvoyExceptionOrPanic("Failed to get filter factory creation function");
+    throw EnvoyException("Failed to get filter factory creation function");
   }
 
   return [cb = std::move(callback)]() -> Matcher::ActionPtr {

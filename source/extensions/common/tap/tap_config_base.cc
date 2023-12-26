@@ -109,7 +109,8 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           absl::get<HttpContextRef>(context).get();
       config = Config::Utility::translateAnyToFactoryConfig(
           sinks[0].custom_sink().typed_config(),
-          http_context.messageValidationContext().staticValidationVisitor(), tap_sink_factory);
+          http_context.serverFactoryContext().messageValidationContext().staticValidationVisitor(),
+          tap_sink_factory);
     }
 
     sink_ = tap_sink_factory.createSinkPtr(*config, context);

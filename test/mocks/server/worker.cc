@@ -47,7 +47,8 @@ MockWorker::MockWorker() {
       }));
 
   ON_CALL(*this, start(_, _))
-      .WillByDefault(Invoke([](GuardDog&, const std::function<void()>& cb) -> void { cb(); }));
+      .WillByDefault(
+          Invoke([](OptRef<GuardDog>, const std::function<void()>& cb) -> void { cb(); }));
 }
 
 MockWorker::~MockWorker() = default;

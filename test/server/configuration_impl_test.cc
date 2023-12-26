@@ -18,6 +18,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -80,6 +81,7 @@ protected:
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Server::MockInstance> server_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };
 
@@ -679,9 +681,8 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, factory_context_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
@@ -719,9 +720,8 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, factory_context_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
@@ -1042,9 +1042,8 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, factory_context_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
@@ -1079,7 +1078,7 @@ TEST_F(ConfigurationImplTest, AccessLogWithFilter) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, factory_context_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
@@ -1114,7 +1113,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, factory_context_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
 }
@@ -1128,7 +1127,7 @@ TEST_F(ConfigurationImplTest, EmptyAdmin) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, factory_context_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 0);
 }
@@ -1151,7 +1150,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, factory_context_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);

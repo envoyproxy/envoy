@@ -230,7 +230,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return());
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return(absl::OkStatus()));
   async_client_manager_->factoryForGrpcService(grpc_service, scope_, false);
 }
 
@@ -350,11 +350,11 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](const std::string&) {
-    throw EnvoyException("fake exception");
+    return absl::InvalidArgumentError("failure");
   }));
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_->factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "fake exception");
+      "failure");
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {

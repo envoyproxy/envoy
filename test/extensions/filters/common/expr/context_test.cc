@@ -7,6 +7,7 @@
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/context.h"
 
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -490,6 +491,8 @@ TEST(Context, ConnectionAttributes) {
   const absl::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));
+  const std::string downstream_transport_failure_reason = "TlsError";
+  info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
@@ -673,6 +676,13 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = connection[CelValue::CreateStringView(DownstreamTransportFailureReason)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(downstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+
+  {
     auto value = upstream[CelValue::CreateStringView(TLSVersion)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
@@ -820,6 +830,7 @@ TEST(Context, FilterStateAttributes) {
 }
 
 TEST(Context, XDSAttributes) {
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
       new NiceMock<Upstream::MockClusterInfo>());
@@ -837,8 +848,15 @@ TEST(Context, XDSAttributes) {
   filter_chain_info->filter_chain_name_ = "fake_filter_chain_name";
   info.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
 
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  envoy::config::core::v3::Metadata listener_metadata;
+  EXPECT_CALL(*listener_info, metadata()).WillRepeatedly(ReturnRef(listener_metadata));
+  EXPECT_CALL(*listener_info, direction())
+      .WillRepeatedly(Return(envoy::config::core::v3::TrafficDirection::OUTBOUND));
+  info.downstream_connection_info_provider_->setListenerInfo(listener_info);
+
   Protobuf::Arena arena;
-  XDSWrapper wrapper(arena, info);
+  XDSWrapper wrapper(arena, info, &local_info);
 
   {
     const auto value = wrapper[CelValue::CreateStringView(ClusterName)];
@@ -877,12 +895,29 @@ TEST(Context, XDSAttributes) {
     EXPECT_EQ(chain_name, value.value().StringOrDie().value());
   }
   {
+    const auto value = wrapper[CelValue::CreateStringView(ListenerMetadata)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_EQ(&listener_metadata, value.value().MessageOrDie());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ListenerDirection)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(2, value.value().Int64OrDie());
+  }
+  {
     const auto value = wrapper[CelValue::CreateStringView(XDS)];
     EXPECT_FALSE(value.has_value());
   }
   {
     const auto value = wrapper[CelValue::CreateInt64(5)];
     EXPECT_FALSE(value.has_value());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(Node)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
   }
 }
 

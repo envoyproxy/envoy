@@ -64,14 +64,14 @@ public:
 
   /**
    * @param headers the headers to parse.
-   * @return bool indicating whether the header is a Buf Connect request header.
+   * @return bool indicating whether the header is a Connect request header.
    * This is determined by checking for the connect protocol version header and a path header.
    */
   static bool isConnectRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * @param headers the headers to parse.
-   * @return bool indicating whether the header is a Buf Connect streaming request header.
+   * @return bool indicating whether the header is a Connect streaming request header.
    * This is determined by checking for the connect streaming content type and a path header.
    */
   static bool isConnectStreamingRequestHeaders(const Http::RequestHeaderMap& headers);
@@ -93,7 +93,7 @@ public:
 
   /**
    * @param headers the headers to parse.
-   * @return bool indicating whether the header is a Buf Connect streaming response header.
+   * @return bool indicating whether the header is a Connect streaming response header.
    */
   static bool isConnectStreamingResponseHeaders(const Http::ResponseHeaderMap& headers);
 

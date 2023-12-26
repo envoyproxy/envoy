@@ -362,11 +362,6 @@ config_setting(
 )
 
 config_setting(
-    name = "disable_envoy_mobile_request_compression",
-    values = {"define": "envoy_mobile_request_compression=disabled"},
-)
-
-config_setting(
     name = "disable_envoy_mobile_xds",
     values = {"define": "envoy_mobile_xds=disabled"},
 )
@@ -896,7 +891,7 @@ cc_library(
 updater(
     name = "update",
     data = ["//tools/dependency:check"],
-    dependencies = ":repository_locations",
+    dependencies = "//tools/dependency:filtered-dependencies",
     post_script = ":version_update_post.sh",
     pydict = True,
     tags = ["skip_on_windows"],

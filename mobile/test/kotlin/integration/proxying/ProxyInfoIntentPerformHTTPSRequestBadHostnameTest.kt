@@ -11,6 +11,7 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -21,7 +22,7 @@ import org.mockito.Mockito
 import org.robolectric.RobolectricTestRunner
 
 //                                                ┌──────────────────┐
-//                                                │   Proxy Engine   │
+//                                                │   Envoy Proxy    │
 //                                                │ ┌──────────────┐ │
 // ┌─────────────────────────┐                  ┌─┼─►listener_proxy│ │
 // │https://api.lyft.com/ping│  ┌──────────────┬┘ │ └──────┬───────┘ │ ┌────────────┐
@@ -35,11 +36,13 @@ import org.robolectric.RobolectricTestRunner
 class PerformHTTPSRequestBadHostname {
   init {
     JniLibrary.loadTestLibrary()
+    JniLibrary.load()
   }
 
   @Test
   fun `attempts an HTTPs request through a proxy using an async DNS resolution that fails`() {
-    val port = (10001..11000).random()
+    TestJni.startHttpsProxyTestServer()
+    val port = TestJni.getServerPort()
 
     val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
     val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
@@ -50,19 +53,7 @@ class PerformHTTPSRequestBadHostname {
       .thenReturn(ProxyInfo.buildDirectProxy("loopback", port))
 
     val onEngineRunningLatch = CountDownLatch(1)
-    val onProxyEngineRunningLatch = CountDownLatch(1)
     val onErrorLatch = CountDownLatch(1)
-
-    val proxyEngineBuilder = Proxy(context, port).https()
-    val proxyEngine =
-      proxyEngineBuilder
-        .addLogLevel(LogLevel.DEBUG)
-        .addDNSQueryTimeoutSeconds(2)
-        .setOnEngineRunning { onProxyEngineRunningLatch.countDown() }
-        .build()
-
-    onProxyEngineRunningLatch.await(10, TimeUnit.SECONDS)
-    assertThat(onProxyEngineRunningLatch.count).isEqualTo(0)
 
     context.sendStickyBroadcast(Intent(Proxy.PROXY_CHANGE_ACTION))
 
@@ -97,6 +88,6 @@ class PerformHTTPSRequestBadHostname {
     assertThat(onErrorLatch.count).isEqualTo(0)
 
     engine.terminate()
-    proxyEngine.terminate()
+    TestJni.shutdownTestServer()
   }
 }

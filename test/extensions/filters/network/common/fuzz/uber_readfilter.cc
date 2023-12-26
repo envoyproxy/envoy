@@ -27,7 +27,7 @@ void UberFilterFuzzer::reset() {
   Event::MockDispatcher& mock_dispatcher =
       dynamic_cast<Event::MockDispatcher&>(read_filter_callbacks_->connection_.dispatcher_);
   mock_dispatcher.clearDeferredDeleteList();
-  factory_context_.admin_.config_tracker_.config_tracker_callbacks_.clear();
+  factory_context_.server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_.clear();
   read_filter_.reset();
 }
 
@@ -62,22 +62,24 @@ void UberFilterFuzzer::fuzzerSetup() {
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
 
   // Set featureEnabled for mongo_proxy
-  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.proxy_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
           featureEnabled("mongo.connection_logging_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("mongo.logging_enabled", 100))
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.logging_enabled", 100))
       .WillByDefault(Return(true));
 
   // Set featureEnabled for thrift_proxy
-  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.thrift_filter_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.thrift_filter_enforcing", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.test_key.thrift_filter_enabled", 100))
       .WillByDefault(Return(true));
 
@@ -85,8 +87,9 @@ void UberFilterFuzzer::fuzzerSetup() {
   // TODO(mattklein123): This should not be required and we should be able to test different
   // variations here, however the fuzz test fails without this change and the overall change is
   // large enough as it is so this will be revisited.
-  ON_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
-      .WillByDefault(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
 }
 
 UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.simulatedTimeSystem()) {
@@ -140,7 +143,8 @@ void UberFilterFuzzer::fuzz(
     case test::extensions::filters::network::Action::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
-          factory_context_.mainThreadDispatcher(), Event::Dispatcher::RunType::NonBlock);
+          factory_context_.server_factory_context_.mainThreadDispatcher(),
+          Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {
