@@ -62,22 +62,23 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
   if (!credential_success_) {
     config_->stats().failed_.inc();
 
-    if (config_->allowRequestWithoutCredential()) {
-      return Http::FilterHeadersStatus::Continue;
+    if (!config_->allowRequestWithoutCredential()) {
+      decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                         nullptr, absl::nullopt, "failed_to_inject_credential");
+      return Http::FilterHeadersStatus::StopIteration;
     }
 
-    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                       nullptr, absl::nullopt, "failed_to_inject_credential");
-    return Http::FilterHeadersStatus::StopIteration;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   // The credential provider has successfully retrieved the credential, inject it to the header
   bool succeed = config_->injectCredential(*request_headers_);
-  if (!succeed) {
+  if (!succeed && !config_->allowRequestWithoutCredential()) {
     decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
                                        nullptr, absl::nullopt, "failed_to_inject_credential");
     return Http::FilterHeadersStatus::StopIteration;
   }
+
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -88,7 +89,7 @@ void CredentialInjectorFilter::onSuccess() {
 
   assert(request_headers_ != nullptr);
   bool succeed = config_->injectCredential(*request_headers_);
-  if (!succeed) {
+  if (!succeed && !config_->allowRequestWithoutCredential()) {
     decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
                                        nullptr, absl::nullopt, "failed_to_inject_credential");
     return;
@@ -106,12 +107,13 @@ void CredentialInjectorFilter::onFailure(const std::string& reason) {
   ENVOY_LOG(warn, "Failed to get credential: {}", reason);
   config_->stats().failed_.inc();
 
-  if (config_->allowRequestWithoutCredential()) {
-    decoder_callbacks_->continueDecoding();
+  if (!config_->allowRequestWithoutCredential()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                       nullptr, absl::nullopt, "failed_to_inject_credential");
+    return;
   }
 
-  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                     nullptr, absl::nullopt, "failed_to_inject_credential");
+  decoder_callbacks_->continueDecoding();
 }
 
 void CredentialInjectorFilter::setDecoderFilterCallbacks(
