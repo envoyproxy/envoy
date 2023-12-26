@@ -21,19 +21,25 @@ A simple example of configuring Lua cluster specifier is as follow:
 
 .. code-block:: yaml
 
-  name: envoy.router.cluster_specifier_plugin.lua
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.router.cluster_specifiers.lua.v3.LuaConfig
-    source_code:
-      inline_string: |
-        function envoy_on_route(route_handle)
-          local header_value = route_handle:headers():get("header_key")
-          if header_value == "fake" then
-            return "fake_service"
-          end
-          return "web_service"
-        end
-    default_cluster: web_service
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      inline_cluster_specifier_plugin:
+        extension:
+          name: envoy.router.cluster_specifier_plugin.lua
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.router.cluster_specifiers.lua.v3.LuaConfig
+            source_code:
+              inline_string: |
+                function envoy_on_route(route_handle)
+                  local header_value = route_handle:headers():get("header_key")
+                  if header_value == "fake" then
+                    return "fake_service"
+                  end
+                  return "web_service"
+                end
+            default_cluster: web_service
 
 Lua script defined in ``source_code`` will be executed to select router cluster, and just as cluster specifier
 plugin in C++, Lua script can also select router cluster based on request headers. If Lua script has no

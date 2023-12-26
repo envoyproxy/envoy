@@ -16,7 +16,8 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
 
   cluster_function_slot_ = lua_state_.registerGlobal("envoy_on_route", initializers);
   if (lua_state_.getGlobalRef(cluster_function_slot_) == LUA_REFNIL) {
-    ENVOY_LOG(info, "envoy_on_route() function not found. Lua will not hook cluster specifier.");
+    throw EnvoyException(
+        "envoy_on_route() function not found. Lua will not hook cluster specifier.");
   }
 }
 
@@ -45,7 +46,8 @@ int RouteHandleWrapper::luaHeaders(lua_State* state) {
 LuaClusterSpecifierConfig::LuaClusterSpecifierConfig(
     const LuaClusterSpecifierConfigProto& config,
     Server::Configuration::CommonFactoryContext& context)
-    : default_cluster_(config.default_cluster()) {
+    : main_thread_dispatcher_(context.mainThreadDispatcher()),
+      default_cluster_(config.default_cluster()) {
   const std::string code_str = Config::DataSource::read(config.source_code(), true, context.api());
   per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
 }
