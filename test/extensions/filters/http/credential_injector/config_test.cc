@@ -34,4 +34,3 @@ TEST(Factory, UnregisteredExtension) {
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-

@@ -48,4 +48,3 @@ REGISTER_FACTORY(CredentialInjectorFilterFactory,
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-
