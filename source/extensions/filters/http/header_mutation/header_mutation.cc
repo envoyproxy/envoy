@@ -37,14 +37,14 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
   config_->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
 
   // Traverse through all route configs to retrieve all available header mutations.
-  // getAllPerFilterConfig will return in ascending order of specificity (i.e., route table
+  // `getAllPerFilterConfig` returns in ascending order of specificity (i.e., route table
   // first, then virtual host, then per route).
   route_configs_ = Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
   if (!config_->mostSpecificHeaderMutationsWins()) {
-    // most_specific_wins means that most specific level is evaluated last. In other words, header
-    // mutations are evaluated in ascending order of specificity (which is the same order as
-    // `getAllPerFilterConfig` function returns). Thus, reverse order when the configuration is not
-    // most_specific_wins.
+    // most_specific_wins means that most specific level per filter config is evaluated last. In
+    // other words, header mutations are evaluated in ascending order of specificity (same order as
+    // `getAllPerFilterConfig` above returns). Thus, we should reverse order when the configuration
+    // is not `most_specific_wins`.
     std::reverse(route_configs_.begin(), route_configs_.end());
   }
 
