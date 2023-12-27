@@ -44,8 +44,8 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
   if (!config_->mostSpecificHeaderMutationsWins()) {
     // most_specific_wins means that most specific level per filter config is evaluated last. In
     // other words, header mutations are evaluated in ascending order of specificity (same order as
-    // `getAllPerFilterConfig` above returns). Thus, we should reverse iterate the vector when the
-    // configuration is not `most_specific_wins`.
+    // `getAllPerFilterConfig` above returns).
+    // Thus, here we reverse iterate the vector when `most_specific_wins` is false.
     for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
       ASSERT(*it != nullptr);
       (*it)->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
