@@ -637,8 +637,6 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
 template <class ConfigType>
 absl::InlinedVector<const ConfigType*, 3>
 getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
-  static_assert(std::is_copy_constructible<ConfigType>::value,
-                "ConfigType must be copy constructible");
   ASSERT(callbacks != nullptr);
 
   absl::InlinedVector<const ConfigType*, 3> all_configs;
