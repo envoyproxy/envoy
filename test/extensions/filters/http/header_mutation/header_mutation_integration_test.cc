@@ -34,7 +34,7 @@ public:
 
   void setPerFilterConfigsWithSameKey(const std::string& prefix) {
     config_helper_.addConfigModifier(
-        [prefix](
+        [&prefix](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
