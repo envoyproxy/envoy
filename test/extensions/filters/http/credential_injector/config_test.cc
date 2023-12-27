@@ -24,13 +24,14 @@ TEST(Factory, UnregisteredExtension) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   CredentialInjectorFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException,
-      "Didn't find a registered implementation for type: 'test.mock_credential.Unregistered'");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().message(),
+      testing::HasSubstr("Didn't find a registered implementation for type: "
+                         "'test.mock_credential.Unregistered'"));
 }
 
 } // namespace CredentialInjector
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+

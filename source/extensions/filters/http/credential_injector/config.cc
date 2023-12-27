@@ -11,7 +11,8 @@ namespace CredentialInjector {
 
 using Envoy::Extensions::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory;
 
-Http::FilterFactoryCb CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
@@ -21,7 +22,7 @@ Http::FilterFactoryCb CredentialInjectorFilterFactory::createFilterFactoryFromPr
   NamedCredentialInjectorConfigFactory* const config_factory =
       Registry::FactoryRegistry<NamedCredentialInjectorConfigFactory>::getFactoryByType(type);
   if (config_factory == nullptr) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Didn't find a registered implementation for type: '{}'", type));
   }
 
@@ -47,3 +48,4 @@ REGISTER_FACTORY(CredentialInjectorFilterFactory,
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
