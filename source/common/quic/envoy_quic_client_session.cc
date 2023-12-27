@@ -15,7 +15,7 @@
 namespace Envoy {
 namespace Quic {
 
-// Quic connection doesn't have transport socket object to do handshake. This callback
+// Quic connection doesn't use transport socket object to do handshake. This callback
 // implementation is used by the cert verifier to access Network::Connection interfaces.
 class ConnectionWrapper : public Network::TransportSocketCallbacks {
 public:
