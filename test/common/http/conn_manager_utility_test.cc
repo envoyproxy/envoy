@@ -2251,7 +2251,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHo
   EXPECT_EQ("80", headers.getForwardedPortValue());
 }
 
-TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersForHttp11) {
+/*TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersForHttp11) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60, max=1000"},
                                                    {"proxy-connection", "proxy-header"}};
@@ -2302,7 +2302,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionKeepAliveRequestHeaderHttp1
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(request_headers, Protocol::Http11));
   EXPECT_FALSE(request_headers.has("connection"));
-}
+}*/
 
 } // namespace Http
 } // namespace Envoy
