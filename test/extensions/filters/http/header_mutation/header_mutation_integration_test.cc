@@ -72,7 +72,7 @@ public:
               {absl::StrCat(prefix, "-header-mutation"), per_route_config});
 
           // Set response mutations on other levels than per route with same key. This is to test
-          // per filter config specifility order of downstream filter.
+          // per filter config specificity order of downstream filter.
           if (prefix == "downstream") {
             // Per virtual host header mutation.
             PerRouteProtoConfig header_mutation_vhost;
