@@ -640,7 +640,6 @@ getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   ASSERT(callbacks != nullptr);
 
   absl::InlinedVector<const ConfigType*, 3> all_configs;
-
   callbacks->traversePerFilterConfig([&all_configs](const Router::RouteSpecificFilterConfig& cfg) {
     const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
     if (typed_cfg == nullptr) {
