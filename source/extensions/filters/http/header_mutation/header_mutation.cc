@@ -40,17 +40,22 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
   // `getAllPerFilterConfig` returns in ascending order of specificity (i.e., route table
   // first, then virtual host, then per route).
   route_configs_ = Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
+
   if (!config_->mostSpecificHeaderMutationsWins()) {
     // most_specific_wins means that most specific level per filter config is evaluated last. In
     // other words, header mutations are evaluated in ascending order of specificity (same order as
-    // `getAllPerFilterConfig` above returns). Thus, we should reverse order when the configuration
-    // is not `most_specific_wins`.
-    std::reverse(route_configs_.begin(), route_configs_.end());
-  }
-
-  for (const auto* route_config : route_configs_) {
-    ASSERT(route_config != nullptr);
-    route_config->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
+    // `getAllPerFilterConfig` above returns). Thus, we should reverse iterate the vector when the
+    // configuration is not `most_specific_wins`.
+    for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
+      ASSERT(*it != nullptr);
+      (*it)->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
+    }
+  } else {
+    for (const auto* route_config : route_configs_) {
+      ASSERT(route_config != nullptr);
+      route_config->mutations().mutateRequestHeaders(headers, ctx,
+                                                     decoder_callbacks_->streamInfo());
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -64,15 +69,19 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
   if (route_configs_.empty()) {
     route_configs_ =
         Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(encoder_callbacks_);
-
-    if (!config_->mostSpecificHeaderMutationsWins()) {
-      std::reverse(route_configs_.begin(), route_configs_.end());
-    }
   }
 
-  for (const auto* route_config : route_configs_) {
-    ASSERT(route_config != nullptr);
-    route_config->mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());
+  if (!config_->mostSpecificHeaderMutationsWins()) {
+    for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
+      ASSERT(*it != nullptr);
+      (*it)->mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());
+    }
+  } else {
+    for (const auto* route_config : route_configs_) {
+      ASSERT(route_config != nullptr);
+      route_config->mutations().mutateResponseHeaders(headers, ctx,
+                                                      encoder_callbacks_->streamInfo());
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
