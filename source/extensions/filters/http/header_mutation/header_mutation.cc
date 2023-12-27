@@ -47,7 +47,6 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
     // most_specific_wins.
     std::reverse(route_configs_.begin(), route_configs_.end());
   }
-  std::cout << "tyxia_route_configs_size: " << route_configs_.size() << std::endl;
 
   for (const auto* route_config : route_configs_) {
     ASSERT(route_config != nullptr);
@@ -70,7 +69,7 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
       std::reverse(route_configs_.begin(), route_configs_.end());
     }
   }
-  std::cout << "tyxia_route_configs_size: " << route_configs_.size() << std::endl;
+
   for (const auto* route_config : route_configs_) {
     ASSERT(route_config != nullptr);
     route_config->mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());
