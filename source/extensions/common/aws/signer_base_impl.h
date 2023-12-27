@@ -70,7 +70,7 @@ public:
   std::string getRegion() const;
 
 protected:
-  std::string createContentHash(Http::RequestMessage& message, const bool sign_body) const;
+  std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
 
   virtual void addRegionHeader(Http::RequestHeaderMap& headers,
                                const absl::string_view override_region) const;

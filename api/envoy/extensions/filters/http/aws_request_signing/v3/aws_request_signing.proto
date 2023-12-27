@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_request_signing]
 
 // Top level configuration for the AWS request signing filter.
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message AwsRequestSigning {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigning";
@@ -39,14 +39,21 @@ message AwsRequestSigning {
   // Example: s3
   string service_name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ hosting the HTTP
-  // endpoint.
+  // When signing_algorithm = aws_sigv4 the region is a standard AWS `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ string for the service
+  // hosting the HTTP endpoint.
   //
   // Example: us-west-2
   //
-  // region can only be specified if signing_algorithm = aws_sigv4, or if signing_algorithm is unspecified
+  // If region is unspecified and signing_algorithm = aws_sigv4 (or the signing_algorithm is unspecified),
+  // the region will be taken from the aws profile
   //
-  // If region is unspecified and signing_algorithm = aws_sigv4, the region will be taken from the aws profile
+  // When signing_algorithm = aws_sigv4a the region is used as a region set.
+  //
+  // A region set is a comma separated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
+  // or even region strings containing wildcards such as ``us-east-*``
+  //
+  // By configuring a region set, a sigv4a signed request can be sent to multiple regions, rather than being
+  // valid for only a single region destination.
   string region = 2;
 
   // Indicates that before signing headers, the host header will be swapped with
@@ -78,17 +85,6 @@ message AwsRequestSigning {
 
   // Optional Signing algorithm specifier, either aws_sigv4 or aws_sigv4a, defaulting to aws_sigv4.
   SigningAlgorithm signing_algorithm = 6;
-
-  // A region set is a comma separated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
-  // or even region strings containing wildcards such as ``us-east-*``
-  //
-  // By configuring a region set, a sigv4a signed request can be sent to multiple regions, rather than being
-  // valid for only a single region destination.
-  //
-  // region_set can only be specified if signing_algorithm = aws_sigv4a
-  //
-  // If region_set is unspecified and signing_algorithm = aws_sigv4a, the region_set will be taken from the aws profile
-  string region_set = 7;
 }
 
 message AwsRequestSigningPerRoute {

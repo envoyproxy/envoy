@@ -95,7 +95,7 @@ match_excluded_headers:
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4A) {
   const std::string yaml = R"EOF(
 service_name: s3
-region_set: '*'
+region: '*'
 host_rewrite: new-host
 signing_algorithm: aws_sigv4a
 match_excluded_headers:
@@ -109,7 +109,7 @@ match_excluded_headers:
 
   AwsRequestSigningProtoConfig expected_config;
   expected_config.set_service_name("s3");
-  expected_config.set_region_set("*");
+  expected_config.set_region("*");
   expected_config.set_host_rewrite("new-host");
   expected_config.set_signing_algorithm(envoy::extensions::filters::http::aws_request_signing::v3::
                                             AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A);
@@ -130,34 +130,6 @@ match_excluded_headers:
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);
-}
-
-TEST(AwsRequestSigningFilterConfigTest, InvalidConfigRegionSetAndSigV4) {
-
-  // Should not be able to set signing_algorithm = aws_sigv4 and specify a region_set
-  const std::string yaml = R"EOF(
-service_name: s3
-region_set: '*'
-host_rewrite: new-host
-signing_algorithm: aws_sigv4
-match_excluded_headers:
-  - prefix: x-envoy
-  - exact: foo
-  - exact: bar
-  )EOF";
-
-  AwsRequestSigningProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  AwsRequestSigningFilterFactory factory;
-  EXPECT_THROW(
-      {
-        Http::FilterFactoryCb cb =
-            factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
-        Http::MockFilterChainFactoryCallbacks filter_callbacks;
-        cb(filter_callbacks);
-      },
-      EnvoyException);
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidConfigRegionAndSigV4A) {
@@ -218,7 +190,7 @@ TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4A) {
 aws_request_signing:
   service_name: s3
   signing_algorithm: aws_sigv4a
-  region_set: '*'
+  region: '*'
   host_rewrite: new-host
   match_excluded_headers:
     - prefix: x-envoy

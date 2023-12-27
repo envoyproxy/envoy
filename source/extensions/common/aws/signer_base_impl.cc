@@ -100,8 +100,7 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
   headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 }
 
-std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message,
-                                              const bool sign_body) const {
+std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {
   if (!sign_body) {
     return SignatureConstants::get().HashedEmptyString;
   }
