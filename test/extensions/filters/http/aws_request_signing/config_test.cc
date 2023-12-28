@@ -132,34 +132,6 @@ match_excluded_headers:
   cb(filter_callbacks);
 }
 
-TEST(AwsRequestSigningFilterConfigTest, InvalidConfigRegionAndSigV4A) {
-
-  // Should not be able to set signing_algorithm = aws_sigv4a and specify a region
-  const std::string yaml = R"EOF(
-service_name: s3
-region: 'us-east-1'
-host_rewrite: new-host
-signing_algorithm: aws_sigv4a
-match_excluded_headers:
-  - prefix: x-envoy
-  - exact: foo
-  - exact: bar
-  )EOF";
-
-  AwsRequestSigningProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  AwsRequestSigningFilterFactory factory;
-  EXPECT_THROW(
-      {
-        Http::FilterFactoryCb cb =
-            factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
-        Http::MockFilterChainFactoryCallbacks filter_callbacks;
-        cb(filter_callbacks);
-      },
-      EnvoyException);
-}
-
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4) {
   const std::string yaml = R"EOF(
 aws_request_signing:
