@@ -45,3 +45,4 @@ Extensions
   wasm/wasm
   watchdog/watchdog
   load_balancing_policies/load_balancing_policies
+  cluster_specifier/cluster_specifier
