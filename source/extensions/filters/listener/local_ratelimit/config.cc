@@ -29,7 +29,8 @@ public:
         message, context.messageValidationVisitor());
 
     FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-        proto_config, context.mainThreadDispatcher(), context.scope(), context.runtime());
+        proto_config, context.serverFactoryContext().mainThreadDispatcher(), context.scope(),
+        context.serverFactoryContext().runtime());
     return
         [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
           filter_manager.addAcceptFilter(listener_filter_matcher, std::make_unique<Filter>(config));

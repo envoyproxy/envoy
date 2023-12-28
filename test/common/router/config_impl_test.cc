@@ -138,8 +138,8 @@ genHeaders(const std::string& host, const std::string& path, const std::string& 
   }
 
   if (random_value_pair.has_value()) {
-    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair.value().first),
-                  random_value_pair.value().second);
+    hdrs.setCopy(Envoy::Http::LowerCaseString(random_value_pair.value().first),
+                 random_value_pair.value().second);
   }
   return hdrs;
 }
@@ -2204,7 +2204,7 @@ most_specific_header_mutations_wins: true
 
 // Validate that we can't add :-prefixed or Host request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddNoHostOrPseudoHeader) {
-  for (const std::string& header :
+  for (const std::string header :
        {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:
@@ -2230,7 +2230,7 @@ virtual_hosts:
 
 // Validate that we can't remove :-prefixed request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
-  for (const std::string& header :
+  for (const std::string header :
        {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:
@@ -10220,6 +10220,7 @@ virtual_hosts:
   EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
   EXPECT_TRUE(internal_redirect_policy.predicates().empty());
   EXPECT_FALSE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
+  EXPECT_TRUE(internal_redirect_policy.responseHeadersToCopy().empty());
 }
 
 TEST_F(RouteConfigurationV2, InternalRedirectPolicyDropsInvalidRedirectCode) {
@@ -10285,6 +10286,31 @@ virtual_hosts:
       internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(304)));
   EXPECT_FALSE(
       internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
+}
+
+TEST_F(RouteConfigurationV2, InternalRedirectPolicyAcceptsResponseHeadersToPrserve) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            response_headers_to_copy: ["x-foo", "x-bar"]
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_EQ(2, internal_redirect_policy.responseHeadersToCopy().size());
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {

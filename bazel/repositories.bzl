@@ -290,6 +290,8 @@ def envoy_dependencies(skip_targets = []):
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
+    _com_github_intel_qatzip()
+    _com_github_lz4_lz4()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
@@ -554,6 +556,18 @@ def _com_github_intel_ipp_crypto_crypto_mb_fips():
 def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_intel_qatzip():
+    external_http_archive(
+        name = "com_github_intel_qatzip",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_lz4_lz4():
+    external_http_archive(
+        name = "com_github_lz4_lz4",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -1399,7 +1413,7 @@ filegroup(
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
     external_http_archive(
-        name = "edenhill_librdkafka",
+        name = "confluentinc_librdkafka",
         build_file_content = BUILD_ALL_CONTENT,
         # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.

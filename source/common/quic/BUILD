@@ -532,8 +532,10 @@ envoy_cc_library(
         "//source/common/network:io_socket_error_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib",
-    ],
+    ] + select({
+        "//bazel:linux": ["@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(

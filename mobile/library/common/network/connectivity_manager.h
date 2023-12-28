@@ -263,7 +263,8 @@ using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
  */
 class ConnectivityManagerFactory {
 public:
-  ConnectivityManagerFactory(Server::GenericFactoryContextImpl context) : context_(context) {}
+  ConnectivityManagerFactory(Server::Configuration::GenericFactoryContext& context)
+      : context_(context) {}
 
   /**
    * @returns singleton ConnectivityManager instance.

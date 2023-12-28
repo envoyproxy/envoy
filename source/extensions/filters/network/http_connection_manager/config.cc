@@ -311,7 +311,11 @@ LEGACY_REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
 InternalAddressConfig::InternalAddressConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         InternalAddressConfig& config)
-    : unix_sockets_(config.unix_sockets()), cidr_ranges_(config.cidr_ranges()) {}
+    : unix_sockets_(config.unix_sockets()) {
+  auto list_or_error = Network::Address::IpList::create(config.cidr_ranges());
+  THROW_IF_STATUS_NOT_OK(list_or_error, throw);
+  cidr_ranges_ = std::move(list_or_error.value());
+}
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -559,8 +563,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_tracing()) {
     tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
-    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
-                                                                             config.tracing());
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
+        context.listenerInfo().direction(), config.tracing());
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -628,7 +632,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
-    if (!context_.isQuicListener()) {
+    if (!context_.listenerInfo().isQuic()) {
       throwEnvoyExceptionOrPanic("HTTP/3 codec configured on non-QUIC listener.");
     }
 #else
@@ -636,7 +640,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
     break;
   }
-  if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
+  if (codec_type_ != CodecType::HTTP3 && context_.listenerInfo().isQuic()) {
     throwEnvoyExceptionOrPanic("Non-HTTP/3 codec configured on QUIC listener.");
   }
 

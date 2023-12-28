@@ -107,7 +107,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       tracer = tracer_manager->getOrCreateTracer(&proto_config.tracing().provider());
     }
     tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
-        context.direction(), proto_config.tracing());
+        context.listenerInfo().direction(), proto_config.tracing());
   }
 
   // Access log configuration.

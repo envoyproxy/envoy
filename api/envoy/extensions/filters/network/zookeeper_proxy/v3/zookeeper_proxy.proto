@@ -66,7 +66,7 @@ message ZooKeeperProxy {
   // Whether to emit per opcode response bytes metrics. If not set, it defaults to false.
   bool enable_per_opcode_response_bytes_metrics = 8;
 
-  // Whether to emit per opcode decoder error metrics. If not set, it defaults to false.
+  // [#not-implemented-hide:] Whether to emit per opcode decoder error metrics. If not set, it defaults to false.
   bool enable_per_opcode_decoder_error_metrics = 9;
 }
 
