@@ -39,6 +39,16 @@ ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyCon
       envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>();
 }
 
+void QuicServerTransportSocketFactory::initialize() {
+  config_->setSecretUpdateCallback([this]() {
+    // The callback also updates config_ with the new secret.
+    onSecretUpdated();
+  });
+  if (!config_->alpnProtocols().empty()) {
+    supported_alpns_ = absl::StrSplit(config_->alpnProtocols(), ',');
+  }
+}
+
 Network::UpstreamTransportSocketFactoryPtr
 QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config,
@@ -60,6 +70,13 @@ QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     : QuicTransportSocketFactoryBase(factory_context.statsScope(), "client"),
       fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
           std::move(config), factory_context.sslContextManager(), factory_context.statsScope())) {}
+
+void QuicClientTransportSocketFactory::initialize() {
+  if (!fallback_factory_->clientContextConfig()->alpnProtocols().empty()) {
+    supported_alpns_ =
+        absl::StrSplit(fallback_factory_->clientContextConfig()->alpnProtocols(), ',');
+  }
+}
 
 ProtobufTypes::MessagePtr QuicClientTransportSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport>();

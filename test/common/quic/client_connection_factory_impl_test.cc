@@ -92,13 +92,12 @@ protected:
 
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
-
   const int port = 30;
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
-      nullptr, connection_id_generator_);
+      nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -107,6 +106,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   EXPECT_EQ(highWatermark(session), 45);
   EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
   EXPECT_NE(absl::nullopt, session->lastRoundTripTime());
+  EXPECT_THAT(session->GetAlpnsToOffer(), testing::ElementsAre("h3"));
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -125,7 +125,7 @@ TEST_P(QuicNetworkConnectionTest, SocketOptions) {
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
-      socket_options, nullptr, connection_id_generator_);
+      socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -145,7 +145,7 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       info, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, *store_.rootScope(),
-      nullptr, nullptr, connection_id_generator_);
+      nullptr, nullptr, connection_id_generator_, *factory_);
 
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
 

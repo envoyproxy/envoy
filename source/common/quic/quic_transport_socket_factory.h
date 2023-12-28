@@ -47,9 +47,14 @@ public:
   // To be called right after construction.
   virtual void initialize() PURE;
 
+  // Returns the ALPN list to negotiate during the handshake.
+  const std::vector<absl::string_view>& supportedAlpnProtocols() const { return supported_alpns_; }
+
 protected:
   virtual void onSecretUpdated() PURE;
   QuicTransportSocketFactoryStats stats_;
+  // Populated during initialization.
+  std::vector<absl::string_view> supported_alpns_;
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
@@ -68,12 +73,7 @@ public:
   }
   bool implementsSecureTransport() const override { return true; }
 
-  void initialize() override {
-    config_->setSecretUpdateCallback([this]() {
-      // The callback also updates config_ with the new secret.
-      onSecretUpdated();
-    });
-  }
+  void initialize() override;
 
   // Return TLS certificates if the context config is ready.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
@@ -103,7 +103,7 @@ public:
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
 
-  void initialize() override {}
+  void initialize() override;
   bool implementsSecureTransport() const override { return true; }
   bool supportsAlpn() const override { return true; }
   absl::string_view defaultServerNameIndication() const override {

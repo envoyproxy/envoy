@@ -7,6 +7,7 @@
 #include "source/common/quic/envoy_quic_client_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
@@ -31,7 +32,8 @@ public:
       EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
       QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
       Stats::Scope& scope,
-      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options);
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      OptRef<Network::UpstreamTransportSocketFactory> transport_socket_factory);
 
   ~EnvoyQuicClientSession() override;
 
@@ -71,6 +73,7 @@ public:
 #endif
     return quic::HttpDatagramSupport::kNone;
   }
+  std::vector<std::string> GetAlpnsToOffer() const override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
@@ -127,6 +130,8 @@ private:
   Stats::Scope& scope_;
   bool disable_keepalive_{false};
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  OptRef<QuicClientTransportSocketFactory> transport_socket_factory_;
+  std::vector<std::string> configured_alpns_;
 };
 
 } // namespace Quic

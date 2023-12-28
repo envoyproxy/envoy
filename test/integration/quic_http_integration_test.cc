@@ -2,6 +2,7 @@
 #include <openssl/x509_vfy.h>
 
 #include <cstddef>
+#include <initializer_list>
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -225,7 +226,7 @@ public:
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
         persistent_info.crypto_stream_factory_, quic_stat_names_, cache, *stats_store_.rootScope(),
-        nullptr);
+        nullptr, *transport_socket_factory_);
     return session;
   }
 
@@ -294,7 +295,7 @@ public:
     registerTestServerPorts({"http"});
 
     // Initialize the transport socket factory using a customized ssl option.
-    ssl_client_option_.setAlpn(true).setSan(san_to_match_).setSni("lyft.com");
+    ssl_client_option_.setSan(san_to_match_).setSni("lyft.com");
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
     ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(stats_scope_));
@@ -303,6 +304,7 @@ public:
         quic_transport_socket_config;
     auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
     initializeUpstreamTlsContextConfig(ssl_client_option_, *tls_context);
+    tls_context->mutable_common_tls_context()->add_alpn_protocols(client_alpn_);
 
     envoy::config::core::v3::TransportSocket message;
     message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
@@ -405,6 +407,7 @@ protected:
   bool validation_failure_on_path_response_{false};
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
+  std::string client_alpn_;
 };
 
 class QuicHttpIntegrationTest : public QuicHttpIntegrationTestBase,
@@ -1527,6 +1530,31 @@ TEST_P(QuicHttpIntegrationTest, InvalidTrailer) {
   EXPECT_FALSE(response->complete());
 }
 
+TEST_P(QuicHttpIntegrationTest, AlpnProtocolMismatch) {
+  client_alpn_ = "h3-special";
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client_->disconnected());
+  EXPECT_EQ(quic::QUIC_HANDSHAKE_FAILED,
+            static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->error());
+  EXPECT_THAT(codec_client_->connection()->transportFailureReason(),
+              testing::HasSubstr("no application protocol"));
+}
+
+TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
+  client_alpn_ = "h3-special";
+  custom_alpns_ = {"h3", "h3-special"};
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
+            codec_client_->connection()->requestedServerName());
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {
@@ -1717,7 +1745,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
 
   // Modify 1st transport socket factory to disable early data.
   ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
-  new_config_helper.addQuicDownstreamTransportSocketConfig(/*enable_early_data=*/false);
+  new_config_helper.addQuicDownstreamTransportSocketConfig(/*enable_early_data=*/false, {});
 
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);

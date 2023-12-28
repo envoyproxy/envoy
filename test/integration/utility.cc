@@ -258,7 +258,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
           quic_transport_socket_factory.clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(addr->ip()->port())),
       *dispatcher, addr, local_address, quic_stat_names, {}, *mock_stats_store.rootScope(), nullptr,
-      nullptr, generator);
+      nullptr, generator, quic_transport_socket_factory);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
                                options);
