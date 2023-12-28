@@ -44,17 +44,16 @@ message AwsRequestSigning {
   //
   // Example: us-west-2
   //
-  // If region is unspecified and signing_algorithm = aws_sigv4 (or the signing_algorithm is unspecified),
-  // the region will be taken from the aws profile
-  //
   // When signing_algorithm = aws_sigv4a the region is used as a region set.
   //
   // A region set is a comma separated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
   // or even region strings containing wildcards such as ``us-east-*``
   //
+  // Example: '*'
+  //
   // By configuring a region set, a sigv4a signed request can be sent to multiple regions, rather than being
   // valid for only a single region destination.
-  string region = 2;
+  string region = 2 [(validate.rules).string = {min_len: 1}];
 
   // Indicates that before signing headers, the host header will be swapped with
   // this value. If not set or empty, the original host header value
