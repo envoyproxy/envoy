@@ -323,6 +323,9 @@ new_features:
 - area: lua
   change: |
     Added lua extension of router cluster specifier plugin to support selecting cluster dynamically by lua code.
+- area: redis
+  change: |
+    Added support for the getdel command.
 
 deprecated:
 - area: wasm
