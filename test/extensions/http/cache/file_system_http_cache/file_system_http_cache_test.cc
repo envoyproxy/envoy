@@ -12,7 +12,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 #include "test/extensions/common/async_files/mocks.h"
-#include "test/extensions/filters/http/cache/common.h"
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
