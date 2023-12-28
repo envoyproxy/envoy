@@ -122,7 +122,7 @@ jobs:
             export DEVELOPER_DIR=/Applications/Xcode_14.1.app
             ./ci/mac_ci_setup.sh
           steps-pre: |
-            - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0
+            - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0  # v3.13.0
               with:
                 java-version: '8'
                 java-package: jdk
