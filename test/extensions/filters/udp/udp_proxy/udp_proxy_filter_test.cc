@@ -2081,7 +2081,7 @@ TEST(TunnelingConfigImplTest, HeadersToAdd) {
 
   auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
   config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
-  EXPECT_EQ("test_val", headers.getByKey("test_key"));
+  EXPECT_EQ("test_val", headers.get_("test_key"));
 }
 
 TEST(TunnelingConfigImplTest, ProxyHostFromFilterState) {

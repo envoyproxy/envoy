@@ -223,13 +223,8 @@ Filter::~Filter() {
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
 
-  const Formatter::HttpFormatterContext log_context{
-      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpConnectionEnd};
-
   // Flush the final end stream access log entry.
-  for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(log_context, getStreamInfo());
-  }
+  flushAccessLog(AccessLog::AccessLogType::TcpConnectionEnd);
 
   ASSERT(generic_conn_pool_ == nullptr);
   ASSERT(upstream_ == nullptr);
@@ -854,12 +849,7 @@ void Filter::onUpstreamConnection() {
   }
 
   if (config_->flushAccessLogOnConnected()) {
-    const Formatter::HttpFormatterContext log_context{
-        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpUpstreamConnected};
-
-    for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(log_context, getStreamInfo());
-    }
+    flushAccessLog(AccessLog::AccessLogType::TcpUpstreamConnected);
   }
 }
 
@@ -882,18 +872,21 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
-  const Formatter::HttpFormatterContext log_context{
-      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpPeriodic};
-
-  for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(log_context, getStreamInfo());
-  }
+  flushAccessLog(AccessLog::AccessLogType::TcpPeriodic);
   const SystemTime now = read_callbacks_->connection().dispatcher().timeSource().systemTime();
   getStreamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
   if (getStreamInfo().getUpstreamBytesMeter()) {
     getStreamInfo().getUpstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
   }
   resetAccessLogFlushTimer();
+}
+
+void Filter::flushAccessLog(AccessLog::AccessLogType access_log_type) {
+  const Formatter::HttpFormatterContext log_context{nullptr, nullptr, nullptr, {}, access_log_type};
+
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(log_context, getStreamInfo());
+  }
 }
 
 void Filter::resetAccessLogFlushTimer() {

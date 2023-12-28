@@ -34,6 +34,7 @@ on:
           --volume=${PWD}:/source
           --volume=${TMP_ENTRYPOINT}:/tmp/mobile-entrypoint.sh
           --volume=/tmp/cache:/root/.cache
+          --volume=/tmp/container-output:/tmp/container-output
           --workdir=/source/mobile
           --entrypoint=/tmp/mobile-entrypoint.sh
           -e GITHUB_TOKEN
@@ -68,6 +69,9 @@ on:
         default: |
           NOTICE
           Streaming build results
+      output-path:
+        type: string
+        default: /tmp/container-output
       rbe:
         type: boolean
         default: true
@@ -137,8 +141,10 @@ jobs:
       downloads: ${{ inputs.downloads }}
       error-match: ${{ inputs.error-match }}
       notice-match: ${{ inputs.notice-match }}
+      output-path: ${{ inputs.output-path }}
       request: ${{ inputs.request }}
       source: ${{ inputs.source }}
+      steps-pre: ${{ inputs.steps-pre }}
       steps-post: ${{ inputs.steps-post }}
       target: ${{ inputs.target }}
       trusted: ${{ fromJSON(inputs.request).request.trusted }}
