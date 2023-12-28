@@ -172,9 +172,7 @@ class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
                                  public Configuration::TransportSocketFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
-      : server_(server), server_scope_(server_.stats().createScope("")),
-        filter_config_provider_manager_(
-            std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
+      : server_(server), server_scope_(server_.stats().createScope("")) {}
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
@@ -203,10 +201,6 @@ public:
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
-  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr
-  downstreamHttpFilterConfigProviderManager() override {
-    return filter_config_provider_manager_;
-  }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
@@ -228,7 +222,6 @@ public:
 private:
   Instance& server_;
   Stats::ScopeSharedPtr server_scope_;
-  Configuration::DownstreamHTTPFilterConfigProviderManagerSharedPtr filter_config_provider_manager_;
 };
 
 /**

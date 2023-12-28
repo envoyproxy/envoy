@@ -92,7 +92,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
             const auto& key = header_values[i];
             const auto& value = header_values[i + 1];
             if (value.length() > 0) {
-              headers.setCopy(Http::LowerCaseString(key), value);
+              headers.addCopy(Http::LowerCaseString(key), value);
             }
           }
         };

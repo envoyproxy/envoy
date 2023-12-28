@@ -280,7 +280,8 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
 }
 
 void AsyncRequestImpl::initialize() {
-  child_span_->injectContext(request_->headers(), nullptr);
+  Tracing::HttpTraceContext trace_context(request_->headers());
+  child_span_->injectContext(trace_context, nullptr);
   sendHeaders(request_->headers(), request_->body().length() == 0);
   if (request_->body().length() != 0) {
     // It's possible this will be a no-op due to a local response synchronously generated in
@@ -291,7 +292,8 @@ void AsyncRequestImpl::initialize() {
 }
 
 void AsyncOngoingRequestImpl::initialize() {
-  child_span_->injectContext(*request_headers_, nullptr);
+  Tracing::HttpTraceContext trace_context(*request_headers_);
+  child_span_->injectContext(trace_context, nullptr);
   sendHeaders(*request_headers_, false);
 }
 

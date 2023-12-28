@@ -23,7 +23,7 @@ public:
   explicit TraceContextWriter(Tracing::TraceContext& context) : context_(context) {}
 
   void set(datadog::tracing::StringView key, datadog::tracing::StringView value) override {
-    context_.setByKey(key, value);
+    context_.set(key, value);
   }
 
 private:
