@@ -33,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -520,6 +520,9 @@ message HttpConnectionManager {
   //
   // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
   RequestIDExtension request_id_extension = 36;
+
+  // If true, envoy will retain keep-alive response headers from upstream for http1.1
+  bool retain_keepalive_response_header = 37;
 }
 
 message Rds {

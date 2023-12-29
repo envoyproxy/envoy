@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 57]
+// [#next-free-field: 58]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -891,6 +891,9 @@ message HttpConnectionManager {
   // This should be set to ``false`` in cases where Envoy's view of the downstream address may not correspond to the
   // actual client address, for example, if there's another proxy in front of the Envoy.
   google.protobuf.BoolValue add_proxy_protocol_connection_state = 53;
+
+  // If true, envoy will retain keep-alive response headers from upstream for http1.1
+  bool retain_keepalive_response_header = 57;
 }
 
 // The configuration to customize local reply returned by Envoy.

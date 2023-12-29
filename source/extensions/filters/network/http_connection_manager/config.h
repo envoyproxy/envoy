@@ -204,6 +204,7 @@ public:
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
+  bool retainKeepAliveResponseHeader() const override { return retain_keepalive_response_header_; }
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return *internal_address_config_;
   }
@@ -296,6 +297,7 @@ private:
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
+  const bool retain_keepalive_response_header_{};
   const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;
   const uint32_t xff_num_trusted_hops_;
   const bool skip_xff_append_;

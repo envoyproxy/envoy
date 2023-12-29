@@ -104,7 +104,7 @@ new_features:
 - area: http
   change: |
     added a :ref:`retain_keepalive_response_header
-    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.retain_keepalive_response_header>` configuration option to retain
-    keep-alive settings from upstream to client for HTTP/1.1.
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.retain_keepalive_response_header>` set
+    to true) to retain keep-alive settings from upstream  for HTTP/1.1.
 
 deprecated:
