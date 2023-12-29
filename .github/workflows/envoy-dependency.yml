@@ -50,16 +50,16 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/appauth@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       with:
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/bson@actions-v0.2.20
+    - uses: envoyproxy/toolshed/gh-actions/bson@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       id: update
       name: Update dependency (${{ inputs.dependency }})
       with:
@@ -94,13 +94,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.2.20
+    - uses: envoyproxy/toolshed/gh-actions/upload/diff@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       name: Upload diff
       with:
         name: ${{ inputs.dependency }}-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr }}
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/github/pr@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       with:
         base: main
         body: |
@@ -131,11 +131,11 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/appauth@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.20
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -143,7 +143,7 @@ jobs:
           path: envoy
           fetch-depth: 0
         token: ${{ steps.appauth.outputs.token }}
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
       name: Checkout Envoy build tools repository
       with:
         repository: envoyproxy/envoy-build-tools
@@ -177,7 +177,7 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/docker/shas@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       with:
         images: |
            sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
@@ -206,7 +206,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/github/pr@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       with:
         base: main
         body: Created by Envoy dependency bot
@@ -235,7 +235,7 @@ jobs:
       issues: write
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
     - name: Run dependency checker
       run: |
         TODAY_DATE=$(date -u -I"date")
