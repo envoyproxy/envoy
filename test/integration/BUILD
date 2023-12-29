@@ -368,16 +368,14 @@ envoy_py_test(
     }),
     args = [
         "--envoy-binary=$(location :hotrestart_main)",
-        "--ca-certs=$(location //test/config/integration/certs:cacert.pem)",
-        "--server-cert=$(location //test/config/integration/certs:servercert.pem)",
-        "--server-key=$(location //test/config/integration/certs:serverkey.pem)",
         "--h3-request=$(location //tools/h3_request)",
+        "--ca-certs=$(location //test/config/integration/certs:cacert.pem)",
+        "--ca-key=$(location //test/config/integration/certs:cakey.pem)",
     ],
     data = [
         ":hotrestart_main",
         "//test/config/integration/certs:cacert.pem",
-        "//test/config/integration/certs:servercert.pem",
-        "//test/config/integration/certs:serverkey.pem",
+        "//test/config/integration/certs:cakey.pem",
         "//tools/h3_request",
     ],
     main = select({
@@ -392,6 +390,7 @@ envoy_py_test(
     ],
     deps = [
         requirement("aiohttp"),
+        requirement("cryptography"),
     ],
 )
 

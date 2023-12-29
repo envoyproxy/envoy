@@ -16,7 +16,8 @@ import os
 import pathlib
 import random
 import sys
-from typing import AsyncIterator, Awaitable
+import tempfile
+from typing import Awaitable
 import unittest
 from datetime import datetime, timedelta
 from aiohttp import client_exceptions, web, ClientSession
@@ -61,11 +62,6 @@ ENVOY_ADMIN_PORT = 54324
 # the socket path too long.
 SOCKET_PATH = f"@envoy_domain_socket_{os.getpid()}"
 SOCKET_MODE = 0
-ENVOY_BINARY = ""  # Populated from args
-CA_CERT_PATH = ""  # Populated from args
-CERTIFICATE_PATH = ""  # Populated from args
-CERTIFICATE_KEY_PATH = ""  # Populated from args
-H3_REQUEST_BINARY = ""  # Populated from args
 
 # This log config makes logs interleave with other test output, which
 # is useful since with all the async operations it can be hard to figure
@@ -129,7 +125,7 @@ class LineGenerator:
 
     @abc.abstractmethod
     async def generator(self) -> None:
-        pass
+        raise NotImplementedError
 
     def __init__(self):
         self._task
@@ -152,8 +148,8 @@ class Http3RequestLineGenerator(LineGenerator):
 
     async def generator(self) -> None:
         proc = await asyncio.create_subprocess_exec(
-            H3_REQUEST_BINARY,
-            f"--ca-certs={CA_CERT_PATH}",
+            IntegrationTest.h3_request,
+            f"--ca-certs={IntegrationTest.ca_certs}",
             self._url,
             stdout=asyncio.subprocess.PIPE,
         )
@@ -182,7 +178,10 @@ def _full_http3_request(url: str) -> Awaitable[str]:
 
     async def req() -> str:
         proc = await asyncio.create_subprocess_exec(
-            H3_REQUEST_BINARY, f"--ca-certs={CA_CERT_PATH}", url, stdout=asyncio.subprocess.PIPE)
+            IntegrationTest.h3_request,
+            f"--ca-certs={IntegrationTest.ca_certs}",
+            url,
+            stdout=asyncio.subprocess.PIPE)
         (stdout, _) = await proc.communicate()
         await proc.wait()
         return stdout.decode('utf-8')
@@ -229,8 +228,7 @@ def filter_chains(codec_type: str = "AUTO") -> str:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
 
-
-def _make_envoy_config_yaml(upstream_port, file_path):
+def _make_envoy_config_yaml(upstream_port: int, file_path: pathlib.Path):
     file_path.write_text(
         f"""
 admin:
@@ -256,9 +254,9 @@ static_resources:
             common_tls_context:
               tls_certificates:
               - certificate_chain:
-                  filename: "{CERTIFICATE_PATH}"
+                  filename: "{IntegrationTest.server_cert}"
                 private_key:
-                  filename: "{CERTIFICATE_KEY_PATH}"
+                  filename: "{IntegrationTest.server_key}"
     udp_listener_config:
       quic_options: {"{}"}
       downstream_socket_config:
@@ -305,6 +303,11 @@ async def _wait_for_envoy_epoch(i: int):
 
 
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):
+    server_cert: pathlib.Path
+    server_key: pathlib.Path
+    ca_certs: pathlib.Path
+    h3_request: pathlib.Path
+    envoy_binary: pathlib.Path
 
     async def asyncSetUp(self) -> None:
         print(os.environ)
@@ -315,7 +318,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         _make_envoy_config_yaml(upstream_port=UPSTREAM_SLOW_PORT, file_path=self.slow_config_path)
         _make_envoy_config_yaml(upstream_port=UPSTREAM_FAST_PORT, file_path=self.fast_config_path)
         self.base_envoy_args = [
-            ENVOY_BINARY,
+            IntegrationTest.envoy_binary,
             "--socket-path",
             SOCKET_PATH,
             "--socket-mode",
@@ -345,7 +348,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "-c",
             self.slow_config_path,
         )
-        log.info(f"cert path = {CERTIFICATE_PATH}")
+        log.info(f"cert path = {IntegrationTest.server_cert}")
         log.info("waiting for envoy ready")
         await _wait_for_envoy_epoch(0)
         log.info("making requests")
@@ -406,20 +409,84 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         envoy_process_2.terminate()
         await envoy_process_2.wait()
 
+def generate_server_cert(ca_key_path: pathlib.Path, ca_cert_path: pathlib.Path) -> "tuple[pathlib.Path, pathlib.Path]":
+    """Generates a temporary key and cert pem file and returns the paths.
 
-if __name__ == '__main__':
+    This is necessary because the http3 client validates that the server
+    certificate matches the host of the request, and our host is an
+    arbitrary randomized 127.x.y.z IP address to reduce the likelihood
+    of port collisions during testing. We therefore must use a generated
+    certificate that really matches the host IP.
+    """
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
+    from ipaddress import ip_address
+
+    with open(ca_key_path, "rb") as ca_key_file:
+        ca_key = serialization.load_pem_private_key(
+            ca_key_file.read(),
+            password=None,
+        )
+    with open(ca_cert_path, "rb") as ca_cert_file:
+        ca_cert = x509.load_pem_x509_certificate(ca_cert_file.read())
+
+    key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend(),
+    )
+
+    hostname = "testhost"
+    name = x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, hostname)])
+    alt_names = [x509.DNSName(hostname)]
+    alt_names.append(x509.IPAddress(ip_address(ENVOY_HOST)))
+    san = x509.SubjectAlternativeName(alt_names)
+    basic_constraints = x509.BasicConstraints(ca=True, path_length=0)
+    now = datetime.utcnow()
+    cert = (
+        x509.CertificateBuilder()  # Comment to keep linter from uglifying!
+        .subject_name(name)
+        .issuer_name(ca_cert.subject)
+        .public_key(key.public_key())
+        .serial_number(1)
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=30))
+        .add_extension(basic_constraints, False)
+        .add_extension(san, False)
+        .sign(ca_key, hashes.SHA256(), default_backend())
+    )
+    cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
+    key_pem = key.private_bytes(encoding=serialization.Encoding.PEM,
+                                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                                encryption_algorithm=serialization.NoEncryption())
+    cert_file = tempfile.NamedTemporaryFile(suffix="_key.pem", delete=False, dir=os.environ["TEST_TMPDIR"])
+    cert_file.write(cert_pem)
+    cert_file.close()
+    key_file = tempfile.NamedTemporaryFile(suffix="_cert.pem", delete=False, dir=os.environ["TEST_TMPDIR"])
+    key_file.write(key_pem)
+    key_file.close()
+    return key_file.name, cert_file.name
+
+
+def main():
     parser = argparse.ArgumentParser(description="Hot restart handoff test")
     parser.add_argument("--envoy-binary", type=str, required=True)
-    parser.add_argument("--ca-certs", type=str, required=True)
-    parser.add_argument("--server-key", type=str, required=True)
-    parser.add_argument("--server-cert", type=str, required=True)
     parser.add_argument("--h3-request", type=str, required=True)
+    parser.add_argument("--ca-certs", type=str, required=True)
+    parser.add_argument("--ca-key", type=str, required=True)
     # unittest also parses some args, so we strip out the ones we're using
     # and leave the rest for unittest to consume.
     (args, sys.argv[1:]) = parser.parse_known_args()
-    ENVOY_BINARY = args.envoy_binary
-    CA_CERT_PATH = args.ca_certs
-    CERTIFICATE_PATH = args.server_cert
-    CERTIFICATE_KEY_PATH = args.server_key
-    H3_REQUEST_BINARY = args.h3_request
+    (IntegrationTest.server_key, IntegrationTest.server_cert) = generate_server_cert(args.ca_key, args.ca_certs)
+    IntegrationTest.ca_certs = args.ca_certs
+    IntegrationTest.h3_request = args.h3_request
+    IntegrationTest.envoy_binary = args.envoy_binary
+    
     unittest.main()
+
+if __name__ == '__main__':
+    main()
