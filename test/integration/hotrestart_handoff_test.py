@@ -83,7 +83,7 @@ class Upstream:
         self.port = UPSTREAM_FAST_PORT if fast_version else UPSTREAM_SLOW_PORT
         self.app = web.Application()
         self.app.add_routes([
-            web.get('/', self.fast_response) if fast_version else web.get('/', self.slow_response),
+            web.get("/", self.fast_response) if fast_version else web.get("/", self.slow_response),
         ])
 
     async def start(self):
@@ -99,12 +99,16 @@ class Upstream:
 
     async def fast_response(self, request):
         return web.Response(
-            status=200, reason='OK', headers={'content-type': 'text/plain'}, body='fast instance')
+            status=200,
+            reason="OK",
+            headers={"content-type": "text/plain"},
+            body="fast instance",
+        )
 
     async def slow_response(self, request):
         log.debug("slow request received")
         response = web.StreamResponse(
-            status=200, reason='OK', headers={'content-type': 'text/plain'})
+            status=200, reason="OK", headers={"content-type": "text/plain"})
         await response.prepare(request)
         await response.write(b"start\n")
         await asyncio.sleep(STARTUP_TOLERANCE_SECONDS + 0.5)
@@ -181,10 +185,11 @@ def _full_http3_request(url: str) -> Awaitable[str]:
             IntegrationTest.h3_request,
             f"--ca-certs={IntegrationTest.ca_certs}",
             url,
-            stdout=asyncio.subprocess.PIPE)
+            stdout=asyncio.subprocess.PIPE,
+        )
         (stdout, _) = await proc.communicate()
         await proc.wait()
-        return stdout.decode('utf-8')
+        return stdout.decode("utf-8")
 
     task = asyncio.create_task(req())
     return task
@@ -227,6 +232,7 @@ def filter_chains(codec_type: str = "AUTO") -> str:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
+
 
 def _make_envoy_config_yaml(upstream_port: int, file_path: pathlib.Path):
     file_path.write_text(
@@ -380,8 +386,10 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
                          ] + [_full_http3_request(srequest_url) for i in range(PARALLEL_REQUESTS)]
         for response in fast_responses:
             self.assertEqual(
-                await response, "fast instance",
-                "new requests after hot restart begins should go to new cluster")
+                await response,
+                "fast instance",
+                "new requests after hot restart begins should go to new cluster",
+            )
 
         # Now wait for the slow request to complete, and make sure it still gets the
         # response from the old instance.
@@ -391,8 +399,9 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await response.line(), b"end\n")
         t2 = datetime.now()
         self.assertGreater(
-            (t2 - t1).total_seconds(), 0.5,
-            "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior"
+            (t2 - t1).total_seconds(),
+            0.5,
+            "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior",
         )
         for response in slow_responses:
             self.assertEquals(await response.join(), 0)
@@ -403,13 +412,18 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
                          ] + [_full_http3_request(srequest_url) for i in range(PARALLEL_REQUESTS)]
         for response in fast_responses:
             self.assertEqual(
-                await response, "fast instance",
-                "new requests after old instance terminates should go to new cluster")
+                await response,
+                "fast instance",
+                "new requests after old instance terminates should go to new cluster",
+            )
         log.info("shutting child instance down")
         envoy_process_2.terminate()
         await envoy_process_2.wait()
 
-def generate_server_cert(ca_key_path: pathlib.Path, ca_cert_path: pathlib.Path) -> "tuple[pathlib.Path, pathlib.Path]":
+
+def generate_server_cert(
+        ca_key_path: pathlib.Path,
+        ca_cert_path: pathlib.Path) -> "tuple[pathlib.Path, pathlib.Path]":
     """Generates a temporary key and cert pem file and returns the paths.
 
     This is necessary because the http3 client validates that the server
@@ -449,24 +463,22 @@ def generate_server_cert(ca_key_path: pathlib.Path, ca_cert_path: pathlib.Path) 
     now = datetime.utcnow()
     cert = (
         x509.CertificateBuilder()  # Comment to keep linter from uglifying!
-        .subject_name(name)
-        .issuer_name(ca_cert.subject)
-        .public_key(key.public_key())
-        .serial_number(1)
-        .not_valid_before(now)
-        .not_valid_after(now + timedelta(days=30))
-        .add_extension(basic_constraints, False)
-        .add_extension(san, False)
-        .sign(ca_key, hashes.SHA256(), default_backend())
-    )
+        .subject_name(name).issuer_name(ca_cert.subject).public_key(key.public_key()).serial_number(
+            1).not_valid_before(now).not_valid_after(now + timedelta(days=30)).add_extension(
+                basic_constraints,
+                False).add_extension(san, False).sign(ca_key, hashes.SHA256(), default_backend()))
     cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
-    key_pem = key.private_bytes(encoding=serialization.Encoding.PEM,
-                                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                                encryption_algorithm=serialization.NoEncryption())
-    cert_file = tempfile.NamedTemporaryFile(suffix="_key.pem", delete=False, dir=os.environ["TEST_TMPDIR"])
+    key_pem = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    cert_file = tempfile.NamedTemporaryFile(
+        suffix="_key.pem", delete=False, dir=os.environ["TEST_TMPDIR"])
     cert_file.write(cert_pem)
     cert_file.close()
-    key_file = tempfile.NamedTemporaryFile(suffix="_cert.pem", delete=False, dir=os.environ["TEST_TMPDIR"])
+    key_file = tempfile.NamedTemporaryFile(
+        suffix="_cert.pem", delete=False, dir=os.environ["TEST_TMPDIR"])
     key_file.write(key_pem)
     key_file.close()
     return key_file.name, cert_file.name
@@ -481,12 +493,14 @@ def main():
     # unittest also parses some args, so we strip out the ones we're using
     # and leave the rest for unittest to consume.
     (args, sys.argv[1:]) = parser.parse_known_args()
-    (IntegrationTest.server_key, IntegrationTest.server_cert) = generate_server_cert(args.ca_key, args.ca_certs)
+    (IntegrationTest.server_key,
+     IntegrationTest.server_cert) = generate_server_cert(args.ca_key, args.ca_certs)
     IntegrationTest.ca_certs = args.ca_certs
     IntegrationTest.h3_request = args.h3_request
     IntegrationTest.envoy_binary = args.envoy_binary
-    
+
     unittest.main()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
