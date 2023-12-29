@@ -274,9 +274,6 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  // Http1::keepAlive
-  virtual bool retainKeepAliveResponseHeader() const { return codec_settings_.retain_keepalive_response_header_; }
-
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
                  MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);

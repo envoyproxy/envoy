@@ -2251,10 +2251,11 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHo
   EXPECT_EQ("80", headers.getForwardedPortValue());
 }
 
-/*TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersForHttp11) {
+TEST_F(ConnectionManagerUtilityTest, RetainKeepAliveProxyResponseHeadersForHttp11) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60, max=1000"},
                                                    {"proxy-connection", "proxy-header"}};
+  ON_CALL(config_, retainKeepAliveResponseHeader()).WillByDefault(Return(true));
   EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
                                                   Protocol::Http11, config_, "",
@@ -2268,8 +2269,6 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHo
 
 TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyResponseHeadersHttp11) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60, max=1000"},
                                                    {"proxy-connection", "proxy-header"}};
@@ -2287,6 +2286,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveKeepAliveProxyResponseHeadersHttp11) 
 // Don't remove connection keep-alive headers for h11 as tomcat/java relies on this.
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeaderHttp11) {
   TestRequestHeaderMapImpl request_headers{{"connection", "keep-alive"}};
+  ON_CALL(config_, retainKeepAliveResponseHeader()).WillByDefault(Return(true));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(request_headers, Protocol::Http11));
@@ -2297,12 +2297,10 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionKeepAliveRequestHeader
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionKeepAliveRequestHeaderHttp11) {
   TestRequestHeaderMapImpl request_headers{{"connection", "keep-alive"}};
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.retain_keepalive_header_http11", "false"}});
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(request_headers, Protocol::Http11));
   EXPECT_FALSE(request_headers.has("connection"));
-}*/
+}
 
 } // namespace Http
 } // namespace Envoy

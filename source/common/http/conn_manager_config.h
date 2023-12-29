@@ -538,6 +538,11 @@ public:
    *         Connection Lifetime.
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
+
+  /**
+   * @return Retain keepalive response header for http1.1.
+   */
+  virtual bool retainKeepAliveResponseHeader() const PURE;
 };
 } // namespace Http
 } // namespace Envoy
