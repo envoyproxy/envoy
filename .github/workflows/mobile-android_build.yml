@@ -75,9 +75,9 @@ jobs:
       target: kotlin-hello-world
       runs-on: envoy-x64-small
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.20
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.20
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
           with:
             apk: bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
             app: io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
@@ -104,7 +104,7 @@ jobs:
       target: ${{ matrix.target }}
       runs-on: envoy-x64-small
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.20
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       steps-post: ${{ matrix.steps-post }}
       timeout-minutes: 50
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
@@ -115,7 +115,7 @@ jobs:
         include:
         - name: java-hello-world
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.20
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
               with:
                 apk: bazel-bin/examples/java/hello_world/hello_envoy.apk
                 app: io.envoyproxy.envoymobile.helloenvoy/.MainActivity
@@ -134,7 +134,7 @@ jobs:
             --config=mobile-remote-release-clang-android
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.20
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
               with:
                 apk: bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
@@ -149,7 +149,7 @@ jobs:
             --config=mobile-remote-release-clang-android
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.20
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
               with:
                 apk: bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity

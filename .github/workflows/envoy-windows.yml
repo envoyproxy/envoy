@@ -97,10 +97,10 @@ jobs:
           image-tag: ltsc2022
     runs-on: ${{ matrix.runs-on }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
       with:
         ref: ${{ needs.load.outputs.repo_ref  }}
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a  # v3.0.2
       with:
         name: windows.release
     - run: |
