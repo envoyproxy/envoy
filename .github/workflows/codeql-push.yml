@@ -26,13 +26,13 @@ jobs:
 
     steps:
     - name: Pre-cleanup
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/diskspace@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
       with:
         to_remove: |
           /usr/local/lib/android
 
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
 
     - name: Get build targets
       run: |
@@ -43,7 +43,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@cdcdbb579706841c47f7063dda365e292e5cad7a
+      uses: github/codeql-action/init@cdcdbb579706841c47f7063dda365e292e5cad7a  # v2.13.4
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -76,4 +76,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: env.BUILD_TARGETS != ''
-      uses: github/codeql-action/analyze@cdcdbb579706841c47f7063dda365e292e5cad7a
+      uses: github/codeql-action/analyze@cdcdbb579706841c47f7063dda365e292e5cad7a  # v2.13.4
