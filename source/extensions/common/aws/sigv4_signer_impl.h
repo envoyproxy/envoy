@@ -33,7 +33,7 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 
 /**
  * Implementation of the Signature V4 signing process.
- * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
+ * See https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html
  */
 class SigV4SignerImpl : public SignerBaseImpl {
 public:

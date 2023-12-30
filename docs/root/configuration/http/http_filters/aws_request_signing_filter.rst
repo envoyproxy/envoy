@@ -67,8 +67,8 @@ An example of configuring this filter to use ``aws_sigv4a`` signing with a wildc
 
 .. literalinclude:: _include/aws-request-signing-filter-sigv4a.yaml
     :language: yaml
-    :lines: 25-35
-    :lineno-start: 25
+    :lines: 26-36
+    :lineno-start: 26
     :linenos:
     :caption: :download:`aws-request-signing-filter-sigv4a.yaml <_include/aws-request-signing-filter-sigv4a.yaml>`
 

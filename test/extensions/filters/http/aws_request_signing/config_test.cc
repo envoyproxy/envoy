@@ -92,6 +92,34 @@ match_excluded_headers:
   cb(filter_callbacks);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, InvalidRegionExplicitSigningAlgorithm) {
+  const std::string yaml = R"EOF(
+service_name: s3
+signing_algorithm: aws_sigv4
+region: us-west-1,us-west-2
+host_rewrite: new-host
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  EXPECT_THROW(
+      {
+        Http::FilterFactoryCb cb =
+            factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+        Http::MockFilterChainFactoryCallbacks filter_callbacks;
+        cb(filter_callbacks);
+      },
+      EnvoyException);
+}
+
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4A) {
   const std::string yaml = R"EOF(
 service_name: s3
@@ -181,6 +209,35 @@ stat_prefix: foo_prefix
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
   ASSERT_NE(route_config, nullptr);
 }
+
+TEST(AwsRequestSigningFilterConfigTest, InvalidRegionRouteSpecificFilterConfigSigV4) {
+  const std::string yaml = R"EOF(
+aws_request_signing:
+  service_name: s3
+  signing_algorithm: aws_sigv4
+  region: '*'
+  host_rewrite: new-host
+  match_excluded_headers:
+    - prefix: x-envoy
+    - exact: foo
+    - exact: bar
+stat_prefix: foo_prefix
+  )EOF";
+
+  AwsRequestSigningProtoPerRouteConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  EXPECT_THROW(
+      {
+        const auto route_config = factory.createRouteSpecificFilterConfig(
+            proto_config, context, ProtobufMessage::getNullValidationVisitor());
+      },
+      EnvoyException);
+}
+
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters
 } // namespace Extensions

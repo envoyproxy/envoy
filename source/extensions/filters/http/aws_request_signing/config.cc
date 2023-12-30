@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
 #include <iterator>
+#include <string>
 
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
@@ -17,6 +18,15 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
+
+bool validateRegion(std::string region) {
+  for (const char& c : "*,") {
+    if (region.find(c) != std::string::npos) {
+      return false;
+    }
+  }
+  return true;
+}
 
 SigningAlgorithm getSigningAlgorithm(
     const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config) {
@@ -50,13 +60,15 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
 
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   if (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         config.service_name(), config.region(), credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
+    if (!validateRegion(config.region())) {
+      throw EnvoyException("SigV4 region string cannot contain wildcards or comma");
+    }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         config.service_name(), config.region(), credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
@@ -90,6 +102,9 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
         per_route_config.aws_request_signing().region(), credentials_provider,
         context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
+    if (!validateRegion(per_route_config.aws_request_signing().region())) {
+      throw EnvoyException("SigV4 region string cannot contain wildcards or comma");
+    }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         per_route_config.aws_request_signing().service_name(),
         per_route_config.aws_request_signing().region(), credentials_provider,

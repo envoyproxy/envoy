@@ -105,7 +105,7 @@ bool SigV4AKeyDerivation::derivePublicKey(EC_KEY* ec_key) {
   return true;
 }
 
-// adapted from
+// code based on aws sdk key derivation constant time implementations
 // https://github.com/awslabs/aws-c-auth/blob/baeffa791d9d1cf61460662a6d9ac2186aaf05df/source/key_derivation.c#L152
 
 bool SigV4AKeyDerivation::constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
