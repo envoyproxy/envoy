@@ -9,12 +9,6 @@ behavior_changes:
     the flag to false explicitly.
     See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
     issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
-- area: http
-  change: |
-    Flip runtime flag ``envoy.reloadable_features.retain_keepalive_header_http11`` to true. Retain keep alive
-    for http1.1 proxy response headers and connection keep-alive for http1.1 request headers.
-    This behavior can be temporarily reverted by setting the flag to false explicitly.
-    See issue https://github.com/envoyproxy/envoy/issues/17613 for more specific detail and examples.
 
 minor_behavior_changes:
 - area: upstream
@@ -29,6 +23,13 @@ minor_behavior_changes:
     Added new configuration field :ref:`rate_limited_as_resource_exhausted
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limited_as_resource_exhausted>`
     to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
+- area: http
+  change: |
+    added a :ref:`retain_keepalive_response_header
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.retain_keepalive_response_header>` set
+    to true) to retain keep-alive settings from upstream  for HTTP/1.1.
+    See issue https://github.com/envoyproxy/envoy/issues/17613 for more specific detail and examples.
+
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -101,10 +102,5 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a sampler for the OpenTelemetry tracer.
-- area: http
-  change: |
-    added a :ref:`retain_keepalive_response_header
-    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.retain_keepalive_response_header>` set
-    to true) to retain keep-alive settings from upstream  for HTTP/1.1.
 
 deprecated:
