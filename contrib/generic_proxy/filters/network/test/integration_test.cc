@@ -332,8 +332,8 @@ TEST_P(IntegrationTest, RequestRouteNotFound) {
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().message(),
-            "route_not_found");
+  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().code(),
+            static_cast<uint32_t>(absl::StatusCode::kNotFound));
 
   cleanup();
 }
@@ -362,7 +362,7 @@ TEST_P(IntegrationTest, RequestAndResponse) {
 
   FakeStreamCodecFactory::FakeResponse response;
   response.protocol_ = "fake_fake_fake";
-  response.status_ = Status();
+  response.status_ = StreamStatus();
   response.data_["zzzz"] = "xxxx";
 
   sendResponseForTest(response);
@@ -371,7 +371,7 @@ TEST_P(IntegrationTest, RequestAndResponse) {
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[0].response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[0].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[0].response_->get("zzzz"), "xxxx");
 
   cleanup();
@@ -464,7 +464,7 @@ TEST_P(IntegrationTest, MultipleRequests) {
 
   FakeStreamCodecFactory::FakeResponse response_2;
   response_2.protocol_ = "fake_fake_fake";
-  response_2.status_ = Status();
+  response_2.status_ = StreamStatus();
   response_2.data_["zzzz"] = "xxxx";
   response_2.data_["stream_id"] = "2";
 
@@ -474,13 +474,13 @@ TEST_P(IntegrationTest, MultipleRequests) {
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("zzzz"), "xxxx");
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("stream_id"), "2");
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
-  response_1.status_ = Status();
+  response_1.status_ = StreamStatus();
   response_1.data_["zzzz"] = "yyyy";
   response_1.data_["stream_id"] = "1";
 
@@ -490,7 +490,7 @@ TEST_P(IntegrationTest, MultipleRequests) {
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("zzzz"), "yyyy");
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("stream_id"), "1");
 
@@ -589,7 +589,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
 
   FakeStreamCodecFactory::FakeResponse response_2;
   response_2.protocol_ = "fake_fake_fake";
-  response_2.status_ = Status();
+  response_2.status_ = StreamStatus();
   response_2.data_["zzzz"] = "xxxx";
   response_2.data_["stream_id"] = "2";
   response_2.data_["end_stream"] = "false";
@@ -605,13 +605,13 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[2].response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[2].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("zzzz"), "xxxx");
   EXPECT_EQ(response_decoder_callback_->responses_[2].response_->get("stream_id"), "2");
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
-  response_1.status_ = Status();
+  response_1.status_ = StreamStatus();
   response_1.data_["zzzz"] = "yyyy";
   response_1.data_["stream_id"] = "1";
   response_1.data_["end_stream"] = "false";
@@ -627,7 +627,7 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
                  "unexpected timeout");
 
   EXPECT_NE(response_decoder_callback_->responses_[1].response_, nullptr);
-  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->responses_[1].response_->status().code(), 0);
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("zzzz"), "yyyy");
   EXPECT_EQ(response_decoder_callback_->responses_[1].response_->get("stream_id"), "1");
 
