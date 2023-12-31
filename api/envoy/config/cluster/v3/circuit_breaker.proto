@@ -97,6 +97,21 @@ message CircuitBreakers {
     // :ref:`Circuit Breaking <arch_overview_circuit_break_cluster_maximum_connection_pools>` for
     // more details.
     google.protobuf.UInt32Value max_connection_pools = 7;
+
+    // The retry admission control extension admits or rejects candidate retries based on
+    // overall traffic patterns and load across the cluster at the given priority level.
+    // This field is optional.
+    //
+    // .. note::
+    //
+    //    If this field is set, the retry admission control will override any configured
+    //    :ref:`max_retries <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_retries>` or
+    //    :ref:`retry_budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
+    //    circuit breakers.
+    //
+    // [#extension-category: envoy.retry_admission_control]
+    // [#not-implemented-hide:]
+    core.v3.TypedExtensionConfig retry_admission_control = 9;
   }
 
   // If multiple :ref:`Thresholds<envoy_v3_api_msg_config.cluster.v3.CircuitBreakers.Thresholds>`

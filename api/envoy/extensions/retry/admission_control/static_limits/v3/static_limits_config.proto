@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package envoy.extensions.retry.admission_control.static_limits.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.retry.admission_control.static_limits.v3";
+option java_outer_classname = "StaticLimitsConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/retry/admission_control/static_limits/v3;static_limitsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Static Limits Retry Admission Control]
+
+// The static limits retry admission controller prevents the total number of concurrent retries
+// to the configured upstream cluster from exceeding a set threshold.
+//
+// This is useful for preventing upstreams from being overloaded by retries.
+// The admission controller counts retries across all worker threads, but for simplicity,
+// the limits are best-effort and can potentially be exceeded by a small amount temporarily.
+//
+// Retries are counted as active as soon as they enter backoff,
+// until they are either successful (response streaming starts), or aborted.
+//
+// [#extension: envoy.retry_admission_control.static_limits]
+message StaticLimitsConfig {
+  // The maximum number of concurrent retries allowed for the upstream cluster.
+  // Attempted retries that exceed this limit will be rejected.
+  // This field is optional, the default value is 3.
+  google.protobuf.UInt64Value max_concurrent_retries = 1;
+}

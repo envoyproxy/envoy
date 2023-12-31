@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.retry.admission_control.concurrency_budget.v3;
+
+import "envoy/type/v3/percent.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.retry.admission_control.concurrency_budget.v3";
+option java_outer_classname = "ConcurrencyBudgetConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/retry/admission_control/concurrency_budget/v3;concurrency_budgetv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Concurrency Budget Retry Admission Control]
+
+// The concurrency budget retry admission controller allows for limiting the number of concurrent
+// retries that can be in flight at any given time to the same upstream cluster.
+// This is useful for preventing a single upstream cluster from being overloaded with retries.
+//
+// The concurrency budget limits the number of concurrent retries as a percentage of the total
+// number of active tries (retries or otherwise) to the cluster at the time the retry enters backoff.
+//
+// Retries are counted as active as soon as they enter backoff,
+// until they are either successful (response streaming starts) or aborted.
+//
+// Tries meanwhile include both the initial try, and all retries. The initial try is counted as
+// active as soon as it is dispatched, and remains active until the upstream stream is ended.
+//
+// [#extension: envoy.retry_admission_control.concurrency_budget]
+// [#not-implemented-hide:]
+message ConcurrencyBudgetConfig {
+  // The minimum retry concurrency limit.
+  // Any concurrency limit below this value as suggested by the percentage and number of
+  // active tries will be disregarded in favor of this value.
+  // This is important to prevent the concurrency limit from being set too low due to low traffic on the cluster.
+  //
+  // This field is optional, and defaults to 3.
+  // [#not-implemented-hide:]
+  google.protobuf.UInt64Value min_concurrent_retry_limit = 1;
+
+  // The retry budget percent.
+  // The concurrency limit is calculated as the budget percentage multiplied by the total
+  // number of active tries at the time a potential retry is scheduled.
+  // The concurrency limit is then rounded down to the nearest integer.
+  //
+  // This field is optional, and defaults to 20%.
+  // [#not-implemented-hide:]
+  type.v3.Percent budget_percent = 2;
+}
