@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.cluster.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -27,7 +28,7 @@ message CircuitBreakers {
 
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_v3_api_enum_config.core.v3.RoutingPriority>`.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message Thresholds {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
