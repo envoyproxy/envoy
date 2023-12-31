@@ -25,9 +25,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // until they are either successful (response streaming starts), or aborted.
 //
 // [#extension: envoy.retry_admission_control.static_limits]
+// [#not-implemented-hide:]
 message StaticLimitsConfig {
   // The maximum number of concurrent retries allowed for the upstream cluster.
   // Attempted retries that exceed this limit will be rejected.
   // This field is optional, the default value is 3.
+  // [#not-implemented-hide:]
   google.protobuf.UInt64Value max_concurrent_retries = 1;
 }
