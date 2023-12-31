@@ -3,10 +3,12 @@ syntax = "proto3";
 package envoy.config.cluster.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -27,7 +29,7 @@ message CircuitBreakers {
 
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_v3_api_enum_config.core.v3.RoutingPriority>`.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message Thresholds {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
@@ -70,16 +72,38 @@ message CircuitBreakers {
 
     // The maximum number of parallel retries that Envoy will allow to the
     // upstream cluster. If not specified, the default is 3.
-    google.protobuf.UInt32Value max_retries = 5;
+    // This field is deprecated in favor of retry_admission_control,
+    // specifically using the :ref:`static limits <envoy_v3_api_msg_extensions.retry.admission_control.static_limits.v3.StaticLimitsConfig>` extension.
+    google.protobuf.UInt32Value max_retries = 5
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Specifies a limit on concurrent retries in relation to the number of active requests. This
     // parameter is optional.
     //
+    // This field is deprecated in favor of retry_admission_control,
+    // specifically using the :ref:`concurrency budget <envoy_v3_api_msg_extensions.retry.admission_control.concurrency_budget.v3.ConcurrencyBudgetConfig>` extension.
+    //
     // .. note::
     //
-    //    If this field is set, the retry budget will override any configured retry circuit
-    //    breaker.
-    RetryBudget retry_budget = 8;
+    //    If this field is set, the retry budget will override any configured
+    //    :ref:`max_retries <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_retries>` circuit
+    //    breaker. However, it will not override retry_admission_control.
+    RetryBudget retry_budget = 8
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    // The retry admission control extension admits or rejects candidate retries based on
+    // overall traffic patterns and load across the cluster at the given priority level.
+    // This field is optional.
+    //
+    // .. note::
+    //
+    //    If this field is set, the retry admission control will override any configured
+    //    :ref:`max_retries <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_retries>` or
+    //    :ref:`retry_budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
+    //    circuit breakers.
+    //
+    // [#extension-category: envoy.retry_admission_control]
+    core.v3.TypedExtensionConfig retry_admission_control = 9;
 
     // If track_remaining is true, then stats will be published that expose
     // the number of resources remaining until the circuit breakers open. If

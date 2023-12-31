@@ -76,6 +76,9 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/filters/http/composite @mattklein123 @tyxia @yanavlasov
+# retry admission control
+/*/extensions/retry/admission_control/static_limits @UNOWNED @UNOWNED
+/*/extensions/retry/admission_control/concurrency_budget @UNOWNED @UNOWNED
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
 # previous hosts

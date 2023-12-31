@@ -13,6 +13,7 @@ envoy_cc_mock(
     srcs = ["cluster_info.cc"],
     hdrs = ["cluster_info.h"],
     deps = [
+        ":admission_control_mocks",
         ":transport_socket_match_mocks",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -72,6 +73,7 @@ envoy_cc_mock(
     name = "upstream_mocks",
     hdrs = ["mocks.h"],
     deps = [
+        ":admission_control_mocks",
         ":basic_resource_limit_mocks",
         ":cds_api_mocks",
         ":cluster_discovery_callback_handle_mocks",
@@ -379,5 +381,14 @@ envoy_cc_mock(
     hdrs = ["basic_resource_limit.h"],
     deps = [
         "//envoy/common:resource_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "admission_control_mocks",
+    srcs = ["admission_control.cc"],
+    hdrs = ["admission_control.h"],
+    deps = [
+        "//envoy/upstream:admission_control_interface",
     ],
 )

@@ -35,12 +35,13 @@ configure and code each application independently. Envoy supports various types 
 * **Cluster maximum requests**: The maximum number of requests that can be outstanding to all hosts
   in a cluster at any given time. If this circuit breaker overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
   counter for the cluster will increment.
-* **Cluster maximum active retries**: The maximum number of retries that can be outstanding to all
-  hosts in a cluster at any given time. In general we recommend using :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`; however, if static circuit breaking is preferred it should aggressively circuit break
-  retries. This is so that retries for sporadic failures are allowed, but the overall retry volume cannot
-  explode and cause large scale cascading failure. If this circuit breaker overflows the
-  :ref:`upstream_rq_retry_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
-  will increment.
+* **Cluster retry admission control**: This :ref:`extension point <extension_category_envoy.retry_admission_control>` can admit or reject a retry attempt
+  based on the current state of the cluster. This can be used to control the overall retry volume
+  for a cluster to prevent the retry volume from exploding and causing large scale cascading failure.
+  If this circuit breaker overflows the :ref:`upstream_rq_retry_overflow <config_cluster_manager_cluster_stats>`
+  counter for the cluster will increment.
+  In general we recommend using :ref:`concurrency budget <envoy_v3_api_msg_extensions.retry.admission_control.concurrency_budget.v3.ConcurrencyBudgetConfig>`;
+  however, if :ref:`static circuit breaking <envoy_v3_api_msg_extensions.retry.admission_control.static_limits.v3.StaticLimitsConfig>` is preferred it should aggressively circuit break retries.
 
   .. _arch_overview_circuit_break_cluster_maximum_connection_pools:
 
@@ -58,7 +59,6 @@ configure and code each application independently. Envoy supports various types 
   If this circuit breaker overflows the
   :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
   will increment.
-
 
 Each circuit breaking limit is :ref:`configurable <config_cluster_manager_cluster_circuit_breakers>`
 and tracked on a per upstream cluster and per priority basis. This allows different components of

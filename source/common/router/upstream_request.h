@@ -69,7 +69,7 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool can_send_early_data, bool can_use_http3);
+                  bool can_send_early_data, bool can_use_http3, uint64_t attempt_number);
   ~UpstreamRequest() override;
   void deleteIsPending() override { cleanUp(); }
 
@@ -152,6 +152,7 @@ public:
   bool outlierDetectionTimeoutRecorded() { return outlier_detection_timeout_recorded_; }
   void retried(bool value) { retried_ = value; }
   bool retried() { return retried_; }
+  uint64_t attemptNumber() const { return attempt_number_; }
   bool grpcRqSuccessDeferred() { return grpc_rq_success_deferred_; }
   void grpcRqSuccessDeferred(bool deferred) { grpc_rq_success_deferred_ = deferred; }
   void upstreamCanary(bool value) { upstream_canary_ = value; }
@@ -216,6 +217,8 @@ private:
 
   std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
   std::unique_ptr<Http::FilterManager> filter_manager_;
+
+  uint64_t attempt_number_;
 
   // The number of outstanding readDisable to be called with parameter value true.
   // When downstream send buffers get above high watermark before response headers arrive, we

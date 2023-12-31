@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/network/dns_resolver/cares:config",
+        "//source/extensions/retry/admission_control/static_limits:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/common/upstream:utility_lib",

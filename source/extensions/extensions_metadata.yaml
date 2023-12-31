@@ -1066,6 +1066,20 @@ envoy.retry_priorities.previous_priorities:
   status: stable
   type_urls:
   - envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
+envoy.retry_admission_control.static_limits:
+  categories:
+  - envoy.retry_admission_control
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.retry.admission_control.static_limits.v3.StaticLimitsConfig
+envoy.retry_admission_control.concurrency_budget:
+  categories:
+  - envoy.retry_admission_control
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.retry.admission_control.concurrency_budget.v3.ConcurrencyBudgetConfig
 envoy.route.early_data_policy.default:
   categories:
   - envoy.route.early_data_policy

@@ -31,7 +31,9 @@ public:
          const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
          RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
          Random::RandomGenerator& random, Event::Dispatcher& dispatcher, TimeSource& time_source,
-         Upstream::ResourcePriority priority);
+         Upstream::ResourcePriority priority,
+         Upstream::RetryStreamAdmissionController& retry_admission_controller,
+         const bool use_retry_admission_control);
   ~RetryStateImpl() override;
 
   /**
@@ -103,7 +105,9 @@ private:
                  RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
                  Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  TimeSource& time_source, Upstream::ResourcePriority priority,
-                 bool auto_configured_for_http3);
+                 bool auto_configured_for_http3,
+                 Upstream::RetryStreamAdmissionController& retry_admission_controller,
+                 const bool use_retry_admission_control);
 
   void enableBackoffTimer();
   void resetRetry();
@@ -113,7 +117,8 @@ private:
   // value indicates retry.
   RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
                                     Http3Used http3_used, bool& disable_http3);
-  RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
+  RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback,
+                          bool abort_previous_on_retry);
 
   const Upstream::ClusterInfo& cluster_;
   const VirtualCluster* vcluster_;
@@ -133,12 +138,15 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
+  Upstream::RetryStreamAdmissionController& retry_admission_controller_;
+  uint64_t attempt_number_{1};
 
   // Keep small members (bools, enums and int32s) at the end of class, to reduce alignment overhead.
   uint32_t retry_on_{};
   uint32_t retries_remaining_{};
   uint32_t host_selection_max_attempts_;
   Upstream::ResourcePriority priority_;
+  const bool use_retry_admission_control_ : 1;
   const bool auto_configured_for_http3_{};
 };
 

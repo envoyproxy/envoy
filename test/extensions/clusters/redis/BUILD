@@ -26,6 +26,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/retry/admission_control/static_limits:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",

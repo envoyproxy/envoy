@@ -307,6 +307,13 @@ EXTENSIONS = {
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 
     #
+    # Retry admission control
+    #
+
+    "envoy.retry_admission_control.static_limits": "//source/extensions/retry/admission_control/static_limits:config",
+    "envoy.retry_admission_control.concurrency_budget": "//source/extensions/retry/admission_control/concurrency_budget:config",
+
+    #
     # CacheFilter plugins
     #
     "envoy.extensions.http.cache.file_system_http_cache": "//source/extensions/http/cache/file_system_http_cache:config",

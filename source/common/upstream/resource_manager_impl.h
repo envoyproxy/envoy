@@ -12,28 +12,28 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/basic_resource_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
 
 struct ManagedResourceImpl : public BasicResourceLimitImpl {
   ManagedResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
-                      Stats::Gauge& open_gauge, Stats::Gauge& remaining)
+                      Stats::Gauge& open_gauge, Stats::Gauge& remaining,
+                      const absl::optional<std::string> avoid_stats_feature_key = absl::nullopt)
       : BasicResourceLimitImpl(max, runtime, runtime_key), open_gauge_(open_gauge),
-        remaining_(remaining) {
-    remaining_.set(max);
+        remaining_(remaining), avoid_stats_feature_key_(avoid_stats_feature_key) {
+    updateStats();
   }
 
   // BasicResourceLimitImpl
   void inc() override {
     BasicResourceLimitImpl::inc();
-    updateRemaining();
-    open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
+    updateStats();
   }
   void decBy(uint64_t amount) override {
     BasicResourceLimitImpl::decBy(amount);
-    updateRemaining();
-    open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
+    updateStats();
   }
 
   /**
@@ -41,13 +41,18 @@ struct ManagedResourceImpl : public BasicResourceLimitImpl {
    * though atomics are used, it is possible for the current resource count
    * to be greater than the supplied max.
    */
-  void updateRemaining() {
+  void updateStats() {
+    if (avoid_stats_feature_key_.has_value() &&
+        Runtime::runtimeFeatureEnabled(*avoid_stats_feature_key_)) {
+      return;
+    }
     /**
      * We cannot use std::max here because max() and current_ are
      * unsigned and subtracting them may overflow.
      */
     const uint64_t current_copy = current_;
     remaining_.set(max() > current_copy ? max() - current_copy : 0);
+    open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
   }
 
   /**
@@ -60,6 +65,8 @@ struct ManagedResourceImpl : public BasicResourceLimitImpl {
    * The number of resources remaining before the circuit breaker opens.
    */
   Stats::Gauge& remaining_;
+
+  const absl::optional<std::string> avoid_stats_feature_key_;
 };
 
 /**
@@ -90,8 +97,8 @@ public:
         max_connections_per_host_(max_connections_per_host),
         retries_(budget_percent, min_retry_concurrency, max_retries, runtime,
                  runtime_key + "retry_budget.", runtime_key + "max_retries",
-                 cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_,
-                 pending_requests_) {}
+                 cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_, pending_requests_,
+                 "envoy.reloadable_features.use_retry_admission_control") {}
 
   // Upstream::ResourceManager
   ResourceLimit& connections() override { return connections_; }
@@ -109,13 +116,15 @@ private:
                     Runtime::Loader& runtime, const std::string& retry_budget_runtime_key,
                     const std::string& max_retries_runtime_key, Stats::Gauge& open_gauge,
                     Stats::Gauge& remaining, const ResourceLimit& requests,
-                    const ResourceLimit& pending_requests)
-        : runtime_(runtime),
-          max_retry_resource_(max_retries, runtime, max_retries_runtime_key, open_gauge, remaining),
+                    const ResourceLimit& pending_requests,
+                    const std::string& avoid_stats_feature_key)
+        : runtime_(runtime), max_retry_resource_(max_retries, runtime, max_retries_runtime_key,
+                                                 open_gauge, remaining, avoid_stats_feature_key),
           budget_percent_(budget_percent), min_retry_concurrency_(min_retry_concurrency),
           budget_percent_key_(retry_budget_runtime_key + "budget_percent"),
           min_retry_concurrency_key_(retry_budget_runtime_key + "min_retry_concurrency"),
-          requests_(requests), pending_requests_(pending_requests), remaining_(remaining) {}
+          requests_(requests), pending_requests_(pending_requests), remaining_(remaining),
+          avoid_stats_feature_key_(avoid_stats_feature_key) {}
 
     // Envoy::ResourceLimit
     bool canCreate() override {
@@ -168,7 +177,7 @@ private:
     // they would dependent on other resources that can change without a call to this object.
     // Therefore, the gauge should just be reset to 0.
     void clearRemainingGauge() {
-      if (useRetryBudget()) {
+      if (!Runtime::runtimeFeatureEnabled(avoid_stats_feature_key_) && useRetryBudget()) {
         remaining_.set(0);
       }
     }
@@ -184,6 +193,7 @@ private:
     const ResourceLimit& requests_;
     const ResourceLimit& pending_requests_;
     Stats::Gauge& remaining_;
+    const std::string avoid_stats_feature_key_;
   };
 
   ManagedResourceImpl connections_;

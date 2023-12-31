@@ -391,6 +391,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admission_control_lib",
+    hdrs = ["admission_control_impl.h"],
+    deps = [
+        "//envoy/upstream:admission_control_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "thread_aware_lb_lib",
     srcs = ["thread_aware_lb_impl.cc"],
     hdrs = ["thread_aware_lb_impl.h"],
@@ -422,6 +431,8 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/retry/admission_control/static_limits/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/retry/admission_control/concurrency_budget/v3:pkg_cc_proto",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:dns_interface",
@@ -471,6 +482,7 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_synchronization"],
     deps = [
+        ":admission_control_lib",
         ":load_balancer_lib",
         ":resource_manager_lib",
         ":upstream_factory_context_lib",
@@ -545,6 +557,7 @@ envoy_cc_library(
     name = "cluster_factory_includes",
     hdrs = ["cluster_factory_impl.h"],
     deps = [
+        ":admission_control_lib",
         ":load_balancer_lib",
         ":outlier_detection_lib",
         ":resource_manager_lib",

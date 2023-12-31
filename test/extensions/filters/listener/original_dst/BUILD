@@ -31,6 +31,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/retry/admission_control/static_limits:config",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",

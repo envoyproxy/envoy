@@ -101,6 +101,7 @@ categories:
 - envoy.resource_monitors
 - envoy.retry_host_predicates
 - envoy.retry_priorities
+- envoy.retry_admission_control
 - envoy.route.early_data_policy
 - envoy.stats_sinks
 - envoy.thrift_proxy.filters

@@ -33,7 +33,8 @@ public:
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
                                  RouteStatsContextOptRef, Runtime::Loader&,
                                  Random::RandomGenerator&, Event::Dispatcher&, TimeSource&,
-                                 Upstream::ResourcePriority) override {
+                                 Upstream::ResourcePriority,
+                                 Upstream::RetryStreamAdmissionController&, const bool) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
     if (reject_all_hosts_) {
@@ -122,6 +123,7 @@ public:
       new Http::TestResponseHeaderMapImpl{{":status", "302"}, {"location", "http://www.foo.com"}}};
   NiceMock<Tracing::MockSpan> span_;
   NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_;
+  NiceMock<Upstream::MockRetryStreamAdmissionController>& retry_admission_controller_;
   std::string redirect_records_data_ = "some data";
 };
 

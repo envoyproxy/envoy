@@ -23,6 +23,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 
+#include "admission_control.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -165,6 +166,7 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
+  MOCK_METHOD(AdmissionControl&, admissionControl, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
   MOCK_METHOD(DeferredCreationCompatibleClusterTrafficStats&, trafficStats, (), (const));
   MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
@@ -242,6 +244,7 @@ public:
   ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
+  NiceMock<MockAdmissionControl> admission_control_;
   Network::Address::InstanceConstSharedPtr source_address_;
   std::shared_ptr<MockUpstreamLocalAddressSelector> upstream_local_address_selector_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};

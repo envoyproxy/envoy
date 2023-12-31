@@ -488,6 +488,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "retry_admission_control_integration_test",
+    size = "large",
+    srcs = ["retry_admission_control_integration_test.cc"],
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/integration/retry_admission_control:custom_retry_admission_controller",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_flood_integration_test",
     size = "large",
     srcs = [
@@ -1129,6 +1145,8 @@ envoy_cc_test_library(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/request_id/uuid:config",
+        "//source/extensions/retry/admission_control/concurrency_budget:config",
+        "//source/extensions/retry/admission_control/static_limits:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",

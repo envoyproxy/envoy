@@ -9,8 +9,10 @@
 #include "envoy/api/api.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/retry/admission_control/concurrency_budget/v3/concurrency_budget_config.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
@@ -28,6 +30,8 @@
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
+#include "source/extensions/retry/admission_control/concurrency_budget/config.h"
+#include "source/extensions/retry/admission_control/static_limits/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -50,6 +54,7 @@
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -3706,6 +3711,14 @@ public:
     }
   };
 
+  class RetryAdmissionControlTestClusterInfo : public ClusterInfoImpl {
+  public:
+    static envoy::config::core::v3::TypedExtensionConfig getRetryAdmissionControlConfig(
+        const absl::optional<envoy::config::cluster::v3::CircuitBreakers::Thresholds>& thresholds) {
+      return ClusterInfoImpl::getRetryAdmissionControlConfig(thresholds);
+    }
+  };
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -3842,6 +3855,120 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
   EXPECT_EQ(min_retry_concurrency, 123UL);
+}
+
+TEST_F(ClusterInfoImplTest, RetryAdmissionControl) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {name: meh } } }
+    circuit_breakers:
+      thresholds:
+      # 0 - No retry settings set.
+      - priority: DEFAULT
+      # 1 - Max retries set
+      - priority: DEFAULT
+        max_retries: 123
+      # 2 - Empty budget config, should have defaults.
+      - priority: DEFAULT
+        retry_budget: {}
+      # 3 - Empty budget config with max retries, should have budget defaults.
+      - priority: DEFAULT
+        max_retries: 123
+        retry_budget: {}
+      # 4 - Budget percent set, expect retry concurrency default.
+      - priority: DEFAULT
+        retry_budget:
+          budget_percent:
+            value: 42.0
+      # 5 - Retry concurrency set, expect budget default.
+      - priority: DEFAULT
+        retry_budget:
+          min_retry_concurrency: 123
+      # 6 - Both budget percent and retry concurrency set.
+      - priority: DEFAULT
+        max_retries: 123
+        retry_budget:
+          budget_percent:
+            value: 42.0
+          min_retry_concurrency: 123
+      # 7 - Custom retry admission control extension preferred over built-ins.
+      - priority: DEFAULT
+        max_retries: 123
+        retry_budget: {}
+        retry_admission_control:
+          name: custom_retry_admission_control
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  envoy::extensions::retry::admission_control::static_limits::v3::StaticLimitsConfig
+      static_limits_config;
+  envoy::extensions::retry::admission_control::concurrency_budget::v3::ConcurrencyBudgetConfig
+      concurrency_budget_config;
+
+  auto extConfig =
+      RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(absl::nullopt);
+  EXPECT_EQ(extConfig.name(), "envoy.retry_admission_control.static_limits");
+  extConfig.typed_config().UnpackTo(&static_limits_config);
+  EXPECT_EQ(static_limits_config.max_concurrent_retries().value(), 3UL);
+
+  extConfig = RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(
+      cluster_config_.circuit_breakers().thresholds()[0]);
+  EXPECT_EQ(extConfig.name(), "envoy.retry_admission_control.static_limits");
+  extConfig.typed_config().UnpackTo(&static_limits_config);
+  EXPECT_EQ(static_limits_config.max_concurrent_retries().value(), 3UL);
+
+  extConfig = RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(
+      cluster_config_.circuit_breakers().thresholds()[1]);
+  EXPECT_EQ(extConfig.name(), "envoy.retry_admission_control.static_limits");
+  extConfig.typed_config().UnpackTo(&static_limits_config);
+  EXPECT_EQ(static_limits_config.max_concurrent_retries().value(), 123UL);
+
+  extConfig = RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(
+      cluster_config_.circuit_breakers().thresholds()[2]);
+  EXPECT_EQ(extConfig.name(), "envoy.retry_admission_control.concurrency_budget");
+  extConfig.typed_config().UnpackTo(&concurrency_budget_config);
+  EXPECT_EQ(concurrency_budget_config.budget_percent().value(), 20.0);
+  EXPECT_EQ(concurrency_budget_config.min_concurrent_retry_limit().value(), 3UL);
+
+  extConfig = RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(
+      cluster_config_.circuit_breakers().thresholds()[3]);
+  EXPECT_EQ(extConfig.name(), "envoy.retry_admission_control.concurrency_budget");
+  extConfig.typed_config().UnpackTo(&concurrency_budget_config);
+  EXPECT_EQ(concurrency_budget_config.budget_percent().value(), 20.0);
+  EXPECT_EQ(concurrency_budget_config.min_concurrent_retry_limit().value(), 3UL);
+
+  extConfig = RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(
+      cluster_config_.circuit_breakers().thresholds()[4]);
+  EXPECT_EQ(extConfig.name(), "envoy.retry_admission_control.concurrency_budget");
+  extConfig.typed_config().UnpackTo(&concurrency_budget_config);
+  EXPECT_EQ(concurrency_budget_config.budget_percent().value(), 42.0);
+  EXPECT_EQ(concurrency_budget_config.min_concurrent_retry_limit().value(), 3UL);
+
+  extConfig = RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(
+      cluster_config_.circuit_breakers().thresholds()[5]);
+  EXPECT_EQ(extConfig.name(), "envoy.retry_admission_control.concurrency_budget");
+  extConfig.typed_config().UnpackTo(&concurrency_budget_config);
+  EXPECT_EQ(concurrency_budget_config.budget_percent().value(), 20.0);
+  EXPECT_EQ(concurrency_budget_config.min_concurrent_retry_limit().value(), 123UL);
+
+  extConfig = RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(
+      cluster_config_.circuit_breakers().thresholds()[6]);
+  EXPECT_EQ(extConfig.name(), "envoy.retry_admission_control.concurrency_budget");
+  extConfig.typed_config().UnpackTo(&concurrency_budget_config);
+  EXPECT_EQ(concurrency_budget_config.budget_percent().value(), 42.0);
+  EXPECT_EQ(concurrency_budget_config.min_concurrent_retry_limit().value(), 123UL);
+
+  extConfig = RetryAdmissionControlTestClusterInfo::getRetryAdmissionControlConfig(
+      cluster_config_.circuit_breakers().thresholds()[7]);
+  EXPECT_EQ(extConfig.name(), "custom_retry_admission_control");
+  EXPECT_EQ(extConfig.typed_config().type_url(), "type.googleapis.com/google.protobuf.Empty");
 }
 
 TEST_F(ClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
@@ -4062,6 +4189,10 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
+  // needed for the resource manager to emit stats for retries
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_retry_admission_control", "false"}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s

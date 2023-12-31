@@ -15,9 +15,11 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/time.h"
+#include "envoy/config/cluster/v3/circuit_breaker.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
@@ -57,6 +59,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/upstream/admission_control_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
@@ -951,6 +954,7 @@ public:
     return name_;
   }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
+  AdmissionControl& admissionControl(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   DeferredCreationCompatibleClusterTrafficStats& trafficStats() const override {
     return traffic_stats_;
@@ -1059,24 +1063,41 @@ protected:
   static std::pair<absl::optional<double>, absl::optional<uint32_t>>
   getRetryBudgetParams(const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds);
 
+  static envoy::config::core::v3::TypedExtensionConfig getRetryAdmissionControlConfig(
+      const absl::optional<envoy::config::cluster::v3::CircuitBreakers::Thresholds>& thresholds);
+
 private:
   std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
   createSingletonUpstreamNetworkFilterConfigProviderManager(
       Server::Configuration::ServerFactoryContext& context);
 
-  struct ResourceManagers {
-    ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name, Stats::Scope& stats_scope,
-                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names);
-    ResourceManagerImplPtr load(const envoy::config::cluster::v3::Cluster& config,
-                                Runtime::Loader& runtime, const std::string& cluster_name,
-                                Stats::Scope& stats_scope,
-                                const envoy::config::core::v3::RoutingPriority& priority);
+  struct CircuitBreakers {
+    CircuitBreakers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
+                    const std::string& cluster_name, Stats::Scope& stats_scope,
+                    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names,
+                    ProtobufMessage::ValidationVisitor& validation_visitor);
+    ClusterCircuitBreakersStats
+    generateStats(const envoy::config::cluster::v3::Cluster& config, Stats::Scope& scope,
+                  const ClusterCircuitBreakersStatNames& names,
+                  const envoy::config::core::v3::RoutingPriority& priority);
+    ResourceManagerImplPtr
+    loadResourceManager(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
+                        const std::string& runtime_key_prefix, ClusterCircuitBreakersStats cb_stats,
+                        const envoy::config::core::v3::RoutingPriority& priority);
+    AdmissionControlImplSharedPtr
+    loadAdmissionControl(const envoy::config::cluster::v3::Cluster& config,
+                         const envoy::config::core::v3::RoutingPriority& priority,
+                         ClusterCircuitBreakersStats cb_stats,
+                         ProtobufMessage::ValidationVisitor& validation_visitor,
+                         Runtime::Loader& runtime, const std::string& runtime_key_prefix);
+    std::string getRuntimeKeyPrefix(const std::string& cluster_name,
+                                    const envoy::config::core::v3::RoutingPriority& priority);
 
-    using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
+    using ResourceManagers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
+    using AdmissionControls = std::array<AdmissionControlImplSharedPtr, NumResourcePriorities>;
 
-    Managers managers_;
-    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names_;
+    ResourceManagers managers_;
+    AdmissionControls controls_;
   };
 
   struct OptionalClusterStats {
@@ -1113,7 +1134,7 @@ private:
   mutable ClusterLoadReportStats load_report_stats_;
   const std::unique_ptr<OptionalClusterStats> optional_cluster_stats_;
   const uint64_t features_;
-  mutable ResourceManagers resource_managers_;
+  mutable CircuitBreakers circuit_breakers_;
   const std::string maintenance_mode_runtime_key_;
   UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
   std::unique_ptr<const LBPolicyConfig> lb_policy_config_;

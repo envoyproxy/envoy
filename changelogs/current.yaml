@@ -76,6 +76,19 @@ minor_behavior_changes:
 - area: generic_proxy
   change: |
     Update the stats prefix of generic proxy from ``<stats_prefix>`` to ``generic_proxy.<stats_prefix>``.
+- area: circuit breakers
+  change: |
+    Previously, runtime overrides could be used to dynamically change the retry circuit breaking behavior
+    between using a static limit and using the retry budget, without changing any configuration.
+    This is no longer supported as we deprecate that interface and move to using the retry_admission_control
+    extension point instead.
+    This behavioral change can be reverted by setting ``envoy.reloadable_features.use_retry_admission_control`` to false.
+    Note that this will also mean you will be unable to use the new retry admission control extension point.
+- area: circuit breakers
+  change: |
+    Retries in backoff are now counted as active requests for the purposes of calculating retry budget limits.
+    This behavioral change can be reverted by setting ``envoy.reloadable_features.use_retry_admission_control`` to false.
+    Note that this will also mean you will be unable to use the new retry admission control extension point.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -138,6 +151,13 @@ bug_fixes:
 - area: docker
   change: |
     Updated base image to ``ubuntu:22.04`` to fix Redis memory issue (https://github.com/envoyproxy/envoy/issues/31248).
+- area: circuit breakers
+  change: |
+    Outstanding retries which were then retried again due to hedged per-try timeouts were
+    not being counted by the retry circuit breakers.
+    Now, all in-flight retries (including hedged timeout retries that have themselves been retried) are counted correctly.
+    This behavioral change can be reverted by setting ``envoy.reloadable_features.use_retry_admission_control`` to false.
+    Note that this will also mean you will be unable to use the new retry admission control extension point.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -326,6 +346,13 @@ new_features:
 - area: redis
   change: |
     Added support for the getdel command.
+- area: circuit breakers
+  change: |
+    Added the :ref:`retry admission control <extension_category_envoy.retry_admission_control>`
+    extension point which can choose to admit or deny any potential retry to that cluster and priority level
+    based on information from other streams on the same cluster and priority level.
+    This extension point replaces the :ref:`max_retries <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_retries>` and
+    :ref:`retry_budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>` circuit breaker options.
 
 deprecated:
 - area: wasm
@@ -338,3 +365,9 @@ deprecated:
     are deprecated. Please use the new field
     :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata>`
     to configure static metadata to inject.
+- area: circuit breakers
+  change: |
+    :ref:`max_retries <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_retries>` and
+    :ref:`retry_budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
+    are now deprecated in favor of
+    :ref:`retry_admission_control <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_admission_control>`.

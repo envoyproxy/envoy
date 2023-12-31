@@ -71,6 +71,7 @@ envoy_cc_test(
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/retry/admission_control/static_limits:config",
         "//test/mocks/config:config_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
@@ -110,6 +111,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/network/dns_resolver/cares:config",
+        "//source/extensions/retry/admission_control/static_limits:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/upstreams/http/generic:config",
         "//test/config:v2_link_hacks",
@@ -454,6 +456,7 @@ envoy_cc_test(
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -538,6 +541,8 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/retry/admission_control/concurrency_budget:config",
+        "//source/extensions/retry/admission_control/static_limits:config",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
@@ -563,6 +568,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",
@@ -647,6 +653,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/retry/admission_control/static_limits:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/integration/clusters:custom_static_cluster",

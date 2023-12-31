@@ -34,7 +34,7 @@ public:
     auto conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
     conn_pool_ = conn_pool.get();
     upstream_request_ = std::make_unique<UpstreamRequest>(router_filter_interface_,
-                                                          std::move(conn_pool), false, true);
+                                                          std::move(conn_pool), false, true, 1);
   }
   Http::FilterFactoryCb createDecoderFilterFactoryCb(Http::StreamDecoderFilterSharedPtr filter) {
     return [filter](Http::FilterChainFactoryCallbacks& callbacks) {

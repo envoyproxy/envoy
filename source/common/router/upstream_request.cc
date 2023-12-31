@@ -80,13 +80,14 @@ public:
 
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
-                                 bool can_send_early_data, bool can_use_http3)
+                                 bool can_send_early_data, bool can_use_http3,
+                                 uint64_t attempt_number)
     : parent_(parent), conn_pool_(std::move(conn_pool)),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      calling_encode_headers_(false), upstream_canary_(false), router_sent_end_stream_(false),
-      encode_trailers_(false), retried_(false), awaiting_headers_(true),
-      outlier_detection_timeout_recorded_(false),
+      attempt_number_(attempt_number), calling_encode_headers_(false), upstream_canary_(false),
+      router_sent_end_stream_(false), encode_trailers_(false), retried_(false),
+      awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
       reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),

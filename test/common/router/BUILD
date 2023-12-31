@@ -211,6 +211,7 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:admission_control_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",

@@ -5,6 +5,7 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -151,19 +152,72 @@ TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
   NiceMock<Runtime::MockLoader> runtime;
   Stats::IsolatedStoreImpl store;
 
+  // disable feature flag to test the old codepath with gauges enabled
+  Envoy::TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_retry_admission_control", "false"}});
+
   auto stats = clusterCircuitBreakersStats(store);
+  stats.remaining_retries_.set(42);
 
   // Test retry budgets disable remaining_retries gauge (it should always be 0).
   ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
-                         1, 0, 3, 100, stats, 20.0, 5);
+                         1, 5, 3, 100, stats, 20.0, 5);
 
   EXPECT_EQ(5U, rm.retries().max());
   EXPECT_EQ(0U, stats.remaining_retries_.value());
+  EXPECT_EQ(0U, stats.rq_retry_open_.value());
   EXPECT_EQ(0U, rm.retries().count());
   rm.retries().inc();
   EXPECT_EQ(1U, rm.retries().count());
   EXPECT_EQ(0U, stats.remaining_retries_.value());
+  EXPECT_EQ(0U, stats.rq_retry_open_.value());
   EXPECT_EQ(100u, rm.maxConnectionsPerHost());
+  rm.retries().dec();
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_retry_admission_control", "true"}});
+  stats.remaining_retries_.set(42);
+  stats.rq_retry_open_.set(42);
+
+  // with the feature flag enabled, no stats should be written
+  rm.retries().inc();
+  EXPECT_EQ(1U, rm.retries().count());
+  EXPECT_EQ(42U, stats.remaining_retries_.value());
+  EXPECT_EQ(42U, stats.rq_retry_open_.value());
+  rm.retries().dec();
+}
+
+TEST(ResourceManagerImplTest, MaxRetryGauges) {
+  NiceMock<Runtime::MockLoader> runtime;
+  Stats::IsolatedStoreImpl store;
+
+  // disable feature flag to test the old codepath with gauges enabled
+  Envoy::TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_retry_admission_control", "false"}});
+
+  auto stats = clusterCircuitBreakersStats(store);
+
+  ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
+                         1, 1, 3, 100, stats, absl::nullopt, absl::nullopt);
+
+  EXPECT_EQ(1U, rm.retries().max());
+  EXPECT_EQ(1U, stats.remaining_retries_.value());
+  EXPECT_EQ(0U, stats.rq_retry_open_.value());
+  EXPECT_EQ(0U, rm.retries().count());
+  rm.retries().inc();
+  EXPECT_EQ(1U, rm.retries().count());
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+  EXPECT_EQ(1U, stats.rq_retry_open_.value());
+  rm.retries().dec();
+
+  // with the feature flag enabled, no stats should be written
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_retry_admission_control", "true"}});
+  stats.remaining_retries_.set(42);
+  stats.rq_retry_open_.set(42);
+
+  rm.retries().inc();
+  EXPECT_EQ(1U, rm.retries().count());
+  EXPECT_EQ(42U, stats.remaining_retries_.value());
+  EXPECT_EQ(42U, stats.rq_retry_open_.value());
   rm.retries().dec();
 }
 } // namespace
