@@ -541,7 +541,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/retry/admission_control/concurrency_budget:config",
         "//source/extensions/retry/admission_control/static_limits:config",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",

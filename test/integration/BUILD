@@ -1145,7 +1145,6 @@ envoy_cc_test_library(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/request_id/uuid:config",
-        "//source/extensions/retry/admission_control/concurrency_budget:config",
         "//source/extensions/retry/admission_control/static_limits:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
