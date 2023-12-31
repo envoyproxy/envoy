@@ -32,12 +32,12 @@ option allows excluding certain request headers from being signed. This usually 
 are added later such as in retries. By default, the headers ``x-forwarded-for``, ``x-forwarded-proto``, and ``x-amzn-trace-id`` are always excluded.
 
 The :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.signing_algorithm>`
-can be specified as ``aws_sigv4`` or ``aws_sigv4a``. If the signing algorithm is unspecified, this filter will default to ``aws_sigv4``.
-If ``aws_sigv4`` is unspecified, or explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
+can be specified as ``AWS_SIGV4`` or ``AWS_SIGV4A``. If the signing algorithm is unspecified, this filter will default to ``AWS_SIGV4``.
+If ``AWS_SIGV4`` is unspecified, or explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
 is used to define the region to which the sigv4 calculation is addressed to.
-If ``aws_sigv4a`` is explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
+If ``AWS_SIGV4A`` is explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
 is used as a region set. A region set is a single region, or comma seperated list of regions. Regions in a region set can also include wildcards,
-such as ``us-east-*`` or even ``*``. By using ``aws_sigv4a`` and wildcarded regions it is possible to simplify the overall envoy configuration for
+such as ``us-east-*`` or even ``*``. By using ``AWS_SIGV4A`` and wildcarded regions it is possible to simplify the overall envoy configuration for
 multi-region implementations.
 
 Example configuration
@@ -63,7 +63,7 @@ Note that this filter also supports per route configuration:
 
 Above shows an example of route-level config overriding the config on the virtual-host level.
 
-An example of configuring this filter to use ``aws_sigv4a`` signing with a wildcarded region set, to a AWS VPC Lattice service:
+An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildcarded region set, to a AWS VPC Lattice service:
 
 .. literalinclude:: _include/aws-request-signing-filter-sigv4a.yaml
     :language: yaml

@@ -55,7 +55,7 @@ match_excluded_headers:
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigExplicitSigningAlgorithm) {
   const std::string yaml = R"EOF(
 service_name: s3
-signing_algorithm: aws_sigv4
+signing_algorithm: AWS_SIGV4
 region: us-west-2
 host_rewrite: new-host
 match_excluded_headers:
@@ -95,7 +95,7 @@ match_excluded_headers:
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionExplicitSigningAlgorithm) {
   const std::string yaml = R"EOF(
 service_name: s3
-signing_algorithm: aws_sigv4
+signing_algorithm: AWS_SIGV4
 region: us-west-1,us-west-2
 host_rewrite: new-host
 match_excluded_headers:
@@ -125,7 +125,7 @@ TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4A) {
 service_name: s3
 region: '*'
 host_rewrite: new-host
-signing_algorithm: aws_sigv4a
+signing_algorithm: AWS_SIGV4A
 match_excluded_headers:
   - prefix: x-envoy
   - exact: foo
@@ -164,7 +164,7 @@ TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4) {
   const std::string yaml = R"EOF(
 aws_request_signing:
   service_name: s3
-  signing_algorithm: aws_sigv4
+  signing_algorithm: AWS_SIGV4
   region: us-west-2
   host_rewrite: new-host
   match_excluded_headers:
@@ -189,7 +189,7 @@ TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4A) {
   const std::string yaml = R"EOF(
 aws_request_signing:
   service_name: s3
-  signing_algorithm: aws_sigv4a
+  signing_algorithm: AWS_SIGV4A
   region: '*'
   host_rewrite: new-host
   match_excluded_headers:
@@ -214,7 +214,7 @@ TEST(AwsRequestSigningFilterConfigTest, InvalidRegionRouteSpecificFilterConfigSi
   const std::string yaml = R"EOF(
 aws_request_signing:
   service_name: s3
-  signing_algorithm: aws_sigv4
+  signing_algorithm: AWS_SIGV4
   region: '*'
   host_rewrite: new-host
   match_excluded_headers:

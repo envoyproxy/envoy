@@ -307,7 +307,7 @@ new_features:
     Added new access log command operator ``%EMIT_TIME%`` to get the time when the log entry is emitted.
 - area: aws_request_signing
   change: |
-    added support for specifying the aws signing algorithm, either aws_sigv4 or aws_sigv4a via
+    added support for specifying the aws signing algorithm, either ``AWS_SIGV4`` or ``AWS_SIGV4A`` via
     :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.signing_algorithm>`
     config API.
 - area: access_log

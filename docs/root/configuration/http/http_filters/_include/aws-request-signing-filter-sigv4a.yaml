@@ -27,7 +27,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
               service_name: vpc-lattice-svcs
-              signing_algorithm: aws_sigv4a
+              signing_algorithm: AWS_SIGV4A
               region: '*'
               use_unsigned_payload: true
               match_excluded_headers:

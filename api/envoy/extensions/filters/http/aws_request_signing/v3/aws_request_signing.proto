@@ -39,12 +39,12 @@ message AwsRequestSigning {
   // Example: s3
   string service_name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // When signing_algorithm = aws_sigv4 the region is a standard AWS `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ string for the service
+  // When signing_algorithm is set to ``AWS_SIGV4`` the region is a standard AWS `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ string for the service
   // hosting the HTTP endpoint.
   //
   // Example: us-west-2
   //
-  // When signing_algorithm = aws_sigv4a the region is used as a region set.
+  // When signing_algorithm is set to ``AWS_SIGV4A`` the region is used as a region set.
   //
   // A region set is a comma separated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
   // or even region strings containing wildcards such as ``us-east-*``
@@ -82,7 +82,7 @@ message AwsRequestSigning {
   // When applied, all headers that start with "x-envoy" and headers "foo" and "bar" will not be signed.
   repeated type.matcher.v3.StringMatcher match_excluded_headers = 5;
 
-  // Optional Signing algorithm specifier, either aws_sigv4 or aws_sigv4a, defaulting to aws_sigv4.
+  // Optional Signing algorithm specifier, either ``AWS_SIGV4`` or ``AWS_SIGV4A``, defaulting to ``AWS_SIGV4``.
   SigningAlgorithm signing_algorithm = 6;
 }
 
