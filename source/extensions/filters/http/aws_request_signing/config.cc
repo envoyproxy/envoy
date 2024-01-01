@@ -19,13 +19,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
-bool validateRegion(std::string region) {
+bool isARegionSet(std::string region) {
   for (const char& c : "*,") {
     if (region.find(c) != std::string::npos) {
-      return false;
+      return true;
     }
   }
-  return true;
+  return false;
 }
 
 SigningAlgorithm getSigningAlgorithm(
@@ -66,8 +66,10 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
         config.service_name(), config.region(), credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
-    if (!validateRegion(config.region())) {
-      throw EnvoyException("SigV4 region string cannot contain wildcards or comma");
+    // Verify that we have not specified a region set formatted region for sigv4 algorithm
+    if (isARegionSet(config.region())) {
+      throw EnvoyException("SigV4 region string cannot contain wildcards or commas. Region sets "
+                           "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         config.service_name(), config.region(), credentials_provider,
@@ -102,8 +104,10 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
         per_route_config.aws_request_signing().region(), credentials_provider,
         context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
-    if (!validateRegion(per_route_config.aws_request_signing().region())) {
-      throw EnvoyException("SigV4 region string cannot contain wildcards or comma");
+    // Verify that we have not specified a region set formatted region for sigv4 algorithm
+    if (isARegionSet(per_route_config.aws_request_signing().region())) {
+      throw EnvoyException("SigV4 region string cannot contain wildcards or commas. Region sets "
+                           "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         per_route_config.aws_request_signing().service_name(),
