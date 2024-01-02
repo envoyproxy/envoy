@@ -71,7 +71,7 @@ TEST_F(MemoryReleaseTest, RelaseRateAboveZeroDefaultIntervalMemoryReleased) {
   auto a = std::make_unique<unsigned char[]>(MB);
   auto b = std::make_unique<unsigned char[]>(MB);
   if (Stats::totalCurrentlyAllocated() - initial_allocated_bytes <= 0) {
-    // Cannot measure memory usage precisely on this platform...
+    // Cannot measure memory usage precisely on this platform.
     return;
   }
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
@@ -82,7 +82,7 @@ TEST_F(MemoryReleaseTest, RelaseRateAboveZeroDefaultIntervalMemoryReleased) {
   EXPECT_EQ(std::chrono::milliseconds(1000),
             AllocatorManagerPeer::memoryReleaseInterval(*allocator_manager_));
   a.reset();
-  // Release interval was configured to default value (1 second)...
+  // Release interval was configured to default value (1 second).
   step(std::chrono::milliseconds(1000));
   EXPECT_EQ(1UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
   auto released_bytes_before_next_run = Stats::totalPageHeapUnmapped();
