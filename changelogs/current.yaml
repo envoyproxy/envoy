@@ -326,6 +326,10 @@ new_features:
 - area: redis
   change: |
     Added support for the getdel command.
+- area: zookeeper
+  change: |
+    Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
 
 deprecated:
 - area: wasm
