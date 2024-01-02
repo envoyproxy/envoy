@@ -131,6 +131,9 @@ bug_fixes:
   change: |
     Fixed a bug where a histogram bucket counts were wrong. Additionally, the number of buckets is fixed and is now
     one element larger than the explicit bounds elements, as required by the specification.
+- area: tracing
+  change: |
+    Fixed a bug where child spans produced by the Datadog tracer would have an incorrect operation name.
 - area: DNS
   change: |
     Fixed a race condition that when multiple requests with the same authority header are sent to Envoy, sometimes some requests
