@@ -32,6 +32,8 @@
 #include "library/common/extensions/key_value/platform/platform.pb.h"
 #include "library/common/main_interface.h"
 
+ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_dfp_mixed_scheme);
+
 namespace Envoy {
 namespace Platform {
 
@@ -784,6 +786,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   (*metadata.mutable_fields())["app_id"].set_string_value(app_id_);
   (*metadata.mutable_fields())["app_version"].set_string_value(app_version_);
   (*metadata.mutable_fields())["device_os"].set_string_value(device_os_);
+
+  // Before setting up runtime values from config, set any default values for E-M.
+  absl::SetFlag(&FLAGS_envoy_reloadable_features_dfp_mixed_scheme, true);
 
   // Set up runtime.
   auto* runtime = bootstrap->mutable_layered_runtime()->add_layers();
