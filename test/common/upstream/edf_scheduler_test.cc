@@ -4,16 +4,51 @@
 
 namespace Envoy {
 namespace Upstream {
-namespace {
 
-TEST(EdfSchedulerTest, Empty) {
+class EdfSchedulerTest : public testing::Test {
+public:
+  template <typename T>
+  static void compareEdfScehdulers(EdfScheduler<T>& scheduler1, EdfScheduler<T>& scheduler2) {
+    // Compares that the given EdfSchedulers internal queues are equal up
+    // (ignoring the order_offset_ values).
+    EXPECT_EQ(scheduler1.queue_.size(), scheduler2.queue_.size());
+    // Cannot iterate over std::priority_queue directly, so need to copy the
+    // contents to a vector first.
+    // std::function<std::vector<EdfScheduler<T>::EdfEntry>(EdfScheduler<T>& scheduler)>
+    auto copyFunc = [](EdfScheduler<T>& scheduler) {
+      std::vector<typename EdfScheduler<T>::EdfEntry> result;
+      result.reserve(scheduler.queue_.size());
+      while (!scheduler.empty()) {
+        result.emplace_back(std::move(scheduler.queue_.top()));
+        scheduler.queue_.pop();
+      }
+      // Re-add all elements so the contents of the input scheduler isn't
+      // changed.
+      for (auto& entry : result) {
+        scheduler.queue_.push(entry);
+      }
+      return result;
+    };
+    std::vector<typename EdfScheduler<T>::EdfEntry> contents1 = copyFunc(scheduler1);
+    std::vector<typename EdfScheduler<T>::EdfEntry> contents2 = copyFunc(scheduler2);
+    for (size_t i = 0; i < contents1.size(); ++i) {
+      EXPECT_NEAR(contents1[i].deadline_, contents2[i].deadline_, 0.0000001)
+          << "inequal deadline in element " << i;
+      std::shared_ptr<T> entry1 = contents1[i].entry_.lock();
+      std::shared_ptr<T> entry2 = contents2[i].entry_.lock();
+      EXPECT_EQ(*entry1, *entry2) << "inequal entry in element " << i;
+    }
+  }
+};
+
+TEST_F(EdfSchedulerTest, Empty) {
   EdfScheduler<uint32_t> sched;
   EXPECT_EQ(nullptr, sched.peekAgain([](const double&) { return 0; }));
   EXPECT_EQ(nullptr, sched.pickAndAdd([](const double&) { return 0; }));
 }
 
 // Validate we get regular RR behavior when all weights are the same.
-TEST(EdfSchedulerTest, Unweighted) {
+TEST_F(EdfSchedulerTest, Unweighted) {
   EdfScheduler<uint32_t> sched;
   constexpr uint32_t num_entries = 128;
   std::shared_ptr<uint32_t> entries[num_entries];
@@ -34,7 +69,7 @@ TEST(EdfSchedulerTest, Unweighted) {
 }
 
 // Validate we get weighted RR behavior when weights are distinct.
-TEST(EdfSchedulerTest, Weighted) {
+TEST_F(EdfSchedulerTest, Weighted) {
   EdfScheduler<uint32_t> sched;
   constexpr uint32_t num_entries = 128;
   std::shared_ptr<uint32_t> entries[num_entries];
@@ -59,7 +94,7 @@ TEST(EdfSchedulerTest, Weighted) {
 }
 
 // Validate that expired entries are ignored.
-TEST(EdfSchedulerTest, Expired) {
+TEST_F(EdfSchedulerTest, Expired) {
   EdfScheduler<uint32_t> sched;
 
   auto second_entry = std::make_shared<uint32_t>(42);
@@ -77,7 +112,7 @@ TEST(EdfSchedulerTest, Expired) {
 }
 
 // Validate that expired entries are not peeked.
-TEST(EdfSchedulerTest, ExpiredPeek) {
+TEST_F(EdfSchedulerTest, ExpiredPeek) {
   EdfScheduler<uint32_t> sched;
 
   {
@@ -93,7 +128,7 @@ TEST(EdfSchedulerTest, ExpiredPeek) {
 }
 
 // Validate that expired entries are ignored.
-TEST(EdfSchedulerTest, ExpiredPeekedIsNotPicked) {
+TEST_F(EdfSchedulerTest, ExpiredPeekedIsNotPicked) {
   EdfScheduler<uint32_t> sched;
 
   {
@@ -110,7 +145,7 @@ TEST(EdfSchedulerTest, ExpiredPeekedIsNotPicked) {
   EXPECT_TRUE(sched.pickAndAdd([](const double&) { return 1; }) == nullptr);
 }
 
-TEST(EdfSchedulerTest, ManyPeekahead) {
+TEST_F(EdfSchedulerTest, ManyPeekahead) {
   EdfScheduler<uint32_t> sched1;
   EdfScheduler<uint32_t> sched2;
   constexpr uint32_t num_entries = 128;
@@ -134,6 +169,60 @@ TEST(EdfSchedulerTest, ManyPeekahead) {
   }
 }
 
-} // namespace
+// Validates that creating a scheduler using the createWithPicks (with 0 picks)
+// is equal to creating an empty scheduler and adding entries one after the other.
+TEST_F(EdfSchedulerTest, EqualityAfterCreateEmpty) {
+  constexpr uint32_t num_entries = 128;
+  std::vector<std::shared_ptr<uint32_t>> entries;
+  entries.reserve(num_entries);
+
+  // Populate sched1 one entry after the other.
+  EdfScheduler<uint32_t> sched1;
+  for (uint32_t i = 0; i < num_entries; ++i) {
+    entries.emplace_back(std::make_shared<uint32_t>(i + 1));
+    sched1.add(i + 1, entries.back());
+  }
+
+  EdfScheduler<uint32_t> sched2 = EdfScheduler<uint32_t>::createWithPicks(
+      entries, [](const double& w) { return w; }, 0);
+
+  compareEdfScehdulers(sched1, sched2);
+}
+
+// Validates that creating a scheduler using the createWithPicks (with 5 picks)
+// is equal to creating an empty scheduler and adding entries one after the other,
+// and then performing some number of picks.
+TEST_F(EdfSchedulerTest, EqualityAfterCreateWithPicks) {
+  constexpr uint32_t num_entries = 128;
+  // Use double-precision weights from the range [0.01, 100.5].
+  // Using different weights to avoid a case where entries with the same weight
+  // will be chosen in different order.
+  std::vector<std::shared_ptr<double>> entries;
+  entries.reserve(num_entries);
+  for (uint32_t i = 0; i < num_entries; ++i) {
+    const double entry_weight = (100.5 - 0.01) / num_entries * i + 0.01;
+    entries.emplace_back(std::make_shared<double>(entry_weight));
+  }
+
+  const std::vector<uint32_t> all_picks{5, 140, 501, 123456, 894571};
+  for (const auto picks : all_picks) {
+    // Populate sched1 one entry after the other.
+    EdfScheduler<double> sched1;
+    for (uint32_t i = 0; i < num_entries; ++i) {
+      sched1.add(*entries[i], entries[i]);
+    }
+    // Perform the picks on sched1.
+    for (uint32_t i = 0; i < picks; ++i) {
+      sched1.pickAndAdd([](const double& w) { return w; });
+    }
+
+    // Create sched2 with pre-built and pre-picked entries.
+    EdfScheduler<double> sched2 = EdfScheduler<double>::createWithPicks(
+        entries, [](const double& w) { return w; }, picks);
+
+    compareEdfScehdulers(sched1, sched2);
+  }
+}
+
 } // namespace Upstream
 } // namespace Envoy
