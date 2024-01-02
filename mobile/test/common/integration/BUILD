@@ -26,6 +26,7 @@ envoy_cc_test(
         "@envoy//source/common/quic:active_quic_listener_lib",
         "@envoy//source/common/quic:client_connection_factory_lib",
         "@envoy//source/common/quic:quic_server_factory_lib",
+        "@envoy//source/common/quic:quic_server_transport_socket_factory_lib",
         "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/quic:udp_gso_batch_writer_lib",
         "@envoy//source/extensions/udp_packet_writer/gso:config",
