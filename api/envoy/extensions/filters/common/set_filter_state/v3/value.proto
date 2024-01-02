@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Set-Filter-State filter state value]
 
 // A filter state key and value pair.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message FilterStateValue {
   enum SharedWithUpstream {
     // Object is not shared with the upstream internal connections.
@@ -35,6 +35,9 @@ message FilterStateValue {
     // Filter state object key. The key is expected to be registered via an object factory, see
     // :ref:`the well-known filter state keys <well_known_filter_state>`.
     string object_key = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Use a string value object to store the value under the given key.
+    string string_key = 6 [(validate.rules).string = {min_len: 1}];
   }
 
   oneof value {

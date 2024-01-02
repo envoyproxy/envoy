@@ -62,7 +62,7 @@ public:
   ConfigSharedPtr config_;
 };
 
-TEST_F(ConfigTest, SetValue) {
+TEST_F(ConfigTest, SetObjectValue) {
   initialize({R"YAML(
     object_key: foo
     format_string:
@@ -72,6 +72,21 @@ TEST_F(ConfigTest, SetValue) {
   update();
   EXPECT_FALSE(info_.filterState()->hasDataAtOrAboveLifeSpan(LifeSpan::Request));
   const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("foo");
+  ASSERT_NE(nullptr, foo);
+  EXPECT_EQ(foo->serializeAsString(), "XXX");
+  EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
+}
+
+TEST_F(ConfigTest, SetStringValue) {
+  initialize({R"YAML(
+    string_key: my_key
+    format_string:
+      text_format_source:
+        inline_string: "XXX"
+  )YAML"});
+  update();
+  EXPECT_FALSE(info_.filterState()->hasDataAtOrAboveLifeSpan(LifeSpan::Request));
+  const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("my_key");
   ASSERT_NE(nullptr, foo);
   EXPECT_EQ(foo->serializeAsString(), "XXX");
   EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
