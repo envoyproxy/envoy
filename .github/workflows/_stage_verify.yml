@@ -85,5 +85,5 @@ jobs:
                 export DEBIAN_FRONTEND=noninteractive
                 sudo apt-get -qq update -y
                 sudo apt-get -qq install -y --no-install-recommends expect gettext whois
-                sudo snap install yq
+                pip install -r ./.github/workflows/verify-requirements.txt
               shell: bash
