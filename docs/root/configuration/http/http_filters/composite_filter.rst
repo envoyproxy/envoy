@@ -18,13 +18,13 @@ Delegation can fail if the filter factory attempted to use a callback not suppor
 composite filter. In either case, the ``<stat_prefix>.composite.delegation_error`` stat will be
 incremented.
 
-This filter adds in filter state the delegated filter name that match the condition as a pair
-with the root config filter name in ``envoy.extensions.filters.http.composite.matched_actions``
+This filter adds a map of the delegated filter name (of the action that is matched )and the root config filter name to the filter state with key
+``envoy.extensions.filters.http.composite.matched_actions``
 
 Contains a map of pairs `FILTER_CONFIG_NAME:ACTION_NAME`:
 
   * ``FILTER_CONFIG_NAME``: root filter config name;
-  * ``ACTION_NAME``: delegated filter name of the action witch matched.
+  * ``ACTION_NAME``: delegated filter name of the action that is matched.
 
 
 Sample Envoy configuration
