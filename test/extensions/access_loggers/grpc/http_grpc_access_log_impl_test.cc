@@ -461,6 +461,8 @@ response: {}
     ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
     const std::string peerSubject = "peerSubject";
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(peerSubject));
+    const std::string peerIssuer = "peerIssuer";
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(peerIssuer));
     const std::string localSubject = "localSubject";
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(localSubject));
     const std::string sessionId =
@@ -512,6 +514,7 @@ common_properties:
       - uri: peerSan1
       - uri: peerSan2
       subject: peerSubject
+      issuer: peerIssuer
     tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
 request:
   request_method: "METHOD_UNSPECIFIED"
