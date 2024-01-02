@@ -436,6 +436,11 @@ void UpstreamRequest::onDecodingSuccess(StreamFramePtr response) {
   }
 
   if (response_stream_header_received_) {
+    if (end_stream) {
+      // The response is fully received.
+      upstream_info_->upstreamTiming().onLastUpstreamRxByteReceived(parent_.time_source_);
+    }
+
     parent_.onResponseFrame(std::move(response));
   } else {
     // The first frame of response is received.
@@ -448,12 +453,12 @@ void UpstreamRequest::onDecodingSuccess(StreamFramePtr response) {
       return;
     }
     response_stream_header_received_ = true;
-    parent_.onResponseStart(std::move(helper.typed_frame_));
-  }
 
-  if (end_stream) {
-    // The response is fully received.
-    upstream_info_->upstreamTiming().onLastUpstreamRxByteReceived(parent_.time_source_);
+    if (end_stream) {
+      // The response is fully received.
+      upstream_info_->upstreamTiming().onLastUpstreamRxByteReceived(parent_.time_source_);
+    }
+    parent_.onResponseStart(std::move(helper.typed_frame_));
   }
 }
 
