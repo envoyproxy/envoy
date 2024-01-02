@@ -189,6 +189,9 @@ TEST_P(FilterIntegrationTest, AltSvcCached) {
 }
 
 TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
+#ifdef WIN32
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
   // Start with the alt-svc header in the cache.
   write_alt_svc_to_file_ = true;
 
