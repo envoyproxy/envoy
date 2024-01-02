@@ -12,6 +12,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+#include "envoy/tracing/trace_context.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -879,6 +880,19 @@ public:
     for (const auto& value : values) {
       context_map_[value.first] = value.second;
     }
+    // Backwards compatibility for tracing tests.
+    if (context_map_.contains(":protocol")) {
+      context_protocol_ = context_map_[":protocol"];
+    }
+    if (context_map_.contains(":authority")) {
+      context_host_ = context_map_[":authority"];
+    }
+    if (context_map_.contains(":path")) {
+      context_path_ = context_map_[":path"];
+    }
+    if (context_map_.contains(":method")) {
+      context_method_ = context_map_[":method"];
+    }
   }
   absl::string_view protocol() const override { return context_protocol_; }
   absl::string_view host() const override { return context_host_; }
@@ -891,21 +905,18 @@ public:
       }
     }
   }
-  absl::optional<absl::string_view> getByKey(absl::string_view key) const override {
+  absl::optional<absl::string_view> get(absl::string_view key) const override {
     auto iter = context_map_.find(key);
     if (iter == context_map_.end()) {
       return absl::nullopt;
     }
     return iter->second;
   }
-  void setByKey(absl::string_view key, absl::string_view val) override {
+
+  void set(absl::string_view key, absl::string_view val) override {
     context_map_.insert({std::string(key), std::string(val)});
   }
-  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
-    setByKey(key, val);
-  }
-  void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
-  void removeByKey(absl::string_view key) override { context_map_.erase(std::string(key)); }
+  void remove(absl::string_view key) override { context_map_.erase(std::string(key)); }
 
   std::string context_protocol_;
   std::string context_host_;
@@ -1147,38 +1158,6 @@ public:
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
-
-  // Tracing::TraceContext
-  absl::string_view protocol() const override { return header_map_->getProtocolValue(); }
-  absl::string_view host() const override { return header_map_->getHostValue(); }
-  absl::string_view path() const override { return header_map_->getPathValue(); }
-  absl::string_view method() const override { return header_map_->getMethodValue(); }
-  void forEach(IterateCallback callback) const override {
-    ASSERT(header_map_);
-    header_map_->iterate([cb = std::move(callback)](const HeaderEntry& entry) {
-      if (cb(entry.key().getStringView(), entry.value().getStringView())) {
-        return HeaderMap::Iterate::Continue;
-      }
-      return HeaderMap::Iterate::Break;
-    });
-  }
-  absl::optional<absl::string_view> getByKey(absl::string_view key) const override {
-    ASSERT(header_map_);
-    return header_map_->getByKey(key);
-  }
-  void setByKey(absl::string_view key, absl::string_view value) override {
-    ASSERT(header_map_);
-    header_map_->setByKey(key, value);
-  }
-  void setByReference(absl::string_view key, absl::string_view val) override {
-    ASSERT(header_map_);
-    header_map_->setByReference(key, val);
-  }
-  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
-    ASSERT(header_map_);
-    header_map_->setByReferenceKey(key, val);
-  }
-  void removeByKey(absl::string_view key) override { header_map_->removeByKey(key); }
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;

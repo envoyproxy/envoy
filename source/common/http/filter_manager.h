@@ -617,6 +617,9 @@ public:
   OptRef<const Network::FilterChainInfo> filterChainInfo() const override {
     return StreamInfoImpl::downstreamAddressProvider().filterChainInfo();
   }
+  OptRef<const Network::ListenerInfo> listenerInfo() const override {
+    return StreamInfoImpl::downstreamAddressProvider().listenerInfo();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
@@ -1056,9 +1059,11 @@ private:
       // to verify we do not encode1xx headers more than once per
       // filter.
       static constexpr uint32_t Encode1xxHeaders  = 0x100;
-      // Used to indicate that we're processing the final [En|De]codeData frame,
-      // i.e. end_stream = true
-      static constexpr uint32_t LastDataFrame = 0x200;
+      // Used to indicate that one of the following conditions is true:
+      // 1. The filter manager is processing the final [En|De]codeData frame.
+      // 2. The filter manager is in [En|De]codeHeaders and is processing a
+      //    header-only request or response.
+      static constexpr uint32_t EndOfStream = 0x200;
 
       // Masks for filter call state.
       static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeMetadata | DecodeTrailers;

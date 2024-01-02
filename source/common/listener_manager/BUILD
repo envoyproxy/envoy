@@ -24,6 +24,7 @@ envoy_cc_library(
         ":connection_handler_lib",
         ":filter_chain_manager_lib",
         ":lds_api_lib",
+        ":listener_info_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/network:connection_interface",

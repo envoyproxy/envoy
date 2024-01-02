@@ -206,7 +206,11 @@ TEST_F(DatadogTracerSpanTest, SpawnChild) {
   EXPECT_NE(nullptr, child_ptr);
   const datadog::tracing::SpanData& child = *child_ptr;
   EXPECT_EQ(estimateTime(child_start).wall, child.start.wall);
-  EXPECT_EQ("child", child.name);
+  // Setting the operation name actually sets the resource name, because
+  // Envoy's notion of operation name more closely matches Datadog's notion of
+  // resource name. The actual operation name is hard-coded as "envoy.proxy".
+  EXPECT_EQ("child", child.resource);
+  EXPECT_EQ("envoy.proxy", child.name);
   EXPECT_EQ(id_, child.trace_id);
   EXPECT_EQ(id_, child.span_id);
   EXPECT_EQ(id_, child.parent_id);

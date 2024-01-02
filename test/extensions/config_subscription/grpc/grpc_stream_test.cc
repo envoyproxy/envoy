@@ -110,21 +110,21 @@ TEST_F(GrpcStreamTest, LogClose) {
   // Failures with statuses that do not need special handling. They are always logged in the same
   // way and so never saved.
   {
-    EXPECT_FALSE(grpc_stream_->getCloseStatus().has_value());
+    EXPECT_FALSE(grpc_stream_->getCloseStatusForTest().has_value());
 
     // Benign status: debug.
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     EXPECT_LOG_CONTAINS("debug", "gRPC config stream to test_destination closed", {
       grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "Ok");
     });
-    EXPECT_FALSE(grpc_stream_->getCloseStatus().has_value());
+    EXPECT_FALSE(grpc_stream_->getCloseStatusForTest().has_value());
 
     // Non-retriable failure: warn.
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     EXPECT_LOG_CONTAINS("warn", "gRPC config stream to test_destination closed", {
       grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::NotFound, "Not Found");
     });
-    EXPECT_FALSE(grpc_stream_->getCloseStatus().has_value());
+    EXPECT_FALSE(grpc_stream_->getCloseStatusForTest().has_value());
   }
   // Repeated failures that warn after enough time.
   {
@@ -133,7 +133,7 @@ TEST_F(GrpcStreamTest, LogClose) {
     EXPECT_LOG_CONTAINS("debug", "gRPC config stream to test_destination closed", {
       grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Unavailable, "Unavailable");
     });
-    EXPECT_EQ(grpc_stream_->getCloseStatus().value(),
+    EXPECT_EQ(grpc_stream_->getCloseStatusForTest().value(),
               Grpc::Status::WellKnownGrpcStatus::Unavailable);
 
     // Different retriable failure: warn.
@@ -147,7 +147,7 @@ TEST_F(GrpcStreamTest, LogClose) {
                               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                               "Deadline Exceeded");
                         });
-    EXPECT_EQ(grpc_stream_->getCloseStatus().value(),
+    EXPECT_EQ(grpc_stream_->getCloseStatusForTest().value(),
               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
 
     // Same retriable failure after a short amount of time: debug.
@@ -157,7 +157,7 @@ TEST_F(GrpcStreamTest, LogClose) {
       grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                                   "Deadline Exceeded");
     });
-    EXPECT_EQ(grpc_stream_->getCloseStatus().value(),
+    EXPECT_EQ(grpc_stream_->getCloseStatusForTest().value(),
               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
 
     // Same retriable failure after a long time: warn.
@@ -169,7 +169,7 @@ TEST_F(GrpcStreamTest, LogClose) {
           grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                                       "Deadline Exceeded");
         });
-    EXPECT_EQ(grpc_stream_->getCloseStatus().value(),
+    EXPECT_EQ(grpc_stream_->getCloseStatusForTest().value(),
               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
 
     // Warn again, using the newest message.
@@ -180,7 +180,7 @@ TEST_F(GrpcStreamTest, LogClose) {
           grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                                       "new message");
         });
-    EXPECT_EQ(grpc_stream_->getCloseStatus().value(),
+    EXPECT_EQ(grpc_stream_->getCloseStatusForTest().value(),
               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
 
     // Different retriable failure, using the most recent error message from the previous one.
@@ -193,7 +193,7 @@ TEST_F(GrpcStreamTest, LogClose) {
                           grpc_stream_->onRemoteClose(
                               Grpc::Status::WellKnownGrpcStatus::Unavailable, "Unavailable");
                         });
-    EXPECT_EQ(grpc_stream_->getCloseStatus().value(),
+    EXPECT_EQ(grpc_stream_->getCloseStatusForTest().value(),
               Grpc::Status::WellKnownGrpcStatus::Unavailable);
   }
 
@@ -204,12 +204,12 @@ TEST_F(GrpcStreamTest, LogClose) {
     grpc_stream_->establishNewStream();
     EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
     // Status isn't cleared yet.
-    EXPECT_EQ(grpc_stream_->getCloseStatus().value(),
+    EXPECT_EQ(grpc_stream_->getCloseStatusForTest().value(),
               Grpc::Status::WellKnownGrpcStatus::Unavailable);
 
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     grpc_stream_->onReceiveMessage(std::move(response));
-    EXPECT_FALSE(grpc_stream_->getCloseStatus().has_value());
+    EXPECT_FALSE(grpc_stream_->getCloseStatusForTest().has_value());
   }
 }
 

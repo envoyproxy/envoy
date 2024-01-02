@@ -36,11 +36,10 @@ same or different weights.
   host which has the fewest active requests (`Mitzenmacher et al.
   <https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
   approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
-  choices). The P2C load balancer has the property that a host with the highest number of active
-  requests in the cluster will never receive new requests. It will be allowed to drain until it is
-  less than or equal to all of the other hosts. The number of hosts chosen can be changed by setting
-  ``choice_count``.
-
+  choices). The P2C load balancer has the property that host weights will decrease as the number of
+  active requests on those hosts increases. P2C selection is particularly useful for load
+  balancer implementations due to its resistance to
+  [herding behavior](https://en.wikipedia.org/wiki/Thundering_herd_problem).
 * *all weights not equal*:  If two or more hosts in the cluster have different load balancing
   weights, the load balancer shifts into a mode where it uses a weighted round robin schedule in
   which weights are dynamically adjusted based on the host's request load at the time of selection.
