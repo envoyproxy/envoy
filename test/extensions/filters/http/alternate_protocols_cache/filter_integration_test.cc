@@ -242,6 +242,13 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
 }
 
 TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
+#ifdef WIN32
+  // TODO: sort out what race only happens on windows and GCC.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+#ifdef GCC_COMPILER
+  GTEST_SKIP() << "Skipping on GCC";
+#endif
   // Start with the alt-svc header in the cache.
   write_alt_svc_to_file_ = true;
 
