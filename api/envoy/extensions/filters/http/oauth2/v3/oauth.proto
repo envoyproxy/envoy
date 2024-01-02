@@ -133,6 +133,9 @@ message OAuth2Config {
   google.protobuf.BoolValue use_refresh_token = 12;
 
   // The default lifetime in seconds of the access token, if omitted by the authorization server.
+  //
+  // If this value is not set, it will default to ``0s``. In this case, the expiry must be set by
+  // the authorization server or the OAuth flow will fail.
   google.protobuf.Duration default_expires_in = 13;
 }
 
