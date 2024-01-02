@@ -22,6 +22,11 @@ behavior_changes:
     Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
     is properly extracted. This changes the Prometheus name from
     dns_filter_myprefix_local_a_record_answers{} to dns_filter_local_a_record_answers{envoy.dns_filter_prefix="myprefix"}.
+- area: stats connection_limit
+  change: |
+    Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.network.connection_limit.v3.ConnectionLimit>`
+    is properly extracted. This changes the Prometheus name from ``envoy_connection_limit_myprefix_limited_connections{}`` to
+    ``envoy_connection_limit_limited_connections{envoy_connection_limit_prefix="myprefix"}``.
 - area: http2
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
@@ -126,6 +131,9 @@ bug_fixes:
   change: |
     Fixed a bug where a histogram bucket counts were wrong. Additionally, the number of buckets is fixed and is now
     one element larger than the explicit bounds elements, as required by the specification.
+- area: tracing
+  change: |
+    Fixed a bug where child spans produced by the Datadog tracer would have an incorrect operation name.
 - area: DNS
   change: |
     Fixed a race condition that when multiple requests with the same authority header are sent to Envoy, sometimes some requests
@@ -320,6 +328,12 @@ new_features:
     to add multiple namespaces with one filter and config to overwrite existing metadata is opt-in.
     :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata>`
     may now be used to configure the ``set_metadata`` filter.
+- area: lua
+  change: |
+    Added lua extension of router cluster specifier plugin to support selecting cluster dynamically by lua code.
+- area: redis
+  change: |
+    Added support for the getdel command.
 
 deprecated:
 - area: wasm
