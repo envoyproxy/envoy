@@ -437,6 +437,13 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   dns_filter_prefix.value_ = "my_dns_prefix";
   regex_tester.testRegex("dns_filter.my_dns_prefix.local_a_record_answers",
                          "dns_filter.local_a_record_answers", {dns_filter_prefix});
+
+  // Connection Limit Filter Prefix
+  Tag connection_limit_prefix;
+  connection_limit_prefix.name_ = tag_names.CONNECTION_LIMIT_PREFIX;
+  connection_limit_prefix.value_ = "my_connection_limit_prefix";
+  regex_tester.testRegex("connection_limit.my_connection_limit_prefix.limited_connections",
+                         "connection_limit.limited_connections", {connection_limit_prefix});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
