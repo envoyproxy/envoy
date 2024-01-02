@@ -178,34 +178,33 @@ class HttpRequestLineGenerator(LineGenerator):
                     await self._queue.put(line)
 
 
+async def _full_http3_request_task(url: str) -> str:
+    proc = await asyncio.create_subprocess_exec(
+        IntegrationTest.h3_request,
+        f"--ca-certs={IntegrationTest.ca_certs}",
+        url,
+        stdout=asyncio.subprocess.PIPE,
+    )
+    (stdout, _) = await proc.communicate()
+    await proc.wait()
+    return stdout.decode("utf-8")
+
+
 def _full_http3_request(url: str) -> Awaitable[str]:
-
-    async def req() -> str:
-        proc = await asyncio.create_subprocess_exec(
-            IntegrationTest.h3_request,
-            f"--ca-certs={IntegrationTest.ca_certs}",
-            url,
-            stdout=asyncio.subprocess.PIPE,
-        )
-        (stdout, _) = await proc.communicate()
-        await proc.wait()
-        return stdout.decode("utf-8")
-
-    task = asyncio.create_task(req())
-    return task
+    return asyncio.create_task(_full_http3_request_task(url))
 
 
-def _full_http_request(url: str) -> Awaitable[str]:
+async def _full_http_request_task(url: str) -> str:
     # Separate session per request is against aiohttp idioms, but is
     # intentional here because the point of the test is verifying
     # where connections go - reusing a connection would do the wrong thing.
-    async def req() -> str:
-        async with ClientSession() as session:
-            async with session.get(url) as response:
-                return await response.text()
+    async with ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.text()
 
-    task = asyncio.create_task(req())
-    return task
+
+def _full_http_request(url: str) -> Awaitable[str]:
+    return asyncio.create_task(_full_http_request_task(url))
 
 
 def filter_chains(codec_type: str = "AUTO") -> str:
