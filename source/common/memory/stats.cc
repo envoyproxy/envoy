@@ -117,13 +117,13 @@ void Stats::dumpStatsToLog() {
 void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine() {
   ENVOY_LOG_MISC(debug, "Started tcmallocProcessBackgroundActionsThreadRoutine");
   while (true) {
-    Thread::LockGuard guard(mutex_);
-    memory_release_event_.wait(mutex_);
+    Thread::ReleasableLockGuard guard(mutex_);
     if (terminating_) {
+      guard.release();
       return;
-    } else {
-      MallocExtension::instance()->ReleaseToSystem(bytes_to_release_);
     }
+    memory_release_event_.wait(mutex_);
+    MallocExtension::instance()->ReleaseToSystem(bytes_to_release_);
   }
 }
 

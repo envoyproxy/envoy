@@ -98,6 +98,8 @@ private:
   Thread::MutexBasicLockable mutex_{};
   bool terminating_ ABSL_GUARDED_BY(mutex_){false};
   Thread::CondVar memory_release_event_;
+  // Used for testing.
+  friend class AllocatorManagerPeer;
 
   /**
    * Configures tcmalloc release rate from the page heap. If `bytes_to_release_`
