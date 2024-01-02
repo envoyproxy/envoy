@@ -477,7 +477,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
         release_date = "2023-04-16",
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.filters.http.lua"],
+        extensions = [
+            "envoy.filters.http.lua",
+            "envoy.router.cluster_specifier_plugin.lua",
+        ],
         cpe = "cpe:2.3:a:luajit:luajit:*",
         license = "MIT",
         license_url = "https://github.com/LuaJIT/LuaJIT/blob/{version}/COPYRIGHT",

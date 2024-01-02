@@ -320,6 +320,12 @@ new_features:
     to add multiple namespaces with one filter and config to overwrite existing metadata is opt-in.
     :ref:`untyped_metadata <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.metadata>`
     may now be used to configure the ``set_metadata`` filter.
+- area: lua
+  change: |
+    Added lua extension of router cluster specifier plugin to support selecting cluster dynamically by lua code.
+- area: redis
+  change: |
+    Added support for the getdel command.
 
 deprecated:
 - area: wasm

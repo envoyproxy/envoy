@@ -50,7 +50,7 @@ jobs:
           rbe: false
           steps-pre: |
             - id: url
-              uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.20
+              uses: envoyproxy/toolshed/gh-actions/jq@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
               with:
                 options: -Rr
                 input: >-
@@ -66,15 +66,15 @@ jobs:
                     end
                   | . as $bucket
                   | "https://storage.googleapis.com/\($bucket)/\($sha)"
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.20
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
               with:
                 url: %{{ steps.url.outputs.value }}/docker/envoy.tar
                 variant: dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.20
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
               with:
                 url: %{{ steps.url.outputs.value }}/docker/envoy-contrib.tar
                 variant: contrib-dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.20
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
               with:
                 url: %{{ steps.url.outputs.value }}/docker/envoy-google-vrp.tar
                 variant: google-vrp-dev
@@ -84,5 +84,6 @@ jobs:
                 # Install expected host packages
                 export DEBIAN_FRONTEND=noninteractive
                 sudo apt-get -qq update -y
-                sudo apt-get -qq install -y --no-install-recommends expect
+                sudo apt-get -qq install -y --no-install-recommends expect gettext whois
+                sudo snap install yq
               shell: bash
