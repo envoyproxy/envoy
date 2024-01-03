@@ -120,6 +120,12 @@ envoy_extension_cc_test(
     name = "tcp_grpc_access_log_integration_test",
     size = "large",
     srcs = ["tcp_grpc_access_log_integration_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows CEL build
+        "//conditions:default": [
+            "-DUSE_CEL",
+        ],
+    }),
     extension_names = ["envoy.access_loggers.tcp_grpc"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -145,5 +151,10 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/network/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/accesslog/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows CEL build
+        "//conditions:default": [
+            "//source/extensions/filters/network/rbac:config",
+        ],
+    }),
 )
