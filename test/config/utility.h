@@ -159,7 +159,8 @@ public:
 
   static void
   initializeTls(const ServerSslOptions& options,
-                envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
+                envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context,
+                bool http3);
 
   static void initializeTlsKeyLog(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
