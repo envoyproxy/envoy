@@ -34,8 +34,8 @@
 #include "source/extensions/upstreams/http/generic/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
-#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #endif
 
 #ifdef ENVOY_ENABLE_QUIC

@@ -1284,6 +1284,16 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.setNodeMetadata(node_metadata);
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_getNativeFilterConfig(JNIEnv* env, jclass,
+                                                                       jstring filter_name_jstr) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::string filter_name = Envoy::JNI::javaStringToString(jni_helper, filter_name_jstr);
+  std::string filter_config = EngineBuilder::nativeNameToConfig(filter_name);
+
+  return jni_helper.newStringUtf(filter_config.c_str()).release();
+}
+
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
     JNIEnv* env, jclass, jlong connect_timeout_seconds, jlong dns_refresh_seconds,
     jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,

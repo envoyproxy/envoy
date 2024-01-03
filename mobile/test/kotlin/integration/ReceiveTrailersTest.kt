@@ -75,7 +75,7 @@ class ReceiveTrailersTest {
           name = "test_platform_filter",
           factory = { ErrorValidationFilter(trailersReceived) }
         )
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .addNativeFilter("test_remote_response", "[$TEST_RESPONSE_FILTER_TYPE]{}")
         .build()
 
     val client = engine.streamClient()

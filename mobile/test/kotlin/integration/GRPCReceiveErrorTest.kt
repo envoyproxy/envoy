@@ -21,8 +21,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val PBF_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
 private const val FILTER_NAME = "error_validation_filter"
 
 class GRPCReceiveErrorTest {
@@ -87,10 +85,6 @@ class GRPCReceiveErrorTest {
         .addPlatformFilter(
           name = FILTER_NAME,
           factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
-        )
-        .addNativeFilter(
-          "envoy.filters.http.platform_bridge",
-          "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}"
         )
         .build()
 

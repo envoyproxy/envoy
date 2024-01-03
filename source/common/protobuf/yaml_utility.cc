@@ -180,37 +180,6 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api) {
-  auto file_or_error = api.fileSystem().fileReadToEnd(path);
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
-  const std::string contents = file_or_error.value();
-  // If the filename ends with .pb, attempt to parse it as a binary proto.
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
-    // Attempt to parse the binary format.
-    if (message.ParseFromString(contents)) {
-      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
-    }
-    return;
-  }
-
-  // If the filename ends with .pb_text, attempt to parse it as a text proto.
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
-    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-      return;
-    }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                         message.GetTypeName() + ")");
-  }
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
-      absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
-    loadFromYaml(contents, message, validation_visitor);
-  } else {
-    loadFromJson(contents, message, validation_visitor);
-  }
-}
-
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
                                                   const bool block_print,
                                                   const bool always_print_primitive_fields) {

@@ -80,21 +80,22 @@ Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeGetXdsTestServerPort
   return getXdsServerPort();
 }
 
-#ifdef ENVOY_ENABLE_YAML
 extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeSendDiscoveryResponse(JNIEnv* env,
-                                                                                  jclass clazz,
-                                                                                  jstring yaml) {
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeSendDiscoveryResponse(
+    JNIEnv* env, jclass clazz, jstring response_str) {
   jni_log("[XTS]", "sending DiscoveryResponse from the xDS server");
-  const char* yaml_chars = env->GetStringUTFChars(yaml, /* isCopy= */ nullptr);
-  // The yaml utilities have non-relevant thread asserts.
+  const char* response_chars = env->GetStringUTFChars(response_str, /* isCopy= */ nullptr);
+  // The response utilities have non-relevant thread asserts.
   Envoy::Thread::SkipAsserts skip;
   envoy::service::discovery::v3::DiscoveryResponse response;
-  Envoy::TestUtility::loadFromYaml(yaml_chars, response);
-  sendDiscoveryResponse(response);
-  env->ReleaseStringUTFChars(yaml, yaml_chars);
-}
+#ifdef ENVOY_ENABLE_YAML
+  Envoy::TestUtility::loadFromYaml(response_chars, response);
+#else
+  Envoy::Protobuf::TextFormat::ParseFromString(response_chars, &response);
 #endif
+  sendDiscoveryResponse(response);
+  env->ReleaseStringUTFChars(response_str, response_chars);
+}
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeShutdownXdsTestServer(JNIEnv* env,
@@ -103,14 +104,16 @@ Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeShutdownXdsTestServe
   shutdownXdsServer();
 }
 
-#ifdef ENVOY_ENABLE_YAML
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeCreateYaml(JNIEnv* env, jclass,
                                                                        jlong bootstrap_ptr) {
   Envoy::Thread::SkipAsserts skip_asserts;
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap(
       reinterpret_cast<envoy::config::bootstrap::v3::Bootstrap*>(bootstrap_ptr));
+#ifdef ENVOY_ENABLE_YAML
   std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
+#else
+  std::string yaml = bootstrap->ShortDebugString();
+#endif
   return env->NewStringUTF(yaml.c_str());
 }
-#endif

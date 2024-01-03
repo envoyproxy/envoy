@@ -62,20 +62,28 @@ class XdsTest {
     engine.waitForStatGe("cluster_manager.cluster_added", 2)
     val cdsResponse =
       """
-      version_info: v1
-      resources:
-      - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
-        name: my_cluster
-        type: STATIC
-        connect_timeout: 5s
-        typed_extension_protocol_options:
-          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-            explicit_http_config:
-              http2_protocol_options:
-                {}
-      type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
-      nonce: nonce1
+resources {
+  [type.googleapis.com/envoy.config.cluster.v3.Cluster] {
+    name: "my_cluster"
+    type: STATIC
+    connect_timeout {
+      seconds: 5
+    }
+    typed_extension_protocol_options {
+      key: "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"
+      value {
+        [type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions] {
+          explicit_http_config {
+            http2_protocol_options {
+            }
+          }
+        }
+      }
+    }
+  }
+}
+type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+nonce: "nonce1"
     """
         .trimIndent()
     TestJni.sendDiscoveryResponse(cdsResponse)

@@ -360,14 +360,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
-#else
-    if (!config_path.empty()) {
-      throwEnvoyExceptionOrPanic("Cannot load from file with YAML disabled\n");
-    }
-    UNREFERENCED_PARAMETER(api);
-#endif
   }
   if (!config_yaml.empty()) {
 #ifdef ENVOY_ENABLE_YAML
@@ -376,7 +369,9 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
 #else
-    throwEnvoyExceptionOrPanic("Cannot load from YAML with YAML disabled\n");
+    // Treat the yaml as proto
+    envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
+    Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
 #endif
   }
   if (config_proto.ByteSizeLong() != 0) {

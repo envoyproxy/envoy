@@ -255,6 +255,7 @@ test:mobile-remote-ci-android --build_tests_only
 test:mobile-remote-ci-android --config=test-android
 test:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --define=signal_trace=disabled
+test:mobile-remote-ci-android --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
@@ -292,6 +293,7 @@ build:mobile-remote-ci-macos-kotlin --define=google_grpc=disabled
 build:mobile-remote-ci-macos-kotlin --define=envoy_mobile_xds=disabled
 build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
 build:mobile-remote-ci-macos-kotlin --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
+build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --config=ios

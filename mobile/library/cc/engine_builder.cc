@@ -342,14 +342,23 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
   return *this;
 }
 
+std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
+#ifndef ENVOY_ENABLE_YAML
+  return absl::StrCat("[type.googleapis.com/"
+                      "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
+                      "platform_filter_name: \"",
+                      name, "\" }");
+#else
+  return absl::StrCat(
+      "{'@type': "
+      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
+      "platform_filter_name: ",
+      name, "}");
+#endif
+}
+
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
-  addNativeFilter(
-      "envoy.filters.http.platform_bridge",
-      absl::StrCat(
-          "{'@type': "
-          "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
-          "platform_filter_name: ",
-          name, "}"));
+  addNativeFilter("envoy.filters.http.platform_bridge", nativeNameToConfig(name));
   return *this;
 }
 
@@ -406,13 +415,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
-#ifdef ENVOY_ENABLE_YAML
     auto* native_filter = hcm->add_http_filters();
     native_filter->set_name((*filter).name_);
+#ifdef ENVOY_ENABLE_YAML
     MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
 #else
-    IS_ENVOY_BUG("native filter chains can not be added when YAML is compiled out.");
+    Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
+                                          native_filter->mutable_typed_config());
+    RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
+                   "Failed to parse" + (*filter).typed_config_);
 #endif
   }
 

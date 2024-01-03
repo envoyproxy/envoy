@@ -34,13 +34,13 @@ class SendTrailersTest {
       EngineBuilder(Standard())
         .addNativeFilter(
           "envoy.filters.http.assertion",
-          "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}"
+          "[$ASSERTION_FILTER_TYPE] {match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}"
         )
         .addNativeFilter(
           "envoy.filters.http.buffer",
-          "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":65000}"
+          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 65000 } }"
         )
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .addNativeFilter("test_remote_response", "[$TEST_RESPONSE_FILTER_TYPE]{}")
         .build()
 
     val client = engine.streamClient()

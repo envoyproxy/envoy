@@ -124,6 +124,7 @@ class EngineBuilder {
 public:
   EngineBuilder();
   virtual ~EngineBuilder() {}
+  static std::string nativeNameToConfig(absl::string_view name);
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
