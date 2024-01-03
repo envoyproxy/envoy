@@ -5,9 +5,9 @@
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
