@@ -50,7 +50,6 @@ envoy_extension_cc_test(
 envoy_proto_library(
     name = "evaluator_fuzz_proto",
     srcs = ["evaluator_fuzz.proto"],
-    tags = ["skip_on_windows"],
     deps = [
         "//test/fuzz:common_proto",
         "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
