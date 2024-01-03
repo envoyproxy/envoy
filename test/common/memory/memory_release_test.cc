@@ -41,12 +41,10 @@ protected:
         dispatcher_("test_thread", *api_, time_system_), scope_("memory_release_test.", stats_) {}
 
   void initialiseAllocatorManager(uint64_t bytes_to_release, float release_interval_s) {
-    std::string yaml_config;
-    if (release_interval_s > 0) {
-      yaml_config = fmt::format(ConfigWithInterval, bytes_to_release, release_interval_s);
-    } else {
-      yaml_config = fmt::format(DefaultConfig, bytes_to_release);
-    }
+    const std::string yaml_config =
+        (release_interval_s > 0)
+            ? fmt::format(ConfigWithInterval, bytes_to_release, release_interval_s)
+            : fmt::format(DefaultConfig, bytes_to_release);
     const auto proto_config =
         TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
     allocator_manager_ = std::make_unique<Memory::AllocatorManager>(

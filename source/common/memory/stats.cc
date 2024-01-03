@@ -142,7 +142,7 @@ uint64_t Stats::totalPageHeapUnmapped() { return 0; }
 uint64_t Stats::totalPageHeapFree() { return 0; }
 uint64_t Stats::totalPhysicalBytes() { return 0; }
 void Stats::dumpStatsToLog() {}
-void AllocatorManager::configureBackgroundMemoryRelease() {}
+void AllocatorManager::configureBackgroundMemoryRelease(Event::Dispatcher&) {}
 void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine() {}
 
 } // namespace Memory
