@@ -124,11 +124,13 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
     access_logs.push_back(current_access_log);
   }
 
+  const std::string stat_prefix = fmt::format("generic_proxy.{}.", proto_config.stat_prefix());
+
   const FilterConfigSharedPtr config = std::make_shared<FilterConfigImpl>(
-      proto_config.stat_prefix(), std::move(factories.first),
+      stat_prefix, std::move(factories.first),
       routeConfigProviderFromProto(proto_config, context, *route_config_provider_manager),
-      filtersFactoryFromProto(proto_config.filters(), proto_config.codec_config(),
-                              proto_config.stat_prefix(), context),
+      filtersFactoryFromProto(proto_config.filters(), proto_config.codec_config(), stat_prefix,
+                              context),
       std::move(tracer), std::move(tracing_config), std::move(access_logs), context);
 
   return [route_config_provider_manager, tracer_manager, config, &server_context,
