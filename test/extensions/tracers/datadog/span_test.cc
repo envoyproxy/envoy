@@ -187,7 +187,8 @@ TEST_F(DatadogTracerSpanTest, SetTagResourceName) {
 //   that occurred. It's debatable whether this more closely corresponds to
 //   Datadog's `.set_error_message(...)` or to `.set_error_type(...)`, but this
 //   library chooses `.set_error_message(...)`, which has the result of setting
-//   the "error.message" tag.
+//   the "error.message" tag. The "error.reason" tag is also set to the same
+//   value.
 // - Note that calling `.set_error_message(...)` causes `.set_error(true)` to
 //   be called. However, it might be possible for Envoy to set the
 //   "error.reason" tag without also setting the "error" tag. This library
@@ -209,7 +210,9 @@ TEST_F(DatadogTracerSpanTest, SetTagError) {
   const datadog::tracing::SpanData& data = *data_ptr;
 
   ASSERT_TRUE(data.error);
+  ASSERT_EQ(0, data.tags.count(Tags.Error));
   ASSERT_EQ(0, data.tags.count("error.message"));
+  ASSERT_EQ(0, data.tags.count(Tags.ErrorReason));
 }
 
 TEST_F(DatadogTracerSpanTest, SetTagErrorBogus) {
@@ -230,7 +233,9 @@ TEST_F(DatadogTracerSpanTest, SetTagErrorBogus) {
   const datadog::tracing::SpanData& data = *data_ptr;
 
   ASSERT_TRUE(data.error);
+  ASSERT_EQ(0, data.tags.count(Tags.Error));
   ASSERT_EQ(0, data.tags.count("error.message"));
+  ASSERT_EQ(0, data.tags.count(Tags.ErrorReason));
 }
 
 TEST_F(DatadogTracerSpanTest, SetTagErrorReason) {
@@ -246,11 +251,14 @@ TEST_F(DatadogTracerSpanTest, SetTagErrorReason) {
   ASSERT_NE(nullptr, data_ptr);
   const datadog::tracing::SpanData& data = *data_ptr;
 
-  // In addition to setting the "error.message" tag, we also have
-  // `.error == true`.
+  // In addition to setting the "error.message" and "error.reason" tags, we also
+  // have `.error == true`. But still there is no "error" tag.
   ASSERT_TRUE(data.error);
+  ASSERT_EQ(0, data.tags.count(Tags.Error));
   ASSERT_EQ(1, data.tags.count("error.message"));
   ASSERT_EQ("not enough minerals", data.tags.at("error.message"));
+  ASSERT_EQ(1, data.tags.count(Tags.ErrorReason));
+  ASSERT_EQ("not enough minerals", data.tags.at(Tags.ErrorReason));
 }
 
 TEST_F(DatadogTracerSpanTest, InjectContext) {

@@ -62,15 +62,18 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
     // resource name directly; so, here if the tag name is "resource.name", we
     // actually set the resource name instead of setting a tag.
     span_->set_resource_name(value);
-  } else if (name == Tags.Error && value == Tags.True) {
+  } else if (name == Tags.Error) {
     // Envoy marks spans as containing errors by setting the "error" tag.
     // Here we translate into the dd-trace-cpp equivalent.
-    span_->set_error(true);
+    if (value == Tags.True) {
+      span_->set_error(true);
+    }
   } else if (name == Tags.ErrorReason) {
     // Envoy conveys information about an error by setting the "error.reason"
     // tag.
     // Here we translate into the dd-trace-cpp equivalent.
     span_->set_error_message(value);
+    span_->set_tag(name, value);
   } else {
     span_->set_tag(name, value);
   }
