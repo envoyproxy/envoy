@@ -508,7 +508,11 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
       // "internal_listener" is present.
       if (absl::c_none_of(
               listener_factory_context_->serverFactoryContext().bootstrap().bootstrap_extensions(),
-              [=](const auto extension) { return extension.name() == "internal_listener"; })) {
+              [=](const auto extension) {
+                return extension.typed_config().type_url() ==
+                       "type.googleapis.com/"
+                       "envoy.extensions.bootstrap.internal_listener.v3.InternalListener";
+              })) {
         throw EnvoyException(
             fmt::format("error adding listener named '{}': internal_listener is mandatory", name_));
       }
