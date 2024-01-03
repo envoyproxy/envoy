@@ -27,6 +27,11 @@ behavior_changes:
     Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.network.connection_limit.v3.ConnectionLimit>`
     is properly extracted. This changes the Prometheus name from ``envoy_connection_limit_myprefix_limited_connections{}`` to
     ``envoy_connection_limit_limited_connections{envoy_connection_limit_prefix="myprefix"}``.
+- area: stats rbac
+  change: |
+    Fixed tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>`
+    is properly extracted. This changes the Prometheus name from ``envoy_myprefixrbac_allowed{}`` to
+    ``envoy_rbac_allowed{envoy_rbac_prefix="myprefix"}``.
 - area: http2
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
