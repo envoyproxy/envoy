@@ -631,7 +631,9 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
   EXPECT_CALL(*server_codec_, respond(_, _, _))
       .WillOnce(Invoke([&](Status status, absl::string_view, const Request&) -> ResponsePtr {
         auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-        response->status_ = std::move(status);
+        response->status_ = {static_cast<uint32_t>(status.code()),
+                             status.code() == StatusCode::kOk};
+        response->message_ = status.message();
         return response;
       }));
 
@@ -640,7 +642,8 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame& response, EncodingCallbacks& callback) {
         Buffer::OwnedImpl buffer;
-        EXPECT_EQ(dynamic_cast<const Response*>(&response)->status().message(), "test_detail");
+        EXPECT_EQ(dynamic_cast<const Response*>(&response)->status().code(),
+                  static_cast<uint32_t>(StatusCode::kUnknown));
         buffer.add("test");
         callback.onEncodingSuccess(buffer, true);
       }));

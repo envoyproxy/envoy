@@ -138,8 +138,8 @@ genHeaders(const std::string& host, const std::string& path, const std::string& 
   }
 
   if (random_value_pair.has_value()) {
-    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair.value().first),
-                  random_value_pair.value().second);
+    hdrs.setCopy(Envoy::Http::LowerCaseString(random_value_pair.value().first),
+                 random_value_pair.value().second);
   }
   return hdrs;
 }
@@ -2204,7 +2204,7 @@ most_specific_header_mutations_wins: true
 
 // Validate that we can't add :-prefixed or Host request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddNoHostOrPseudoHeader) {
-  for (const std::string& header :
+  for (const std::string header :
        {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:
@@ -2230,7 +2230,7 @@ virtual_hosts:
 
 // Validate that we can't remove :-prefixed request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
-  for (const std::string& header :
+  for (const std::string header :
        {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:

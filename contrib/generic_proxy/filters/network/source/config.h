@@ -23,7 +23,7 @@ public:
                                     Envoy::Server::Configuration::FactoryContext& context) override;
 
   static std::pair<CodecFactoryPtr, ProxyFactoryPtr>
-  factoriesFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,
+  factoriesFromProto(const TypedExtensionConfig& codec_config,
                      Server::Configuration::FactoryContext& context);
 
   static Rds::RouteConfigProviderSharedPtr
@@ -31,9 +31,10 @@ public:
                                Server::Configuration::FactoryContext& context,
                                RouteConfigProviderManager& route_config_provider_manager);
 
-  static std::vector<NamedFilterFactoryCb> filtersFactoryFromProto(
-      const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
-      const std::string stats_prefix, Server::Configuration::FactoryContext& context);
+  static std::vector<NamedFilterFactoryCb>
+  filtersFactoryFromProto(const ProtobufWkt::RepeatedPtrField<TypedExtensionConfig>& filters,
+                          const TypedExtensionConfig& codec_config, const std::string stats_prefix,
+                          Server::Configuration::FactoryContext& context);
 };
 
 } // namespace GenericProxy

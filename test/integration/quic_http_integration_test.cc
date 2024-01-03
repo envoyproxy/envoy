@@ -18,7 +18,7 @@
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
@@ -1112,30 +1112,30 @@ TEST_P(QuicHttpIntegrationTest, NoStreams) {
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationSucceeds) {
   // Config the client to defer cert validation by 5ms.
-  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
-      new envoy::config::core::v3::TypedExtensionConfig();
+  auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+      envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
+  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
   initialize();
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
   EXPECT_TRUE(codec_client_->connected());
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterDisconnect) {
-  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
-      new envoy::config::core::v3::TypedExtensionConfig();
+  auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+      envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
+  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
 
   // Change the configured cert validation to defer 1s.
   auto* cert_validator_factory =
@@ -1166,15 +1166,15 @@ typed_config:
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterTearDown) {
-  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
-      new envoy::config::core::v3::TypedExtensionConfig();
+  auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+      envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
+  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
   // Change the configured cert validation to defer 1s.
   auto cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::

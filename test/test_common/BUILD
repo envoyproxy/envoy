@@ -138,6 +138,7 @@ envoy_cc_test_library(
         "//envoy/http:codec_interface",
         "//envoy/network:address_interface",
         "//envoy/server/overload:thread_local_overload_state",
+        "//envoy/tracing:trace_context_interface",
         "//source/common/api:api_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
