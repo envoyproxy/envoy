@@ -14,7 +14,6 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "datadog/clock.h"
 #include "datadog/collector.h"
 #include "datadog/expected.h"
