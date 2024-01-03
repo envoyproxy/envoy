@@ -21,6 +21,7 @@ jobs:
 
     permissions:
       security-events: write  # for github/codeql-action/analyze to upload SARIF results
+      pull-requests: read
     strategy:
       fail-fast: false
 
