@@ -1,4 +1,5 @@
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"

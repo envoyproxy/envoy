@@ -273,6 +273,7 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> filters_proto_config;
+  envoy::config::core::v3::TypedExtensionConfig codec_config;
 
   const std::string yaml_config_0 = R"EOF(
     name: mock_generic_proxy_filter_name_0
@@ -308,9 +309,10 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
 
   // No terminal filter.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
-        EnvoyException, "A terminal L7 filter is necessary for generic proxy");
+    EXPECT_THROW_WITH_MESSAGE(Factory::filtersFactoryFromProto(filters_proto_config, codec_config,
+                                                               "test", factory_context),
+                              EnvoyException,
+                              "A terminal L7 filter is necessary for generic proxy");
   }
 
   // Error terminal filter position.
@@ -318,17 +320,32 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
     ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(true));
 
     EXPECT_THROW_WITH_MESSAGE(
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
+        Factory::filtersFactoryFromProto(filters_proto_config, codec_config, "test",
+                                         factory_context),
         EnvoyException,
         "Terminal filter: mock_generic_proxy_filter_name_0 must be the last generic L7 "
         "filter");
   }
 
+  // Codec validation error.
+  {
+    ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(false));
+    ON_CALL(mock_filter_config_0, validateCodec(_))
+        .WillByDefault(Return(absl::InvalidArgumentError("codec validation error")));
+
+    EXPECT_THROW_WITH_MESSAGE(Factory::filtersFactoryFromProto(filters_proto_config, codec_config,
+                                                               "test", factory_context),
+                              EnvoyException, "codec validation error");
+  }
+
   {
     ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(false));
     ON_CALL(mock_filter_config_1, isTerminalFilter()).WillByDefault(Return(true));
-    auto factories =
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context);
+    ON_CALL(mock_filter_config_0, validateCodec(_)).WillByDefault(Return(absl::OkStatus()));
+    ON_CALL(mock_filter_config_1, validateCodec(_)).WillByDefault(Return(absl::OkStatus()));
+
+    auto factories = Factory::filtersFactoryFromProto(filters_proto_config, codec_config, "test",
+                                                      factory_context);
     EXPECT_EQ(2, factories.size());
   }
 }

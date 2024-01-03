@@ -29,7 +29,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"

@@ -139,7 +139,6 @@ paths:
     - source/common/config/datasource.cc
     - source/common/config/utility.cc
     - source/common/runtime/runtime_impl.cc
-    - source/common/quic/quic_transport_socket_factory.cc
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc

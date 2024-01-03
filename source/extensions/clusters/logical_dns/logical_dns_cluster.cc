@@ -90,7 +90,7 @@ LogicalDnsCluster::~LogicalDnsCluster() {
 }
 
 void LogicalDnsCluster::startResolve() {
-  ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_address_);
+  ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   info_->configUpdateStats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_->resolve(
@@ -98,7 +98,7 @@ void LogicalDnsCluster::startResolve() {
       [this](Network::DnsResolver::ResolutionStatus status,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
-        ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
 
         std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
 

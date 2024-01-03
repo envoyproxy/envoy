@@ -366,7 +366,18 @@ envoy_py_test(
         "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
         "//conditions:default": ["hotrestart_handoff_test.py"],
     }),
-    data = [":hotrestart_main"],
+    args = [
+        "--envoy-binary=$(location :hotrestart_main)",
+        "--h3-request=$(location //tools/h3_request)",
+        "--ca-certs=$(location //test/config/integration/certs:cacert.pem)",
+        "--ca-key=$(location //test/config/integration/certs:cakey.pem)",
+    ],
+    data = [
+        ":hotrestart_main",
+        "//test/config/integration/certs:cacert.pem",
+        "//test/config/integration/certs:cakey.pem",
+        "//tools/h3_request",
+    ],
     main = select({
         "//bazel:disable_hot_restart_or_admin": "null_test.py",
         "//conditions:default": "hotrestart_handoff_test.py",
@@ -379,6 +390,7 @@ envoy_py_test(
     ],
     deps = [
         requirement("aiohttp"),
+        requirement("cryptography"),
     ],
 )
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_proof_source_base.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/server/listener_stats.h"
 
 namespace Envoy {
