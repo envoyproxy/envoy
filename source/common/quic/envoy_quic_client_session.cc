@@ -15,11 +15,12 @@
 namespace Envoy {
 namespace Quic {
 
-// Quic connection doesn't use transport socket object to do handshake. This callback
-// implementation is used by the cert verifier to access Network::Connection interfaces.
-class ConnectionWrapper : public Network::TransportSocketCallbacks {
+// Quic connection doesn't use transport socket object to do handshake. This class is only used to
+// provide extra context during certificate validation. As such it does not implement the various
+// interfaces which are irrelevant to certificate validation.
+class CertValidationContext : public Network::TransportSocketCallbacks {
 public:
-  ConnectionWrapper(EnvoyQuicClientSession& session, Network::IoHandle& io_handle)
+  CertValidationContext(EnvoyQuicClientSession& session, Network::IoHandle& io_handle)
       : session_(session), io_handle_(io_handle) {}
 
   // Network::TransportSocketCallbacks
@@ -37,7 +38,7 @@ private:
   Network::IoHandle& io_handle_;
 };
 
-using ConnectionWrapperPtr = std::unique_ptr<ConnectionWrapper>;
+using CertValidationContextPtr = std::unique_ptr<CertValidationContext>;
 
 // An implementation of the verify context interface.
 class EnvoyQuicProofVerifyContextImpl : public EnvoyQuicProofVerifyContext {
@@ -45,10 +46,10 @@ public:
   EnvoyQuicProofVerifyContextImpl(
       Event::Dispatcher& dispatcher, const bool is_server,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-      QuicSslConnectionInfo& ssl_info, ConnectionWrapperPtr connection_wrapper)
+      QuicSslConnectionInfo& ssl_info, CertValidationContextPtr validation_context)
       : dispatcher_(dispatcher), is_server_(is_server),
         transport_socket_options_(transport_socket_options), ssl_info_(ssl_info),
-        connection_wrapper_(std::move(connection_wrapper)) {}
+        validation_context_(std::move(validation_context)) {}
 
   // EnvoyQuicProofVerifyContext
   bool isServer() const override { return is_server_; }
@@ -60,7 +61,7 @@ public:
   Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext
   extraValidationContext() const override {
     ASSERT(ssl_info_.ssl());
-    return {connection_wrapper_.get()};
+    return {validation_context_.get()};
   }
 
 private:
@@ -68,7 +69,7 @@ private:
   const bool is_server_;
   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options_;
   QuicSslConnectionInfo& ssl_info_;
-  ConnectionWrapperPtr connection_wrapper_;
+  CertValidationContextPtr validation_context_;
 };
 
 EnvoyQuicClientSession::EnvoyQuicClientSession(
@@ -228,8 +229,8 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
       server_id(), this,
       std::make_unique<EnvoyQuicProofVerifyContextImpl>(
           dispatcher_, /*is_server=*/false, transport_socket_options_, *quic_ssl_info_,
-          std::make_unique<ConnectionWrapper>(*this,
-                                              network_connection_->connectionSocket()->ioHandle())),
+          std::make_unique<CertValidationContext>(
+              *this, network_connection_->connectionSocket()->ioHandle())),
       crypto_config(), this, /*has_application_state = */ version().UsesHttp3());
 }
 
