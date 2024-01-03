@@ -15,9 +15,8 @@
 namespace Envoy {
 namespace Quic {
 
-// Quic connection doesn't use transport socket object to do handshake. This class is only used to
-// provide extra context during certificate validation. As such it does not implement the various
-// interfaces which are irrelevant to certificate validation.
+// This class is only used to provide extra context during certificate validation. As such it does
+// not implement the various interfaces which are irrelevant to certificate validation.
 class CertValidationContext : public Network::TransportSocketCallbacks {
 public:
   CertValidationContext(EnvoyQuicClientSession& session, Network::IoHandle& io_handle)
