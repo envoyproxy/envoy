@@ -26,7 +26,7 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
   ASSERT(proto_config.descriptors_size() > 0);
 
   ConfigSharedPtr filter_config(
-      new Config(proto_config, context.scope(), context.getServerFactoryContext().runtime()));
+      new Config(proto_config, context.scope(), context.serverFactoryContext().runtime()));
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 

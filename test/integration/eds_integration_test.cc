@@ -90,6 +90,7 @@ public:
     uint32_t disable_active_hc_endpoints = 0;
     absl::optional<bool> weighted_priority_health = absl::nullopt;
     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
+    absl::optional<uint32_t> drop_overload_numerator = absl::nullopt;
   };
 
   // We need to supply the endpoints via EDS to provide health status. Use a
@@ -109,6 +110,16 @@ public:
       cluster_load_assignment.mutable_policy()->set_weighted_priority_health(
           endpoint_setting.weighted_priority_health.value());
     }
+
+    if (endpoint_setting.drop_overload_numerator.has_value()) {
+      auto* drop_overload = cluster_load_assignment.mutable_policy()->add_drop_overloads();
+      drop_overload->set_category("test");
+      drop_overload->mutable_drop_percentage()->set_denominator(
+          envoy::type::v3::FractionalPercent::HUNDRED);
+      drop_overload->mutable_drop_percentage()->set_numerator(
+          endpoint_setting.drop_overload_numerator.value());
+    }
+
     auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
 
     for (uint32_t i = 0; i < endpoint_setting.total_endpoints; ++i) {
@@ -194,6 +205,27 @@ public:
   }
 
   void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, nullptr); }
+
+  void dropOverloadTest(uint32_t numerator, const std::string& status) {
+    autonomous_upstream_ = true;
+
+    initializeTest(false);
+    EndpointSettingOptions options;
+    options.total_endpoints = 2;
+    options.healthy_endpoints = 2;
+    options.drop_overload_numerator = numerator;
+    setEndpoints(options);
+
+    // Check deferred.
+    if (deferred_cluster_creation_) {
+      test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+    }
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(status, response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+  }
 
   envoy::type::v3::CodecClientType codec_client_type_{};
   const bool deferred_cluster_creation_{};
@@ -894,6 +926,11 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
                      healthy_hosts, degraded_hosts);
   }
 }
+
+// Test EDS cluster DROP_OVERLOAD configuration.
+TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterNoDrop) { dropOverloadTest(0, "200"); }
+
+TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterAllDrop) { dropOverloadTest(100, "503"); }
 
 } // namespace
 } // namespace Envoy

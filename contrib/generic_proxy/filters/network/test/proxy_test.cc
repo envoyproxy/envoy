@@ -188,8 +188,9 @@ public:
         .WillOnce(
             Invoke([this](ServerCodecCallbacks& callback) { decoder_callback_ = &callback; }));
 
-    filter_ = std::make_shared<Filter>(filter_config_, factory_context_.time_system_,
-                                       factory_context_.runtime_loader_);
+    filter_ = std::make_shared<Filter>(filter_config_,
+                                       factory_context_.server_factory_context_.time_system_,
+                                       factory_context_.server_factory_context_.runtime_loader_);
 
     EXPECT_EQ(filter_.get(), decoder_callback_);
 
@@ -630,7 +631,9 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
   EXPECT_CALL(*server_codec_, respond(_, _, _))
       .WillOnce(Invoke([&](Status status, absl::string_view, const Request&) -> ResponsePtr {
         auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-        response->status_ = std::move(status);
+        response->status_ = {static_cast<uint32_t>(status.code()),
+                             status.code() == StatusCode::kOk};
+        response->message_ = status.message();
         return response;
       }));
 
@@ -639,7 +642,8 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame& response, EncodingCallbacks& callback) {
         Buffer::OwnedImpl buffer;
-        EXPECT_EQ(dynamic_cast<const Response*>(&response)->status().message(), "test_detail");
+        EXPECT_EQ(dynamic_cast<const Response*>(&response)->status().code(),
+                  static_cast<uint32_t>(StatusCode::kUnknown));
         buffer.add("test");
         callback.onEncodingSuccess(buffer, true);
       }));

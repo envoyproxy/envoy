@@ -28,5 +28,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/tracing:common_values_lib",
         "//source/common/tracing:null_span_lib",
+        "//source/common/tracing:trace_context_lib",
     ],
 )

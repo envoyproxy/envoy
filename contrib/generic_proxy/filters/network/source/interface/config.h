@@ -10,6 +10,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
+using TypedExtensionConfig = envoy::config::core::v3::TypedExtensionConfig;
+
 /**
  * Implemented by each generic filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
@@ -41,6 +43,14 @@ public:
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
   virtual bool isTerminalFilter() PURE;
+
+  /**
+   * @return absl::Status validate the codec config to see if it is compatible with the filter.
+   * If the codec config is not compatible with this filter, return an error status.
+   */
+  virtual absl::Status validateCodec(const TypedExtensionConfig& /*config*/) {
+    return absl::OkStatus();
+  }
 };
 
 } // namespace GenericProxy

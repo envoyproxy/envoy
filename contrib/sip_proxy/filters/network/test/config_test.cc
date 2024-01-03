@@ -34,7 +34,7 @@ public:
   void testConfig(envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& config) {
     Network::FilterFactoryCb cb;
     EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
-    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.getServerFactoryContext()));
+    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.serverFactoryContext()));
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
@@ -182,8 +182,9 @@ customized_affinity:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   const auto options = std::make_shared<ProtocolOptionsConfigImpl>(config);
-  EXPECT_CALL(*context.cluster_manager_.thread_local_cluster_.cluster_.info_,
-              extensionProtocolOptions(_))
+  EXPECT_CALL(
+      *context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+      extensionProtocolOptions(_))
       .WillRepeatedly(Return(options));
 
   EXPECT_EQ(true, options->sessionAffinity());

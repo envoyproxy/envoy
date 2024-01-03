@@ -8,7 +8,10 @@ namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
 absl::StatusOr<int32_t> BufferHelper::peekInt32(Buffer::Instance& buffer, uint64_t& offset) {
-  absl::Status status = ensureMaxLen(sizeof(int32_t));
+  absl::Status status = ensureMinLen(buffer, offset, sizeof(int32_t));
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekInt32: {}", status.message()));
+
+  status = ensureMaxLen(sizeof(int32_t));
   RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekInt32: {}", status.message()));
 
   const int32_t val = buffer.peekBEInt<int32_t>(offset);
@@ -17,7 +20,10 @@ absl::StatusOr<int32_t> BufferHelper::peekInt32(Buffer::Instance& buffer, uint64
 }
 
 absl::StatusOr<int64_t> BufferHelper::peekInt64(Buffer::Instance& buffer, uint64_t& offset) {
-  absl::Status status = ensureMaxLen(sizeof(int64_t));
+  absl::Status status = ensureMinLen(buffer, offset, sizeof(int64_t));
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekInt64: {}", status.message()));
+
+  status = ensureMaxLen(sizeof(int64_t));
   RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekInt64: {}", status.message()));
 
   const int64_t val = buffer.peekBEInt<int64_t>(offset);
@@ -26,7 +32,10 @@ absl::StatusOr<int64_t> BufferHelper::peekInt64(Buffer::Instance& buffer, uint64
 }
 
 absl::StatusOr<bool> BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset) {
-  absl::Status status = ensureMaxLen(1);
+  absl::Status status = ensureMinLen(buffer, offset, 1);
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekBool: {}", status.message()));
+
+  status = ensureMaxLen(1);
   RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekBool: {}", status.message()));
 
   const char byte = buffer.peekInt<char, ByteOrder::Host, 1>(offset);
@@ -45,11 +54,10 @@ absl::StatusOr<std::string> BufferHelper::peekString(Buffer::Instance& buffer, u
     return val;
   }
 
-  if (buffer.length() < (offset + len.value())) {
-    return absl::InvalidArgumentError("peekString: buffer is smaller than string length");
-  }
+  absl::Status status = ensureMinLen(buffer, offset, len.value());
+  RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekString: {}", status.message()));
 
-  absl::Status status = ensureMaxLen(len.value());
+  status = ensureMaxLen(len.value());
   RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(status, fmt::format("peekString: {}", status.message()));
 
   std::unique_ptr<char[]> data(new char[len.value()]);
@@ -70,6 +78,15 @@ absl::Status BufferHelper::ensureMaxLen(const uint32_t size) {
 
   if (current_ > max_len_) {
     return absl::InvalidArgumentError("read beyond max length");
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status BufferHelper::ensureMinLen(const Buffer::Instance& buffer, const uint64_t offset,
+                                        const uint32_t size) {
+  if (buffer.length() < (offset + size)) {
+    return absl::InvalidArgumentError("read beyond buffer size");
   }
 
   return absl::OkStatus();

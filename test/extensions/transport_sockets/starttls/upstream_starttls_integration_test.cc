@@ -180,8 +180,8 @@ public:
       // Inject two filters into downstream connection: first is helper read filter and then
       // terminal filter.
       filter_manager.addReadFilter(std::make_shared<StartTlsSwitchFilter::DownstreamReadFilter>());
-      filter_manager.addReadFilter(
-          StartTlsSwitchFilter::newInstance(context.clusterManager(), upstream_callbacks_));
+      filter_manager.addReadFilter(StartTlsSwitchFilter::newInstance(
+          context.serverFactoryContext().clusterManager(), upstream_callbacks_));
     };
   }
 

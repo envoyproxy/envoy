@@ -1118,6 +1118,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("507", response->headers().getStatusValue());
   test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
+  cleanupUpstreamAndDownstream();
 }
 
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
@@ -2986,6 +2987,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_TRUE(response->complete());
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
@@ -3467,6 +3472,7 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeData) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
 }
 
 // Verify that when a filter decodeData callback overflows request buffer in filter manager the

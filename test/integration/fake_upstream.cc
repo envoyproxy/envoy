@@ -22,7 +22,7 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -950,6 +950,11 @@ AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<Asserti
   RELEASE_ASSERT(done->WaitForNotificationWithTimeout(absl::FromChrono(timeout)),
                  "Timed out waiting for cb to run on dispatcher");
   return *result;
+}
+
+void FakeUpstream::runOnDispatcherThread(std::function<void()> cb) {
+  ASSERT(!dispatcher_->isThreadSafe());
+  dispatcher_->post([&]() { cb(); });
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,

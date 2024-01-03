@@ -28,12 +28,10 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 envoy_stream_t init_stream(envoy_engine_t) { return current_stream_handle_++; }
 
 envoy_status_t start_stream(envoy_engine_t engine, envoy_stream_t stream,
-                            envoy_http_callbacks callbacks, bool explicit_flow_control,
-                            uint64_t min_delivery_size) {
+                            envoy_http_callbacks callbacks, bool explicit_flow_control) {
   return runOnEngineDispatcher(
-      engine, [stream, callbacks, explicit_flow_control, min_delivery_size](auto& engine) -> void {
-        engine.httpClient().startStream(stream, callbacks, explicit_flow_control,
-                                        min_delivery_size);
+      engine, [stream, callbacks, explicit_flow_control](auto& engine) -> void {
+        engine.httpClient().startStream(stream, callbacks, explicit_flow_control);
       });
 }
 

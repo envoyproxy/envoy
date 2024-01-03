@@ -2,6 +2,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
@@ -19,6 +20,11 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   // registry may lead to crashes at Engine shutdown. To be figured out as part of
   // https://github.com/envoyproxy/envoy-mobile/issues/332
   Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
+  // Envoy Mobile always requires dfp_mixed_scheme for the TLS and cleartext DFP clusters.
+  // While dfp_mixed_scheme defaults to true, some environments force it to false (e.g. within
+  // Google), so we force it back to true in Envoy Mobile.
+  // TODO(abeyad): Remove once this is no longer needed.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
 envoy_status_t Engine::run(const std::string config, const std::string log_level) {
@@ -90,8 +96,10 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
           ASSERT(Thread::MainThread::isMainOrTestThread());
 
-          connectivity_manager_ =
-              Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
+          Envoy::Server::GenericFactoryContextImpl generic_context(
+              server_->serverFactoryContext(),
+              server_->serverFactoryContext().messageValidationVisitor());
+          connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);

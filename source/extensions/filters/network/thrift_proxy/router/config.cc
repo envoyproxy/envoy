@@ -16,7 +16,7 @@ namespace Router {
 ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::router::v3::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+  auto& server_context = context.serverFactoryContext();
 
   auto stats =
       std::make_shared<const RouterStats>(stat_prefix, context.scope(), server_context.localInfo());
@@ -29,8 +29,8 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
   return [&context, stats, shadow_writer, close_downstream_on_error](
              ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Router>(
-        context.getServerFactoryContext().clusterManager(), *stats,
-        context.getServerFactoryContext().runtime(), *shadow_writer, close_downstream_on_error));
+        context.serverFactoryContext().clusterManager(), *stats,
+        context.serverFactoryContext().runtime(), *shadow_writer, close_downstream_on_error));
   };
 }
 

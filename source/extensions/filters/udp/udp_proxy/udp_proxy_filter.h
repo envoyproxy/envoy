@@ -552,10 +552,7 @@ private:
     bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
-
-    void onAccessLogFlushInterval();
-    void rearmAccessLogFlushTimer();
-    void disableAccessLogFlushTimer();
+    void onSessionComplete();
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {
@@ -600,6 +597,7 @@ private:
     ClusterInfo& cluster_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     Upstream::HostConstSharedPtr host_;
+    uint64_t session_id_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
     // time stamp and a periodic scan of all sessions to look for timeouts. This solution is simple,
     // though it might not perform well for high volume traffic. Note that this is how TCP proxy
@@ -610,9 +608,16 @@ private:
 
     UdpProxySessionStats session_stats_{};
     StreamInfo::StreamInfoImpl udp_session_info_;
-    uint64_t session_id_;
     std::list<ActiveReadFilterPtr> read_filters_;
     std::list<ActiveWriteFilterPtr> write_filters_;
+
+  private:
+    std::shared_ptr<Network::ConnectionInfoSetterImpl> CreateDownstreamConnectionInfoProvider();
+    void onAccessLogFlushInterval();
+    void rearmAccessLogFlushTimer();
+    void disableAccessLogFlushTimer();
+
+    bool on_session_complete_called_{false};
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
@@ -788,8 +793,8 @@ private:
                 SessionStorageType&& sessions);
     virtual ~ClusterInfo();
     virtual Network::FilterStatus onData(Network::UdpRecvData& data) PURE;
-    void removeSession(const ActiveSession* session);
-    void addSession(const Upstream::Host* host, const ActiveSession* session) {
+    void removeSession(ActiveSession* session);
+    void addSession(const Upstream::Host* host, ActiveSession* session) {
       host_to_sessions_[host].emplace(session);
     }
 
@@ -819,7 +824,7 @@ private:
                                   const Upstream::HostConstSharedPtr& host);
 
     Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
-    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
+    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<ActiveSession*>>
         host_to_sessions_;
   };
 

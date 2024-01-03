@@ -142,7 +142,6 @@ public:
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
-
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
   }
@@ -160,6 +159,7 @@ public:
   const CookieNames& cookieNames() const { return cookie_names_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
+  std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -182,6 +182,7 @@ private:
   const CookieNames cookie_names_;
   const AuthType auth_type_;
   const bool use_refresh_token_{};
+  const std::chrono::seconds default_expires_in_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

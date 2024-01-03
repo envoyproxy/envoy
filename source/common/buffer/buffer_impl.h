@@ -14,6 +14,8 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/libevent.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -30,7 +32,7 @@ namespace Buffer {
  * +-----------------+----------------+----------------------+
  * ^                 ^                ^                      ^
  * |                 |                |                      |
- * base_             data()           base_ + reservable_    base_ + capacity_
+ * base_             base_ + data_    base_ + reservable_    base_ + capacity_
  */
 class Slice {
 public:
@@ -604,8 +606,8 @@ public:
    */
   BufferFragmentImpl(
       const void* data, size_t size,
-      const std::function<void(const void*, size_t, const BufferFragmentImpl*)>& releasor)
-      : data_(data), size_(size), releasor_(releasor) {}
+      absl::AnyInvocable<void(const void*, size_t, const BufferFragmentImpl*)> releasor)
+      : data_(data), size_(size), releasor_(std::move(releasor)) {}
 
   // Buffer::BufferFragment
   const void* data() const override { return data_; }
@@ -619,7 +621,7 @@ public:
 private:
   const void* const data_;
   const size_t size_;
-  const std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
+  absl::AnyInvocable<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
 class LibEventInstance : public Instance {

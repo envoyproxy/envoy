@@ -33,7 +33,8 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
   }
 
   return std::make_unique<CELAccessLogExtensionFilter>(
-      Extensions::Filters::Common::Expr::getBuilder(context.getServerFactoryContext()),
+      context.serverFactoryContext().localInfo(),
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
       parse_status.value().expr());
 #else
   throw EnvoyException("CEL is not available for use in this environment.");

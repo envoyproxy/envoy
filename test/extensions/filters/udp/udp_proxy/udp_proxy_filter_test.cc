@@ -13,6 +13,8 @@
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/extensions/filters/udp/udp_proxy/mocks.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/socket.h"
@@ -426,7 +428,7 @@ public:
   }
 };
 
-// Basic UDP proxy flow with a single session. Also test disabling GRO.
+// Basic UDP proxy flow with two sessions. Also test disabling GRO.
 TEST_F(UdpProxyFilterTest, BasicFlow) {
   InSequence s;
 
@@ -435,6 +437,7 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
+      "%CONNECTION_ID% "
       "%DOWNSTREAM_REMOTE_ADDRESS% "
       "%DOWNSTREAM_LOCAL_ADDRESS% "
       "%UPSTREAM_HOST% "
@@ -465,6 +468,10 @@ upstream_socket_config:
                         session_access_log_format, proxy_access_log_format),
         true, false);
 
+  // Allow for two sessions.
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->resetResourceManager(2, 0, 0, 0, 0);
+
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -486,15 +493,26 @@ upstream_socket_config:
   test_sessions_[0].recvDataFromUpstream("world3");
   checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
 
+  expectSessionCreate(upstream_address_);
+  test_sessions_[1].expectWriteToUpstream("hello4", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.3:1000", "10.0.0.2:80", "hello4");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(23 /*rx_bytes*/, 4 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
+  test_sessions_[1].recvDataFromUpstream("world4");
+  checkTransferStats(23 /*rx_bytes*/, 4 /*rx_datagrams*/, 23 /*tx_bytes*/, 4 /*tx_datagrams*/);
+
   filter_.reset();
-  EXPECT_EQ(output_.size(), 2);
-  EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
+  EXPECT_EQ(output_.size(), 3);
+  EXPECT_EQ(output_[0], "23 4 23 4 0 2 0");
+
   const std::string session_access_log_regex =
-      "17 3 17 3 10.0.0.1:1000 10.0.0.2:80 20.0.0.1:443 "
+      "(17 3 17 3 0|6 1 6 1 1) 10.0.0.(1|3):1000 10.0.0.2:80 20.0.0.1:443 "
       "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
       AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
 
-  EXPECT_TRUE(std::regex_match(output_.back(), std::regex(session_access_log_regex)));
+  EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex)));
+  EXPECT_TRUE(std::regex_match(output_[2], std::regex(session_access_log_regex)));
 }
 
 // Route with source IP.
@@ -1512,6 +1530,47 @@ hash_policies:
   test_sessions_[0].recvDataFromUpstream("world");
 }
 
+TEST_F(UdpProxyFilterTest, EnrichAccessLogOnSessionComplete) {
+  InSequence s;
+
+  const std::string session_access_log_format =
+      "%FILTER_STATE(test.udp_session.drainer.on_session_complete)%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionReadFilterConfig
+    downstream_bytes_to_drain: 0
+    stop_iteration_on_new_session: false
+    stop_iteration_on_first_read: false
+    continue_filter_chain: false
+  )EOF",
+                        session_access_log_format, ""));
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  test_sessions_[0].idle_timer_->invokeCallback();
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+
+  filter_.reset();
+  EXPECT_EQ(output_.size(), 1);
+  EXPECT_THAT(output_.front(), testing::HasSubstr("session_complete"));
+}
+
 class HttpUpstreamImplTest : public testing::Test {
 public:
   struct HeaderToAdd {
@@ -2038,7 +2097,7 @@ TEST(TunnelingConfigImplTest, HeadersToAdd) {
 
   auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
   config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
-  EXPECT_EQ("test_val", headers.getByKey("test_key"));
+  EXPECT_EQ("test_val", headers.get_("test_key"));
 }
 
 TEST(TunnelingConfigImplTest, ProxyHostFromFilterState) {
