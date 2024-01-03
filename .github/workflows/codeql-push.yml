@@ -1,5 +1,8 @@
 name: CodeQL
 
+permissions:
+  contents: read
+
 on:
   push:
     paths:
@@ -11,6 +14,7 @@ on:
 concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true
+
 
 jobs:
   CodeQL-Build:
