@@ -146,6 +146,9 @@ bug_fixes:
 - area: docker
   change: |
     Updated base image to ``ubuntu:22.04`` to fix Redis memory issue (https://github.com/envoyproxy/envoy/issues/31248).
+- area: ext_authz
+  change: |
+    Fixed a bug to ensure the proper functioning of the ``with_request_body`` feature within the per-route ExtAuthZ filter.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
