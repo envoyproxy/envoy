@@ -62,7 +62,7 @@ public:
   ConfigSharedPtr config_;
 };
 
-TEST_F(ConfigTest, SetObjectValue) {
+TEST_F(ConfigTest, SetValue) {
   initialize({R"YAML(
     object_key: foo
     format_string:
@@ -77,9 +77,10 @@ TEST_F(ConfigTest, SetObjectValue) {
   EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
 }
 
-TEST_F(ConfigTest, SetStringValue) {
+TEST_F(ConfigTest, SetValueWithFactory) {
   initialize({R"YAML(
-    string_key: my_key
+    object_key: my_key
+    factory_key: envoy.string
     format_string:
       text_format_source:
         inline_string: "XXX"
