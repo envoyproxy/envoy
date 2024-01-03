@@ -40,7 +40,7 @@ message FilterStateValue {
 
   // Optional filter object factory lookup key. See :ref:`the well-known filter state keys <well_known_filter_state>`
   // for a list of valid factory keys.
-  string factory_key = 6 [(validate.rules).string = {min_len: 1}];
+  string factory_key = 6;
 
   oneof value {
     option (validate.required) = true;
