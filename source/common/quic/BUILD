@@ -108,6 +108,7 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
         "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
@@ -436,11 +437,42 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_transport_socket_factory_lib",
-    srcs = ["quic_transport_socket_factory.cc"],
-    hdrs = ["quic_transport_socket_factory.h"],
+    srcs = [
+        "quic_client_transport_socket_factory.cc",
+        "quic_transport_socket_factory.cc",
+    ],
+    hdrs = [
+        "quic_client_transport_socket_factory.h",
+        "quic_transport_socket_factory.h",
+    ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_verifier_lib",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/server:transport_socket_config_interface",
+        "//envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+    alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "quic_server_transport_socket_factory_lib",
+    srcs = [
+        "quic_server_transport_socket_factory.cc",
+    ],
+    hdrs = [
+        "quic_server_transport_socket_factory.h",
+    ],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_proof_verifier_lib",
+        ":quic_transport_socket_factory_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:context_config_interface",

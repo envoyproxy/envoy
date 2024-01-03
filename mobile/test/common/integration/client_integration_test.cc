@@ -1,4 +1,4 @@
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
@@ -402,11 +402,9 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
     }
 
     if (terminate_engine && request_for_engine_termination == i) {
-      {
-        absl::MutexLock l(&engine_lock_);
-        ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
-        engine_.reset();
-      }
+      absl::MutexLock l(&engine_lock_);
+      ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
+      engine_.reset();
       break;
     }
   }
@@ -547,7 +545,7 @@ TEST_P(ClientIntegrationTest, InvalidDomain) {
   ASSERT_EQ(cc_.on_headers_calls, 0);
 }
 
-TEST_P(ClientIntegrationTest, BasicReset) {
+TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {
   initialize();
 
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
@@ -557,6 +555,58 @@ TEST_P(ClientIntegrationTest, BasicReset) {
 
   ASSERT_EQ(cc_.on_error_calls, 1);
   ASSERT_EQ(cc_.on_headers_calls, 0);
+}
+
+TEST_P(ClientIntegrationTest, ResetAfterResponseHeaders) {
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, ResetAfterHeaderOnlyResponse) {
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "0");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, ResetBetweenDataChunks) {
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "2");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, ResetAfterData) {
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
 }
 
 TEST_P(ClientIntegrationTest, CancelBeforeRequestHeadersSent) {

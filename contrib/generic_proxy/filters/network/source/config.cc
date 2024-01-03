@@ -50,9 +50,11 @@ Factory::routeConfigProviderFromProto(const ProxyConfig& config,
   }
 }
 
-std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
-    const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
-    const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
+std::vector<NamedFilterFactoryCb>
+Factory::filtersFactoryFromProto(const ProtobufWkt::RepeatedPtrField<TypedExtensionConfig>& filters,
+                                 const TypedExtensionConfig& codec_config,
+                                 const std::string stats_prefix,
+                                 Envoy::Server::Configuration::FactoryContext& context) {
   std::vector<NamedFilterFactoryCb> factories;
   bool has_terminal_filter = false;
   std::string terminal_filter_name;
@@ -63,6 +65,10 @@ std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
     }
 
     auto& factory = Config::Utility::getAndCheckFactory<NamedFilterConfigFactory>(filter);
+
+    // Validate codec to see if this filter is compatible with the codec.
+    const auto validate_codec_status = factory.validateCodec(codec_config);
+    THROW_IF_NOT_OK_REF(validate_codec_status);
 
     ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
     ASSERT(message != nullptr);
@@ -128,7 +134,8 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
   const FilterConfigSharedPtr config = std::make_shared<FilterConfigImpl>(
       proto_config.stat_prefix(), std::move(factories.first),
       routeConfigProviderFromProto(proto_config, context, *route_config_provider_manager),
-      filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context),
+      filtersFactoryFromProto(proto_config.filters(), proto_config.codec_config(),
+                              proto_config.stat_prefix(), context),
       std::move(tracer), std::move(tracing_config), std::move(access_logs), *code_or_flags,
       context);
 
