@@ -159,7 +159,7 @@ public:
   const CookieNames& cookieNames() const { return cookie_names_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
-  const std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
+  std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
