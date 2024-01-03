@@ -1,5 +1,8 @@
 name: CodeQL
 
+permissions:
+  contents: read
+
 on:
   push:
     paths:
@@ -12,11 +15,13 @@ concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true
 
+
 jobs:
   CodeQL-Build:
 
     permissions:
       security-events: write  # for github/codeql-action/analyze to upload SARIF results
+      pull-requests: read
     strategy:
       fail-fast: false
 
