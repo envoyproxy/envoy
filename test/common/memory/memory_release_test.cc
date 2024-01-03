@@ -25,15 +25,6 @@ namespace {
 
 static const int MB = 1048576;
 
-const std::string DefaultConfig = R"EOF(
-  bytes_to_release: {}
-)EOF";
-
-const std::string ConfigWithInterval = R"EOF(
-  bytes_to_release: {}
-  memory_release_interval: {}s
-)EOF";
-
 class MemoryReleaseTest : public testing::Test {
 protected:
   MemoryReleaseTest()
@@ -41,10 +32,16 @@ protected:
         dispatcher_("test_thread", *api_, time_system_), scope_("memory_release_test.", stats_) {}
 
   void initialiseAllocatorManager(uint64_t bytes_to_release, float release_interval_s) {
-    const std::string yaml_config =
-        (release_interval_s > 0)
-            ? fmt::format(ConfigWithInterval, bytes_to_release, release_interval_s)
-            : fmt::format(DefaultConfig, bytes_to_release);
+    const std::string yaml_config = (release_interval_s > 0)
+                                        ? fmt::format(R"EOF(
+  bytes_to_release: {}
+  memory_release_interval: {}s
+)EOF",
+                                                      bytes_to_release, release_interval_s)
+                                        : fmt::format(R"EOF(
+  bytes_to_release: {}
+)EOF",
+                                                      bytes_to_release);
     const auto proto_config =
         TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
     allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
