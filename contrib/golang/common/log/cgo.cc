@@ -42,22 +42,18 @@ uint32_t FilterLogger::level() const { return static_cast<uint32_t>(ENVOY_LOGGER
 
 const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
 
-// The returned absl::string_view only refer to the GoString, won't copy the string content into
-// C++, should not use it after the current cgo call returns.
-absl::string_view referGoString(void* str) {
-  if (str == nullptr) {
-    return "";
-  }
-  auto go_str = reinterpret_cast<GoString*>(str);
-  return {go_str->p, static_cast<size_t>(go_str->n)};
+// The returned absl::string_view only refer to Go memory,
+// should not use it after the current cgo call returns.
+absl::string_view stringViewFromGoPointer(void* p, int len) {
+  return {static_cast<const char*>(p), static_cast<size_t>(len)};
 }
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void envoyGoFilterLog(uint32_t level, void* message) {
-  auto mesg = referGoString(message);
+void envoyGoFilterLog(uint32_t level, void* message_data, int message_len) {
+  auto mesg = stringViewFromGoPointer(message_data, message_len);
   getFilterLogger().log(level, mesg);
 }
 

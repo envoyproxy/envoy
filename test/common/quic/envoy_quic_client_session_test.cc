@@ -78,7 +78,7 @@ public:
         transport_socket_options_(std::make_shared<Network::TransportSocketOptionsImpl>()),
         envoy_quic_session_(quic_config_, quic_version_,
                             std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-                            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
+                            quic::QuicServerId("example.com", 443, false), crypto_config_,
                             *dispatcher_,
                             /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_,
                             quic_stat_names_, {}, *store_.rootScope(), transport_socket_options_),

@@ -9,10 +9,16 @@ namespace GenericProxy {
 namespace Router {
 
 FilterFactoryCb
-RouterFactory::createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+RouterFactory::createFilterFactoryFromProto(const Protobuf::Message& config, const std::string&,
                                             Server::Configuration::FactoryContext& context) {
-  return [&context](FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addDecoderFilter(std::make_shared<RouterFilter>(context));
+  const auto& typed_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::filters::network::generic_proxy::router::v3::Router&>(
+      config, context.serverFactoryContext().messageValidationVisitor());
+
+  auto router_config = std::make_shared<RouterConfig>(typed_config);
+
+  return [&context, router_config](FilterChainFactoryCallbacks& callbacks) {
+    callbacks.addDecoderFilter(std::make_shared<RouterFilter>(router_config, context));
   };
 }
 

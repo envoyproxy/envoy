@@ -49,6 +49,7 @@ public:
   bool connected() const { return !disconnected_; }
   // clear up to the `count` number of bytes of received data
   void clearData(size_t count = std::string::npos) { payload_reader_->clearData(count); }
+  Network::Connection* connection() const { return connection_.get(); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {

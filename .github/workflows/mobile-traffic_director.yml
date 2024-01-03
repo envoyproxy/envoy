@@ -4,9 +4,9 @@ permissions:
   contents: read
 
 on:
-  schedule:
-  # Once a day at midnight.
-  - cron: '0 0 * * *'
+  # Disabled scheduled runs until https://github.com/envoyproxy/envoy/issues/31416 is resolved.
+  # schedule:
+  # - cron: '0 0 * * *'
   # Allows manual triggering in the UI. Makes it easier to test.
   workflow_dispatch:
 
@@ -30,12 +30,15 @@ jobs:
     timeout-minutes: 120
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run GcpTrafficDirectorIntegrationTest'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GCP_TEST_PROJECT_PROD_API_KEY: ${{ secrets.GCP_TEST_PROJECT_PROD_API_KEY }}
+        # TODO(abeyad): remove this key once we're fully switched over to using the
+        # prod consumer mesh shard.
         GCP_TEST_PROJECT_API_KEY: ${{ secrets.GCP_TEST_PROJECT_API_KEY }}
         ENVOY_IP_TEST_VERSIONS: v4only
       run: |

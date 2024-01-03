@@ -26,6 +26,8 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
+#include "source/extensions/load_balancing_policies/least_request/config.h"
+#include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -207,6 +209,116 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   cluster.initialize([&]() -> void { initialized.ready(); });
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+}
+
+TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 35
+              denominator: MILLION
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
+  EXPECT_EQ(0.000035f, cluster.dropOverload().value());
+}
+
+TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 1000
+              denominator: TEN_THOUSAND
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
+  EXPECT_EQ(0.1f, cluster.dropOverload().value());
+}
+
+TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 35
+              denominator: 4
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  EXPECT_THROW_WITH_MESSAGE(
+      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
+      "Cluster drop_overloads config denominator setting is invalid : 4. Valid range 0~2.");
+}
+
+TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        policy:
+          drop_overloads:
+            - category: foo
+              drop_percentage:
+                numerator: 35
+            - category: bar
+              drop_percentage:
+                numerator: 10
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  EXPECT_THROW_WITH_MESSAGE(
+      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
+      "Cluster drop_overloads config has 2 categories. Envoy only support one.");
 }
 
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
@@ -1883,7 +1995,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster->prioritySet().hostSetsPerPriority()[0]->localityWeights());
+  EXPECT_NE(nullptr, cluster->prioritySet().hostSetsPerPriority()[0]->localityWeights());
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
@@ -1981,7 +2093,9 @@ TEST_F(StaticClusterImplTest, RingHash) {
   cluster->initialize([] {});
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::RingHash, cluster->info()->lbType());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
+  EXPECT_EQ("envoy.load_balancing_policies.ring_hash",
+            cluster->info()->loadBalancerFactory()->name());
   EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
@@ -2016,8 +2130,14 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
 
   cluster->initialize([] {});
 
-  EXPECT_EQ(LoadBalancerType::RoundRobin, cluster->info()->lbType());
-  auto slow_start_config = cluster->info()->lbRoundRobinConfig()->slow_start_config();
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
+  EXPECT_EQ("envoy.load_balancing_policies.round_robin",
+            cluster->info()->loadBalancerFactory()->name());
+  auto slow_start_config =
+      dynamic_cast<const Extensions::LoadBalancingPolices::RoundRobin::LegacyRoundRobinLbConfig*>(
+          cluster->info()->loadBalancerConfig().ptr())
+          ->lbConfig()
+          ->slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
@@ -2056,8 +2176,15 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
 
   cluster->initialize([] {});
 
-  EXPECT_EQ(LoadBalancerType::LeastRequest, cluster->info()->lbType());
-  auto slow_start_config = cluster->info()->lbLeastRequestConfig()->slow_start_config();
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
+  EXPECT_EQ("envoy.load_balancing_policies.least_request",
+            cluster->info()->loadBalancerFactory()->name());
+  auto slow_start_config =
+      dynamic_cast<
+          const Extensions::LoadBalancingPolices::LeastRequest::LegacyLeastRequestLbConfig*>(
+          cluster->info()->loadBalancerConfig().ptr())
+          ->lbConfig()
+          ->slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
@@ -2367,7 +2494,8 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(0U, cluster->info()->maxRequestsPerConnection());
   EXPECT_EQ(::Envoy::Http2::Utility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE,
             cluster->info()->http2Options().hpack_table_size().value());
-  EXPECT_EQ(LoadBalancerType::Random, cluster->info()->lbType());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
+  EXPECT_EQ("envoy.load_balancing_policies.random", cluster->info()->loadBalancerFactory()->name());
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
       ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
@@ -2608,6 +2736,36 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
       },
       EnvoyException, "cluster: load_balancing_policy cannot be combined with lb_subset_config");
+}
+
+// Empty lb_subset_config is set and it should be ignored.
+TEST_F(StaticClusterImplTest, EmptyLbSubsetConfig) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: ROUND_ROBIN
+    lb_subset_config: {}
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 10.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      true);
+
+  auto cluster = createCluster(cluster_config, factory_context);
+
+  EXPECT_EQ(cluster->info()->loadBalancerFactory()->name(),
+            "envoy.load_balancing_policies.round_robin");
 }
 
 // Verify that if Envoy does not have a factory for any of the load balancing policies specified in
@@ -3618,7 +3776,8 @@ TEST_F(ClusterInfoImplTest, Metadata) {
             Config::Metadata::metadataValue(&cluster->info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
-  EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
+  EXPECT_EQ("envoy.load_balancing_policies.maglev", cluster->info()->loadBalancerFactory()->name());
 }
 
 // Verify retry budget default values are honored.
@@ -3683,6 +3842,22 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
   EXPECT_EQ(min_retry_concurrency, 123UL);
+}
+
+TEST_F(ClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
+  std::string yaml = R"EOF(
+    name: name
+    type: STRICT_DNS
+    lb_policy: RANDOM
+    track_cluster_stats:
+      per_endpoint_stats: true
+  )EOF";
+
+  server_context_.bootstrap_.mutable_cluster_manager()->mutable_load_stats_config();
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Only one of cluster per_endpoint_stats and cluster manager "
+                            "load_stats_config can be specified");
 }
 
 TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
@@ -4259,7 +4434,7 @@ public:
   TestHttpFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
     PANIC("not implemented");

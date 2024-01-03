@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -97,38 +98,6 @@ HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
   HostStatusSet override_host_status;
 
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.validate_detailed_override_host_statuses")) {
-    // Old code path that should be removed once the runtime flag is removed directly.
-    // Coarse health status is used here.
-
-    if (!common_config.has_override_host_status()) {
-      // No override host status and 'Healthy' and 'Degraded' will be applied by default.
-      override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
-      override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
-      return override_host_status;
-    }
-
-    for (auto single_status : common_config.override_host_status().statuses()) {
-      switch (static_cast<envoy::config::core::v3::HealthStatus>(single_status)) {
-        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-      case envoy::config::core::v3::HealthStatus::UNKNOWN:
-      case envoy::config::core::v3::HealthStatus::HEALTHY:
-        override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
-        break;
-      case envoy::config::core::v3::HealthStatus::UNHEALTHY:
-      case envoy::config::core::v3::HealthStatus::DRAINING:
-      case envoy::config::core::v3::HealthStatus::TIMEOUT:
-        override_host_status.set(static_cast<size_t>(Host::Health::Unhealthy));
-        break;
-      case envoy::config::core::v3::HealthStatus::DEGRADED:
-        override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
-        break;
-      }
-    }
-    return override_host_status;
-  }
-
   if (!common_config.has_override_host_status()) {
     // No override host status and [UNKNOWN, HEALTHY, DEGRADED] will be applied by default.
     override_host_status.set(static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::UNKNOWN));
@@ -169,7 +138,7 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
     return nullptr;
   }
 
-  auto host_iter = host_map->find(override_host.value());
+  auto host_iter = host_map->find(override_host.value().first);
 
   // The override host cannot be found in the host map.
   if (host_iter == host_map->end()) {
@@ -179,21 +148,90 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
   HostConstSharedPtr host = host_iter->second;
   ASSERT(host != nullptr);
 
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.validate_detailed_override_host_statuses")) {
-    // Old code path that should be removed once the runtime flag is removed directly.
-    // Coarse health status is used here.
-
-    if (status[static_cast<size_t>(host->coarseHealth())]) {
-      return host;
-    }
-    return nullptr;
-  }
-
   if (status[static_cast<uint32_t>(host->healthStatus())]) {
     return host;
   }
   return nullptr;
+}
+
+bool HostUtility::allowLBChooseHost(LoadBalancerContext* context) {
+  if (context == nullptr) {
+    return true;
+  }
+
+  auto override_host = context->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return true;
+  }
+
+  // Return opposite value to "strict" setting.
+  return !override_host.value().second;
+}
+
+void HostUtility::forEachHostMetric(
+    const ClusterManager& cluster_manager,
+    const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
+    const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb) {
+  for (const auto& [unused_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster_ref.get().info();
+    if (cluster_info->perEndpointStatsEnabled()) {
+      const std::string cluster_name =
+          Stats::Utility::sanitizeStatsName(cluster_info->observabilityName());
+
+      const Stats::TagVector& fixed_tags = cluster_info->statsScope().store().fixedTags();
+
+      for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
+        for (auto& host : host_set->hosts()) {
+
+          Stats::TagVector tags;
+          tags.reserve(fixed_tags.size() + 3);
+          tags.insert(tags.end(), fixed_tags.begin(), fixed_tags.end());
+          tags.emplace_back(Stats::Tag{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name});
+          tags.emplace_back(Stats::Tag{"envoy.endpoint_address", host->address()->asString()});
+
+          const auto& hostname = host->hostname();
+          if (!hostname.empty()) {
+            tags.push_back({"envoy.endpoint_hostname", hostname});
+          }
+
+          auto set_metric_metadata = [&](absl::string_view metric_name,
+                                         Stats::PrimitiveMetricMetadata& metric) {
+            metric.setName(
+                absl::StrCat("cluster.", cluster_name, ".endpoint.",
+                             Stats::Utility::sanitizeStatsName(host->address()->asStringView()),
+                             ".", metric_name));
+            metric.setTagExtractedName(absl::StrCat("cluster.endpoint.", metric_name));
+            metric.setTags(tags);
+
+            // Validate that all components were sanitized.
+            ASSERT(metric.name() == Stats::Utility::sanitizeStatsName(metric.name()));
+            ASSERT(metric.tagExtractedName() ==
+                   Stats::Utility::sanitizeStatsName(metric.tagExtractedName()));
+          };
+
+          for (auto& [metric_name, primitive] : host->counters()) {
+            Stats::PrimitiveCounterSnapshot metric(primitive.get());
+            set_metric_metadata(metric_name, metric);
+
+            counter_cb(std::move(metric));
+          }
+
+          auto gauges = host->gauges();
+
+          // Add synthetic "healthy" gauge.
+          Stats::PrimitiveGauge healthy_gauge;
+          healthy_gauge.set((host->coarseHealth() == Host::Health::Healthy) ? 1 : 0);
+          gauges.emplace_back(absl::string_view("healthy"), healthy_gauge);
+
+          for (auto& [metric_name, primitive] : gauges) {
+            Stats::PrimitiveGaugeSnapshot metric(primitive.get());
+            set_metric_metadata(metric_name, metric);
+            gauge_cb(std::move(metric));
+          }
+        }
+      }
+    }
+  }
 }
 
 } // namespace Upstream

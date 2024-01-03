@@ -152,7 +152,7 @@ type FilterCallbacks interface {
 	StreamFilterCallbacks
 	// Continue or SendLocalReply should be last API invoked, no more code after them.
 	Continue(StatusType)
-	SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
+	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
 	Log(level LogType, msg string)
@@ -162,7 +162,11 @@ type FilterCallbacks interface {
 	// If the fetch succeeded, a string will be returned.
 	// If the value is a timestamp, it is returned as a timestamp string like "2023-07-31T07:21:40.695646+00:00".
 	// If the fetch failed (including the value is not found), an error will be returned.
-	// Currently, fetching requests/response attributes are mostly unsupported.
+	//
+	// The error can be one of:
+	// * ErrInternalFailure
+	// * ErrSerializationFailure (Currently, fetching attributes in List/Map type are unsupported)
+	// * ErrValueNotFound
 	GetProperty(key string) (string, error)
 	// TODO add more for filter callbacks
 }

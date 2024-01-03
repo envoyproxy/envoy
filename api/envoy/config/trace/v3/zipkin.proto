@@ -75,7 +75,7 @@ message ZipkinConfig {
   //
   // * The Envoy Proxy is used as gateway or ingress.
   // * The Envoy Proxy is used as sidecar but inbound traffic capturing or outbound traffic capturing is disabled.
-  // * Any case that the `start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` is set to true.
+  // * Any case that the :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` is set to true.
   //
   // .. attention::
   //

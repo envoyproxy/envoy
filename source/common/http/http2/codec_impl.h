@@ -426,7 +426,7 @@ protected:
 
   private:
     StreamImpl& stream_;
-    bool send_fin_ = true;
+    bool send_fin_ = false;
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;

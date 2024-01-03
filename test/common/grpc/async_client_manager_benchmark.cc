@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 
@@ -28,7 +29,9 @@ class AsyncClientManagerImplTest {
 public:
   AsyncClientManagerImplTest()
       : api_(Api::createApiForTest()), stat_names_(scope_.symbolTable()),
-        async_client_manager_(cm_, tls_, test_time_.timeSystem(), *api_, stat_names_) {}
+        async_client_manager_(
+            cm_, tls_, test_time_.timeSystem(), *api_, stat_names_,
+            envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig()) {}
 
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;

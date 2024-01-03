@@ -171,6 +171,8 @@ public:
     max_headers_count_ = max_headers_count;
   }
 
+  bool fix_quic_lifetime_issues() const { return fix_quic_lifetime_issues_; }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
@@ -207,10 +209,10 @@ private:
   // Called when aggregated buffered bytes across all the streams declines to low watermark.
   void onSendBufferLowWatermark();
 
-  // Currently ConnectionManagerImpl is the one and only filter. If more network
-  // filters are added, ConnectionManagerImpl should always be the last one.
-  // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
-  // and the rest incoming data bypasses these filters.
+  // ConnectionManagerImpl should always be the last filter. Its onRead() is only called once to
+  // trigger ReadFilter::onNewConnection() and the rest incoming data bypasses these filters.
+  // It has the same life time as this connection, so do all the filters. If the connection gets
+  // defer-deleted, they will be defer-deleted together.
   std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
@@ -224,6 +226,7 @@ private:
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
   absl::optional<Network::ConnectionCloseType> close_type_during_initialize_;
+  bool fix_quic_lifetime_issues_{false};
 };
 
 } // namespace Quic

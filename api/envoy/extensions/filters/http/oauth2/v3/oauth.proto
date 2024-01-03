@@ -7,6 +7,8 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 import "envoy/type/matcher/v3/path.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -71,7 +73,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -123,6 +125,11 @@ message OAuth2Config {
   // Defines how ``client_id`` and ``client_secret`` are sent in OAuth client to OAuth server requests.
   // RFC https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1
   AuthType auth_type = 11 [(validate.rules).enum = {defined_only: true}];
+
+  // If set to true, allows automatic access token refresh using the associated refresh token (see
+  // `RFC 6749 section 6 <https://datatracker.ietf.org/doc/html/rfc6749#section-6>`_), provided that the OAuth server supports that.
+  // Default value is false.
+  google.protobuf.BoolValue use_refresh_token = 12;
 }
 
 // Filter config.

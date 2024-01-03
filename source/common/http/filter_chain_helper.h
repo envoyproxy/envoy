@@ -6,9 +6,11 @@
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/dependency_manager.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Http {
@@ -20,10 +22,32 @@ using UpstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
 
+// Allows graceful handling of missing configuration for ECDS.
+class MissingConfigFilter : public Http::PassThroughDecoderFilter {
+public:
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
+                                       absl::nullopt, EMPTY_STRING);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+};
+
+static Http::FilterFactoryCb MissingConfigFilterFactory =
+    [](Http::FilterChainFactoryCallbacks& cb) {
+      cb.addStreamDecoderFilter(std::make_shared<MissingConfigFilter>());
+    };
+
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:
-  using FilterFactoriesList =
-      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
+  struct FilterFactoryProvider {
+    Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb> provider;
+    // If true, this filter is disabled by default and must be explicitly enabled by
+    // route configuration.
+    bool disabled{};
+  };
+
+  using FilterFactoriesList = std::list<FilterFactoryProvider>;
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
@@ -43,8 +67,7 @@ public:
 template <class FilterCtx, class NeutralNamedHttpFilterFactory>
 class FilterChainHelper : Logger::Loggable<Logger::Id::config> {
 public:
-  using FilterFactoriesList =
-      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
+  using FilterFactoriesList = FilterChainUtility::FilterFactoriesList;
   using FilterConfigProviderManager =
       Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb, FilterCtx>;
 
@@ -85,12 +108,25 @@ private:
                 bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
                 DependencyManager& dependency_manager) {
     ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
+
+    const bool disabled_by_default = proto_config.disabled();
+
+    // Ensure the terminal filter will not be disabled by default. Because the terminal filter must
+    // be the last filter in the chain (ensured by 'validateTerminalFilters') and terminal flag of
+    // dynamic filter could not determined and may changed at runtime, so we check the last filter
+    // flag here as alternative.
+    if (last_filter_in_current_config && disabled_by_default) {
+      return absl::InvalidArgumentError(fmt::format(
+          "Error: the last (terminal) filter ({}) in the chain cannot be disabled by default.",
+          proto_config.name()));
+    }
+
     if (proto_config.config_type_case() ==
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::
             ConfigTypeCase::kConfigDiscovery) {
       return processDynamicFilterConfig(proto_config.name(), proto_config.config_discovery(),
                                         filter_factories, filter_chain_type,
-                                        last_filter_in_current_config);
+                                        last_filter_in_current_config, disabled_by_default);
     }
 
     // Now see if there is a factory that will accept the config.
@@ -104,8 +140,12 @@ private:
     }
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, server_context_.messageValidationVisitor(), *factory);
-    Http::FilterFactoryCb callback =
+    absl::StatusOr<Http::FilterFactoryCb> callback_or_error =
         factory->createFilterFactoryFromProto(*message, stats_prefix_, factory_context_);
+    if (!callback_or_error.status().ok()) {
+      return callback_or_error.status();
+    }
+    Http::FilterFactoryCb callback = callback_or_error.value();
     dependency_manager.registerFilter(factory->name(), *factory->dependencies());
     const bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
     Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
@@ -119,7 +159,7 @@ private:
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 #endif
-    filter_factories.push_back(std::move(filter_config_provider));
+    filter_factories.push_back({std::move(filter_config_provider), disabled_by_default});
     return absl::OkStatus();
   }
 
@@ -128,7 +168,7 @@ private:
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
                              FilterFactoriesList& filter_factories,
                              const std::string& filter_chain_type,
-                             bool last_filter_in_current_config) {
+                             bool last_filter_in_current_config, bool disabled_by_default) {
     ENVOY_LOG(debug, "      dynamic filter name: {}", name);
     if (config_discovery.apply_default_config_without_warming() &&
         !config_discovery.has_default_config()) {
@@ -148,7 +188,7 @@ private:
     auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
         config_discovery, name, server_context_, factory_context_, cluster_manager_,
         last_filter_in_current_config, filter_chain_type, nullptr);
-    filter_factories.push_back(std::move(filter_config_provider));
+    filter_factories.push_back({std::move(filter_config_provider), disabled_by_default});
     return absl::OkStatus();
   }
 

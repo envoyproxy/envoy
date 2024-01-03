@@ -4,7 +4,6 @@ EXTENSION_CONFIG_VISIBILITY = ["//visibility:public"]
 EXTENSION_PACKAGE_VISIBILITY = ["//visibility:public"]
 EXTENSIONS = {
     "envoy.clusters.dynamic_forward_proxy":                "//source/extensions/clusters/dynamic_forward_proxy:cluster",
-    "envoy.clusters.logical_dns":                          "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
     "envoy.clusters.static":                               "//source/extensions/clusters/static:static_cluster_lib",
     "envoy.filters.connection_pools.http.generic":         "//source/extensions/upstreams/http/generic:config",
     "envoy.filters.http.alternate_protocols_cache":        "//source/extensions/filters/http/alternate_protocols_cache:config",
@@ -23,7 +22,6 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.apple":                    "//source/extensions/network/dns_resolver/apple:config",
     "envoy.network.dns_resolver.getaddrinfo":              "//source/extensions/network/dns_resolver/getaddrinfo:config",
     "envoy.retry.options.network_configuration":           "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
-    "envoy.stat_sinks.metrics_service":                    "//source/extensions/stat_sinks/metrics_service:config",
     "envoy.transport_sockets.http_11_proxy":               "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
     "envoy.transport_sockets.raw_buffer":                  "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tls":                         "//source/extensions/transport_sockets/tls:config",
@@ -31,6 +29,8 @@ EXTENSIONS = {
     "envoy_mobile.cert_validator.platform_bridge_cert_validator": "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:config",
     "envoy.listener_manager_impl.api":                     "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
     "envoy.connection_handler.default":                    "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
+    "envoy.load_balancing_policies.round_robin":           "//source/extensions/load_balancing_policies/round_robin:config",
+    "envoy.load_balancing_policies.cluster_provided":      "//source/extensions/load_balancing_policies/cluster_provided:config",
 }
 WINDOWS_EXTENSIONS = {}
 LEGACY_ALWAYSLINK = 1

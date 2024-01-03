@@ -217,6 +217,13 @@ envoy.filters.http.bandwidth_limit:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.bandwidth_limit.v3.BandwidthLimit
+envoy.filters.http.basic_auth:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.basic_auth.v3.BasicAuth
 envoy.filters.http.buffer:
   categories:
   - envoy.filters.http
@@ -319,8 +326,8 @@ envoy.filters.http.ext_authz:
 envoy.filters.http.ext_proc:
   categories:
   - envoy.filters.http
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
   - envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
@@ -577,7 +584,7 @@ envoy.filters.listener.proxy_protocol:
 envoy.filters.listener.tls_inspector:
   categories:
   - envoy.filters.listener
-  security_posture: robust_to_untrusted_downstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
@@ -754,6 +761,13 @@ envoy.filters.udp.session.http_capsule:
   status: alpha
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig
+envoy.filters.udp.session.dynamic_forward_proxy:
+  categories:
+  - envoy.filters.udp.session
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig
 envoy.formatter.cel:
   categories:
   - envoy.formatter
@@ -775,6 +789,13 @@ envoy.formatter.req_without_query:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+envoy.geoip_providers.maxmind:
+  categories:
+  - envoy.geoip_providers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
 envoy.grpc_credentials.aws_iam:
   categories:
   - envoy.grpc_credentials
@@ -1000,7 +1021,7 @@ envoy.resource_monitors.downstream_connections:
   categories:
   - envoy.resource_monitors
   security_posture: data_plane_agnostic
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
 envoy.resource_monitors.fixed_heap:
@@ -1052,6 +1073,13 @@ envoy.route.early_data_policy.default:
   status: stable
   type_urls:
   - envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
+envoy.router.cluster_specifier_plugin.lua:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.cluster_specifiers.lua.v3.LuaConfig
 envoy.stat_sinks.dog_statsd:
   categories:
   - envoy.stats_sinks
@@ -1134,6 +1162,13 @@ envoy.tracers.opentelemetry:
   status: wip
   type_urls:
   - envoy.config.trace.v3.OpenTelemetryConfig
+envoy.tracers.opentelemetry.samplers.always_on:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers
@@ -1648,3 +1683,31 @@ envoy.config_mux.sotw_grpc_mux_factory:
   - envoy.config_mux
   security_posture: unknown
   status: stable
+envoy.filters.http.set_filter_state:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.set_filter_state.v3.Config
+envoy.filters.network.set_filter_state:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.set_filter_state.v3.Config
+envoy.tracers.opentelemetry.resource_detectors.environment:
+  categories:
+  - envoy.tracers.opentelemetry.resource_detectors
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig
+envoy.tracers.opentelemetry.resource_detectors.dynatrace:
+  categories:
+  - envoy.tracers.opentelemetry.resource_detectors
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig

@@ -87,7 +87,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
+        "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
         "@utf8_range//:utf8_validity",
@@ -105,8 +105,8 @@ envoy_cc_library(
     deps = [
         "utility_lib_header",
     ] + envoy_select_enable_lite_protos([
-        "//bazel/cc_proto_descriptor_library:create_dynamic_message",
-        "//bazel/cc_proto_descriptor_library:text_format_transcoder",
+        "@envoy_api//bazel/cc_proto_descriptor_library:create_dynamic_message",
+        "@envoy_api//bazel/cc_proto_descriptor_library:text_format_transcoder",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/annotations:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto_descriptor",
@@ -154,6 +154,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/http/original_ip_detection/xff/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/extensions/load_balancing_policies/cluster_provided/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto_descriptor",
@@ -199,12 +200,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "deterministic_hash_lib",
+    srcs = ["deterministic_hash.cc"],
+    hdrs = ["deterministic_hash.h"],
+    deps = [
+        ":protobuf",
+        "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     external_deps = [
         "protobuf",
     ],
     deps = [
+        ":deterministic_hash_lib",
         ":message_validator_lib",
         ":protobuf",
         ":utility_lib_header",
@@ -215,7 +228,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
+        "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ] + envoy_select_enable_yaml(["yaml_utility_lib"]),
@@ -236,7 +249,7 @@ envoy_cc_library(
         ":message_validator_lib",
         ":protobuf",
         ":utility_lib_header",
-        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
-        "@com_github_cncf_udpa//xds/type/v3:pkg_cc_proto",
+        "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
+        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
     ],
 )

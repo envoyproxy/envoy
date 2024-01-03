@@ -1,6 +1,6 @@
 module example.com/echo
 
-go 1.18
+go 1.20
 
 require (
 	github.com/cncf/xds/go v0.0.0-20230112175826-46e39c7b9b43

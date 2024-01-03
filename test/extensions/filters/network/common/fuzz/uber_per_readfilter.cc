@@ -54,7 +54,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClient(_, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return async_client_; }));
@@ -84,7 +84,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClient(_, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return async_client_; }));
@@ -139,7 +139,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       // Sanity check on connection_keepalive interval and timeout.
       try {
         PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), interval);
-      } catch (const DurationUtil::OutOfRangeException& e) {
+      } catch (const EnvoyException& e) {
         throw EnvoyException(
             absl::StrCat("In http2_protocol_options.connection_keepalive interval shall not be "
                          "negative. Exception {}",
@@ -147,7 +147,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       }
       try {
         PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), timeout);
-      } catch (const DurationUtil::OutOfRangeException& e) {
+      } catch (const EnvoyException& e) {
         throw EnvoyException(
             absl::StrCat("In http2_protocol_options.connection_keepalive timeout shall not be "
                          "negative. Exception {}",

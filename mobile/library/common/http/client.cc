@@ -1,6 +1,5 @@
 #include "library/common/http/client.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/http/codes.h"
@@ -14,8 +13,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
-#include "library/common/jni/android_jni_utility.h"
-#include "library/common/network/connectivity_manager.h"
 #include "library/common/stream_info/extra_stream_info.h"
 
 namespace Envoy {
@@ -39,8 +36,7 @@ Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream
                                                      envoy_http_callbacks bridge_callbacks,
                                                      Client& http_client)
     : direct_stream_(direct_stream), bridge_callbacks_(bridge_callbacks), http_client_(http_client),
-      explicit_flow_control_(direct_stream_.explicit_flow_control_),
-      min_delivery_size_(direct_stream_.min_delivery_size_) {}
+      explicit_flow_control_(direct_stream_.explicit_flow_control_) {}
 
 void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& headers,
                                                   bool end_stream) {
@@ -116,7 +112,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
 
   // The response_data_ is systematically assigned here because resumeData can
   // incur an asynchronous callback to sendDataToBridge.
-  if ((explicit_flow_control_ || min_delivery_size_ != 0) && !response_data_) {
+  if (explicit_flow_control_ && !response_data_) {
     response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
         [this]() -> void { onBufferedDataDrained(); }, [this]() -> void { onHasBufferedData(); },
         []() -> void {});
@@ -126,10 +122,8 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     response_data_->setWatermarks(1000000);
   }
 
-  // Try to send data if
-  //  1) in default flow control mode
-  //  2) if resumeData has been called in explicit flow control mode.
-  //  sendDataToBridge will enforce delivery size limits.
+  // Send data if in default flow control mode, or if resumeData has been called in explicit
+  // flow control mode.
   if (bytes_to_send_ > 0 || !explicit_flow_control_) {
     ASSERT(!hasBufferedData());
     sendDataToBridge(data, end_stream);
@@ -137,24 +131,16 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
 
   // If not all the bytes have been sent up, buffer any remaining data in response_data.
   if (data.length() != 0) {
-    ENVOY_LOG(debug, "[S{}] buffering {} bytes. {} total bytes buffered.",
-              direct_stream_.stream_handle_, data.length(),
-              data.length() + response_data_->length());
+    ASSERT(explicit_flow_control_);
+    ENVOY_LOG(
+        debug, "[S{}] buffering {} bytes due to explicit flow control. {} total bytes buffered.",
+        direct_stream_.stream_handle_, data.length(), data.length() + response_data_->length());
     response_data_->move(data);
   }
 }
 
 void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, bool end_stream) {
   ASSERT(!explicit_flow_control_ || bytes_to_send_ > 0);
-
-  if (min_delivery_size_ > 0 && (data.length() < min_delivery_size_) && !end_stream) {
-    ENVOY_LOG(
-        debug,
-        "[S{}] defering sending {} bytes due to delivery size limits (limit={} end stream={})",
-        direct_stream_.stream_handle_, data.length(), min_delivery_size_, end_stream);
-
-    return; // Not enough data to justify sending up to the bridge.
-  }
 
   // Cap by bytes_to_send_ if and only if applying explicit flow control.
   uint32_t bytes_to_send = calculateBytesToSend(data, bytes_to_send_);
@@ -475,11 +461,10 @@ void Client::DirectStream::dumpState(std::ostream&, int indent_level) const {
 }
 
 void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks bridge_callbacks,
-                         bool explicit_flow_control, uint64_t min_delivery_size) {
+                         bool explicit_flow_control) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream{new DirectStream(new_stream_handle, *this)};
   direct_stream->explicit_flow_control_ = explicit_flow_control;
-  direct_stream->min_delivery_size_ = min_delivery_size;
   direct_stream->callbacks_ =
       std::make_unique<DirectStreamCallbacks>(*direct_stream, bridge_callbacks, *this);
 
@@ -514,7 +499,7 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
   RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
 
-  // This is largely a check for the android platform: is_cleartext_permitted
+  // This is largely a check for the android platform: isCleartextPermitted
   // is a no-op for other platforms.
   if (internal_headers->getSchemeValue() != "https" &&
       !SystemHelper::getInstance().isCleartextPermitted(internal_headers->getHostValue())) {

@@ -43,7 +43,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                   .api_config_source()
                                   .api_type();
   if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+    throwEnvoyExceptionOrPanic("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
   const auto resource_name = getResourceName();
   Envoy::Config::SubscriptionOptions options;

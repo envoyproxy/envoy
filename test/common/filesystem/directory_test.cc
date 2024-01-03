@@ -6,6 +6,7 @@
 #include "source/common/filesystem/directory.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/node_hash_set.h"
@@ -14,6 +15,9 @@
 
 namespace Envoy {
 namespace Filesystem {
+
+using StatusHelpers::HasStatus;
+using testing::HasSubstr;
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const DirectoryEntry& entry, std::ostream* os) {
@@ -240,6 +244,40 @@ TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
+#ifndef WIN32
+// Test that removing a file while iterating continues to the next file.
+TEST_F(DirectoryTest, FileDeletedWhileIterating) {
+  addFiles({"file", "file2"});
+  DirectoryIteratorImpl dir_iterator(dir_path_);
+  EntrySet found;
+  TestEnvironment::removePath(dir_path_ + "/file");
+  TestEnvironment::removePath(dir_path_ + "/file2");
+  while (!(*dir_iterator).name_.empty()) {
+    found.insert(*dir_iterator);
+    ++dir_iterator;
+  }
+  // Test environment can potentially list files in any order, so if the
+  // first file was one of the temporary files it will still be in the
+  // set. The important thing is that at least one of them is *not* in
+  // the set, and we didn't crash.
+  EXPECT_THAT(found, testing::AnyOf(
+                         EntrySet{
+                             {".", FileType::Directory, absl::nullopt},
+                             {"..", FileType::Directory, absl::nullopt},
+                         },
+                         EntrySet{
+                             {".", FileType::Directory, absl::nullopt},
+                             {"..", FileType::Directory, absl::nullopt},
+                             {"file", FileType::Regular, 0},
+                         },
+                         EntrySet{
+                             {".", FileType::Directory, absl::nullopt},
+                             {"..", FileType::Directory, absl::nullopt},
+                             {"file1", FileType::Regular, 0},
+                         }));
+}
+#endif
+
 // Test that we can list an empty directory
 TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
   const EntrySet expected = {
@@ -249,18 +287,16 @@ TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-// Test that the constructor throws an exception when given a non-existing path
+// Test that the status is an error when given a non-existing path
 TEST(DirectoryIteratorImpl, NonExistingDir) {
   const std::string dir_path("some/non/existing/dir");
-
+  DirectoryIteratorImpl dir_iterator(dir_path);
 #ifdef WIN32
-  EXPECT_THROW_WITH_MESSAGE(
-      DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
-      fmt::format("unable to open directory {}: {}", dir_path, ERROR_PATH_NOT_FOUND));
+  EXPECT_THAT(dir_iterator.status(),
+              HasStatus(absl::StatusCode::kUnknown, HasSubstr("unable to open directory")));
 #else
-  EXPECT_THROW_WITH_MESSAGE(
-      DirectoryIteratorImpl dir_iterator(dir_path), EnvoyException,
-      fmt::format("unable to open directory {}: No such file or directory", dir_path));
+  EXPECT_THAT(dir_iterator.status(),
+              HasStatus(absl::StatusCode::kNotFound, HasSubstr("unable to open directory")));
 #endif
 }
 
@@ -284,8 +320,8 @@ TEST_F(DirectoryTest, Fifo) {
 // instead by directly calling the private function.
 TEST_F(DirectoryTest, MakeEntryThrowsOnStatFailure) {
   Directory directory(dir_path_);
-  EXPECT_THROW_WITH_REGEX(directory.begin().makeEntry("foo"), EnvoyException,
-                          "unable to stat file: '.*foo' .*");
+  EXPECT_THAT(directory.begin().makeEntry("foo"),
+              HasStatus(absl::StatusCode::kNotFound, HasSubstr("unable to stat file")));
 }
 #endif
 

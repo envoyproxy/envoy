@@ -29,7 +29,7 @@ public:
     // 1. The platform supports the original destination feature
     // 2. The `traffic_direction` property is set on the listener. This is required to redirect the
     // traffic.
-    if (context.listenerConfig().direction() == envoy::config::core::v3::UNSPECIFIED) {
+    if (context.listenerInfo().direction() == envoy::config::core::v3::UNSPECIFIED) {
       throw EnvoyException("[Windows] Setting original destination filter on a listener without "
                            "specifying the traffic_direction."
                            "Configure the traffic_direction listener option");
@@ -40,7 +40,7 @@ public:
     }
 #endif
 
-    return [listener_filter_matcher, traffic_direction = context.listenerConfig().direction()](
+    return [listener_filter_matcher, traffic_direction = context.listenerInfo().direction()](
                Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(listener_filter_matcher,
                                      std::make_unique<OriginalDstFilter>(traffic_direction));

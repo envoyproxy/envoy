@@ -158,7 +158,10 @@ envoy_extension_cc_test(
     name = "filter_integration_test",
     size = "large",
     srcs = ["filter_integration_test.cc"],
-    extension_names = ["envoy.filters.http.jwt_authn"],
+    extension_names = [
+        "envoy.filters.http.jwt_authn",
+        "envoy.filters.http.set_filter_state",
+    ],
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -166,12 +169,13 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/jwt_authn:config",
+        "//source/extensions/filters/http/set_filter_state:config",
         "//test/config:utility_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/integration:http_protocol_integration_lib",
-        "//test/integration/filters:header_to_filter_state_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/set_filter_state/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

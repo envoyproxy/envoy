@@ -98,13 +98,13 @@ TEST(DsoInstanceTest, RemovePluginConfig) {
   EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(config), 0);
 
   // remove it
-  dso->envoyGoFilterDestroyHttpPluginConfig(300);
+  dso->envoyGoFilterDestroyHttpPluginConfig(300, 0);
   // new again, after removed.
   EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(config), 300);
 
   // remove twice should be ok
-  dso->envoyGoFilterDestroyHttpPluginConfig(300);
-  dso->envoyGoFilterDestroyHttpPluginConfig(300);
+  dso->envoyGoFilterDestroyHttpPluginConfig(300, 0);
+  dso->envoyGoFilterDestroyHttpPluginConfig(300, 0);
 }
 
 } // namespace

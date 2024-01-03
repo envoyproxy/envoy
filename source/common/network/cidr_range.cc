@@ -194,6 +194,14 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+absl::StatusOr<std::unique_ptr<IpList>>
+IpList::create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs) {
+  std::unique_ptr<IpList> ret = std::unique_ptr<IpList>(new IpList(cidrs));
+  if (!ret->error_.empty()) {
+    return absl::InvalidArgumentError(ret->error_);
+  }
+  return ret;
+}
 IpList::IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs) {
   ip_list_.reserve(cidrs.size());
   for (const envoy::config::core::v3::CidrRange& entry : cidrs) {
@@ -201,9 +209,8 @@ IpList::IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRan
     if (list_entry.isValid()) {
       ip_list_.push_back(std::move(list_entry));
     } else {
-      throw EnvoyException(
-          fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
-                      entry.address_prefix(), entry.prefix_len().value()));
+      error_ = fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
+                           entry.address_prefix(), entry.prefix_len().value());
     }
   }
 }

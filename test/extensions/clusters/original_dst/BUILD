@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",

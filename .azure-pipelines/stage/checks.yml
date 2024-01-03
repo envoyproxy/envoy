@@ -101,15 +101,7 @@ jobs:
         displayName: "Upload $(CI_TARGET) Report to GCS"
         condition: and(not(canceled()), or(eq(variables['CI_TARGET'], 'coverage'), eq(variables['CI_TARGET'], 'fuzz_coverage')))
         env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci --config=rbe-google --jobs=$(RbeJobs)"
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-          ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-            BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
-          ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-            BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
 
 - job: complete
   displayName: "Checks complete"

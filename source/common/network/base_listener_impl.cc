@@ -15,7 +15,7 @@
 namespace Envoy {
 namespace Network {
 
-BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket)
+BaseListenerImpl::BaseListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr socket)
     : local_address_(nullptr), dispatcher_(dispatcher), socket_(std::move(socket)) {
   const auto ip = socket_->connectionInfoProvider().localAddress()->ip();
 

@@ -65,7 +65,7 @@ class NullTracer : public Tracer {
 public:
   // Tracing::Tracer
   SpanPtr startSpan(const Config&, TraceContext&, const StreamInfo::StreamInfo&,
-                    const Tracing::Decision) override {
+                    Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
   }
 };
@@ -77,7 +77,7 @@ public:
   // Tracing::Tracer
   SpanPtr startSpan(const Config& config, TraceContext& trace_context,
                     const StreamInfo::StreamInfo& stream_info,
-                    const Tracing::Decision tracing_decision) override;
+                    Tracing::Decision tracing_decision) override;
 
   DriverSharedPtr driverForTest() const { return driver_; }
 

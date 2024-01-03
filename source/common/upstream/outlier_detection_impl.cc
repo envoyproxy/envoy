@@ -23,7 +23,7 @@ namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
-DetectorSharedPtr DetectorImplFactory::createForCluster(
+absl::StatusOr<DetectorSharedPtr> DetectorImplFactory::createForCluster(
     Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger,
     Random::RandomGenerator& random) {
@@ -284,7 +284,7 @@ DetectorImpl::~DetectorImpl() {
   }
 }
 
-std::shared_ptr<DetectorImpl>
+absl::StatusOr<std::shared_ptr<DetectorImpl>>
 DetectorImpl::create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger,
@@ -293,7 +293,7 @@ DetectorImpl::create(Cluster& cluster, const envoy::config::cluster::v3::Outlier
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger, random));
 
   if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         "outlier detector's max_ejection_time cannot be smaller than base_ejection_time");
   }
   detector->initialize(cluster);
@@ -354,10 +354,6 @@ void DetectorImpl::armIntervalTimer() {
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
                                        MonotonicTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-    // Node seems to be healthy and was not ejected since the last check.
-    if (monitor->ejectTimeBackoff() != 0) {
-      monitor->ejectTimeBackoff()--;
-    }
     return;
   }
 
@@ -759,6 +755,22 @@ void DetectorImpl::onIntervalTimer() {
 
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+
+  // Decrement time backoff for all hosts which have not been ejected.
+  for (auto host : host_monitors_) {
+    if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+      auto& monitor = host.second;
+      // Node is healthy and was not ejected since the last check.
+      if (monitor->lastUnejectionTime().has_value() &&
+          ((now - monitor->lastUnejectionTime().value()) >=
+           std::chrono::milliseconds(
+               runtime_.snapshot().getInteger(IntervalMsRuntime, config_.intervalMs())))) {
+        if (monitor->ejectTimeBackoff() != 0) {
+          monitor->ejectTimeBackoff()--;
+        }
+      }
+    }
+  }
 
   armIntervalTimer();
 }

@@ -31,11 +31,9 @@ public:
   MOCK_METHOD(Network::Socket&, socket, ());
   MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
   MOCK_METHOD(void, startHttpListener,
-              (const std::list<AccessLog::InstanceSharedPtr>& access_logs,
-               const std::string& address_out_path,
+              (std::list<AccessLog::InstanceSharedPtr> access_logs,
                Network::Address::InstanceConstSharedPtr address,
-               const Network::Socket::OptionsSharedPtr& socket_options,
-               Stats::ScopeSharedPtr&& listener_scope));
+               Network::Socket::OptionsSharedPtr socket_options));
   MOCK_METHOD(Http::Code, request,
               (absl::string_view path_and_query, absl::string_view method,
                Http::ResponseHeaderMap& response_headers, std::string& body));

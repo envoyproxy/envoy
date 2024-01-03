@@ -1,4 +1,5 @@
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
+load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
 
 licenses(["notice"])  # Apache 2
@@ -59,13 +60,32 @@ cc_library(
     ],
 )
 
+make(
+    name = "lz4",
+    args = [
+        "MOREFLAGS='-fPIC'",
+        "BUILD_SHARED=no",
+    ],
+    lib_source = "@com_github_lz4_lz4//:all",
+    out_static_libs = [
+        "liblz4.a",
+    ],
+    tags = ["skip_on_windows"],
+    targets = [
+        "lib",
+        "install",
+    ],
+    visibility = ["//visibility:public"],
+    alwayslink = False,
+)
+
 # Kafka client dependency used by Kafka-mesh filter.
 # librdkafka build generates extra headers that need to be copied into source to get it to compile.
 configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
-    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
-    lib_source = "@edenhill_librdkafka//:all",
+    configure_options = ["--disable-ssl --disable-gssapi --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
+    lib_source = "@confluentinc_librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
         "librdkafka++.a",
@@ -74,6 +94,7 @@ configure_make(
     targets = [
         "ARFLAGS='' libs install-subdirs",
     ],
+    deps = [":lz4"],
     alwayslink = True,
 )
 
@@ -119,7 +140,7 @@ configure_make(
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
-        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+        "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
     },
     lib_source = "@net_colm_open_source_colm//:all",
     out_binaries = ["colm"],
@@ -141,7 +162,7 @@ configure_make(
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
-        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+        "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
     },
     lib_source = "@net_colm_open_source_ragel//:all",
     out_binaries = ["ragel"],
@@ -578,4 +599,28 @@ envoy_cmake(
         "//conditions:default": ["libzstd.a"],
     }),
     working_directory = "build/cmake",
+)
+
+envoy_cmake(
+    name = "maxmind",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
+        "BUILD_SHARED_LIBS": "off",
+        "BUILD_TESTING": "off",
+    },
+    defines = ["MAXMIND_STATICLIB"],
+    lib_source = "@com_github_maxmind_libmaxminddb//:all",
+    out_static_libs = ["libmaxminddb.a"],
+    tags = ["skip_on_windows"],
+)
+
+envoy_cc_library(
+    name = "maxmind_linux",
+    srcs = [],
+    deps = select({
+        "//bazel:linux": [":maxmind"],
+        "//conditions:default": [],
+    }),
 )

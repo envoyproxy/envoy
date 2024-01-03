@@ -86,7 +86,8 @@ StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& 
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
-    throw EnvoyException("Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+    throwEnvoyExceptionOrPanic(
+        "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
   }
 
   flush_interval_ =
@@ -118,7 +119,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
     ENVOY_LOG(debug, "static secret #{}: {}", i, secrets[i].name());
-    server.secretManager().addStaticSecret(secrets[i]);
+    THROW_IF_NOT_OK(server.secretManager().addStaticSecret(secrets[i]));
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
@@ -131,7 +132,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     absl::StatusOr<bool> update_or_error =
         server.listenerManager().addOrUpdateListener(listeners[i], "", false);
     if (!update_or_error.status().ok()) {
-      throw EnvoyException(std::string(update_or_error.status().message()));
+      throwEnvoyExceptionOrPanic(std::string(update_or_error.status().message()));
     }
   }
   initializeWatchdogs(bootstrap, server);
@@ -183,7 +184,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
 void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                    Instance& server) {
   if (bootstrap.has_watchdog() && bootstrap.has_watchdogs()) {
-    throw EnvoyException("Only one of watchdog or watchdogs should be set!");
+    throwEnvoyExceptionOrPanic("Only one of watchdog or watchdogs should be set!");
   }
 
   if (bootstrap.has_watchdog()) {
@@ -253,12 +254,12 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
 }
 
 void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                     Instance& server) {
+                                     FactoryContext& factory_context) {
   const auto& admin = bootstrap.admin();
 
   for (const auto& access_log : admin.access_log()) {
     AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+        AccessLog::AccessLogFactory::fromProto(access_log, factory_context);
     admin_.access_logs_.emplace_back(current_access_log);
   }
 
@@ -267,7 +268,7 @@ void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstr
                                           admin.access_log_path()};
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
         file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
-        server.accessLogManager()));
+        factory_context.serverFactoryContext().accessLogManager()));
   }
 }
 

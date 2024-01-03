@@ -18,10 +18,10 @@ namespace ConnectGrpcBridge {
 namespace {
 
 struct RcDetailsValues {
-  // The Buf Connect gRPC bridge tried to buffer a unary request that was too large for the
+  // The Connect RPC to gRPC bridge tried to buffer a unary request that was too large for the
   // configured decoder buffer limit.
   const std::string ConnectBridgeUnaryRequestTooLarge = "connect_bridge_unary_request_too_large";
-  // The Buf Connect gRPC bridge tried to buffer a unary response that was too large for the
+  // The Connect RPC to gRPC bridge tried to buffer a unary response that was too large for the
   // configured encoder buffer limit.
   const std::string ConnectBridgeUnaryResponseTooLarge = "connect_bridge_unary_response_too_large";
 };
@@ -288,6 +288,13 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::decodeHeaders(Http::RequestHe
     if (!compression.empty() &&
         compression[0]->value() != Http::CustomHeaders::get().AcceptEncodingValues.Identity) {
       unary_payload_frame_flags_ |= Envoy::Grpc::GRPC_FH_COMPRESSED;
+    }
+
+    headers.removeContentLength();
+
+    if (end_stream) {
+      Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, request_buffer_);
+      decoder_callbacks_->addDecodedData(request_buffer_, true);
     }
   } else {
     Http::Utility::QueryParamsMulti query_parameters =

@@ -254,12 +254,16 @@ public:
   MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
+  MOCK_METHOD(const std::vector<Stats::PrimitiveCounterSnapshot>&, hostCounters, ());
+  MOCK_METHOD(const std::vector<Stats::PrimitiveGaugeSnapshot>&, hostGauges, ());
   MOCK_METHOD(SystemTime, snapshotTime, (), (const));
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;
   std::vector<std::reference_wrapper<const ParentHistogram>> histograms_;
   std::vector<std::reference_wrapper<const TextReadout>> text_readouts_;
+  std::vector<Stats::PrimitiveCounterSnapshot> host_counters_;
+  std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges_;
   SystemTime snapshot_time_;
 };
 
@@ -356,6 +360,7 @@ public:
   ~MockIsolatedStatsStore() override;
 
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
+  MOCK_METHOD(const TagVector&, fixedTags, ());
 };
 
 class MockStatsMatcher : public StatsMatcher {

@@ -129,7 +129,9 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
   absl::flat_hash_set<std::string> effective_resources;
   for (const auto& resource : resources) {
     if (XdsResourceIdentifier::hasXdsTpScheme(resource)) {
-      auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource);
+      auto xdstp_resource_or_error = XdsResourceIdentifier::decodeUrn(resource);
+      THROW_IF_STATUS_NOT_OK(xdstp_resource_or_error, throw);
+      auto xdstp_resource = xdstp_resource_or_error.value();
       if (options.add_xdstp_node_context_params_) {
         const auto context = XdsContextParams::encodeResource(
             local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
@@ -222,6 +224,11 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
 }
 
 template <class S, class F, class RQ, class RS> void GrpcMuxImpl<S, F, RQ, RS>::start() {
+  ASSERT(!started_);
+  if (started_) {
+    return;
+  }
+  started_ = true;
   ENVOY_LOG(debug, "GrpcMuxImpl now trying to establish a stream");
   grpc_stream_.establishNewStream();
 }

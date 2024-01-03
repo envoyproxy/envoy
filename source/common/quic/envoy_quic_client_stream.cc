@@ -91,9 +91,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
       (Http::HeaderUtility::isCapsuleProtocol(headers) ||
-       Http::HeaderUtility::isConnectUdp(headers))) {
+       Http::HeaderUtility::isConnectUdpRequest(headers))) {
     useCapsuleProtocol();
-    if (Http::HeaderUtility::isConnectUdp(headers)) {
+    if (Http::HeaderUtility::isConnectUdpRequest(headers)) {
       // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it
       // bypass the default Datagram queue.
       session()->SetForceFlushForDefaultQueue(true);
@@ -147,7 +147,19 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
       // TODO(danzh): investigate the cost of allocating one buffer per slice.
       // If it turns out to be expensive, add a new function to free data in the middle in buffer
       // interface and re-design QuicheMemSliceImpl.
-      quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.quiche_use_mem_slice_releasor_api")) {
+        quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
+      } else {
+        auto single_slice_buffer = std::make_unique<Buffer::OwnedImpl>();
+        single_slice_buffer->move(data, slice.len_);
+        quic_slices.emplace_back(
+            reinterpret_cast<char*>(slice.mem_), slice.len_,
+            [single_slice_buffer = std::move(single_slice_buffer)](const char*) mutable {
+              // Free this memory explicitly when the callback is invoked.
+              single_slice_buffer = nullptr;
+            });
+      }
     }
     quic::QuicConsumedData result{0, false};
     absl::Span<quiche::QuicheMemSlice> span(quic_slices);

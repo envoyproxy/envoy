@@ -111,7 +111,7 @@ public:
   virtual SpanPtr startSpan(const Config& config, TraceContext& trace_context,
                             const StreamInfo::StreamInfo& stream_info,
                             const std::string& operation_name,
-                            const Tracing::Decision tracing_decision) PURE;
+                            Tracing::Decision tracing_decision) PURE;
 };
 
 using DriverPtr = std::unique_ptr<Driver>;

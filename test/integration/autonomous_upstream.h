@@ -21,18 +21,26 @@ public:
   // If set, the stream will reset when the request is complete, rather than
   // sending a response.
   static const char RESET_AFTER_REQUEST[];
+  // If set, the stream will reset when the response headers are sent.
+  static const char RESET_AFTER_RESPONSE_HEADERS[];
+  // If set, the stream will reset after the first data chunk. Note by default
+  // there is only one data chunk.
+  static const char RESET_AFTER_RESPONSE_DATA[];
   // Prevents upstream from sending trailers.
   static const char NO_TRAILERS[];
   // Prevents upstream from finishing response.
   static const char NO_END_STREAM[];
   // Closes the underlying connection after a given response is sent.
   static const char CLOSE_AFTER_RESPONSE[];
+  // Send the response after the request headers are received.
+  static const char RESPOND_AFTER_REQUEST_HEADERS[];
 
   AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                    AutonomousUpstream& upstream, bool allow_incomplete_streams);
   ~AutonomousStream() override;
 
   void setEndStream(bool set) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) override;
+  void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
 
 private:
   AutonomousUpstream& upstream_;

@@ -31,8 +31,8 @@ public:
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort:
       break;
     }
-    throw EnvoyException(fmt::format("IP resolver can't handle port specifier type {}",
-                                     socket_address.port_specifier_case()));
+    throwEnvoyExceptionOrPanic(fmt::format("IP resolver can't handle port specifier type {}",
+                                           socket_address.port_specifier_case()));
   }
 
   std::string name() const override { return Config::AddressResolverNames::get().IP; }
@@ -46,7 +46,7 @@ REGISTER_FACTORY(IpResolver, Resolver);
 InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   switch (address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
-    throw EnvoyException("Address must be set: " + address.DebugString());
+    throwEnvoyExceptionOrPanic("Address must be set: " + address.DebugString());
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
@@ -63,7 +63,7 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
       break;
     }
   }
-  throw EnvoyException("Failed to resolve address:" + address.DebugString());
+  throwEnvoyExceptionOrPanic("Failed to resolve address:" + address.DebugString());
 }
 
 InstanceConstSharedPtr
@@ -77,7 +77,7 @@ resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& socket_a
     resolver = Registry::FactoryRegistry<Resolver>::getFactory(resolver_name);
   }
   if (resolver == nullptr) {
-    throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
+    throwEnvoyExceptionOrPanic(fmt::format("Unknown address resolver: {}", resolver_name));
   }
   return resolver->resolve(socket_address);
 }

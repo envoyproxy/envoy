@@ -7,10 +7,13 @@ load(
     "READFILTER_NOFUZZ_FILTERS",
 )
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_py_namespace()
 
 FUZZ_FILTER_COUNT = (
     len(READFILTER_FUZZ_FILTERS) +

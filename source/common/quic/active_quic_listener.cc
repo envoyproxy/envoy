@@ -10,6 +10,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/network/udp_listener_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
@@ -36,8 +37,8 @@ ActiveQuicListener::ActiveQuicListener(
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
-          dispatcher.createUdpListener(
-              listen_socket, *this,
+          std::make_unique<Network::UdpListenerImpl>(
+              dispatcher, listen_socket, *this, dispatcher.timeSource(),
               listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedHttp3Versions()),
