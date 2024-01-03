@@ -158,6 +158,12 @@ bug_fixes:
 - area: ext_authz
   change: |
     Fixed a bug to ensure the proper functioning of the ``with_request_body`` feature within the per-route ExtAuthZ filter.
+- area: oauth
+  change: |
+    Add :ref:`default_expires_in <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.default_expires_in>` configuration
+    setting. The OAuth spec does not dictate that an authorization server must respond with an expiry. Envoy currently
+    fails any OAuth flow if the expiry is not set. This setting allows you to provide a default in this case to ensure
+    the OAuth flow can succeed.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
