@@ -15,7 +15,9 @@ CMD tail -f /dev/null
 
 
 FROM python-base as aiohttp-service
-ENV DEBIAN_FRONTEND=noninteractive
+ARG SERVICE_PORT=8080
+ENV DEBIAN_FRONTEND=noninteractive \
+    SERVICE_PORT=$SERVICE_PORT
 ADD "$PYTHON_REQUIREMENTS_FILE" /tmp/requirements.txt
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -28,7 +30,7 @@ HEALTHCHECK \
     --timeout=1s \
     --start-period=1s \
     --retries=3 \
-    CMD nc -zv localhost 8080
+    CMD nc -zv localhost "$SERVICE_PORT"
 ENTRYPOINT ["python3", "/code/service.py"]
 
 
