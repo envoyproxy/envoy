@@ -1450,7 +1450,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "rules_rust-{version}",
         sha256 = "3120c7aa3a146dfe6be8d5f23f4cf10af7d0f74a5aed8b94a818f88643bd24c3",
         urls = ["https://github.com/bazelbuild/rules_rust/archive/{version}.tar.gz"],
-        use_category = ["dataplane_ext"],
+        use_category = [
+            "controlplane",
+            "dataplane_core",
+            "dataplane_ext",
+        ],
+        implied_untracked_deps = ["rules_cc"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
         release_date = "2023-12-27",
         cpe = "N/A",
