@@ -16,8 +16,9 @@ envoy_cc_library(
     deps = [
         "//envoy/compression/compressor:compressor_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/compression/zstd/common:zstd_base_lib",
-        "//source/extensions/compression/zstd/common:zstd_dictionary_manager_lib",
+        "//source/common/compression/zstd/common:zstd_base_lib",
+        "//source/common/compression/zstd/common:zstd_dictionary_manager_lib",
+        "//source/common/compression/zstd/compressor:compressor_base",
     ],
 )
 
