@@ -90,8 +90,13 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
 
   // The OpenTracing implementation ignored the `Tracing::Config` argument,
   // so we will as well.
+  // The `name` parameter to this function more closely matches Datadog's
+  // concept of "resource name." Datadog's "span name," or "operation name,"
+  // instead describes the category of operation being performed, which here
+  // we hard-code.
   datadog::tracing::SpanConfig config;
-  config.name = name;
+  config.name = "envoy.proxy";
+  config.resource = name;
   config.start = estimateTime(start_time);
 
   return std::make_unique<Span>(span_->create_child(config));
