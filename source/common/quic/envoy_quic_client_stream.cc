@@ -215,9 +215,11 @@ void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (http_datagram_handler_) {
     UnregisterHttp3DatagramVisitor();
   }
+#endif
   Reset(envoyResetReasonToQuicRstError(reason));
 }
 
