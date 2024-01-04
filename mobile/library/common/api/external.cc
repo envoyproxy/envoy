@@ -22,8 +22,6 @@ void registerApi(std::string name, void* api) {
 
 // TODO(goaway): This is not thread-safe, but the assumption here is that all writes will complete
 // before any reads occur.
-// TODO(alyssawilk, abeyad): gracefully handle the case where an Api by the given name is not
-// registered.
 void* retrieveApi(std::string name, bool allow_absent) {
   void* api = registry_[name];
   if (!allow_absent) {
