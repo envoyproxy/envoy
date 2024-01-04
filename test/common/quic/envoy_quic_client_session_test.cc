@@ -375,7 +375,11 @@ TEST_P(EnvoyQuicClientSessionTest, VerifyContext) {
   EXPECT_FALSE(verify_context.isServer());
   EXPECT_EQ(transport_socket_options_.get(), verify_context.transportSocketOptions().get());
   EXPECT_EQ(dispatcher_.get(), &verify_context.dispatcher());
-  EXPECT_EQ(&envoy_quic_session_, &verify_context.extraValidationContext().callbacks->connection());
+  EXPECT_EQ(peer_addr_->asString(), verify_context.extraValidationContext()
+                                        .callbacks->connection()
+                                        .connectionInfoSetter()
+                                        .remoteAddress()
+                                        ->asString());
   EXPECT_TRUE(verify_context.extraValidationContext().callbacks->ioHandle().isOpen());
 }
 
