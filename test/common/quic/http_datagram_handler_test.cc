@@ -46,7 +46,9 @@ public:
 
 class HttpDatagramHandlerTest : public ::testing::Test {
 public:
-  HttpDatagramHandlerTest() { http_datagram_handler_.setStreamDecoder(&stream_decoder_); };
+  HttpDatagramHandlerTest() {
+    http_datagram_handler_.setStreamDecoder(&stream_decoder_);
+  };
 
 protected:
   testing::NiceMock<quic::test::MockQuicConnectionHelper> connection_helper_;
