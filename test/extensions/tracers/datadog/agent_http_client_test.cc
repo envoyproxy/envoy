@@ -464,6 +464,45 @@ TEST_F(DatadogAgentHttpClientTest, SendFailReturnsError) {
   EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
 }
 
+TEST_F(DatadogAgentHttpClientTest, SendCalculatedTimeoutIsZero) {
+  // If the `deadline` argument to `AgentHTTPClient::post` is such that the
+  // timeout calculated by `post` truncates to exactly zero milliseconds, then
+  // `post` will return an error and increment `stats_.reports_dropped_`.
+
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats_, time_);
+
+  const auto ignore = [](auto&&...) {};
+  const auto deadline = time_.monotonicTime() + std::chrono::seconds(1);
+  time_.setMonotonicTime(deadline);
+  datadog::tracing::Expected<void> result = client.post(url_, ignore, "", ignore, ignore, deadline);
+  ASSERT_FALSE(result);
+  EXPECT_EQ(datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE, result.error().code);
+  EXPECT_EQ(1, stats_.reports_dropped_.value());
+  EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
+  EXPECT_EQ(0, stats_.reports_failed_.value());
+}
+
+TEST_F(DatadogAgentHttpClientTest, SendCalculatedTimeoutIsNegative) {
+  // If the `deadline` argument to `AgentHTTPClient::post` is such that the
+  // timeout calculated by `post` truncates to a negative number of
+  // milliseconds, then `post` will return an error and increment
+  // `stats_.reports_dropped_`.
+
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats_, time_);
+
+  const auto ignore = [](auto&&...) {};
+  const auto deadline = time_.monotonicTime() + std::chrono::seconds(1);
+  time_.setMonotonicTime(deadline + std::chrono::seconds(1));
+  datadog::tracing::Expected<void> result = client.post(url_, ignore, "", ignore, ignore, deadline);
+  ASSERT_FALSE(result);
+  EXPECT_EQ(datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE, result.error().code);
+  EXPECT_EQ(1, stats_.reports_dropped_.value());
+  EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
+  EXPECT_EQ(0, stats_.reports_failed_.value());
+}
+
 TEST_F(DatadogAgentHttpClientTest, DrainIsANoOp) {
   // `AgentHTTPClient::drain` doesn't do anything. It only makes sense in
   // multi-threaded contexts.
