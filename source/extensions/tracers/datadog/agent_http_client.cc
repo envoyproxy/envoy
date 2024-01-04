@@ -53,7 +53,7 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
 
   message->body().add(body);
 
-  auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+  const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
       deadline - time_source_.monotonicTime());
   if (timeout.count() <= 0) {
     std::string message = "request deadline expired already";
