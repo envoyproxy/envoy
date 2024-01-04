@@ -91,8 +91,9 @@ public:
     }
 
     filter_config_ = std::make_shared<FilterConfigImpl>(
-        "test_prefix", std::move(codec_factory), route_config_provider_, factories, tracer_,
-        std::move(tracing_config_), std::move(access_logs), code_or_flags_, factory_context_);
+        "generic_proxy.test_prefix.", std::move(codec_factory), route_config_provider_, factories,
+        tracer_, std::move(tracing_config_), std::move(access_logs), code_or_flags_,
+        factory_context_);
   }
 
   AccessLogInstanceSharedPtr loggerFormFormat(const std::string& format = DEFAULT_LOG_FORMAT) {
