@@ -16,11 +16,11 @@ http_archive(
 # is merged and released.
 http_archive(
     name = "rules_foreign_cc",
-    sha256 = "bbc605fd36048923939845d6843464197df6e6ffd188db704423952825e4760a",
-    strip_prefix = "rules_foreign_cc-a473d42bada74afac4e32b767964c1785232e07b",
+    sha256 = "73aaf397ce8774c5ca7f5efa0f7ab7cb95860e975bffa8406a22c7079ebb1238",
+    strip_prefix = "rules_foreign_cc-0dafcb29a8ce9c3b49a211ebba6c9c0f79eb93d6",
     urls = [
-        "https://storage.googleapis.com/engflow-tools-public/rules_foreign_cc-a473d42bada74afac4e32b767964c1785232e07b.tar.gz",
-        "https://github.com/EngFlow/rules_foreign_cc/archive/a473d42bada74afac4e32b767964c1785232e07b.tar.gz",
+        "https://storage.googleapis.com/engflow-tools-public/rules_foreign_cc-0dafcb29a8ce9c3b49a211ebba6c9c0f79eb93d6.tar.gz",
+        "https://github.com/EngFlow/rules_foreign_cc/archive/0dafcb29a8ce9c3b49a211ebba6c9c0f79eb93d6.tar.gz",
     ],
 )
 
