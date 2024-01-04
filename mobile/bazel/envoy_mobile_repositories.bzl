@@ -107,9 +107,9 @@ def android_repos():
 def python_repos():
     http_archive(
         name = "pybind11_bazel",
-        strip_prefix = "pybind11_bazel-26973c0ff320cb4b39e45bc3e4297b82bc3a6c09",
-        urls = ["https://github.com/pybind/pybind11_bazel/archive/26973c0ff320cb4b39e45bc3e4297b82bc3a6c09.zip"],
-        sha256 = "a5666d950c3344a8b0d3892a88dc6b55c8e0c78764f9294e806d69213c03f19d",
+        strip_prefix = "pybind11_bazel-23926b00e2b2eb2fc46b17e587cf0c0cfd2f2c4b",
+        urls = ["https://github.com/pybind/pybind11_bazel/archive/23926b00e2b2eb2fc46b17e587cf0c0cfd2f2c4b.zip"],
+        sha256 = "07e529a85cf4c11e1ca1b423149e86e63a3f3859c22efee3b3c5225ca89580f2",
     )
     http_archive(
         name = "pybind11",
