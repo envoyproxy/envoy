@@ -195,9 +195,11 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     buffer_memory_account_->clearDownstream();
   }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (http_datagram_handler_) {
     UnregisterHttp3DatagramVisitor();
   }
+#endif
 
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
