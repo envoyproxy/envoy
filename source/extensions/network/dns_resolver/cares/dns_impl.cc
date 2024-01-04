@@ -555,9 +555,7 @@ public:
       const auto& resolver_addrs = cares.resolvers();
       resolvers.reserve(resolver_addrs.size());
       for (const auto& resolver_addr : resolver_addrs) {
-        auto address_or_error = Network::Address::resolveProtoAddress(resolver_addr);
-        THROW_IF_STATUS_NOT_OK(address_or_error, throw);
-        resolvers.push_back(std::move(address_or_error.value()));
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
     return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers,
