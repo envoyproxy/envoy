@@ -456,6 +456,12 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
 }
 
 void UpstreamRequest::resetStream() {
+  if (reset_stream_) {
+    // resetStream() has already been called on this UpstreamRequest.
+    IS_ENVOY_BUG("UpstreamRequest::resetStream() called more than once.");
+    return;
+  }
+
   if (conn_pool_->cancelAnyPendingStream()) {
     ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks());
     ASSERT(!upstream_);
