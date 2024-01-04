@@ -787,6 +787,53 @@ TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_EQ(callbacks_.details(), "maintenance_mode");
 }
 
+// DropOverload pass test
+TEST_F(RouterTest, DropOverloadPassed) {
+  EXPECT_CALL(cm_.thread_local_cluster_, dropOverload()).WillRepeatedly(Return(UnitFloat(0.3)));
+  EXPECT_CALL(random_, random())
+      .WillRepeatedly(Return(0.5 * float(std::numeric_limits<uint64_t>::max())));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_drop_overload")
+                    .value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_dropped")
+                    .value());
+  router_->onDestroy();
+}
+
+// DropOverload drop test
+TEST_F(RouterTest, DropOverloadDropped) {
+  EXPECT_CALL(cm_.thread_local_cluster_, dropOverload()).WillRepeatedly(Return(UnitFloat(0.3)));
+  EXPECT_CALL(random_, random())
+      .WillRepeatedly(Return(0.2 * float(std::numeric_limits<uint64_t>::max())));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"},
+                                                   {"content-length", "13"},
+                                                   {"content-type", "text/plain"},
+                                                   {"x-envoy-drop-overload", "true"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::DropOverLoad));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_drop_overload")
+                    .value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(0U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_dropped")
+                    .value());
+  EXPECT_EQ(callbacks_.details(), "drop_overload");
+}
+
 TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -4179,6 +4226,10 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
 
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
 
@@ -4228,6 +4279,9 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
   EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
   ON_CALL(*mock_predicate, name()).WillByDefault(Return("mock_predicate"));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
   EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
@@ -4250,6 +4304,10 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4276,6 +4334,9 @@ TEST_F(RouterTest, HttpInternalRedirectMatchedToDirectResponseSucceeded) {
             .WillRepeatedly(Return(&direct_response));
       }));
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4299,6 +4360,10 @@ TEST_F(RouterTest, InternalRedirectStripsFragment) {
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
       {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+
   response_decoder_->decodeHeaders(std::move(redirect_headers), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4319,6 +4384,9 @@ TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
 
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
   Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
       {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
   response_decoder_->decodeHeaders(std::move(redirect_headers), false);
@@ -4343,6 +4411,9 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4366,6 +4437,9 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
       .WillOnce(Return(true));
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4373,6 +4447,35 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
 
   // In production, the HCM recreateStream would have called this.
   router_->onDestroy();
+}
+
+TEST_F(RouterTest, ResponseHeadersTCopyCopiesHeadersOrClears) {
+  enableRedirects();
+  default_request_headers_.setCopy(Http::LowerCaseString("x-to-clear"), "value");
+
+  sendRequest();
+
+  redirect_headers_->setCopy(Http::LowerCaseString("x-to-copy"), "bar");
+
+  std::vector<Http::LowerCaseString> toCopy;
+  toCopy.emplace_back("x-to-clear");
+  toCopy.emplace_back("x-to-copy");
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_->onDestroy();
+  EXPECT_TRUE(default_request_headers_.get(Http::LowerCaseString("x-to-clear")).empty());
+  auto copyResult = default_request_headers_.get(Http::LowerCaseString("x-to-copy"));
+  EXPECT_FALSE(copyResult.empty());
+  EXPECT_EQ(1, copyResult.size());
+  EXPECT_EQ("bar", copyResult[0]->value().getStringView());
 }
 
 namespace {
@@ -4703,6 +4806,53 @@ TEST_P(RouterShadowingTest, NoShadowForConnect) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   router_->onDestroy();
+}
+
+// If the shadow stream watermark callbacks are invoked in the Router filter destructor,
+// it causes a potential use-after-free bug, as the FilterManger may have already been freed.
+TEST_P(RouterShadowingTest, ShadowCallbacksNotCalledInDestructor) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP();
+  }
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
+        EXPECT_TRUE(options.sampled_.value());
+        return &foo_request;
+      }));
+  router_->decodeHeaders(headers, false);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_CALL(foo_request, sendData(BufferStringEqual("hello"), false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
+
+  // Guarantee that callbacks are invoked in onDestroy instead of destructor.
+  {
+    EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+    EXPECT_CALL(foo_request, cancel());
+    router_->onDestroy();
+  }
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks()).Times(0);
+  EXPECT_CALL(foo_request, cancel()).Times(0);
 }
 
 TEST_F(RouterTest, AltStatName) {
@@ -6356,10 +6506,11 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
   // called to get address of upstream host that should be selected first.
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+      .WillOnce(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
+          std::make_pair("1.2.3.4", false))));
 
   auto override_host = router_->overrideHostToSelect();
-  EXPECT_EQ("1.2.3.4", override_host.value());
+  EXPECT_EQ("1.2.3.4", override_host.value().first);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);

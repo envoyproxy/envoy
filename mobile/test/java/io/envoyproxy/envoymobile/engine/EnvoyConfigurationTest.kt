@@ -103,7 +103,6 @@ class EnvoyConfigurationTest {
     xdsPort: Int = 0,
     xdsGrpcInitialMetadata: Map<String, String> = emptyMap(),
     xdsSslRootCerts: String = "",
-    xdsSni: String = "",
     nodeId: String = "",
     nodeRegion: String = "",
     nodeZone: String = "",
@@ -154,7 +153,6 @@ class EnvoyConfigurationTest {
       xdsPort,
       xdsGrpcInitialMetadata,
       xdsSslRootCerts,
-      xdsSni,
       nodeId,
       nodeRegion,
       nodeZone,
@@ -166,8 +164,8 @@ class EnvoyConfigurationTest {
     )
   }
 
-  fun isGoogleGrpcDisabled(): Boolean {
-    return System.getProperty("envoy_jni_google_grpc_disabled") != null;
+  fun isEnvoyMobileXdsDisabled(): Boolean {
+    return System.getProperty("envoy_jni_envoy_mobile_xds_disabled") != null;
   }
 
   @Test
@@ -207,12 +205,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains(".xyz.com");
     assertThat(resolvedTemplate).contains("connection_options: 5RTO");
     assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
-
-    // Gzip
-    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
-
-    // Brotli
-    assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
 
     // Per Host Limits
     assertThat(resolvedTemplate).contains("max_connections: 543")
@@ -283,12 +275,8 @@ class EnvoyConfigurationTest {
     // enableGzipDecompression = false
     assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
 
-    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip");
-
     // enableBrotliDecompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
-
-    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli");
 
     // enableInterfaceBinding = true
     assertThat(resolvedTemplate).contains("enable_interface_binding: true")
@@ -317,7 +305,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -334,7 +322,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS and CDS`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -365,7 +353,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test enableCds with default string`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 
@@ -382,7 +370,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test RTDS default timeout`() {
-    if (isGoogleGrpcDisabled()) {
+    if (isEnvoyMobileXdsDisabled()) {
       return;
     }
 

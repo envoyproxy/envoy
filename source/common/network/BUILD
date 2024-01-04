@@ -274,6 +274,7 @@ envoy_cc_library(
     srcs = ["socket_impl.cc"],
     hdrs = ["socket_impl.h"],
     deps = [
+        "//envoy/network:listener_interface",
         "//envoy/network:socket_interface",
         "//envoy/network:socket_interface_interface",
         "//source/common/api:os_sys_calls_lib",
@@ -348,6 +349,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/event:dispatcher_includes",
+        "//source/common/runtime:runtime_keys_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

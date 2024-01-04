@@ -26,6 +26,8 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+NID
+NIST
 bm
 BSON
 BPF
@@ -34,6 +36,7 @@ Bencoded
 CIO
 deadcode
 DFP
+Dynatrace
 DOM
 Gasd
 GiB
@@ -348,6 +351,8 @@ QDCOUNT
 QPACK
 QUIC
 QoS
+qat
+qatzip
 RAII
 RANLUX
 RBAC
@@ -1236,6 +1241,9 @@ sigactions
 sigaltstack
 siginfo
 signalstack
+sigv
+sigv4
+sigv4a
 siloed
 sim
 sinked

@@ -20,11 +20,9 @@ const Network::Socket& ValidationAdmin::socket() { return *socket_; }
 
 ConfigTracker& ValidationAdmin::getConfigTracker() { return config_tracker_; }
 
-void ValidationAdmin::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&,
-                                        const std::string&,
+void ValidationAdmin::startHttpListener(std::list<AccessLog::InstanceSharedPtr>,
                                         Network::Address::InstanceConstSharedPtr,
-                                        const Network::Socket::OptionsSharedPtr&,
-                                        Stats::ScopeSharedPtr&&) {}
+                                        Network::Socket::OptionsSharedPtr) {}
 
 Http::Code ValidationAdmin::request(absl::string_view, absl::string_view, Http::ResponseHeaderMap&,
                                     std::string&) {

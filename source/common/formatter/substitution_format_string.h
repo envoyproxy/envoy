@@ -12,6 +12,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -27,7 +28,7 @@ public:
   template <class FormatterContext = HttpFormatterContext>
   static FormatterBasePtr<FormatterContext>
   fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
-                  Server::Configuration::CommonFactoryContext& context) {
+                  Server::Configuration::GenericFactoryContext& context) {
     // Instantiate formatter extensions.
     std::vector<CommandParserBasePtr<FormatterContext>> commands;
     for (const auto& formatter : config.formatters()) {
@@ -57,7 +58,8 @@ public:
           commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
       return std::make_unique<FormatterBaseImpl<FormatterContext>>(
-          Config::DataSource::read(config.text_format_source(), true, context.api()),
+          Config::DataSource::read(config.text_format_source(), true,
+                                   context.serverFactoryContext().api()),
           config.omit_empty_values(), commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::FORMAT_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;

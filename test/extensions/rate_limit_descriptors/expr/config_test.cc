@@ -32,7 +32,7 @@ public:
     rate_limit_entry_ = std::make_unique<Router::RateLimitPolicyEntryImpl>(rate_limit, context_);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::unique_ptr<Router::RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;

@@ -51,6 +51,7 @@ envoy_cc_test(
     srcs = ["golang_integration_test.cc"],
     data = [
         "//contrib/golang/filters/http/test/test_data/access_log:filter.so",
+        "//contrib/golang/filters/http/test/test_data/action:filter.so",
         "//contrib/golang/filters/http/test/test_data/basic:filter.so",
         "//contrib/golang/filters/http/test/test_data/buffer:filter.so",
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",
@@ -62,6 +63,7 @@ envoy_cc_test(
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//source/exe:main_common_lib",
+        "//source/extensions/filters/http/lua:config",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",

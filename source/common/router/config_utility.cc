@@ -106,8 +106,9 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
   return {};
 }
 
-std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
-                                                   Api::Api& api, uint32_t max_body_size_bytes) {
+absl::StatusOr<std::string>
+ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route, Api::Api& api,
+                                       uint32_t max_body_size_bytes) {
   if (!route.has_direct_response() || !route.direct_response().has_body()) {
     return EMPTY_STRING;
   }
@@ -116,8 +117,8 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v
   const std::string string_body =
       Envoy::Config::DataSource::read(body, true, api, max_body_size_bytes);
   if (string_body.length() > max_body_size_bytes) {
-    throwEnvoyExceptionOrPanic(fmt::format("response body size is {} bytes; maximum is {}",
-                                           string_body.length(), max_body_size_bytes));
+    return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
+                                                  string_body.length(), max_body_size_bytes));
   }
   return string_body;
 }

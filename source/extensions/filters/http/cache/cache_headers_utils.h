@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iosfwd>
+
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/http/header_map.h"
@@ -93,6 +95,8 @@ struct ResponseCacheControl {
 
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs);
 bool operator==(const ResponseCacheControl& lhs, const ResponseCacheControl& rhs);
+std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control);
+std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control);
 
 namespace CacheHeadersUtils {
 // Parses header_entry as an HTTP time. Returns SystemTime() if

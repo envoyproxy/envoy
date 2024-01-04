@@ -1,5 +1,5 @@
 ARG BUILD_OS=mcr.microsoft.com/windows/servercore
-ARG BUILD_TAG=ltsc2019
+ARG BUILD_TAG=ltsc2019@sha256:56c5fe9f320b41a873f73ce5d019a9650dce2e10cb27b234d425418bef9310dd
 
 FROM $BUILD_OS:$BUILD_TAG
 

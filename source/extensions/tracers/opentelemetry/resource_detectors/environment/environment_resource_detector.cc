@@ -26,7 +26,7 @@ Resource EnvironmentResourceDetector::detect() {
   ds.set_environment_variable(kOtelResourceAttributesEnv);
 
   Resource resource;
-  resource.schemaUrl_ = "";
+  resource.schema_url_ = "";
   std::string attributes_str = "";
 
   attributes_str = Config::DataSource::read(ds, true, context_.serverFactoryContext().api());

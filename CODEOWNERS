@@ -56,7 +56,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.datadog extension
 /*/extensions/tracers/datadog @cgilmour @dgoffredo @dmehala @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
+/*/extensions/tracers/xray @suniltheta @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
 # tracers.opentelemetry extension
@@ -117,7 +117,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
-/*/extensions/filters/http/connect_grpc_bridge @UNOWNED @UNOWNED
+/*/extensions/filters/http/connect_grpc_bridge @jchadwick-buf @mattklein123
 /*/extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
 /*/extensions/grpc_credentials/example @wozz @htuch
@@ -140,7 +140,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
 /*/extensions/filters/network/echo @htuch @alyssawilk
-/*/extensions/filters/udp/dns_filter @abaptiste @mattklein123 @yanjunxiang-google
+/*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @mattklein123
@@ -305,10 +305,10 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
 # upstream load balancing policies
-/*/extensions/load_balancing_policies/common @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/least_request @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/random @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/round_robin @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/common @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/random @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en
 /*/extensions/load_balancing_policies/ring_hash @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher
@@ -332,6 +332,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
 
 /*/extensions/health_checkers/common @zuercher @botengyao
+
+# Lua cluster specifier
+/*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

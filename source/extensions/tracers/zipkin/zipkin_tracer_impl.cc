@@ -42,19 +42,18 @@ std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context,
                                const Upstream::HostDescriptionConstSharedPtr&) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                  span_.traceIdAsHexString());
-  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
+  ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, span_.traceIdAsHexString());
+  ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, span_.idAsHexString());
 
   // Set the parent-span header properly, based on the newly-created span structure.
   if (span_.isSetParentId()) {
-    trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                    span_.parentIdAsHexString());
+    ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.setRefKey(trace_context,
+                                                             span_.parentIdAsHexString());
   }
 
   // Set the sampled header.
-  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                  span_.sampled() ? SAMPLED : NOT_SAMPLED);
+  ZipkinCoreConstants::get().X_B3_SAMPLED.setRefKey(trace_context,
+                                                    span_.sampled() ? SAMPLED : NOT_SAMPLED);
 }
 
 void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }

@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.validate.h"
 
+#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 
@@ -14,12 +15,16 @@ class ExecuteFilterAction
     : public Matcher::ActionBase<
           envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
 public:
-  explicit ExecuteFilterAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
+  explicit ExecuteFilterAction(Http::FilterFactoryCb cb, const std::string& name)
+      : cb_(std::move(cb)), name_(name) {}
 
   void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
 
+  const std::string& actionName() const { return name_; }
+
 private:
   Http::FilterFactoryCb cb_;
+  const std::string name_;
 };
 
 class ExecuteFilterActionFactory

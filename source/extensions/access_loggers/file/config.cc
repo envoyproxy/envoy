@@ -19,17 +19,10 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace File {
 
-AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
-AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+AccessLog::InstanceSharedPtr
+FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                              AccessLog::FilterPtr&& filter,
+                                              Server::Configuration::FactoryContext& context) {
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
       config, context.messageValidationVisitor());
@@ -68,7 +61,7 @@ AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
 
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
   return std::make_shared<FileAccessLog>(file_info, std::move(filter), std::move(formatter),
-                                         context.accessLogManager());
+                                         context.serverFactoryContext().accessLogManager());
 }
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {

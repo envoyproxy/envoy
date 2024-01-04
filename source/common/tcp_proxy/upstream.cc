@@ -136,7 +136,7 @@ void HttpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!request_encoder_) {
     return;
   }
-  // auto codec = type_;
+  auto codec = type_;
   request_encoder_->encodeData(data, end_stream);
 
   // doneWriting() is being skipped for H1 codec to avoid resetEncoder() call.
@@ -144,7 +144,7 @@ void HttpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   // will fully close the upstream connection without flushing any pending data, rather than a http
   // stream reset.
   // More details can be found on https://github.com/envoyproxy/envoy/pull/13293
-  if ((type_ != Http::CodecType::HTTP1) && (end_stream)) {
+  if ((codec != Http::CodecType::HTTP1) && (end_stream)) {
     doneWriting();
   }
 }

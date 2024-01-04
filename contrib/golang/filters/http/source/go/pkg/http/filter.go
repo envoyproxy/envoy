@@ -114,7 +114,7 @@ func (r *httpRequest) Continue(status api.StatusType) {
 	cAPI.HttpContinue(unsafe.Pointer(r.req), uint64(status))
 }
 
-func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string) {
+func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string) {
 	cAPI.HttpSendLocalReply(unsafe.Pointer(r.req), responseCode, bodyText, headers, grpcStatus, details)
 }
 

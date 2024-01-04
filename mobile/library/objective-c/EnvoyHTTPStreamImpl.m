@@ -174,7 +174,7 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
   // start_stream could result in a reset that would release the native ref.
   _strongSelf = self;
   envoy_status_t result =
-      start_stream(engineHandle, _streamHandle, native_callbacks, explicitFlowControl, 0);
+      start_stream(engineHandle, _streamHandle, native_callbacks, explicitFlowControl);
   if (result != ENVOY_SUCCESS) {
     _strongSelf = nil;
     return nil;

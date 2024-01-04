@@ -78,10 +78,6 @@ TEST(TestConfig, ConfigIsApplied) {
       "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-      "asdf.fake.website",
-      "stats_flush_interval { seconds: 654 }",
-#endif
 #ifdef ENVOY_ENABLE_QUIC
       "connection_options: \"5RTO\"",
       "client_connection_options: \"MPQC\"",
@@ -295,7 +291,7 @@ TEST(TestConfig, DisableHttp3) {
 #endif
 }
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 TEST(TestConfig, XdsConfig) {
   EngineBuilder engine_builder;
   const std::string host = "fake-td.googleapis.com";
@@ -491,7 +487,7 @@ TEST(TestConfig, SetNodeMetadata) {
   EXPECT_EQ(bootstrap->node().metadata().fields().at("number_field").number_value(), 3.14);
 }
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 TEST(TestConfig, AddCdsLayer) {
   XdsBuilder xds_builder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);
   xds_builder.addClusterDiscoveryService();

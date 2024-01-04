@@ -1333,7 +1333,7 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
       // Use TLS because it will respond to a TCP half-close during handshake by closing the
       // connection.
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
+      ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context(), false);
       filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
       filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 

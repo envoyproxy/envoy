@@ -69,7 +69,7 @@ struct StatsParams {
   std::string filter_string_;
   std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
-  Http::Utility::QueryParams query_;
+  Http::Utility::QueryParamsMulti query_;
 
   /**
    * Determines whether a metric should be shown based on the specified query-parameters. This

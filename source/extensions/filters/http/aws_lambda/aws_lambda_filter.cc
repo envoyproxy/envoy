@@ -112,6 +112,7 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
 
 } // namespace
 
+// TODO(nbaws) Implement Sigv4a support
 Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
                const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer)
     : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
@@ -286,8 +287,9 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
 
   // Wrap the Query String
   if (headers.Path()) {
-    for (auto&& kv_pair : Http::Utility::parseQueryString(headers.getPathValue())) {
-      json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
+    auto queryParams = Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
+    for (const auto& kv_pair : queryParams.data()) {
+      json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second[0]});
     }
   }
 

@@ -13,6 +13,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/common_values.h"
+#include "source/common/tracing/trace_context_impl.h"
 #include "source/extensions/tracers/xray/daemon_broker.h"
 #include "source/extensions/tracers/xray/sampling_strategy.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"
@@ -27,9 +28,10 @@ namespace XRay {
 
 constexpr absl::string_view SpanClientIp = "client_ip";
 constexpr absl::string_view SpanXForwardedFor = "x_forwarded_for";
-constexpr absl::string_view XForwardedForHeader = "x-forwarded-for";
-constexpr absl::string_view XRayTraceHeader = "x-amzn-trace-id";
 constexpr absl::string_view Subsegment = "subsegment";
+
+const Tracing::TraceContextHandler& xRayTraceHeader();
+const Tracing::TraceContextHandler& xForwardedForHeader();
 
 class Span : public Tracing::Span, Logger::Loggable<Logger::Id::config> {
 public:
