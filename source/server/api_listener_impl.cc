@@ -13,10 +13,10 @@
 namespace Envoy {
 namespace Server {
 
-ApiListenerImplBase::ApiListenerImplBase(Network::Address::InstanceConstSharedPtr&& address,
-                                         const envoy::config::listener::v3::Listener& config,
+ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
                                          Server::Instance& server, const std::string& name)
-    : config_(config), name_(name), address_(std::move(address)),
+    : config_(config), name_(name),
+      address_(Network::Address::resolveProtoAddress(config.address())),
       factory_context_(server, *this, server.stats().createScope(""),
                        server.stats().createScope(fmt::format("listener.api.{}.", name_)),
                        std::make_shared<ListenerInfoImpl>(config)) {}
@@ -41,19 +41,9 @@ HttpApiListener::ApiListenerWrapper::newStreamHandle(Http::ResponseEncoder& resp
   return http_connection_manager_->newStreamHandle(response_encoder, is_internally_created);
 }
 
-absl::StatusOr<std::unique_ptr<HttpApiListener>>
-HttpApiListener::create(const envoy::config::listener::v3::Listener& config,
-                        Server::Instance& server, const std::string& name) {
-  auto address_or_error = Network::Address::resolveProtoAddress(config.address());
-  RETURN_IF_STATUS_NOT_OK(address_or_error);
-  return std::unique_ptr<HttpApiListener>(
-      new HttpApiListener(std::move(address_or_error.value()), config, server, name));
-}
-
-HttpApiListener::HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
-                                 const envoy::config::listener::v3::Listener& config,
+HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  Server::Instance& server, const std::string& name)
-    : ApiListenerImplBase(std::move(address), config, server, name) {
+    : ApiListenerImplBase(config, server, name) {
   if (config.api_listener().api_listener().type_url() ==
       absl::StrCat(
           "type.googleapis.com/",

@@ -14,17 +14,17 @@ namespace Address {
 /**
  * Create an Instance from a envoy::config::core::v3::Address.
  * @param address supplies the address proto to resolve.
- * @return pointer to the Instance or an error status
+ * @return pointer to the Instance.
  */
-absl::StatusOr<Address::InstanceConstSharedPtr>
+Address::InstanceConstSharedPtr
 resolveProtoAddress(const envoy::config::core::v3::Address& address);
 
 /**
  * Create an Instance from a envoy::config::core::v3::SocketAddress.
  * @param address supplies the socket address proto to resolve.
- * @return pointer to the Instance or an error status.
+ * @return pointer to the Instance.
  */
-absl::StatusOr<Address::InstanceConstSharedPtr>
+Address::InstanceConstSharedPtr
 resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& address);
 
 DECLARE_FACTORY(IpResolver);
