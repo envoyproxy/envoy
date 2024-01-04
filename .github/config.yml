@@ -51,6 +51,7 @@ checks:
   mobile-compile-time-options:
     name: Mobile/Compile time options
     on-run:
+    - mobile-compile-time-cc
     - mobile-compile-time-options
   mobile-core:
     name: Mobile/Core
@@ -228,6 +229,9 @@ run:
     - bazel/repository_locations.bzl
     - mobile/**/*
     - tools/code_format/check_format.py
+  mobile-compile-time-cc:
+    paths:
+    - "**/*"
   mobile-compile-time-options:
     paths:
     - .bazelrc
