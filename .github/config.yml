@@ -252,13 +252,7 @@ run:
     - tools/code_format/check_format.py
   mobile-core:
     paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
-    - mobile/**/*
-    - tools/code_format/check_format.py
+    - "**/*"
   mobile-format:
     paths:
     - .bazelrc
