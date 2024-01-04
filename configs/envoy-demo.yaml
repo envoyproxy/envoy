@@ -40,6 +40,7 @@ static_resources:
   clusters:
   - name: service_envoyproxy_io
     type: LOGICAL_DNS
+    connect_timeout: 5s
     # Comment out the following line to test on v6 networks
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
