@@ -37,7 +37,7 @@ pyreadline
 pyyaml
 setuptools
 slack_sdk
-sphinx>=7
+sphinx>=7,<7.2
 sphinxcontrib.googleanalytics
 thrift
 verboselogs
