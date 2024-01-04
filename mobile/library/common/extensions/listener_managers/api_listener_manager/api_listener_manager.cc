@@ -36,9 +36,9 @@ ApiListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::L
           name));
     }
     if (!api_listener_ && !added_via_api) {
-      // TODO(junr03): dispatch to different concrete constructors when there are other
-      // ApiListenerImplBase derived classes.
-      api_listener_ = std::make_unique<HttpApiListener>(config, server_, config.name());
+      auto listener_or_error = HttpApiListener::create(config, server_, config.name());
+      RETURN_IF_STATUS_NOT_OK(listener_or_error);
+      api_listener_ = std::move(listener_or_error.value());
       return true;
     } else {
       ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "
