@@ -309,8 +309,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en @nezdolik
 /*/extensions/load_balancing_policies/random @wbpcode @tonya11en
 /*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en @nezdolik
-/*/extensions/load_balancing_policies/ring_hash @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/ring_hash @wbpcode @nezdolik
+/*/extensions/load_balancing_policies/maglev @wbpcode @nezdolik
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 # Early header mutation
