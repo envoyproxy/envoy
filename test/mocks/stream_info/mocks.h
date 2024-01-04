@@ -75,6 +75,7 @@ public:
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(SystemTime, startTime, (), (const));
   MOCK_METHOD(MonotonicTime, startTimeMonotonic, (), (const));
+  MOCK_METHOD(TimeSource&, timeSource, (), (const));
   MOCK_METHOD(void, setUpstreamInfo, (std::shared_ptr<UpstreamInfo>));
   MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
   MOCK_METHOD(OptRef<const UpstreamInfo>, upstreamInfo, (), (const));

@@ -227,10 +227,14 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
   std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses;
   if (bind_config.has_value()) {
     UpstreamLocalAddress upstream_local_address;
-    upstream_local_address.address_ =
-        bind_config->has_source_address()
-            ? ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address())
-            : nullptr;
+    upstream_local_address.address_ = nullptr;
+    if (bind_config->has_source_address()) {
+
+      auto address_or_error =
+          ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      upstream_local_address.address_ = address_or_error.value();
+    }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
 
     ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
@@ -242,8 +246,10 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 
     for (const auto& extra_source_address : bind_config->extra_source_addresses()) {
       UpstreamLocalAddress extra_upstream_local_address;
-      extra_upstream_local_address.address_ =
+      auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      extra_upstream_local_address.address_ = address_or_error.value();
 
       extra_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -264,8 +270,10 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 
     for (const auto& additional_source_address : bind_config->additional_source_addresses()) {
       UpstreamLocalAddress additional_upstream_local_address;
-      additional_upstream_local_address.address_ =
+      auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      additional_upstream_local_address.address_ = address_or_error.value();
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
@@ -354,7 +362,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
                                                                                  false);
   }
-  return local_address_selector_factory->createLocalAddressSelector(
+  auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       parseBindConfig(
           bind_config, cluster_name,
           buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
@@ -362,6 +370,8 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{}))),
       cluster_name);
+  THROW_IF_STATUS_NOT_OK(selector_or_error, throw);
+  return selector_or_error.value();
 }
 
 } // namespace
@@ -947,7 +957,9 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
 
   // Handle the lb subset config case first.
-  if (cluster.has_lb_subset_config()) {
+  // Note it is possible to have a lb_subset_config without actually having any subset selectors.
+  // In this case the subset load balancer should not be used.
+  if (cluster.has_lb_subset_config() && !cluster.lb_subset_config().subset_selectors().empty()) {
     auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.subset");
     if (lb_factory != nullptr) {
@@ -1284,7 +1296,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
+        helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);
     THROW_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
                                           http_filter_factories_));
@@ -1521,6 +1533,11 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         info_->endpointStats().membership_degraded_.set(degraded_hosts);
         info_->endpointStats().membership_excluded_.set(excluded_hosts);
       });
+  // Drop overload configuration parsing.
+  absl::Status status = parseDropOverloadConfig(cluster.load_assignment());
+  if (!status.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(status.message()));
+  }
 }
 
 namespace {
@@ -1640,6 +1657,45 @@ void ClusterImplBase::finishInitialization() {
   }
 }
 
+absl::Status ClusterImplBase::parseDropOverloadConfig(
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+  // Default drop_overload_ to zero.
+  drop_overload_ = UnitFloat(0);
+
+  if (!cluster_load_assignment.has_policy()) {
+    return absl::OkStatus();
+  }
+  auto policy = cluster_load_assignment.policy();
+  if (policy.drop_overloads().size() == 0) {
+    return absl::OkStatus();
+  }
+  if (policy.drop_overloads().size() > kDropOverloadSize) {
+    return absl::InvalidArgumentError(
+        fmt::format("Cluster drop_overloads config has {} categories. Envoy only support one.",
+                    policy.drop_overloads().size()));
+  }
+
+  const auto drop_percentage = policy.drop_overloads(0).drop_percentage();
+  float denominator = 100;
+  switch (drop_percentage.denominator()) {
+  case envoy::type::v3::FractionalPercent::HUNDRED:
+    denominator = 100;
+    break;
+  case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
+    denominator = 10000;
+    break;
+  case envoy::type::v3::FractionalPercent::MILLION:
+    denominator = 1000000;
+    break;
+  default:
+    return absl::InvalidArgumentError(fmt::format(
+        "Cluster drop_overloads config denominator setting is invalid : {}. Valid range 0~2.",
+        drop_percentage.denominator()));
+  }
+  drop_overload_ = UnitFloat(float(drop_percentage.numerator()) / (denominator));
+  return absl::OkStatus();
+}
+
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
   ASSERT(!health_checker_);
   health_checker_ = health_checker;
@@ -1693,7 +1749,11 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
 
 const Network::Address::InstanceConstSharedPtr
 ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& address) {
-  TRY_ASSERT_MAIN_THREAD { return Network::Address::resolveProtoAddress(address); }
+  TRY_ASSERT_MAIN_THREAD {
+    auto address_or_error = Network::Address::resolveProtoAddress(address);
+    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    return address_or_error.value();
+  }
   END_TRY
   CATCH(EnvoyException & e, {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||
@@ -2361,7 +2421,9 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
   Network::Address::InstanceConstSharedPtr health_check_address;
   const auto& port_value = health_check_config.port_value();
   if (health_check_config.has_address()) {
-    auto address = Network::Address::resolveProtoAddress(health_check_config.address());
+    auto address_or_error = Network::Address::resolveProtoAddress(health_check_config.address());
+    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    auto address = address_or_error.value();
     health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
   } else {

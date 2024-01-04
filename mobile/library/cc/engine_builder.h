@@ -36,7 +36,7 @@ struct NodeLocality {
   std::string sub_zone;
 };
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 // A class for building the xDS configuration for the Envoy Mobile engine.
 // xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in:
 // https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
@@ -49,7 +49,7 @@ public:
   //                       (https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/operations/dynamic_configuration#aggregated-xds-ads).
   // `xds_server_port`: the port on which the xDS management server listens for ADS discovery
   //                    requests.
-  XdsBuilder(std::string xds_server_address, const int xds_server_port);
+  XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port);
 
   // Adds a header to the initial HTTP metadata headers sent on the gRPC stream.
   //
@@ -66,11 +66,6 @@ public:
   // Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
   // connection. If no root certs are specified, the operating system defaults are used.
   XdsBuilder& setSslRootCerts(std::string root_certs);
-
-  // Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake
-  // and the authority HTTP header. If not set, the SNI is set by default to the xDS server address
-  // and the authority HTTP header is not set.
-  XdsBuilder& setSni(std::string sni);
 
   // Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
   // to retrieve dynamic runtime configuration via the xDS management server.
@@ -111,10 +106,9 @@ private:
   friend class EngineBuilder;
 
   std::string xds_server_address_;
-  int xds_server_port_;
+  uint32_t xds_server_port_;
   std::vector<envoy::config::core::v3::HeaderValue> xds_initial_grpc_metadata_;
   std::string ssl_root_certs_;
-  std::string sni_;
   std::string rtds_resource_name_;
   int rtds_timeout_in_seconds_ = DefaultXdsTimeout;
   bool enable_cds_ = false;
@@ -171,7 +165,7 @@ public:
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Sets the node.metadata field in the Bootstrap configuration.
   EngineBuilder& setNodeMetadata(ProtobufWkt::Struct node_metadata);
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   // Sets the xDS configuration for the Envoy Mobile engine.
   //
   // `xds_builder`: the XdsBuilder instance used to specify the xDS configuration options.
@@ -187,11 +181,6 @@ public:
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
 
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-  EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
-  EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
-  EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
-#endif
   EngineBuilder& addPlatformFilter(const std::string& name);
 
   EngineBuilder& setRuntimeGuard(std::string guard, bool value);
@@ -217,7 +206,6 @@ private:
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
 
-  std::string stats_domain_;
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
@@ -226,7 +214,6 @@ private:
   bool use_system_resolver_ = true;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
-  int stats_flush_seconds_ = 60;
   std::string app_version_ = "unspecified";
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";
@@ -255,7 +242,6 @@ private:
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
-  std::vector<std::string> stats_sinks_;
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
@@ -263,7 +249,7 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif
 };

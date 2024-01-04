@@ -78,7 +78,7 @@ public:
   MockDnsCacheManager();
   ~MockDnsCacheManager() override;
 
-  MOCK_METHOD(DnsCacheSharedPtr, getCache,
+  MOCK_METHOD(absl::StatusOr<DnsCacheSharedPtr>, getCache,
               (const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config));
   MOCK_METHOD(DnsCacheSharedPtr, lookUpCacheByName, (absl::string_view cache_name));
 
@@ -95,6 +95,7 @@ public:
   MOCK_METHOD(const std::string&, resolvedHost, (), (const));
   MOCK_METHOD(bool, isIpAddress, (), (const));
   MOCK_METHOD(void, touch, ());
+  MOCK_METHOD(bool, firstResolveComplete, (), (const));
 
   Network::Address::InstanceConstSharedPtr address_;
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;

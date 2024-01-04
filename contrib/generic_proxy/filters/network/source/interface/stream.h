@@ -80,9 +80,12 @@ public:
    * same for all frames of the same stream.
    * @param stream_flags StreamFlags of the stream.
    * @param end_stream whether the current frame is the last frame of the request or response.
+   * @param frame_tags frame tags of the current frame. The meaning of the frame tags is
+   * application protocol specific.
    */
-  FrameFlags(StreamFlags stream_flags = StreamFlags(), bool end_stream = true)
-      : stream_flags_(stream_flags), end_stream_(end_stream) {}
+  FrameFlags(StreamFlags stream_flags = StreamFlags(), bool end_stream = true,
+             uint32_t frame_tags = 0)
+      : stream_flags_(stream_flags), end_stream_(end_stream), frame_tags_(frame_tags) {}
 
   /**
    * Get flags of stream that the frame belongs to. The flags MUST be same for all frames of the
@@ -96,11 +99,22 @@ public:
    */
   bool endStream() const { return end_stream_; }
 
+  /**
+   * @return frame tags of the current frame. The meaning of the frame tags is application
+   * protocol specific. This allows the creator of the frame to attach additional information to the
+   * frame and get it by the receiver of the frame without parsing the frame payload or dynamic
+   * cast.
+   * For example, the frame tags could be used to indicate the type of the frame by the server
+   * codec. Then the client codec could get the frame type without dynamic cast.
+   */
+  uint32_t frameTags() const { return frame_tags_; }
+
 private:
   StreamFlags stream_flags_{};
 
   // Default to true for backward compatibility.
   bool end_stream_{true};
+  uint32_t frame_tags_{};
 };
 
 /**
@@ -138,7 +152,7 @@ public:
    *
    * @param callback supplies the iteration callback.
    */
-  virtual void forEach(IterateCallback callback) const PURE;
+  virtual void forEach(IterateCallback /*callback*/) const {};
 
   /**
    * Get generic stream metadata value by key.
@@ -146,7 +160,7 @@ public:
    * @param key The metadata key of string view type.
    * @return The optional metadata value of string_view type.
    */
-  virtual absl::optional<absl::string_view> getByKey(absl::string_view key) const PURE;
+  virtual absl::optional<absl::string_view> get(absl::string_view /*key*/) const { return {}; }
 
   /**
    * Set new generic stream metadata key/value pair.
@@ -154,25 +168,13 @@ public:
    * @param key The metadata key of string view type.
    * @param val The metadata value of string view type.
    */
-  virtual void setByKey(absl::string_view key, absl::string_view val) PURE;
+  virtual void set(absl::string_view /*key*/, absl::string_view /*val*/) {}
 
   /**
-   * Set new generic stream metadata key/value pair. The key MUST point to data that will live
-   * beyond the lifetime of any generic stream that using the string.
-   *
+   * Erase generic stream metadata by key.
    * @param key The metadata key of string view type.
-   * @param val The metadata value of string view type.
    */
-  virtual void setByReferenceKey(absl::string_view key, absl::string_view val) PURE;
-
-  /**
-   * Set new generic stream metadata key/value pair. Both key and val MUST point to data that
-   * will live beyond the lifetime of any generic stream that using the string.
-   *
-   * @param key The metadata key of string view type.
-   * @param val The metadata value of string view type.
-   */
-  virtual void setByReference(absl::string_view key, absl::string_view val) PURE;
+  virtual void erase(absl::string_view /*key*/) {}
 
   // Used for matcher.
   static constexpr absl::string_view name() { return "generic_proxy"; }
@@ -186,10 +188,33 @@ public:
  * to simplify the tracing integration. This is not a good design. This should be changed in the
  * future.
  */
-class StreamRequest : public Tracing::TraceContext, public StreamFrame {
+class StreamRequest : public StreamBase {
 public:
-  // Used for matcher.
-  static constexpr absl::string_view name() { return "generic_proxy"; }
+  /**
+   * Get request host.
+   *
+   * @return The host of generic request. The meaning of the return value may be different For
+   * different application protocols. It typically should be domain, VIP, or service name that
+   * used to represents target service instances.
+   */
+  virtual absl::string_view host() const { return {}; }
+
+  /**
+   * Get request path.
+   *
+   * @return The path of generic request. The meaning of the return value may be different For
+   * different application protocols. It typically should be RPC service name that used to
+   * represents set of method or functionality provided by target service.
+   */
+  virtual absl::string_view path() const { return {}; }
+
+  /**
+   * Get request method.
+   *
+   * @return The method of generic request. The meaning of the return value may be different For
+   * different application protocols.
+   */
+  virtual absl::string_view method() const { return {}; }
 };
 
 using StreamRequestPtr = std::unique_ptr<StreamRequest>;
@@ -207,8 +232,35 @@ enum class Event {
   ConnectionFailure,
 };
 
+/**
+ * The Status type is used by the generic proxy to indicate statuses or error types
+ * to the application protocol codec. This is application protocol independent.
+ */
 using Status = absl::Status;
 using StatusCode = absl::StatusCode;
+
+/**
+ * Generic stream status. The Status is used by the application protocol codec to
+ * indicate the status of the response. The meaning of status code is application
+ * protocol specific.
+ */
+struct StreamStatus {
+public:
+  StreamStatus() = default;
+  StreamStatus(uint32_t code, bool ok) : code_(code), ok_(ok) {}
+
+  // Returns true if the status indicates success. This will be used for tracing, logging
+  // or stats purposes.
+  ABSL_MUST_USE_RESULT bool ok() const { return ok_; }
+
+  // Returns the status code value. The code will be used for tracing, logging or stats
+  // purposes. The specific code value is application protocol specific.
+  ABSL_MUST_USE_RESULT uint32_t code() const { return code_; }
+
+private:
+  uint32_t code_{};
+  bool ok_{true};
+};
 
 /**
  * Interface of generic response. This is derived from StreamFrame that contains the response
@@ -221,7 +273,7 @@ public:
    *
    * @return generic response status.
    */
-  virtual Status status() const PURE;
+  virtual StreamStatus status() const { return {}; }
 };
 
 using StreamResponsePtr = std::unique_ptr<StreamResponse>;

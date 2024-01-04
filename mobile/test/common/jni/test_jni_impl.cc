@@ -11,6 +11,20 @@
 // Quic Test ServerJniLibrary
 
 extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttpProxyTestServer(JNIEnv* env,
+                                                                                     jclass clazz) {
+  jni_log("[QTS]", "starting server");
+  start_server(Envoy::TestServerType::HTTP_PROXY);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttpsProxyTestServer(
+    JNIEnv* env, jclass clazz) {
+  jni_log("[QTS]", "starting server");
+  start_server(Envoy::TestServerType::HTTPS_PROXY);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttp3TestServer(JNIEnv* env,
                                                                                  jclass clazz) {
   jni_log("[QTS]", "starting server");

@@ -59,7 +59,7 @@ TEST(ConfigTest, ConfigTest) {
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
 
-  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context.getServerFactoryContext()));
+  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context.serverFactoryContext()));
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;

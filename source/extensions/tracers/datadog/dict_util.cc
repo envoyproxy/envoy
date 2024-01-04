@@ -3,6 +3,7 @@
 #include <cstddef>
 
 #include "envoy/http/header_map.h"
+#include "envoy/tracing/trace_context.h"
 
 #include "absl/strings/str_join.h"
 
@@ -61,7 +62,7 @@ TraceContextReader::TraceContextReader(const Tracing::TraceContext& context) : c
 
 datadog::tracing::Optional<datadog::tracing::StringView>
 TraceContextReader::lookup(datadog::tracing::StringView key) const {
-  return context_.getByKey(key);
+  return context_.get(key);
 }
 
 void TraceContextReader::visit(

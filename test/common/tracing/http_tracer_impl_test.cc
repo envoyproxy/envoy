@@ -709,6 +709,58 @@ TEST_F(HttpConnManFinalizerImplTest, CustomTagOverwritesCommonTag) {
                                             config);
 }
 
+TEST(HttpTraceContextTest, HttpTraceContextTest) {
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    HttpTraceContext trace_context(request_headers);
+
+    // Protocol.
+    EXPECT_EQ(trace_context.protocol(), "");
+    request_headers.addCopy(Http::Headers::get().Protocol, "HTTP/x");
+    EXPECT_EQ(trace_context.protocol(), "HTTP/x");
+
+    // Host.
+    EXPECT_EQ(trace_context.host(), "");
+    request_headers.addCopy(Http::Headers::get().Host, "test.com:233");
+    EXPECT_EQ(trace_context.host(), "test.com:233");
+
+    // Path.
+    EXPECT_EQ(trace_context.path(), "");
+    request_headers.addCopy(Http::Headers::get().Path, "/anything");
+    EXPECT_EQ(trace_context.path(), "/anything");
+
+    // Method.
+    EXPECT_EQ(trace_context.method(), "");
+    request_headers.addCopy(Http::Headers::get().Method, Http::Headers::get().MethodValues.Options);
+    EXPECT_EQ(trace_context.method(), Http::Headers::get().MethodValues.Options);
+
+    // Set.
+    trace_context.set("foo", "bar");
+    EXPECT_EQ(request_headers.get_("foo"), "bar");
+
+    // Get.
+    EXPECT_EQ(trace_context.get("foo").value(), "bar");
+
+    // Remove.
+    trace_context.remove("foo");
+    EXPECT_EQ(request_headers.get_("foo"), "");
+    EXPECT_EQ(trace_context.get("foo"), absl::nullopt);
+  }
+
+  {
+    size_t size = 0;
+    Http::TestRequestHeaderMapImpl request_headers{{"host", "foo"}, {"bar", "var"}, {"ok", "no"}};
+    HttpTraceContext trace_context(request_headers);
+    trace_context.forEach([&size](absl::string_view key, absl::string_view val) {
+      size += key.size();
+      size += val.size();
+      return true;
+    });
+    // 'host' will be converted to ':authority'.
+    EXPECT_EQ(23, size);
+  }
+}
+
 } // namespace
 } // namespace Tracing
 } // namespace Envoy

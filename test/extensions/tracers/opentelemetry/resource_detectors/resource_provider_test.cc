@@ -79,7 +79,7 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   ResourceProviderImpl resource_provider;
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-  EXPECT_EQ(resource.schemaUrl_, "");
+  EXPECT_EQ(resource.schema_url_, "");
 
   // Only the service name was added to the resource
   EXPECT_EQ(1, resource.attributes_.size());
@@ -100,7 +100,7 @@ TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
   ResourceProviderImpl resource_provider;
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-  EXPECT_EQ(resource.schemaUrl_, "");
+  EXPECT_EQ(resource.schema_url_, "");
 
   // service.name receives the unknown value when not configured
   EXPECT_EQ(1, resource.attributes_.size());
@@ -151,7 +151,7 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   ResourceProviderImpl resource_provider;
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-  EXPECT_EQ(resource.schemaUrl_, "");
+  EXPECT_EQ(resource.schema_url_, "");
 
   // The resource should contain all 3 merged attributes
   // service.name + 1 for each detector
@@ -225,7 +225,7 @@ TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
 
   // Updating resource is empty (no attributes)
   Resource updating_resource;
-  updating_resource.schemaUrl_ = expected_schema_url;
+  updating_resource.schema_url_ = expected_schema_url;
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
   EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
@@ -265,17 +265,17 @@ TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
   // OTel spec says the updating schema should be used
-  EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
+  EXPECT_EQ(expected_schema_url, resource.schema_url_);
 }
 
 // Test merge when old schema url is not empty but updating is
 TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
   std::string expected_schema_url = "my.schema/v1";
   Resource old_resource = resource_a_;
-  old_resource.schemaUrl_ = expected_schema_url;
+  old_resource.schema_url_ = expected_schema_url;
 
   Resource updating_resource = resource_b_;
-  updating_resource.schemaUrl_ = "";
+  updating_resource.schema_url_ = "";
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
   EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
@@ -315,17 +315,17 @@ TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
   // OTel spec says the updating schema should be used
-  EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
+  EXPECT_EQ(expected_schema_url, resource.schema_url_);
 }
 
 // Test merge when both old and updating schema url are set and equal
 TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
   std::string expected_schema_url = "my.schema/v1";
   Resource old_resource = resource_a_;
-  old_resource.schemaUrl_ = expected_schema_url;
+  old_resource.schema_url_ = expected_schema_url;
 
   Resource updating_resource = resource_b_;
-  updating_resource.schemaUrl_ = expected_schema_url;
+  updating_resource.schema_url_ = expected_schema_url;
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
   EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
@@ -364,17 +364,17 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
   ResourceProviderImpl resource_provider;
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-  EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
+  EXPECT_EQ(expected_schema_url, resource.schema_url_);
 }
 
 // Test merge when both old and updating schema url are set but different
 TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreDifferent) {
   std::string expected_schema_url = "my.schema/v1";
   Resource old_resource = resource_a_;
-  old_resource.schemaUrl_ = expected_schema_url;
+  old_resource.schema_url_ = expected_schema_url;
 
   Resource updating_resource = resource_b_;
-  updating_resource.schemaUrl_ = "my.schema/v2";
+  updating_resource.schema_url_ = "my.schema/v2";
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
   EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
@@ -414,7 +414,7 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreDifferent) {
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
   // OTel spec says Old schema should be used
-  EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
+  EXPECT_EQ(expected_schema_url, resource.schema_url_);
 }
 
 } // namespace

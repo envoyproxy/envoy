@@ -51,7 +51,7 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
       stat_prefix, max_packet_bytes, enable_per_opcode_request_bytes_metrics,
       enable_per_opcode_response_bytes_metrics, enable_latency_threshold_metrics,
       default_latency_threshold, latency_threshold_overrides, context.scope()));
-  auto& time_source = context.mainThreadDispatcher().timeSource();
+  auto& time_source = context.serverFactoryContext().mainThreadDispatcher().timeSource();
 
   return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ZooKeeperFilter>(filter_config, time_source));

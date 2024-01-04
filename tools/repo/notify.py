@@ -9,6 +9,7 @@
 
 import datetime
 import html
+import icalendar
 import json
 import os
 import sys
@@ -25,6 +26,9 @@ from aio.core.functional import async_property
 from aio.run import runner
 
 ENVOY_REPO = "envoyproxy/envoy"
+
+# Oncall calendar
+CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
 
 ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
@@ -55,10 +59,11 @@ MAINTAINERS = {
 # notifications but not result in a PR not getting assigned a
 # maintainer owner.
 FIRST_PASS = {
-    'dmitri-d': 'UB1883Q5S',
-    'tonya11en': 'U989BG2CW',
-    'esmet': 'U01BCGBUUAE',
-    'mathetake': 'UG9TD2FSB',
+    'silverstar194': 'U03LNPC8JN9',
+    'nezdolik': 'UDYUWRL13',
+    'daixiang0': 'U020CJG6UU8',
+    'botengyao': 'U037YUAK147',
+    'tyxia': 'U023U1ZN9SP',
 }
 
 # Only notify API reviewers who aren't maintainers.
@@ -131,6 +136,21 @@ class RepoNotifier(runner.Runner):
     @async_property(cache=True)
     async def stalled_prs(self):
         return (await self.tracked_prs)["stalled_prs"]
+
+    @async_property(cache=True)
+    async def oncall_string(self):
+        response = await self.session.get(CALENDAR)
+        content = await response.read()
+        parsed_calendar = icalendar.Calendar.from_ical(content)
+
+        now = datetime.datetime.now()
+        sunday = now - datetime.timedelta(days=now.weekday() + 1)
+
+        for component in parsed_calendar.walk():
+            if component.name == "VEVENT":
+                if (sunday.date() == component.decoded("dtstart").date()):
+                    return component.get("summary")
+        return "unable to find this week's oncall"
 
     @async_property(cache=True)
     async def tracked_prs(self):
@@ -231,6 +251,11 @@ class RepoNotifier(runner.Runner):
         try:
             unassigned = "\n".join(await self.unassigned_prs)
             stalled = "\n".join(await self.stalled_prs)
+            # On Monday, post the new oncall.
+            if datetime.date.today().weekday() == 0:
+                oncall = await self.oncall_string
+                await self.send_message(channel='#envoy-maintainer-oncall', text=(f"{oncall}"))
+                await self.send_message(channel='#general', text=(f"{oncall}"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))

@@ -42,7 +42,8 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   initiating_call_ = true;
 
   Envoy::Upstream::ThreadLocalCluster* cluster =
-      context_.clusterManager().getThreadLocalCluster(route->routeEntry()->clusterName());
+      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
+          route->routeEntry()->clusterName());
 
   if (cluster != nullptr) {
     // The `audience` is passed to filter through cluster metadata.

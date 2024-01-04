@@ -540,9 +540,12 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
 
   filter_state_ = FilterState::EncodeServingFromCache;
 
-  // Update the 304 response status code and content-length
+  // Replace the 304 response status code with the cached status code.
   response_headers.setStatus(lookup_result_->headers_->getStatusValue());
-  response_headers.setContentLength(lookup_result_->headers_->getContentLengthValue());
+
+  // Remove content length header if the 304 had one; if the cache entry had a
+  // content length header it will be added by the header adding block below.
+  response_headers.removeContentLength();
 
   // A response that has been validated should not contain an Age header as it is equivalent to a
   // freshly served response from the origin, unless the 304 response has an Age header, which
@@ -553,7 +556,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   // Add any missing headers from the cached response to the 304 response.
   lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
     // TODO(yosrym93): Try to avoid copying the header key twice.
-    Http::LowerCaseString key(std::string(cached_header.key().getStringView()));
+    Http::LowerCaseString key(cached_header.key().getStringView());
     absl::string_view value = cached_header.value().getStringView();
     if (response_headers.get(key).empty()) {
       response_headers.setCopy(key, value);

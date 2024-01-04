@@ -29,7 +29,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -349,7 +349,15 @@ void HttpIntegrationTest::useAccessLog(
   ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format, formatters));
 }
 
-HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
+HttpIntegrationTest::~HttpIntegrationTest() {
+  // Make sure any open streams have been closed. If there's an open stream, the decoder will
+  // be out of scope, and so open streams result in writing to freed memory.
+  if (codec_client_) {
+    EXPECT_EQ(codec_client_->numActiveRequests(), 0)
+        << "test requires explicit cleanupUpstreamAndDownstream";
+  }
+  cleanupUpstreamAndDownstream();
+}
 
 void HttpIntegrationTest::initialize() {
   if (downstream_protocol_ != Http::CodecType::HTTP3) {

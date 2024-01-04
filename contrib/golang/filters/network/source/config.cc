@@ -16,7 +16,7 @@ Network::FilterFactoryCb GolangConfigFactory::createFilterFactoryFromProtoTyped(
     Server::Configuration::FactoryContext& context) {
   is_terminal_filter_ = proto_config.is_terminal_filter();
 
-  UpstreamConn::initThreadLocalStorage(context, context.threadLocal());
+  UpstreamConn::initThreadLocalStorage(context, context.serverFactoryContext().threadLocal());
 
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config);
   std::string config_str;

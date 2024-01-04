@@ -2880,55 +2880,6 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
 }
 
-TEST_P(LeastRequestLoadBalancerTest, FullScan) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
-  hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
-
-  hostSet().healthy_hosts_[0]->stats().rq_active_.set(4);
-  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
-  hostSet().healthy_hosts_[2]->stats().rq_active_.set(2);
-  hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
-  hostSet().healthy_hosts_[4]->stats().rq_active_.set(5);
-
-  // Creating various load balancer objects with different choice configs.
-  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
-  lr_lb_config.mutable_choice_count()->set_value(2);
-  // Enable full table scan on hosts
-  lr_lb_config.mutable_enable_full_scan()->set_value(true);
-  common_config_.mutable_healthy_panic_threshold()->set_value(0);
-
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(3);
-  LeastRequestLoadBalancer lb_3{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(4);
-  LeastRequestLoadBalancer lb_4{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(6);
-  LeastRequestLoadBalancer lb_6{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-
-  // random is called only once every time and is not to select the host.
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_4.chooseHost(nullptr));
-
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_6.chooseHost(nullptr));
-}
-
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};

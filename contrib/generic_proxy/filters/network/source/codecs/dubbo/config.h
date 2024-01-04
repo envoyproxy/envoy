@@ -33,16 +33,12 @@ public:
   // Request
   absl::string_view protocol() const override { return DubboProtocolName; }
   void forEach(IterateCallback callback) const override;
-  absl::optional<absl::string_view> getByKey(absl::string_view key) const override;
-  void setByKey(absl::string_view key, absl::string_view val) override;
-  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
-    setByKey(key, val);
-  }
-  void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
+  absl::optional<absl::string_view> get(absl::string_view key) const override;
+  void set(absl::string_view key, absl::string_view val) override;
   absl::string_view host() const override { return inner_metadata_->request().serviceName(); }
   absl::string_view path() const override { return inner_metadata_->request().serviceName(); }
   absl::string_view method() const override { return inner_metadata_->request().methodName(); }
-  void removeByKey(absl::string_view key) override;
+  void erase(absl::string_view key) override;
 
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
@@ -59,28 +55,21 @@ public:
     ASSERT(inner_metadata_ != nullptr);
     ASSERT(inner_metadata_->hasContext());
     ASSERT(inner_metadata_->hasResponse());
-    refreshGenericStatus();
+    refreshStatus();
   }
 
-  void refreshGenericStatus();
+  void refreshStatus();
 
   // Response.
   absl::string_view protocol() const override { return DubboProtocolName; }
-  void forEach(IterateCallback) const override {}
-  absl::optional<absl::string_view> getByKey(absl::string_view) const override {
-    return absl::nullopt;
-  }
-  void setByKey(absl::string_view, absl::string_view) override{};
-  void setByReferenceKey(absl::string_view, absl::string_view) override {}
-  void setByReference(absl::string_view, absl::string_view) override {}
-  Status status() const override { return status_; }
+  StreamStatus status() const override { return status_; }
 
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
 
   FrameFlags stream_frame_flags_;
 
-  Status status_;
+  StreamStatus status_;
   Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
 };
 
@@ -162,7 +151,7 @@ class DubboServerCodec
 public:
   using DubboDecoderBase::DubboDecoderBase;
 
-  ResponsePtr respond(Status status, absl::string_view short_response_flags,
+  ResponsePtr respond(absl::Status status, absl::string_view short_response_flags,
                       const Request& request) override;
 };
 

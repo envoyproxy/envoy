@@ -154,7 +154,7 @@ in 2-node cluster:
                 socket_address:
                   address: broker1.example.org # Kafka broker's host for broker 1.
                   port_value: 9092             # Kafka broker's port for broker 1.
-  - name: broker1cluster
+  - name: broker2cluster
     connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
