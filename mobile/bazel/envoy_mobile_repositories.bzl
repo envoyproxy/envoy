@@ -18,9 +18,9 @@ def upstream_envoy_overrides():
     # Workaround old NDK version breakages https://github.com/envoyproxy/envoy-mobile/issues/934
     http_archive(
         name = "com_github_libevent_libevent",
-        urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
-        strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
-        sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
+        urls = ["https://github.com/libevent/libevent/archive/0c54433c120309ff14c90de40567b214d5335306.tar.gz"],
+        strip_prefix = "libevent-0c54433c120309ff14c90de40567b214d5335306",
+        sha256 = "7cd416026a88498ecac15a51a4839bb4ec43d76f63d31feca9160d38aff39bc4",
         build_file_content = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])""",
     )
 
