@@ -148,3 +148,70 @@ the filter config name.
 
 Use of per filter config map is filter specific. See the :ref:`HTTP filter documentation <config_http_filters>`
 for if and how it is utilized for every filter.
+
+.. _arch_overview_http_filters_route_based_filter_chain:
+
+Route based filter chain
+------------------------
+
+There is support for having different filter chains for different routes. There are two different modes for this:
+
+* Disabling a filter in the filter chain for specific routes.
+* Overriding a filter in the filter chain that is disabled by default and enabling it for specific
+  routes.
+
+By default, the filter chain is the same for all routes and all filters are enabled. However, a filter
+can be disabled for specific routes by using the :ref:`FilterConfig <envoy_v3_api_msg_config.route.v3.FilterConfig>`
+and setting the :ref:`disabled field <envoy_v3_api_field_config.route.v3.FilterConfig.disabled>` in the
+per filter config map in the route configuration. See the
+:ref:`Route specific config <arch_overview_http_filters_per_filter_config>` section for more details.
+
+For example, given following http filter config:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: buffer
+    typed_config: { ... }
+  - name: lua
+    typed_config: { ... }
+
+Both the ``buffer`` and ``lua`` filters are enabled by default. If we want to disable the ``buffer`` filter
+for a specific route, we can set the per filter config map in the route configuration:
+
+.. code-block:: yaml
+
+  typed_per_filter_config:
+    buffer:
+      "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+      disabled: true
+
+In addition, we can set a filter to be disabled by default by setting the :ref:`disabled field
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`
+in the HttpFilter configuration and then enable it for specific routes if needed.
+
+For example, given following http filter config:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: buffer
+    typed_config: { ... }
+    disabled: true
+  - name: lua
+    typed_config: { ... }
+    disabled: true
+
+Both the ``buffer`` and ``lua`` filters are disabled by default. If we want to enable one of them
+for a specific route, we can set per filter config map in the route configuration:
+
+.. code-block:: yaml
+
+  typed_per_filter_config:
+    lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      name: my_lua_script
+
+
+Legitimate route-specific configuration for filter (like the above ``lua`` filter) is valid way to
+enable the filter for the route.

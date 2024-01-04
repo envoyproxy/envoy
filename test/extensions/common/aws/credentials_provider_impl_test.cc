@@ -13,9 +13,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 
-using Envoy::Extensions::Common::Aws::MetadataFetcher;
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
-using Envoy::Extensions::Common::Aws::MockMetadataFetcher;
 using testing::_;
 using testing::Eq;
 using testing::InSequence;

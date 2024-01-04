@@ -78,7 +78,7 @@ TEST_F(DatadogAgentHttpClientTest, PathFromURL) {
       .WillOnce(
           Invoke([this](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
                         const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ(url_.path, message->headers().path());
+            EXPECT_EQ(url_.path, message->headers().getPathValue());
             return &request_;
           }));
 
@@ -121,17 +121,23 @@ TEST_F(DatadogAgentHttpClientTest, RequestHeaders) {
   };
 
   EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([this](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ("test_host", message->headers().getHostValue());
+      .WillOnce(Invoke([this](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                              const Http::AsyncClient::RequestOptions&)
+                           -> Http::AsyncClient::Request* {
+        EXPECT_EQ("test_host", message->headers().getHostValue());
 
-            EXPECT_EQ("bar", message->headers().getByKey("foo"));
-            EXPECT_EQ("boing boing", message->headers().getByKey("baz-boing"));
-            EXPECT_EQ("boing boing boing", message->headers().getByKey("boing-boing"));
+        EXPECT_EQ("bar",
+                  message->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+        EXPECT_EQ(
+            "boing boing",
+            message->headers().get(Http::LowerCaseString("baz-boing"))[0]->value().getStringView());
+        EXPECT_EQ("boing boing boing", message->headers()
+                                           .get(Http::LowerCaseString("boing-boing"))[0]
+                                           ->value()
+                                           .getStringView());
 
-            return &request_;
-          }));
+        return &request_;
+      }));
 
   // `~AgentHTTPClient()` will cancel the request since we don't finish it here.
   EXPECT_CALL(request_, cancel());

@@ -515,6 +515,7 @@ protected:
   void onMaxDownstreamConnectionDuration();
   void onAccessLogFlushInterval();
   void resetAccessLogFlushTimer();
+  void flushAccessLog(AccessLog::AccessLogType access_log_type);
   void disableAccessLogFlushTimer();
 
   const ConfigSharedPtr config_;

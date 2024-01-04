@@ -389,79 +389,82 @@ makeCidrRangeList(const std::vector<std::pair<std::string, uint32_t>>& ranges) {
 }
 
 TEST(IpListTest, Errors) {
-  {
-    EXPECT_THROW({ IpList list(makeCidrRangeList({{"foo", 0}})); }, EnvoyException);
-  }
+  { EXPECT_THROW(IpList::create(makeCidrRangeList({{"foo", 0}})).IgnoreError(), EnvoyException); }
 }
 
 TEST(IpListTest, SpecificAddressAllowed) {
-  IpList list(makeCidrRangeList({{"192.168.1.1", 24}}));
+  std::unique_ptr<IpList> list = IpList::create(makeCidrRangeList({{"192.168.1.1", 24}})).value();
 
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.1.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.1.3")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.1.255")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.1.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.1.3")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.1.255")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("192.168.0.0")));
 }
 
 TEST(IpListTest, Normal) {
-  IpList list(makeCidrRangeList({{"192.168.3.0", 24}, {"50.1.2.3", 32}, {"10.15.0.0", 16}}));
+  std::unique_ptr<IpList> list =
+      IpList::create(makeCidrRangeList({{"192.168.3.0", 24}, {"50.1.2.3", 32}, {"10.15.0.0", 16}}))
+          .value();
 
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.2.255")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.4.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("192.168.2.255")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("192.168.4.0")));
 
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("50.1.2.3")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("50.1.2.2")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("50.1.2.4")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("50.1.2.3")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("50.1.2.2")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("50.1.2.4")));
 
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("10.15.0.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("10.15.90.90")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("10.15.255.255")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("10.14.255.255")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("10.16.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("10.15.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("10.15.90.90")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("10.15.255.255")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("10.14.255.255")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("10.16.0.0")));
 
-  EXPECT_FALSE(list.contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
 }
 
 TEST(IpListTest, AddressVersionMix) {
-  IpList list(makeCidrRangeList({{"192.168.3.0", 24}, {"2001:db8:85a3::", 64}, {"::1", 128}}));
+  std::unique_ptr<IpList> list =
+      IpList::create(
+          makeCidrRangeList({{"192.168.3.0", 24}, {"2001:db8:85a3::", 64}, {"::1", 128}}))
+          .value();
 
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.2.255")));
-  EXPECT_FALSE(list.contains(Address::Ipv4Instance("192.168.4.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("192.168.2.255")));
+  EXPECT_FALSE(list->contains(Address::Ipv4Instance("192.168.4.0")));
 
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::")));
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3:0:1::")));
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::ffff:ffff:ffff:ffff")));
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::ffff")));
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::1")));
-  EXPECT_FALSE(list.contains(Address::Ipv6Instance("2001:db8:85a3:1::")));
-  EXPECT_FALSE(list.contains(Address::Ipv6Instance("2002:db8:85a3::")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("2001:db8:85a3::")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("2001:db8:85a3:0:1::")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("2001:db8:85a3::ffff:ffff:ffff:ffff")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("2001:db8:85a3::ffff")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("2001:db8:85a3::1")));
+  EXPECT_FALSE(list->contains(Address::Ipv6Instance("2001:db8:85a3:1::")));
+  EXPECT_FALSE(list->contains(Address::Ipv6Instance("2002:db8:85a3::")));
 
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list.contains(Address::Ipv6Instance("::")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(list->contains(Address::Ipv6Instance("::")));
 
-  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAny) {
-  IpList list(makeCidrRangeList({{"0.0.0.0", 0}}));
+  std::unique_ptr<IpList> list = IpList::create(makeCidrRangeList({{"0.0.0.0", 0}})).value();
 
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.0.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.0.0.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("1.1.1.1")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.0.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("1.1.1.1")));
 
-  EXPECT_FALSE(list.contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAnyImplicitPrefixLen) {
@@ -470,35 +473,36 @@ TEST(IpListTest, MatchAnyImplicitPrefixLen) {
   cidrRange->set_address_prefix("0.0.0.0");
   EXPECT_FALSE(cidrRange->has_prefix_len());
 
-  IpList list(cidrRangeList);
+  std::unique_ptr<IpList> list = IpList::create(cidrRangeList).value();
 
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.0.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.0.0.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("1.1.1.1")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.0.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("1.1.1.1")));
 
-  EXPECT_FALSE(list.contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAnyAll) {
-  IpList list(makeCidrRangeList({{"0.0.0.0", 0}, {"::", 0}}));
+  std::unique_ptr<IpList> list =
+      IpList::create(makeCidrRangeList({{"0.0.0.0", 0}, {"::", 0}})).value();
 
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.0.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.0.0.0")));
-  EXPECT_TRUE(list.contains(Address::Ipv4Instance("1.1.1.1")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("192.0.0.0")));
+  EXPECT_TRUE(list->contains(Address::Ipv4Instance("1.1.1.1")));
 
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("::1")));
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("::")));
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("2001:db8:85a3::")));
-  EXPECT_TRUE(list.contains(Address::Ipv6Instance("ffee::")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("::1")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("::")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("2001:db8:85a3::")));
+  EXPECT_TRUE(list->contains(Address::Ipv6Instance("ffee::")));
 
-  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
 }
 
 } // namespace

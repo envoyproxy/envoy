@@ -3,19 +3,19 @@ module example.com/routeconfig
 go 1.18
 
 require (
-	github.com/cncf/xds/go v0.0.0-20230112175826-46e39c7b9b43
+	github.com/cncf/xds/go v0.0.0-20231128003011-0fa0005c9caa
 	github.com/envoyproxy/envoy v1.28.0
 )
 
 require (
-	github.com/envoyproxy/protoc-gen-validate v0.1.0 // indirect
-	github.com/golang/protobuf v1.5.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
-	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 // indirect
-	google.golang.org/grpc v1.25.1 // indirect
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/genproto/googleapis/api v0.0.0-20240102182953-50ed04b92917 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240102182953-50ed04b92917 // indirect
+)
+
+require (
+	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
+	google.golang.org/protobuf v1.32.0
 )
 
 replace github.com/envoyproxy/envoy => ../../../../../../../

@@ -255,11 +255,13 @@ TEST_P(DownstreamProtocolIntegrationTest, AddInvalidEncodedData) {
         initialize();
         codec_client_ = makeHttpConnection(lookupPort("http"));
         default_request_headers_.setCopy(Envoy::Http::LowerCaseString("invalid-encode"), "yes");
-        auto response = std::move((codec_client_->startRequest(default_request_headers_)).second);
+        auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+        auto response = std::move(encoder_decoder.second);
         ASSERT_TRUE(response->waitForEndStream());
         EXPECT_EQ("502", response->headers().getStatusValue());
         EXPECT_THAT(waitForAccessLog(access_log_name_),
                     HasSubstr("filter_added_invalid_response_data"));
+        cleanupUpstreamAndDownstream();
       },
       "Invalid response data");
 }
@@ -2987,6 +2989,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_TRUE(response->complete());
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT

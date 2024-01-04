@@ -46,7 +46,7 @@
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 #endif
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
 #include "extension_registry_platform_additions.h"

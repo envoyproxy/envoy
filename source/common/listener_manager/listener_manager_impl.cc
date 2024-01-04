@@ -27,7 +27,7 @@
 #include "absl/synchronization/blocking_counter.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
 #include "source/server/api_listener_impl.h"
@@ -101,7 +101,7 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
 
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrError(
+              MessageUtil::convertToStringForLogs(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
@@ -164,7 +164,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",
-                MessageUtil::getJsonStringFromMessageOrError(
+                MessageUtil::convertToStringForLogs(
                     static_cast<const Protobuf::Message&>(proto_config.typed_config())));
       // For static configuration, now see if there is a factory that will accept the config.
       auto& factory =
@@ -192,7 +192,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrError(
+              MessageUtil::convertToStringForLogs(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
     if (proto_config.config_type_case() ==
         envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
@@ -251,7 +251,7 @@ ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
           createListenerFilterMatcher(proto_config)));
     } else {
       ENVOY_LOG(debug, "  config: {}",
-                MessageUtil::getJsonStringFromMessageOrError(
+                MessageUtil::convertToStringForLogs(
                     static_cast<const Protobuf::Message&>(proto_config.typed_config())));
       // For static configuration, now see if there is a factory that will accept the config.
       auto& factory =
@@ -996,7 +996,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
   stop_listeners_type_ = stop_listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     if (stop_listeners_type != StopListenersType::InboundOnly ||
-        listener.listenerInfo().direction() == envoy::config::core::v3::INBOUND) {
+        listener.listenerInfo()->direction() == envoy::config::core::v3::INBOUND) {
       ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
       auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
       // Destroy a warming listener directly.

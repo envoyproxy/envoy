@@ -118,7 +118,7 @@ func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
 
 // Only may panic with errRequestFinished, errFilterDestroyed or errNotInGo,
 // won't panic with errInvalidPhase and others, otherwise will cause deadloop, see RecoverPanic for the details.
-func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string) {
+func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string) {
 	hLen := len(headers)
 	strs := make([]*C.char, 0, hLen*2)
 	defer func() {
@@ -127,10 +127,12 @@ func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, responseCode int, bo
 		}
 	}()
 	// TODO: use runtime.Pinner after go1.22 release for better performance.
-	for k, v := range headers {
-		keyStr := C.CString(k)
-		valueStr := C.CString(v)
-		strs = append(strs, keyStr, valueStr)
+	for k, h := range headers {
+		for _, v := range h {
+			keyStr := C.CString(k)
+			valueStr := C.CString(v)
+			strs = append(strs, keyStr, valueStr)
+		}
 	}
 	res := C.envoyGoFilterHttpSendLocalReply(r, C.int(responseCode),
 		unsafe.Pointer(unsafe.StringData(bodyText)), C.int(len(bodyText)),

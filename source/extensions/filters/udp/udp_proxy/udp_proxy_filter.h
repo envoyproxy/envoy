@@ -597,6 +597,7 @@ private:
     ClusterInfo& cluster_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     Upstream::HostConstSharedPtr host_;
+    uint64_t session_id_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
     // time stamp and a periodic scan of all sessions to look for timeouts. This solution is simple,
     // though it might not perform well for high volume traffic. Note that this is how TCP proxy
@@ -607,11 +608,11 @@ private:
 
     UdpProxySessionStats session_stats_{};
     StreamInfo::StreamInfoImpl udp_session_info_;
-    uint64_t session_id_;
     std::list<ActiveReadFilterPtr> read_filters_;
     std::list<ActiveWriteFilterPtr> write_filters_;
 
   private:
+    std::shared_ptr<Network::ConnectionInfoSetterImpl> CreateDownstreamConnectionInfoProvider();
     void onAccessLogFlushInterval();
     void rearmAccessLogFlushTimer();
     void disableAccessLogFlushTimer();

@@ -30,6 +30,7 @@ envoy_cc_library(
         "//source/common/common:non_copyable",
         "//source/common/common:utility_lib",
         "//source/common/event:libevent_lib",
+        "@com_google_absl//absl/functional:any_invocable",
     ],
 )
 

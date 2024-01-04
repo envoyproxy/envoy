@@ -107,73 +107,61 @@ TEST(DubboResponseTest, DubboResponseTest) {
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
-    EXPECT_EQ(StatusCode::kOk, response.status().code());
+    EXPECT_EQ(20, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithException));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("exception_via_upstream", response.status().message());
+    EXPECT_EQ(20, response.status().code());
   }
   {
     DubboResponse response(createDubboResponse(
         request, ResponseStatus::Ok, RpcResponseType::ResponseWithExceptionWithAttachments));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("exception_via_upstream", response.status().message());
+    EXPECT_EQ(20, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ClientTimeout, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnknown, response.status().code());
-    EXPECT_EQ("ClientTimeout", response.status().message());
+    EXPECT_EQ(30, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ServerTimeout, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnknown, response.status().code());
-    EXPECT_EQ(StatusCode::kUnknown, response.status().code());
-    EXPECT_EQ("ServerTimeout", response.status().message());
+    EXPECT_EQ(31, response.status().code());
   }
   {
     DubboResponse response(createDubboResponse(request, ResponseStatus::BadRequest, absl::nullopt));
-    EXPECT_EQ(StatusCode::kInvalidArgument, response.status().code());
-    EXPECT_EQ("BadRequest", response.status().message());
+    EXPECT_EQ(40, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::BadResponse, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnknown, response.status().code());
-    EXPECT_EQ("BadResponse", response.status().message());
+    EXPECT_EQ(50, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ServiceNotFound, absl::nullopt));
-    EXPECT_EQ(StatusCode::kNotFound, response.status().code());
-    EXPECT_EQ("ServiceNotFound", response.status().message());
+    EXPECT_EQ(60, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ServiceError, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("ServiceError", response.status().message());
+    EXPECT_EQ(70, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ServerError, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("ServerError", response.status().message());
+    EXPECT_EQ(80, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ClientError, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("ClientError", response.status().message());
+    EXPECT_EQ(90, response.status().code());
   }
   {
     DubboResponse response(createDubboResponse(
         request, ResponseStatus::ServerThreadpoolExhaustedError, absl::nullopt));
-    EXPECT_EQ(StatusCode::kResourceExhausted, response.status().code());
-    EXPECT_EQ("ServerThreadpoolExhaustedError", response.status().message());
+    EXPECT_EQ(100, response.status().code());
   }
 
   // Getter and setter do nothing for response.
