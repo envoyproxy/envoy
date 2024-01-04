@@ -235,7 +235,7 @@ void Cluster::addOrUpdateHost(
     absl::string_view host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   Upstream::LogicalHostSharedPtr emplaced_host;
-  bool founded = false;
+  bool host_found = false;
   {
     absl::WriterMutexLock lock{&host_map_lock_};
 
@@ -269,7 +269,7 @@ void Cluster::addOrUpdateHost(
 
       ENVOY_LOG(debug, "found existing dfproxy cluster host '{}'", host);
       emplaced_host = host_map_it->second.logical_host_;
-      founded = true;
+      host_found = true;
     } else {
       ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
       emplaced_host = host_map_
@@ -286,7 +286,7 @@ void Cluster::addOrUpdateHost(
   Upstream::HostVector hosts;
   hosts.emplace_back(emplaced_host);
 
-  if (founded) {
+  if (host_found) {
     // removing host from priorityState first, with the old address.
     updatePriorityState({}, hosts);
     ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
