@@ -2899,11 +2899,11 @@ TEST(OverrideTest, OverrideProcessingMode) {
       ProcessingMode::BUFFERED);
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  EXPECT_FALSE(route1.disabled());
-  EXPECT_EQ(route1.processingMode()->request_header_mode(), ProcessingMode::DEFAULT);
-  EXPECT_EQ(route1.processingMode()->request_body_mode(), ProcessingMode::STREAMED);
-  EXPECT_EQ(route1.processingMode()->response_body_mode(), ProcessingMode::BUFFERED);
+  FilterConfigPerRoute merged_route(route1, route2);
+  EXPECT_FALSE(merged_route.disabled());
+  EXPECT_EQ(merged_route.processingMode()->request_header_mode(), ProcessingMode::DEFAULT);
+  EXPECT_EQ(merged_route.processingMode()->request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(merged_route.processingMode()->response_body_mode(), ProcessingMode::BUFFERED);
 }
 
 // When merging two configurations, if the first processing mode is set, and
@@ -2916,9 +2916,9 @@ TEST(OverrideTest, DisableOverridesFirstMode) {
   cfg2.set_disabled(true);
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  EXPECT_TRUE(route1.disabled());
-  EXPECT_FALSE(route1.processingMode());
+  FilterConfigPerRoute merged_route(route1, route2);
+  EXPECT_TRUE(merged_route.disabled());
+  EXPECT_FALSE(merged_route.processingMode());
 }
 
 // When merging two configurations, if the first override is disabled, and
@@ -2931,9 +2931,9 @@ TEST(OverrideTest, ModeOverridesFirstDisable) {
       ProcessingMode::SKIP);
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  EXPECT_FALSE(route1.disabled());
-  EXPECT_EQ(route1.processingMode()->request_header_mode(), ProcessingMode::SKIP);
+  FilterConfigPerRoute merged_route(route1, route2);
+  EXPECT_FALSE(merged_route.disabled());
+  EXPECT_EQ(merged_route.processingMode()->request_header_mode(), ProcessingMode::SKIP);
 }
 
 // When merging two configurations, if both are disabled, then it's still
@@ -2945,9 +2945,9 @@ TEST(OverrideTest, DisabledThingsAreDisabled) {
   cfg2.set_disabled(true);
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  EXPECT_TRUE(route1.disabled());
-  EXPECT_FALSE(route1.processingMode());
+  FilterConfigPerRoute merged_route(route1, route2);
+  EXPECT_TRUE(merged_route.disabled());
+  EXPECT_FALSE(merged_route.processingMode());
 }
 
 // When merging two configurations, second grpc_service overrides the first.
@@ -2960,9 +2960,9 @@ TEST(OverrideTest, GrpcServiceOverride) {
       "cluster_2");
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  ASSERT_TRUE(route1.grpcService().has_value());
-  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg2.overrides().grpc_service()));
+  FilterConfigPerRoute merged_route(route1, route2);
+  ASSERT_TRUE(merged_route.grpcService().has_value());
+  EXPECT_THAT(*merged_route.grpcService(), ProtoEq(cfg2.overrides().grpc_service()));
 }
 
 // When merging two configurations, unset grpc_service is equivalent to no override.
@@ -2974,9 +2974,9 @@ TEST(OverrideTest, GrpcServiceNonOverride) {
   // Leave cfg2.grpc_service unset.
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  ASSERT_TRUE(route1.grpcService().has_value());
-  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
+  FilterConfigPerRoute merged_route(route1, route2);
+  ASSERT_TRUE(merged_route.grpcService().has_value());
+  EXPECT_THAT(*merged_route.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
 }
 
 // Verify that attempts to change headers that are not allowed to be changed

@@ -253,7 +253,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
           quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(port)),
       *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, *stats_store_.rootScope(),
-      options, nullptr, connection_id_generator_);
+      options, nullptr, connection_id_generator_, quic_transport_socket_factory_ref);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -349,7 +349,15 @@ void HttpIntegrationTest::useAccessLog(
   ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format, formatters));
 }
 
-HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
+HttpIntegrationTest::~HttpIntegrationTest() {
+  // Make sure any open streams have been closed. If there's an open stream, the decoder will
+  // be out of scope, and so open streams result in writing to freed memory.
+  if (codec_client_) {
+    EXPECT_EQ(codec_client_->numActiveRequests(), 0)
+        << "test requires explicit cleanupUpstreamAndDownstream";
+  }
+  cleanupUpstreamAndDownstream();
+}
 
 void HttpIntegrationTest::initialize() {
   if (downstream_protocol_ != Http::CodecType::HTTP3) {
@@ -363,7 +371,7 @@ void HttpIntegrationTest::initialize() {
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
-  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_);
+  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_, custom_alpns_);
 
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"}, test_server_);

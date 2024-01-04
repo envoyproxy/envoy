@@ -86,6 +86,8 @@ public:
   void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                         const quic::QuicSocketAddress& peer_address,
                         const quic::QuicReceivedPacket& packet) override;
+  std::vector<absl::string_view>::const_iterator
+  SelectAlpn(const std::vector<absl::string_view>& alpns) const override;
 
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

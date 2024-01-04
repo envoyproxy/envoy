@@ -112,7 +112,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 Network::DownstreamTransportSocketFactoryPtr
 createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool use_http3) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
+  ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context(), use_http3);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
