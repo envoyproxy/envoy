@@ -3,9 +3,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 def envoy_mobile_repositories():
     http_archive(
         name = "google_bazel_common",
-        sha256 = "d8c9586b24ce4a5513d972668f94b62eb7d705b92405d4bc102131f294751f1d",
-        strip_prefix = "bazel-common-413b433b91f26dbe39cdbc20f742ad6555dd1e27",
-        urls = ["https://github.com/google/bazel-common/archive/413b433b91f26dbe39cdbc20f742ad6555dd1e27.zip"],
+        sha256 = "0ba40405bc4cc095dd1ace08d145fe238798388f26c4ad0725e801b7e16e0f27",
+        strip_prefix = "bazel-common-d4ada735afa0ab044957cfa21849be577756a6cd",
+        urls = ["https://github.com/google/bazel-common/archive/d4ada735afa0ab044957cfa21849be577756a6cd.zip"],
     )
 
     upstream_envoy_overrides()
